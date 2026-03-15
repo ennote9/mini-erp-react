@@ -1,4 +1,5 @@
 import { useLocation } from "react-router-dom";
+import { SidebarTrigger } from "@/components/ui/sidebar";
 
 const PAGE_TITLES: Record<string, string> = {
   "/": "Dashboard",
@@ -33,8 +34,9 @@ export function PageTopBar() {
   const location = useLocation();
   const title = getPageTitle(location.pathname);
   return (
-    <header className="app-topbar">
-      <h1 className="app-topbar__title">{title}</h1>
+    <header className="app-topbar flex items-center gap-2">
+      <SidebarTrigger className="-ml-1 shrink-0" />
+      <h1 className="app-topbar__title min-w-0 flex-1 truncate">{title}</h1>
     </header>
   );
 }
