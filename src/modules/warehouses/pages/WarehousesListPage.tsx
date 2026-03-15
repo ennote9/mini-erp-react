@@ -7,6 +7,7 @@ import type { Warehouse } from "../model";
 import { ListPageLayout } from "../../../shared/ui/list/ListPageLayout";
 import { EmptyState } from "../../../shared/ui/feedback/EmptyState";
 import { AgGridContainer, agGridDefaultColDef } from "../../../shared/ui/ag-grid";
+import { Button } from "@/components/ui/button";
 
 type ActiveFilter = "all" | "active" | "inactive";
 
@@ -79,13 +80,13 @@ export function WarehousesListPage() {
   return (
     <ListPageLayout
       header={
-        <button
+        <Button
           type="button"
           className="list-page__primary-action"
           onClick={() => navigate("/warehouses/new")}
         >
           New
-        </button>
+        </Button>
       }
       controls={
         <>

@@ -11,6 +11,7 @@ import type { Supplier } from "../model";
 import { ListPageLayout } from "../../../shared/ui/list/ListPageLayout";
 import { EmptyState } from "../../../shared/ui/feedback/EmptyState";
 import { AgGridContainer, agGridDefaultColDef } from "../../../shared/ui/ag-grid";
+import { Button } from "@/components/ui/button";
 
 type ActiveFilter = "all" | "active" | "inactive";
 
@@ -95,13 +96,13 @@ export function SuppliersListPage() {
   return (
     <ListPageLayout
       header={
-        <button
+        <Button
           type="button"
           className="list-page__primary-action"
           onClick={() => navigate("/suppliers/new")}
         >
           New
-        </button>
+        </Button>
       }
       controls={
         <>

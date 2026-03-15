@@ -1,5 +1,7 @@
 import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { AgGridReact } from "ag-grid-react";
+import type { ColDef, ICellRendererParams } from "ag-grid-community";
 import { purchaseOrderRepository } from "../repository";
 import { supplierRepository } from "../../suppliers/repository";
 import { warehouseRepository } from "../../warehouses/repository";
@@ -9,6 +11,8 @@ import type { PlanningDocumentStatus } from "../../../shared/domain";
 import { ListPageLayout } from "../../../shared/ui/list/ListPageLayout";
 import { EmptyState } from "../../../shared/ui/feedback/EmptyState";
 import { StatusBadge } from "../../../shared/ui/feedback/StatusBadge";
+import { AgGridContainer, agGridDefaultColDef } from "../../../shared/ui/ag-grid";
+import { Button } from "@/components/ui/button";
 
 type StatusFilter = "all" | PlanningDocumentStatus;
 
@@ -33,6 +37,12 @@ function filterByStatus(
 ): RowData[] {
   if (statusFilter === "all") return rows;
   return rows.filter((r) => r.status === statusFilter);
+}
+
+function StatusCellRenderer(params: ICellRendererParams<RowData>) {
+  const status = params.value as string | undefined;
+  if (status == null) return null;
+  return <StatusBadge status={status} />;
 }
 
 export function PurchaseOrdersListPage() {
@@ -76,16 +86,49 @@ export function PurchaseOrdersListPage() {
     { value: "cancelled", label: "Cancelled" },
   ];
 
+  const columnDefs = useMemo<ColDef<RowData>[]>(
+    () => [
+      {
+        field: "number",
+        headerName: "Number",
+        width: 150,
+      },
+      {
+        field: "date",
+        headerName: "Date",
+        width: 140,
+        valueFormatter: (params) => normalizeDateForPO(params.value),
+      },
+      {
+        field: "supplierName",
+        headerName: "Supplier",
+        minWidth: 180,
+      },
+      {
+        field: "warehouseName",
+        headerName: "Warehouse",
+        minWidth: 160,
+      },
+      {
+        field: "status",
+        headerName: "Status",
+        width: 130,
+        cellRenderer: StatusCellRenderer,
+      },
+    ],
+    [],
+  );
+
   return (
     <ListPageLayout
       header={
-        <button
+        <Button
           type="button"
           className="list-page__primary-action"
           onClick={() => navigate("/purchase-orders/new")}
         >
           New
-        </button>
+        </Button>
       }
       controls={
         <>
@@ -122,70 +165,15 @@ export function PurchaseOrdersListPage() {
       {isEmpty ? (
         <EmptyState title={emptyTitle} hint={emptyHint} />
       ) : (
-        <table className="list-table">
-          <thead>
-            <tr>
-              <th className="list-table__cell list-table__cell--checkbox">
-                <input type="checkbox" aria-label="Select all" disabled />
-              </th>
-              <th className="list-table__cell list-table__cell--number">
-                Number
-              </th>
-              <th className="list-table__cell list-table__cell--date">Date</th>
-              <th className="list-table__cell list-table__cell--supplier">
-                Supplier
-              </th>
-              <th className="list-table__cell list-table__cell--warehouse">
-                Warehouse
-              </th>
-              <th className="list-table__cell list-table__cell--status">
-                Status
-              </th>
-            </tr>
-          </thead>
-          <tbody>
-            {filteredRows.map((row) => (
-              <tr
-                key={row.id}
-                className="list-table__row list-table__row--clickable"
-                onClick={() => navigate(`/purchase-orders/${row.id}`)}
-                role="button"
-                tabIndex={0}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" || e.key === " ") {
-                    e.preventDefault();
-                    navigate(`/purchase-orders/${row.id}`);
-                  }
-                }}
-              >
-                <td
-                  className="list-table__cell list-table__cell--checkbox"
-                  onClick={(e) => e.stopPropagation()}
-                >
-                  <input
-                    type="checkbox"
-                    aria-label={`Select ${row.number}`}
-                  />
-                </td>
-                <td className="list-table__cell list-table__cell--number">
-                  {row.number}
-                </td>
-                <td className="list-table__cell list-table__cell--date">
-                  {normalizeDateForPO(row.date)}
-                </td>
-                <td className="list-table__cell list-table__cell--supplier">
-                  {row.supplierName}
-                </td>
-                <td className="list-table__cell list-table__cell--warehouse">
-                  {row.warehouseName}
-                </td>
-                <td className="list-table__cell list-table__cell--status">
-                  <StatusBadge status={row.status} />
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+        <AgGridContainer themeClass="purchase-orders-grid">
+          <AgGridReact<RowData>
+            rowData={filteredRows}
+            columnDefs={columnDefs}
+            defaultColDef={agGridDefaultColDef}
+            getRowId={(params) => params.data.id}
+            onRowClicked={(e) => e.data && navigate(`/purchase-orders/${e.data.id}`)}
+          />
+        </AgGridContainer>
       )}
     </ListPageLayout>
   );
