@@ -1,5 +1,7 @@
 import { useParams, useNavigate } from "react-router-dom";
-import { useMemo, useState, useEffect } from "react";
+import { useMemo, useState, useEffect, useRef } from "react";
+import { AgGridReact } from "ag-grid-react";
+import type { ColDef, CellValueChangedEvent } from "ag-grid-community";
 import { purchaseOrderRepository } from "../repository";
 import { confirm, cancelDocument, createReceipt, saveDraft } from "../service";
 import { supplierRepository } from "../../suppliers/repository";
@@ -7,27 +9,101 @@ import { warehouseRepository } from "../../warehouses/repository";
 import { itemRepository } from "../../items/repository";
 import type { PurchaseOrderLine } from "../model";
 import { DocumentPageLayout } from "../../../shared/ui/object/DocumentPageLayout";
+import { BackButton } from "../../../shared/ui/list/BackButton";
 import { StatusBadge } from "../../../shared/ui/feedback/StatusBadge";
+import { AgGridContainer } from "../../../shared/ui/ag-grid/AgGridContainer";
+import { ItemSelectCellEditor } from "../../../shared/ui/ag-grid/ItemSelectCellEditor";
+import { agGridDefaultColDef } from "../../../shared/ui/ag-grid/agGridDefaults";
 import { todayYYYYMMDD, normalizeDateForPO } from "../dateUtils";
 
 type LineWithItem = PurchaseOrderLine & { itemName: string; uom: string };
+
+type LineFormRow = { itemId: string; qty: number; _lineId: number };
 
 type FormState = {
   date: string;
   supplierId: string;
   warehouseId: string;
   comment: string;
-  lines: Array<{ itemId: string; qty: number }>;
+  lines: LineFormRow[];
 };
 
-function defaultForm(): FormState {
+function defaultForm(nextLineId: number): FormState {
   return {
     date: todayYYYYMMDD(),
     supplierId: "",
     warehouseId: "",
     comment: "",
-    lines: [{ itemId: "", qty: 0 }],
+    lines: [{ itemId: "", qty: 0, _lineId: nextLineId }],
   };
+}
+
+function poLinesEditableColumnDefs(
+  activeItems: { id: string; code: string; name: string }[],
+  linesLength: number,
+  onRemove: (lineId: number) => void,
+): ColDef<LineFormRow>[] {
+  return [
+    {
+      field: "itemId",
+      headerName: "Item *",
+      flex: 1,
+      minWidth: 180,
+      editable: true,
+      valueFormatter: (p) => {
+        if (!p.value) return "";
+        const item = itemRepository.getById(p.value);
+        return item ? `${item.name} (${item.code})` : p.value;
+      },
+      cellEditor: ItemSelectCellEditor,
+      cellEditorParams: { items: activeItems },
+    },
+    {
+      field: "qty",
+      headerName: "Qty *",
+      width: 100,
+      editable: true,
+      type: "numericColumn",
+      cellEditor: "agNumberCellEditor",
+      cellEditorParams: { min: 0 },
+    },
+    {
+      headerName: "UOM",
+      width: 80,
+      valueGetter: (p) => {
+        const itemId = p.data?.itemId;
+        return itemId ? itemRepository.getById(itemId)?.uom ?? "—" : "—";
+      },
+    },
+    {
+      headerName: "",
+      width: 90,
+      sortable: false,
+      cellRenderer: (params: { data?: LineFormRow }) => {
+        if (!params.data) return null;
+        const lineId = params.data._lineId;
+        return (
+          <button
+            type="button"
+            className="doc-header__btn doc-header__btn--secondary"
+            disabled={linesLength <= 1}
+            onClick={() => onRemove(lineId)}
+            aria-label="Remove line"
+          >
+            Remove
+          </button>
+        );
+      },
+    },
+  ];
+}
+
+function poLinesReadOnlyColumnDefs(): ColDef<LineWithItem>[] {
+  return [
+    { field: "itemName", headerName: "Item", flex: 1, minWidth: 120 },
+    { field: "qty", headerName: "Qty", width: 100 },
+    { field: "uom", headerName: "UOM", width: 80 },
+  ];
 }
 
 export function PurchaseOrderPage() {
@@ -46,25 +122,33 @@ export function PurchaseOrderPage() {
     [id, isNew, refresh],
   );
 
-  const [form, setForm] = useState<FormState>(defaultForm);
+  const nextLineIdRef = useRef(0);
+  const [form, setForm] = useState<FormState>(() => defaultForm(0));
 
   useEffect(() => {
     if (isNew) {
-      setForm(defaultForm());
+      nextLineIdRef.current = 0;
+      setForm(defaultForm(0));
       setSaveError(null);
       return;
     }
     if (doc?.status === "draft" && id) {
       const draftLines = purchaseOrderRepository.listLines(id);
+      const linesWithId =
+        draftLines.length > 0
+          ? draftLines.map((l, idx) => ({
+              itemId: l.itemId,
+              qty: l.qty,
+              _lineId: idx,
+            }))
+          : [{ itemId: "", qty: 0, _lineId: 0 }];
+      nextLineIdRef.current = linesWithId.length;
       setForm({
         date: normalizeDateForPO(doc.date),
         supplierId: doc.supplierId,
         warehouseId: doc.warehouseId,
         comment: doc.comment ?? "",
-        lines:
-          draftLines.length > 0
-            ? draftLines.map((l) => ({ itemId: l.itemId, qty: l.qty }))
-            : [{ itemId: "", qty: 0 }],
+        lines: linesWithId,
       });
       setSaveError(null);
     }
@@ -133,9 +217,11 @@ export function PurchaseOrderPage() {
 
   const handleSave = () => {
     setSaveError(null);
-    const linesToSave = form.lines.filter(
-      (l) => l.itemId.trim() !== "" && typeof l.qty === "number" && l.qty > 0,
-    );
+    const linesToSave = form.lines
+      .filter(
+        (l) => l.itemId.trim() !== "" && typeof l.qty === "number" && l.qty > 0,
+      )
+      .map(({ itemId, qty }) => ({ itemId, qty }));
     const result = saveDraft(
       {
         date: normalizeDateForPO(form.date),
@@ -159,25 +245,27 @@ export function PurchaseOrderPage() {
   };
 
   const addLine = () => {
+    const id = nextLineIdRef.current++;
     setForm((f) => ({
       ...f,
-      lines: [...f.lines, { itemId: "", qty: 0 }],
+      lines: [...f.lines, { itemId: "", qty: 0, _lineId: id }],
     }));
   };
-  const removeLine = (index: number) => {
+  const removeLineByLineId = (lineId: number) => {
     setForm((f) => ({
       ...f,
-      lines: f.lines.filter((_, i) => i !== index),
+      lines: f.lines.filter((l) => l._lineId !== lineId),
     }));
   };
-  const updateLine = (
-    index: number,
-    patch: Partial<{ itemId: string; qty: number }>,
-  ) => {
+  const onLinesCellValueChanged = (e: CellValueChangedEvent<LineFormRow>) => {
+    if (!e.data || e.colDef.field == null) return;
+    const lineId = e.data._lineId;
+    const field = e.colDef.field as keyof LineFormRow;
+    const value = e.data[field];
     setForm((f) => ({
       ...f,
-      lines: f.lines.map((line, i) =>
-        i === index ? { ...line, ...patch } : line,
+      lines: f.lines.map((l) =>
+        l._lineId === lineId ? { ...l, [field]: value } : l,
       ),
     }));
   };
@@ -210,6 +298,7 @@ export function PurchaseOrderPage() {
   return (
     <DocumentPageLayout
       breadcrumbItems={breadcrumbItems}
+      breadcrumbPrefix={<BackButton to="/purchase-orders" aria-label="Back to Purchase Orders" />}
       header={
         <div className="doc-header">
           <div className="doc-header__title-row">
@@ -371,75 +460,20 @@ export function PurchaseOrderPage() {
                 Add line
               </button>
             </div>
-            <table className="list-table">
-              <thead>
-                <tr>
-                  <th className="list-table__cell list-table__cell--item">
-                    Item *
-                  </th>
-                  <th className="list-table__cell list-table__cell--qty">
-                    Qty *
-                  </th>
-                  <th className="list-table__cell list-table__cell--uom">
-                    UOM
-                  </th>
-                  <th className="list-table__cell list-table__cell--checkbox" />
-                </tr>
-              </thead>
-              <tbody>
-                {form.lines.map((line, index) => {
-                  const item = itemRepository.getById(line.itemId);
-                  return (
-                    <tr key={index} className="list-table__row">
-                      <td className="list-table__cell list-table__cell--item">
-                        <select
-                          className="doc-form__select doc-form__select--cell"
-                          value={line.itemId}
-                          onChange={(e) =>
-                            updateLine(index, { itemId: e.target.value })
-                          }
-                        >
-                          <option value="">Select item</option>
-                          {activeItems.map((i) => (
-                            <option key={i.id} value={i.id}>
-                              {i.name} ({i.code})
-                            </option>
-                          ))}
-                        </select>
-                      </td>
-                      <td className="list-table__cell list-table__cell--qty">
-                        <input
-                          type="number"
-                          min={0}
-                          step={1}
-                          className="doc-form__input doc-form__input--qty"
-                          value={line.qty || ""}
-                          onChange={(e) => {
-                            const v = e.target.value;
-                            const n = v === "" ? 0 : parseInt(v, 10);
-                            updateLine(index, { qty: isNaN(n) ? 0 : n });
-                          }}
-                        />
-                      </td>
-                      <td className="list-table__cell list-table__cell--uom">
-                        {item?.uom ?? "—"}
-                      </td>
-                      <td className="list-table__cell list-table__cell--checkbox">
-                        <button
-                          type="button"
-                          className="doc-header__btn doc-header__btn--secondary"
-                          disabled={form.lines.length <= 1}
-                          onClick={() => removeLine(index)}
-                          aria-label="Remove line"
-                        >
-                          Remove
-                        </button>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+            <div className="doc-lines__grid">
+              <AgGridContainer themeClass="doc-lines-grid">
+                <AgGridReact<LineFormRow>
+                  rowData={form.lines}
+                  columnDefs={poLinesEditableColumnDefs(activeItems, form.lines.length, removeLineByLineId)}
+                  defaultColDef={agGridDefaultColDef}
+                  getRowId={(p) => String(p.data._lineId)}
+                  onCellValueChanged={onLinesCellValueChanged}
+                  singleClickEdit
+                  stopEditingWhenCellsLoseFocus
+                  suppressRowClickSelection
+                />
+              </AgGridContainer>
+            </div>
           </div>
         </>
       ) : (
@@ -479,36 +513,17 @@ export function PurchaseOrderPage() {
             {linesWithItem.length === 0 ? (
               <p className="doc-lines__empty">No lines.</p>
             ) : (
-              <table className="list-table">
-                <thead>
-                  <tr>
-                    <th className="list-table__cell list-table__cell--item">
-                      Item
-                    </th>
-                    <th className="list-table__cell list-table__cell--qty">
-                      Qty
-                    </th>
-                    <th className="list-table__cell list-table__cell--uom">
-                      UOM
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {linesWithItem.map((line) => (
-                    <tr key={line.id} className="list-table__row">
-                      <td className="list-table__cell list-table__cell--item">
-                        {line.itemName}
-                      </td>
-                      <td className="list-table__cell list-table__cell--qty">
-                        {line.qty}
-                      </td>
-                      <td className="list-table__cell list-table__cell--uom">
-                        {line.uom}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+              <div className="doc-lines__grid">
+                <AgGridContainer themeClass="doc-lines-grid">
+                  <AgGridReact<LineWithItem>
+                    rowData={linesWithItem}
+                    columnDefs={poLinesReadOnlyColumnDefs()}
+                    defaultColDef={agGridDefaultColDef}
+                    getRowId={(p) => p.data.id}
+                    suppressRowClickSelection
+                  />
+                </AgGridContainer>
+              </div>
             )}
           </div>
         </>

@@ -3,6 +3,7 @@ import { useMemo, useState, useEffect } from "react";
 import { supplierRepository } from "../repository";
 import { saveSupplier } from "../service";
 import { Breadcrumb } from "../../../shared/ui/object/Breadcrumb";
+import { BackButton } from "../../../shared/ui/list/BackButton";
 
 type FormState = {
   code: string;
@@ -115,6 +116,7 @@ export function SupplierPage() {
   return (
     <div className="doc-page">
       <div className="doc-page__breadcrumb">
+        <BackButton to="/suppliers" aria-label="Back to Suppliers" />
         <Breadcrumb items={breadcrumbItems} />
       </div>
       <div className="doc-page__header">

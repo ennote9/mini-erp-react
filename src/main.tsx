@@ -1,3 +1,4 @@
+import "@fontsource-variable/geist";
 import "./globals.css";
 import { AllCommunityModule, ModuleRegistry } from "ag-grid-community";
 import React from "react";

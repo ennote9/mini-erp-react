@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import React, { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { AgGridReact } from "ag-grid-react";
 import type { ColDef, ICellRendererParams } from "ag-grid-community";
@@ -16,8 +16,13 @@ import {
   agGridRowNumberColDef,
   agGridCheckboxSelectionColDef,
 } from "../../../shared/ui/ag-grid";
+import { BackButton } from "../../../shared/ui/list/BackButton";
+import { ListPageSearch } from "../../../shared/ui/list/ListPageSearch";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import {
+  ButtonGroup,
+  ButtonGroupSeparator,
+} from "@/components/ui/button-group";
 
 type StatusFilter = "all" | FactualDocumentStatus;
 
@@ -126,35 +131,29 @@ export function ShipmentsListPage() {
       header={null}
       controls={
         <>
-          <Input
-            type="search"
-            className="list-page__search"
-            placeholder="Search by number or sales order"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            aria-label="Search shipments"
-          />
-          <div
-            className="list-page__filters"
-            role="group"
-            aria-label="Filter by status"
-          >
-            {statusOptions.map(({ value, label }) => (
-              <Button
-                key={value}
-                type="button"
-                variant="ghost"
-                size="sm"
-                className={
-                  "list-page__filter-chip" +
-                  (statusFilter === value ? " list-page__filter-chip--active" : "")
-                }
-                onClick={() => setStatusFilter(value)}
-              >
-                {label}
-              </Button>
+          <BackButton to="/" aria-label="Back to Dashboard" />
+          <ButtonGroup className="list-page__filter-group" aria-label="Filter by status">
+            {statusOptions.map(({ value, label }, index) => (
+              <React.Fragment key={value}>
+                {index > 0 && <ButtonGroupSeparator />}
+                <Button
+                  type="button"
+                  variant={statusFilter === value ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => setStatusFilter(value)}
+                >
+                  {label}
+                </Button>
+              </React.Fragment>
             ))}
-          </div>
+          </ButtonGroup>
+          <ListPageSearch
+            placeholder="Search"
+            value={searchQuery}
+            onChange={setSearchQuery}
+            aria-label="Search shipments"
+            resultCount={filteredRows.length}
+          />
         </>
       }
     >

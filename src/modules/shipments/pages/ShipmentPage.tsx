@@ -1,5 +1,7 @@
 import { useParams } from "react-router-dom";
 import { useMemo, useState } from "react";
+import { AgGridReact } from "ag-grid-react";
+import type { ColDef } from "ag-grid-community";
 import { shipmentRepository } from "../repository";
 import { post, cancelDocument } from "../service";
 import { salesOrderRepository } from "../../sales-orders/repository";
@@ -7,9 +9,20 @@ import { warehouseRepository } from "../../warehouses/repository";
 import { itemRepository } from "../../items/repository";
 import type { ShipmentLine } from "../model";
 import { DocumentPageLayout } from "../../../shared/ui/object/DocumentPageLayout";
+import { BackButton } from "../../../shared/ui/list/BackButton";
 import { StatusBadge } from "../../../shared/ui/feedback/StatusBadge";
+import { AgGridContainer } from "../../../shared/ui/ag-grid/AgGridContainer";
+import { agGridDefaultColDef } from "../../../shared/ui/ag-grid/agGridDefaults";
 
 type LineWithItem = ShipmentLine & { itemName: string; uom: string };
+
+function shipmentLinesColumnDefs(): ColDef<LineWithItem>[] {
+  return [
+    { field: "itemName", headerName: "Item", flex: 1, minWidth: 120 },
+    { field: "qty", headerName: "Qty", width: 100 },
+    { field: "uom", headerName: "UOM", width: 80 },
+  ];
+}
 
 export function ShipmentPage() {
   const { id } = useParams<{ id: string }>();
@@ -89,6 +102,7 @@ export function ShipmentPage() {
   return (
     <DocumentPageLayout
       breadcrumbItems={breadcrumbItems}
+      breadcrumbPrefix={<BackButton to="/shipments" aria-label="Back to Shipments" />}
       header={
         <div className="doc-header">
           <div className="doc-header__title-row">
@@ -165,32 +179,17 @@ export function ShipmentPage() {
         {linesWithItem.length === 0 ? (
           <p className="doc-lines__empty">No lines.</p>
         ) : (
-          <table className="list-table">
-            <thead>
-              <tr>
-                <th className="list-table__cell list-table__cell--item">
-                  Item
-                </th>
-                <th className="list-table__cell list-table__cell--qty">Qty</th>
-                <th className="list-table__cell list-table__cell--uom">UOM</th>
-              </tr>
-            </thead>
-            <tbody>
-              {linesWithItem.map((line) => (
-                <tr key={line.id} className="list-table__row">
-                  <td className="list-table__cell list-table__cell--item">
-                    {line.itemName}
-                  </td>
-                  <td className="list-table__cell list-table__cell--qty">
-                    {line.qty}
-                  </td>
-                  <td className="list-table__cell list-table__cell--uom">
-                    {line.uom}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+          <div className="doc-lines__grid">
+            <AgGridContainer themeClass="doc-lines-grid">
+              <AgGridReact<LineWithItem>
+                rowData={linesWithItem}
+                columnDefs={shipmentLinesColumnDefs()}
+                defaultColDef={agGridDefaultColDef}
+                getRowId={(p) => p.data.id}
+                suppressRowClickSelection
+              />
+            </AgGridContainer>
+          </div>
         )}
       </div>
     </DocumentPageLayout>

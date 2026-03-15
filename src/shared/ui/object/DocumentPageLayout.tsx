@@ -4,6 +4,8 @@ import { Breadcrumb } from "./Breadcrumb";
 
 type Props = {
   breadcrumbItems: BreadcrumbItem[];
+  /** Optional node before breadcrumb (e.g. Back button) */
+  breadcrumbPrefix?: ReactNode;
   /** Header: title + number, status badge, actions */
   header: ReactNode;
   /** Summary block: key-value fields */
@@ -17,15 +19,17 @@ type Props = {
  */
 export function DocumentPageLayout({
   breadcrumbItems,
+  breadcrumbPrefix,
   header,
   summary,
   children,
 }: Props) {
   return (
     <div className="doc-page">
-      {breadcrumbItems.length > 0 && (
+      {(breadcrumbItems.length > 0 || breadcrumbPrefix) && (
         <div className="doc-page__breadcrumb">
-          <Breadcrumb items={breadcrumbItems} />
+          {breadcrumbPrefix}
+          {breadcrumbItems.length > 0 && <Breadcrumb items={breadcrumbItems} />}
         </div>
       )}
       <div className="doc-page__header">{header}</div>

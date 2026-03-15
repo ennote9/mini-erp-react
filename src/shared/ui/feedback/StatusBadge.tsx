@@ -1,5 +1,3 @@
-import { Badge } from "@/components/ui/badge";
-
 type Props = {
   /** Internal status value (e.g. draft, confirmed, posted). */
   status: string;
@@ -18,16 +16,8 @@ function toDisplay(status: string): string {
 }
 
 /**
- * Badge for document status. Renders title-case label with status-based class.
+ * Document status as plain text (no badge/pill).
  */
 export function StatusBadge({ status }: Props) {
-  const display = toDisplay(status);
-  const variant = status.toLowerCase().replace(/\s+/g, "-");
-  return (
-    <Badge
-      className={`list-table__badge list-table__badge--status list-table__badge--${variant}`}
-    >
-      {display}
-    </Badge>
-  );
+  return <span>{toDisplay(status)}</span>;
 }

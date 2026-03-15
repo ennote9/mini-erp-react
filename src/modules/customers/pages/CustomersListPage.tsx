@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import React, { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { AgGridReact } from "ag-grid-react";
 import type { ColDef, ICellRendererParams } from "ag-grid-community";
@@ -12,8 +12,13 @@ import {
   agGridRowNumberColDef,
   agGridCheckboxSelectionColDef,
 } from "../../../shared/ui/ag-grid";
+import { BackButton } from "../../../shared/ui/list/BackButton";
+import { ListPageSearch } from "../../../shared/ui/list/ListPageSearch";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import {
+  ButtonGroup,
+  ButtonGroupSeparator,
+} from "@/components/ui/button-group";
 
 type ActiveFilter = "all" | "active" | "inactive";
 
@@ -95,50 +100,45 @@ export function CustomersListPage() {
 
   return (
     <ListPageLayout
-      header={
-        <Button
-          type="button"
-          className="list-page__primary-action"
-          onClick={() => navigate("/customers/new")}
-        >
-          New
-        </Button>
-      }
+      header={null}
       controls={
         <>
-          <Input
-            type="search"
-            className="list-page__search"
-            placeholder="Search by code or name"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            aria-label="Search customers"
-          />
-          <div
-            className="list-page__filters"
-            role="group"
-            aria-label="Filter by status"
-          >
-            {(["all", "active", "inactive"] as const).map((value) => (
-              <Button
-                key={value}
-                type="button"
-                variant="ghost"
-                size="sm"
-                className={
-                  "list-page__filter-chip" +
-                  (activeFilter === value ? " list-page__filter-chip--active" : "")
-                }
-                onClick={() => setActiveFilter(value)}
-              >
-                {value === "all"
-                  ? "All"
-                  : value === "active"
-                    ? "Active"
-                    : "Inactive"}
-              </Button>
+          <BackButton to="/" aria-label="Back to Dashboard" />
+          <ButtonGroup className="list-page__filter-group" aria-label="Filter by status">
+            {(["all", "active", "inactive"] as const).map((value, index) => (
+              <React.Fragment key={value}>
+                {index > 0 && <ButtonGroupSeparator />}
+                <Button
+                  type="button"
+                  variant={activeFilter === value ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => setActiveFilter(value)}
+                >
+                  {value === "all"
+                    ? "All"
+                    : value === "active"
+                      ? "Active"
+                      : "Inactive"}
+                </Button>
+              </React.Fragment>
             ))}
-          </div>
+          </ButtonGroup>
+          <ListPageSearch
+            placeholder="Search"
+            value={searchQuery}
+            onChange={setSearchQuery}
+            aria-label="Search customers"
+            resultCount={filteredRows.length}
+          />
+          <Button
+            type="button"
+            variant="default"
+            size="sm"
+            className="rounded-md bg-white text-black hover:bg-gray-200"
+            onClick={() => navigate("/customers/new")}
+          >
+            Create
+          </Button>
         </>
       }
     >

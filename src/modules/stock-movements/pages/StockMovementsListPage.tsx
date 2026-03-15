@@ -21,7 +21,8 @@ import {
   agGridRowNumberColDef,
   agGridCheckboxSelectionColDef,
 } from "../../../shared/ui/ag-grid";
-import { Input } from "@/components/ui/input";
+import { BackButton } from "../../../shared/ui/list/BackButton";
+import { ListPageSearch } from "../../../shared/ui/list/ListPageSearch";
 
 type RowData = StockMovement & {
   itemCode: string;
@@ -213,14 +214,16 @@ export function StockMovementsListPage() {
     <ListPageLayout
       header={null}
       controls={
-        <Input
-          type="search"
-          className="list-page__search"
-          placeholder="Search by item, warehouse or source document"
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          aria-label="Search stock movements"
-        />
+        <>
+          <BackButton to="/" aria-label="Back to Dashboard" />
+          <ListPageSearch
+            placeholder="Search"
+            value={searchQuery}
+            onChange={setSearchQuery}
+            aria-label="Search stock movements"
+            resultCount={filteredRows.length}
+          />
+        </>
       }
     >
       {isEmpty ? (
