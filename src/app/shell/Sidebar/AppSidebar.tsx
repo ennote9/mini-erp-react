@@ -98,13 +98,16 @@ export function AppSidebar() {
       <SidebarHeader>
         <SidebarMenu>
           <SidebarMenuItem>
-            <SidebarMenuButton size="lg" className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground">
-              <div className="flex aspect-square size-8 items-center justify-center rounded-lg bg-sidebar-primary text-sidebar-primary-foreground">
+            <SidebarMenuButton
+              size="lg"
+              className="rounded-lg hover:bg-sidebar-accent/80 data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
+            >
+              <div className="flex aspect-square size-9 items-center justify-center rounded-lg bg-sidebar-primary text-sidebar-primary-foreground shadow-sm ring-1 ring-sidebar-border/50">
                 <LayoutDashboard className="size-4" />
               </div>
-              <div className="grid flex-1 text-left text-sm leading-tight">
-                <span className="truncate font-semibold">Mini ERP</span>
-                <span className="truncate text-xs text-sidebar-foreground/80">Workspace</span>
+              <div className="grid min-w-0 flex-1 gap-0.5 text-left">
+                <span className="truncate text-sm font-semibold leading-tight text-sidebar-foreground">Mini ERP</span>
+                <span className="truncate text-xs leading-tight text-sidebar-foreground/70">Workspace</span>
               </div>
             </SidebarMenuButton>
           </SidebarMenuItem>
@@ -148,13 +151,16 @@ export function AppSidebar() {
       <SidebarFooter>
         <SidebarMenu>
           <SidebarMenuItem>
-            <SidebarMenuButton size="lg" className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground">
-              <div className="flex aspect-square size-8 items-center justify-center rounded-lg border border-sidebar-border bg-sidebar-accent/50 text-sidebar-foreground">
+            <SidebarMenuButton
+              size="lg"
+              className="rounded-lg border border-sidebar-border/80 bg-sidebar-accent/40 hover:bg-sidebar-accent/70 data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
+            >
+              <div className="flex aspect-square size-9 items-center justify-center rounded-lg border border-sidebar-border bg-sidebar/80 text-sidebar-foreground">
                 <User className="size-4" />
               </div>
-              <div className="grid flex-1 text-left text-sm leading-tight">
-                <span className="truncate font-medium">Account</span>
-                <span className="truncate text-xs text-sidebar-foreground/70">ERP</span>
+              <div className="grid min-w-0 flex-1 gap-0.5 text-left">
+                <span className="truncate text-sm font-medium leading-tight text-sidebar-foreground">Account</span>
+                <span className="truncate text-xs leading-tight text-sidebar-foreground/60">Signed in</span>
               </div>
             </SidebarMenuButton>
           </SidebarMenuItem>
