@@ -12,6 +12,7 @@ import type { StockBalance } from "../model";
 import { ListPageLayout } from "../../../shared/ui/list/ListPageLayout";
 import { EmptyState } from "../../../shared/ui/feedback/EmptyState";
 import { AgGridContainer, agGridDefaultColDef } from "../../../shared/ui/ag-grid";
+import { Input } from "@/components/ui/input";
 
 type RowData = StockBalance & {
   itemCode: string;
@@ -92,7 +93,7 @@ export function StockBalancesListPage() {
     <ListPageLayout
       header={null}
       controls={
-        <input
+        <Input
           type="search"
           className="list-page__search"
           placeholder="Search by item code, name or warehouse"

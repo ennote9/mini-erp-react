@@ -11,6 +11,8 @@ import { ListPageLayout } from "../../../shared/ui/list/ListPageLayout";
 import { EmptyState } from "../../../shared/ui/feedback/EmptyState";
 import { StatusBadge } from "../../../shared/ui/feedback/StatusBadge";
 import { AgGridContainer, agGridDefaultColDef } from "../../../shared/ui/ag-grid";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 
 type StatusFilter = "all" | FactualDocumentStatus;
 
@@ -117,7 +119,7 @@ export function ShipmentsListPage() {
       header={null}
       controls={
         <>
-          <input
+          <Input
             type="search"
             className="list-page__search"
             placeholder="Search by number or sales order"
@@ -131,9 +133,11 @@ export function ShipmentsListPage() {
             aria-label="Filter by status"
           >
             {statusOptions.map(({ value, label }) => (
-              <button
+              <Button
                 key={value}
                 type="button"
+                variant="ghost"
+                size="sm"
                 className={
                   "list-page__filter-chip" +
                   (statusFilter === value ? " list-page__filter-chip--active" : "")
@@ -141,7 +145,7 @@ export function ShipmentsListPage() {
                 onClick={() => setStatusFilter(value)}
               >
                 {label}
-              </button>
+              </Button>
             ))}
           </div>
         </>

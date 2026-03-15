@@ -1,21 +1,24 @@
 import { Outlet } from "react-router-dom";
-import { Sidebar } from "./Sidebar/Sidebar";
+import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
+import { AppSidebar } from "./Sidebar/AppSidebar";
 import { PageTopBar } from "./PageTopBar/PageTopBar";
 
 /**
- * App shell: sidebar (left) + main workspace (right).
+ * App shell: shadcn Sidebar (left) + main workspace (right).
  * Desktop-first. Page content renders via Outlet.
  */
 export function AppShell() {
   return (
-    <div className="app-shell">
-      <Sidebar />
-      <main className="app-workspace">
-        <PageTopBar />
-        <div className="app-page-content">
-          <Outlet />
+    <SidebarProvider>
+      <AppSidebar />
+      <SidebarInset>
+        <div className="app-workspace flex min-h-svh flex-1 flex-col">
+          <PageTopBar />
+          <div className="app-page-content">
+            <Outlet />
+          </div>
         </div>
-      </main>
-    </div>
+      </SidebarInset>
+    </SidebarProvider>
   );
 }

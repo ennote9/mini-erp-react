@@ -11,7 +11,9 @@ import type { Supplier } from "../model";
 import { ListPageLayout } from "../../../shared/ui/list/ListPageLayout";
 import { EmptyState } from "../../../shared/ui/feedback/EmptyState";
 import { AgGridContainer, agGridDefaultColDef } from "../../../shared/ui/ag-grid";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 
 type ActiveFilter = "all" | "active" | "inactive";
 
@@ -28,14 +30,14 @@ function ActiveBadgeCellRenderer(params: ICellRendererParams<Supplier>) {
   const isActive = params.value as boolean;
   const label = isActive ? "Active" : "Inactive";
   return (
-    <span
+    <Badge
       className={
         "list-table__badge" +
         (isActive ? " list-table__badge--active" : " list-table__badge--inactive")
       }
     >
       {label}
-    </span>
+    </Badge>
   );
 }
 
@@ -106,7 +108,7 @@ export function SuppliersListPage() {
       }
       controls={
         <>
-          <input
+          <Input
             type="search"
             className="list-page__search"
             placeholder="Search by code or name"
@@ -120,9 +122,11 @@ export function SuppliersListPage() {
             aria-label="Filter by status"
           >
             {(["all", "active", "inactive"] as const).map((value) => (
-              <button
+              <Button
                 key={value}
                 type="button"
+                variant="ghost"
+                size="sm"
                 className={
                   "list-page__filter-chip" +
                   (activeFilter === value ? " list-page__filter-chip--active" : "")
@@ -134,7 +138,7 @@ export function SuppliersListPage() {
                   : value === "active"
                     ? "Active"
                     : "Inactive"}
-              </button>
+              </Button>
             ))}
           </div>
         </>

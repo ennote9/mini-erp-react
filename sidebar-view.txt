@@ -1,0 +1,741 @@
+﻿node.exe : - Resolving items.
+строка:1 знак:1
++ & "C:\Program Files\nodejs/node.exe" "C:\Program Files\nodejs/node_mo ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (- Resolving items.:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+тФМ shadcn add sidebar (dry run)
+тФВ
+тФЬ src\components\ui\sidebar.tsx (create) 727 lines
+тФВ тФМтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФА
+тФВ тФВ "use client"
+тФВ тФВ 
+тФВ тФВ import * as React from "react"
+тФВ тФВ import { cva, type VariantProps } from "class-variance-authority"
+тФВ тФВ import { PanelLeftIcon } from "lucide-react"
+тФВ тФВ import { Slot } from "radix-ui"
+тФВ тФВ 
+тФВ тФВ import { useIsMobile } from "@/hooks/use-mobile"
+тФВ тФВ import { cn } from "@/lib/utils"
+тФВ тФВ import { Button } from "@/components/ui/button"
+тФВ тФВ import { Input } from "@/components/ui/input"
+тФВ тФВ import { Separator } from "@/components/ui/separator"
+тФВ тФВ import {
+тФВ тФВ   Sheet,
+тФВ тФВ   SheetContent,
+тФВ тФВ   SheetDescription,
+тФВ тФВ   SheetHeader,
+тФВ тФВ   SheetTitle,
+тФВ тФВ } from "@/components/ui/sheet"
+тФВ тФВ import { Skeleton } from "@/components/ui/skeleton"
+тФВ тФВ import {
+тФВ тФВ   Tooltip,
+тФВ тФВ   TooltipContent,
+тФВ тФВ   TooltipProvider,
+тФВ тФВ   TooltipTrigger,
+тФВ тФВ } from "@/components/ui/tooltip"
+тФВ тФВ 
+тФВ тФВ const SIDEBAR_COOKIE_NAME = "sidebar_state"
+тФВ тФВ const SIDEBAR_COOKIE_MAX_AGE = 60 * 60 * 24 * 7
+тФВ тФВ const SIDEBAR_WIDTH = "16rem"
+тФВ тФВ const SIDEBAR_WIDTH_MOBILE = "18rem"
+тФВ тФВ const SIDEBAR_WIDTH_ICON = "3rem"
+тФВ тФВ const SIDEBAR_KEYBOARD_SHORTCUT = "b"
+тФВ тФВ 
+тФВ тФВ type SidebarContextProps = {
+тФВ тФВ   state: "expanded" | "collapsed"
+тФВ тФВ   open: boolean
+тФВ тФВ   setOpen: (open: boolean) => void
+тФВ тФВ   openMobile: boolean
+тФВ тФВ   setOpenMobile: (open: boolean) => void
+тФВ тФВ   isMobile: boolean
+тФВ тФВ   toggleSidebar: () => void
+тФВ тФВ }
+тФВ тФВ 
+тФВ тФВ const SidebarContext = React.createContext<SidebarContextProps | null>(null)
+тФВ тФВ 
+тФВ тФВ function useSidebar() {
+тФВ тФВ   const context = React.useContext(SidebarContext)
+тФВ тФВ   if (!context) {
+тФВ тФВ     throw new Error("useSidebar must be used within a SidebarProvider.")
+тФВ тФВ   }
+тФВ тФВ 
+тФВ тФВ   return context
+тФВ тФВ }
+тФВ тФВ 
+тФВ тФВ function SidebarProvider({
+тФВ тФВ   defaultOpen = true,
+тФВ тФВ   open: openProp,
+тФВ тФВ   onOpenChange: setOpenProp,
+тФВ тФВ   className,
+тФВ тФВ   style,
+тФВ тФВ   children,
+тФВ тФВ   ...props
+тФВ тФВ }: React.ComponentProps<"div"> & {
+тФВ тФВ   defaultOpen?: boolean
+тФВ тФВ   open?: boolean
+тФВ тФВ   onOpenChange?: (open: boolean) => void
+тФВ тФВ }) {
+тФВ тФВ   const isMobile = useIsMobile()
+тФВ тФВ   const [openMobile, setOpenMobile] = React.useState(false)
+тФВ тФВ 
+тФВ тФВ   // This is the internal state of the sidebar.
+тФВ тФВ   // We use openProp and setOpenProp for control from outside the component.
+тФВ тФВ   const [_open, _setOpen] = React.useState(defaultOpen)
+тФВ тФВ   const open = openProp ?? _open
+тФВ тФВ   const setOpen = React.useCallback(
+тФВ тФВ     (value: boolean | ((value: boolean) => boolean)) => {
+тФВ тФВ       const openState = typeof value === "function" ? value(open) : value
+тФВ тФВ       if (setOpenProp) {
+тФВ тФВ         setOpenProp(openState)
+тФВ тФВ       } else {
+тФВ тФВ         _setOpen(openState)
+тФВ тФВ       }
+тФВ тФВ 
+тФВ тФВ       // This sets the cookie to keep the sidebar state.
+тФВ тФВ       document.cookie = `${SIDEBAR_COOKIE_NAME}=${openState}; path=/; max-age=${SIDEBAR_COOKIE_MAX_AGE}`
+тФВ тФВ     },
+тФВ тФВ     [setOpenProp, open]
+тФВ тФВ   )
+тФВ тФВ 
+тФВ тФВ   // Helper to toggle the sidebar.
+тФВ тФВ   const toggleSidebar = React.useCallback(() => {
+тФВ тФВ     return isMobile ? setOpenMobile((open) => !open) : setOpen((open) => !open)
+тФВ тФВ   }, [isMobile, setOpen, setOpenMobile])
+тФВ тФВ 
+тФВ тФВ   // Adds a keyboard shortcut to toggle the sidebar.
+тФВ тФВ   React.useEffect(() => {
+тФВ тФВ     const handleKeyDown = (event: KeyboardEvent) => {
+тФВ тФВ       if (
+тФВ тФВ         event.key === SIDEBAR_KEYBOARD_SHORTCUT &&
+тФВ тФВ         (event.metaKey || event.ctrlKey)
+тФВ тФВ       ) {
+тФВ тФВ         event.preventDefault()
+тФВ тФВ         toggleSidebar()
+тФВ тФВ       }
+тФВ тФВ     }
+тФВ тФВ 
+тФВ тФВ     window.addEventListener("keydown", handleKeyDown)
+тФВ тФВ     return () => window.removeEventListener("keydown", handleKeyDown)
+тФВ тФВ   }, [toggleSidebar])
+тФВ тФВ 
+тФВ тФВ   // We add a state so that we can do data-state="expanded" or "collapsed".
+тФВ тФВ   // This makes it easier to style the sidebar with Tailwind classes.
+тФВ тФВ   const state = open ? "expanded" : "collapsed"
+тФВ тФВ 
+тФВ тФВ   const contextValue = React.useMemo<SidebarContextProps>(
+тФВ тФВ     () => ({
+тФВ тФВ       state,
+тФВ тФВ       open,
+тФВ тФВ       setOpen,
+тФВ тФВ       isMobile,
+тФВ тФВ       openMobile,
+тФВ тФВ       setOpenMobile,
+тФВ тФВ       toggleSidebar,
+тФВ тФВ     }),
+тФВ тФВ     [state, open, setOpen, isMobile, openMobile, setOpenMobile, toggleSidebar]
+тФВ тФВ   )
+тФВ тФВ 
+тФВ тФВ   return (
+тФВ тФВ     <SidebarContext.Provider value={contextValue}>
+тФВ тФВ       <TooltipProvider delayDuration={0}>
+тФВ тФВ         <div
+тФВ тФВ           data-slot="sidebar-wrapper"
+тФВ тФВ           style={
+тФВ тФВ             {
+тФВ тФВ               "--sidebar-width": SIDEBAR_WIDTH,
+тФВ тФВ               "--sidebar-width-icon": SIDEBAR_WIDTH_ICON,
+тФВ тФВ               ...style,
+тФВ тФВ             } as React.CSSProperties
+тФВ тФВ           }
+тФВ тФВ           className={cn(
+тФВ тФВ             "group/sidebar-wrapper flex min-h-svh w-full has-data-[variant=inset]:bg-sidebar",
+тФВ тФВ             className
+тФВ тФВ           )}
+тФВ тФВ           {...props}
+тФВ тФВ         >
+тФВ тФВ           {children}
+тФВ тФВ         </div>
+тФВ тФВ       </TooltipProvider>
+тФВ тФВ     </SidebarContext.Provider>
+тФВ тФВ   )
+тФВ тФВ }
+тФВ тФВ 
+тФВ тФВ function Sidebar({
+тФВ тФВ   side = "left",
+тФВ тФВ   variant = "sidebar",
+тФВ тФВ   collapsible = "offcanvas",
+тФВ тФВ   className,
+тФВ тФВ   children,
+тФВ тФВ   ...props
+тФВ тФВ }: React.ComponentProps<"div"> & {
+тФВ тФВ   side?: "left" | "right"
+тФВ тФВ   variant?: "sidebar" | "floating" | "inset"
+тФВ тФВ   collapsible?: "offcanvas" | "icon" | "none"
+тФВ тФВ }) {
+тФВ тФВ   const { isMobile, state, openMobile, setOpenMobile } = useSidebar()
+тФВ тФВ 
+тФВ тФВ   if (collapsible === "none") {
+тФВ тФВ     return (
+тФВ тФВ       <div
+тФВ тФВ         data-slot="sidebar"
+тФВ тФВ         className={cn(
+тФВ тФВ           "flex h-full w-(--sidebar-width) flex-col bg-sidebar text-sidebar-foreground",
+тФВ тФВ           className
+тФВ тФВ         )}
+тФВ тФВ         {...props}
+тФВ тФВ       >
+тФВ тФВ         {children}
+тФВ тФВ       </div>
+тФВ тФВ     )
+тФВ тФВ   }
+тФВ тФВ 
+тФВ тФВ   if (isMobile) {
+тФВ тФВ     return (
+тФВ тФВ       <Sheet open={openMobile} onOpenChange={setOpenMobile} {...props}>
+тФВ тФВ         <SheetContent
+тФВ тФВ           data-sidebar="sidebar"
+тФВ тФВ           data-slot="sidebar"
+тФВ тФВ           data-mobile="true"
+тФВ тФВ           className="w-(--sidebar-width) bg-sidebar p-0 text-sidebar-foreground [&>button]:hidden"
+тФВ тФВ           style={
+тФВ тФВ             {
+тФВ тФВ               "--sidebar-width": SIDEBAR_WIDTH_MOBILE,
+тФВ тФВ             } as React.CSSProperties
+тФВ тФВ           }
+тФВ тФВ           side={side}
+тФВ тФВ         >
+тФВ тФВ           <SheetHeader className="sr-only">
+тФВ тФВ             <SheetTitle>Sidebar</SheetTitle>
+тФВ тФВ             <SheetDescription>Displays the mobile sidebar.</SheetDescription>
+тФВ тФВ           </SheetHeader>
+тФВ тФВ           <div className="flex h-full w-full flex-col">{children}</div>
+тФВ тФВ         </SheetContent>
+тФВ тФВ       </Sheet>
+тФВ тФВ     )
+тФВ тФВ   }
+тФВ тФВ 
+тФВ тФВ   return (
+тФВ тФВ     <div
+тФВ тФВ       className="group peer hidden text-sidebar-foreground md:block"
+тФВ тФВ       data-state={state}
+тФВ тФВ       data-collapsible={state === "collapsed" ? collapsible : ""}
+тФВ тФВ       data-variant={variant}
+тФВ тФВ       data-side={side}
+тФВ тФВ       data-slot="sidebar"
+тФВ тФВ     >
+тФВ тФВ       {/* This is what handles the sidebar gap on desktop */}
+тФВ тФВ       <div
+тФВ тФВ         data-slot="sidebar-gap"
+тФВ тФВ         className={cn(
+тФВ тФВ           "relative w-(--sidebar-width) bg-transparent transition-[width] duration-200 ease-linear",
+тФВ тФВ           "group-data-[collapsible=offcanvas]:w-0",
+тФВ тФВ           "group-data-[side=right]:rotate-180",
+тФВ тФВ           variant === "floating" || variant === "inset"
+тФВ тФВ             ? "group-data-[collapsible=icon]:w-[calc(var(--sidebar-width-icon)+(--spacing(4)))]"
+тФВ тФВ             : "group-data-[collapsible=icon]:w-(--sidebar-width-icon)"
+тФВ тФВ         )}
+тФВ тФВ       />
+тФВ тФВ       <div
+тФВ тФВ         data-slot="sidebar-container"
+тФВ тФВ         className={cn(
+тФВ тФВ           "fixed inset-y-0 z-10 hidden h-svh w-(--sidebar-width) transition-[left,right,width] duration-200 ease-linear md:flex",
+тФВ тФВ           side === "left"
+тФВ тФВ             ? "left-0 group-data-[collapsible=offcanvas]:left-[calc(var(--sidebar-width)*-1)]"
+тФВ тФВ             : "right-0 group-data-[collapsible=offcanvas]:right-[calc(var(--sidebar-width)*-1)]",
+тФВ тФВ           // Adjust the padding for floating and inset variants.
+тФВ тФВ           variant === "floating" || variant === "inset"
+тФВ тФВ             ? "p-2 group-data-[collapsible=icon]:w-[calc(var(--sidebar-width-icon)+(--spacing(4))+2px)]"
+тФВ тФВ             : "group-data-[collapsible=icon]:w-(--sidebar-width-icon) group-data-[side=left]:border-r group-data-[side=right]:border-l",
+тФВ тФВ           className
+тФВ тФВ         )}
+тФВ тФВ         {...props}
+тФВ тФВ       >
+тФВ тФВ         <div
+тФВ тФВ           data-sidebar="sidebar"
+тФВ тФВ           data-slot="sidebar-inner"
+тФВ тФВ           className="flex h-full w-full flex-col bg-sidebar group-data-[variant=floating]:rounded-lg group-data-[variant=floating]:border group-data-[variant=floating]:border-sidebar-border group-data-[variant=floating]:shadow-sm"
+тФВ тФВ         >
+тФВ тФВ           {children}
+тФВ тФВ         </div>
+тФВ тФВ       </div>
+тФВ тФВ     </div>
+тФВ тФВ   )
+тФВ тФВ }
+тФВ тФВ 
+тФВ тФВ function SidebarTrigger({
+тФВ тФВ   className,
+тФВ тФВ   onClick,
+тФВ тФВ   ...props
+тФВ тФВ }: React.ComponentProps<typeof Button>) {
+тФВ тФВ   const { toggleSidebar } = useSidebar()
+тФВ тФВ 
+тФВ тФВ   return (
+тФВ тФВ     <Button
+тФВ тФВ       data-sidebar="trigger"
+тФВ тФВ       data-slot="sidebar-trigger"
+тФВ тФВ       variant="ghost"
+тФВ тФВ       size="icon"
+тФВ тФВ       className={cn("size-7", className)}
+тФВ тФВ       onClick={(event) => {
+тФВ тФВ         onClick?.(event)
+тФВ тФВ         toggleSidebar()
+тФВ тФВ       }}
+тФВ тФВ       {...props}
+тФВ тФВ     >
+тФВ тФВ       <PanelLeftIcon />
+тФВ тФВ       <span className="sr-only">Toggle Sidebar</span>
+тФВ тФВ     </Button>
+тФВ тФВ   )
+тФВ тФВ }
+тФВ тФВ 
+тФВ тФВ function SidebarRail({ className, ...props }: React.ComponentProps<"button">) {
+тФВ тФВ   const { toggleSidebar } = useSidebar()
+тФВ тФВ 
+тФВ тФВ   return (
+тФВ тФВ     <button
+тФВ тФВ       data-sidebar="rail"
+тФВ тФВ       data-slot="sidebar-rail"
+тФВ тФВ       aria-label="Toggle Sidebar"
+тФВ тФВ       tabIndex={-1}
+тФВ тФВ       onClick={toggleSidebar}
+тФВ тФВ       title="Toggle Sidebar"
+тФВ тФВ       className={cn(
+тФВ тФВ         "absolute inset-y-0 z-20 hidden w-4 -translate-x-1/2 transition-all ease-linear group-data-[side=left]:-right-4 group-data-[side=right]:left-0 after:absolute after:inset-y-0 after:left-1/2 after:w-[2px] hover:after:bg-sidebar-border sm:flex",
+тФВ тФВ         "in-data-[side=left]:cursor-w-resize in-data-[side=right]:cursor-e-resize",
+тФВ тФВ         "[[data-side=left][data-state=collapsed]_&]:cursor-e-resize [[data-side=right][data-state=collapsed]_&]:cursor-w-resize",
+тФВ тФВ         "group-data-[collapsible=offcanvas]:translate-x-0 group-data-[collapsible=offcanvas]:after:left-full hover:group-data-[collapsible=offcanvas]:bg-sidebar",
+тФВ тФВ         "[[data-side=left][data-collapsible=offcanvas]_&]:-right-2",
+тФВ тФВ         "[[data-side=right][data-collapsible=offcanvas]_&]:-left-2",
+тФВ тФВ         className
+тФВ тФВ       )}
+тФВ тФВ       {...props}
+тФВ тФВ     />
+тФВ тФВ   )
+тФВ тФВ }
+тФВ тФВ 
+тФВ тФВ function SidebarInset({ className, ...props }: React.ComponentProps<"main">) {
+тФВ тФВ   return (
+тФВ тФВ     <main
+тФВ тФВ       data-slot="sidebar-inset"
+тФВ тФВ       className={cn(
+тФВ тФВ         "relative flex w-full flex-1 flex-col bg-background",
+тФВ тФВ         "md:peer-data-[variant=inset]:m-2 md:peer-data-[variant=inset]:ml-0 md:peer-data-[variant=inset]:rounded-xl md:peer-data-[variant=inset]:shadow-sm md:peer-data-[variant=inset]:peer-data-[state=collapsed]:ml-2",
+тФВ тФВ         className
+тФВ тФВ       )}
+тФВ тФВ       {...props}
+тФВ тФВ     />
+тФВ тФВ   )
+тФВ тФВ }
+тФВ тФВ 
+тФВ тФВ function SidebarInput({
+тФВ тФВ   className,
+тФВ тФВ   ...props
+тФВ тФВ }: React.ComponentProps<typeof Input>) {
+тФВ тФВ   return (
+тФВ тФВ     <Input
+тФВ тФВ       data-slot="sidebar-input"
+тФВ тФВ       data-sidebar="input"
+тФВ тФВ       className={cn("h-8 w-full bg-background shadow-none", className)}
+тФВ тФВ       {...props}
+тФВ тФВ     />
+тФВ тФВ   )
+тФВ тФВ }
+тФВ тФВ 
+тФВ тФВ function SidebarHeader({ className, ...props }: React.ComponentProps<"div">) {
+тФВ тФВ   return (
+тФВ тФВ     <div
+тФВ тФВ       data-slot="sidebar-header"
+тФВ тФВ       data-sidebar="header"
+тФВ тФВ       className={cn("flex flex-col gap-2 p-2", className)}
+тФВ тФВ       {...props}
+тФВ тФВ     />
+тФВ тФВ   )
+тФВ тФВ }
+тФВ тФВ 
+тФВ тФВ function SidebarFooter({ className, ...props }: React.ComponentProps<"div">) {
+тФВ тФВ   return (
+тФВ тФВ     <div
+тФВ тФВ       data-slot="sidebar-footer"
+тФВ тФВ       data-sidebar="footer"
+тФВ тФВ       className={cn("flex flex-col gap-2 p-2", className)}
+тФВ тФВ       {...props}
+тФВ тФВ     />
+тФВ тФВ   )
+тФВ тФВ }
+тФВ тФВ 
+тФВ тФВ function SidebarSeparator({
+тФВ тФВ   className,
+тФВ тФВ   ...props
+тФВ тФВ }: React.ComponentProps<typeof Separator>) {
+тФВ тФВ   return (
+тФВ тФВ     <Separator
+тФВ тФВ       data-slot="sidebar-separator"
+тФВ тФВ       data-sidebar="separator"
+тФВ тФВ       className={cn("mx-2 w-auto bg-sidebar-border", className)}
+тФВ тФВ       {...props}
+тФВ тФВ     />
+тФВ тФВ   )
+тФВ тФВ }
+тФВ тФВ 
+тФВ тФВ function SidebarContent({ className, ...props }: React.ComponentProps<"div">) {
+тФВ тФВ   return (
+тФВ тФВ     <div
+тФВ тФВ       data-slot="sidebar-content"
+тФВ тФВ       data-sidebar="content"
+тФВ тФВ       className={cn(
+тФВ тФВ         "flex min-h-0 flex-1 flex-col gap-2 overflow-auto group-data-[collapsible=icon]:overflow-hidden",
+тФВ тФВ         className
+тФВ тФВ       )}
+тФВ тФВ       {...props}
+тФВ тФВ     />
+тФВ тФВ   )
+тФВ тФВ }
+тФВ тФВ 
+тФВ тФВ function SidebarGroup({ className, ...props }: React.ComponentProps<"div">) {
+тФВ тФВ   return (
+тФВ тФВ     <div
+тФВ тФВ       data-slot="sidebar-group"
+тФВ тФВ       data-sidebar="group"
+тФВ тФВ       className={cn("relative flex w-full min-w-0 flex-col p-2", className)}
+тФВ тФВ       {...props}
+тФВ тФВ     />
+тФВ тФВ   )
+тФВ тФВ }
+тФВ тФВ 
+тФВ тФВ function SidebarGroupLabel({
+тФВ тФВ   className,
+тФВ тФВ   asChild = false,
+тФВ тФВ   ...props
+тФВ тФВ }: React.ComponentProps<"div"> & { asChild?: boolean }) {
+тФВ тФВ   const Comp = asChild ? Slot.Root : "div"
+тФВ тФВ 
+тФВ тФВ   return (
+тФВ тФВ     <Comp
+тФВ тФВ       data-slot="sidebar-group-label"
+тФВ тФВ       data-sidebar="group-label"
+тФВ тФВ       className={cn(
+тФВ тФВ         "flex h-8 shrink-0 items-center rounded-md px-2 text-xs font-medium text-sidebar-foreground/70 ring-sidebar-ring outline-hidden transition-[margin,opacity] duration-200 ease-linear focus-visible:ring-2 [&>svg]:size-4 [&>svg]:shrink-0",
+тФВ тФВ         "group-data-[collapsible=icon]:-mt-8 group-data-[collapsible=icon]:opacity-0",
+тФВ тФВ         className
+тФВ тФВ       )}
+тФВ тФВ       {...props}
+тФВ тФВ     />
+тФВ тФВ   )
+тФВ тФВ }
+тФВ тФВ 
+тФВ тФВ function SidebarGroupAction({
+тФВ тФВ   className,
+тФВ тФВ   asChild = false,
+тФВ тФВ   ...props
+тФВ тФВ }: React.ComponentProps<"button"> & { asChild?: boolean }) {
+тФВ тФВ   const Comp = asChild ? Slot.Root : "button"
+тФВ тФВ 
+тФВ тФВ   return (
+тФВ тФВ     <Comp
+тФВ тФВ       data-slot="sidebar-group-action"
+тФВ тФВ       data-sidebar="group-action"
+тФВ тФВ       className={cn(
+тФВ тФВ         "absolute top-3.5 right-3 flex aspect-square w-5 items-center justify-center rounded-md p-0 text-sidebar-foreground ring-sidebar-ring outline-hidden transition-transform hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:ring-2 [&>svg]:size-4 [&>svg]:shrink-0",
+тФВ тФВ         // Increases the hit area of the button on mobile.
+тФВ тФВ         "after:absolute after:-inset-2 md:after:hidden",
+тФВ тФВ         "group-data-[collapsible=icon]:hidden",
+тФВ тФВ         className
+тФВ тФВ       )}
+тФВ тФВ       {...props}
+тФВ тФВ     />
+тФВ тФВ   )
+тФВ тФВ }
+тФВ тФВ 
+тФВ тФВ function SidebarGroupContent({
+тФВ тФВ   className,
+тФВ тФВ   ...props
+тФВ тФВ }: React.ComponentProps<"div">) {
+тФВ тФВ   return (
+тФВ тФВ     <div
+тФВ тФВ       data-slot="sidebar-group-content"
+тФВ тФВ       data-sidebar="group-content"
+тФВ тФВ       className={cn("w-full text-sm", className)}
+тФВ тФВ       {...props}
+тФВ тФВ     />
+тФВ тФВ   )
+тФВ тФВ }
+тФВ тФВ 
+тФВ тФВ function SidebarMenu({ className, ...props }: React.ComponentProps<"ul">) {
+тФВ тФВ   return (
+тФВ тФВ     <ul
+тФВ тФВ       data-slot="sidebar-menu"
+тФВ тФВ       data-sidebar="menu"
+тФВ тФВ       className={cn("flex w-full min-w-0 flex-col gap-1", className)}
+тФВ тФВ       {...props}
+тФВ тФВ     />
+тФВ тФВ   )
+тФВ тФВ }
+тФВ тФВ 
+тФВ тФВ function SidebarMenuItem({ className, ...props }: React.ComponentProps<"li">) {
+тФВ тФВ   return (
+тФВ тФВ     <li
+тФВ тФВ       data-slot="sidebar-menu-item"
+тФВ тФВ       data-sidebar="menu-item"
+тФВ тФВ       className={cn("group/menu-item relative", className)}
+тФВ тФВ       {...props}
+тФВ тФВ     />
+тФВ тФВ   )
+тФВ тФВ }
+тФВ тФВ 
+тФВ тФВ const sidebarMenuButtonVariants = cva(
+тФВ тФВ   "peer/menu-button flex w-full items-center gap-2 overflow-hidden rounded-md p-2 text-left text-sm ring-sidebar-ring outline-hidden transition-[width,height,padding] group-has-data-[sidebar=menu-action]/menu-item:pr-8 group-data-[collapsible=icon]:size-8! group-data-[collapsible=icon]:p-2! hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:ring-2 active:bg-sidebar-accent active:text-sidebar-accent-foreground disabled:pointer-events-none disabled:opacity-50 aria-disabled:pointer-events-none aria-disabled:opacity-50 data-[active=true]:bg-sidebar-accent data-[active=true]:font-medium data-[active=true]:text-sidebar-accent-foreground data-[state=open]:hover:bg-sidebar-accent data-[state=open]:hover:text-sidebar-accent-foreground [&>span:last-child]:truncate [&>svg]:size-4 [&>svg]:shrink-0",
+тФВ тФВ   {
+тФВ тФВ     variants: {
+тФВ тФВ       variant: {
+тФВ тФВ         default: "hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
+тФВ тФВ         outline:
+тФВ тФВ           "bg-background shadow-[0_0_0_1px_hsl(var(--sidebar-border))] hover:bg-sidebar-accent hover:text-sidebar-accent-foreground hover:shadow-[0_0_0_1px_hsl(var(--sidebar-accent))]",
+тФВ тФВ       },
+тФВ тФВ       size: {
+тФВ тФВ         default: "h-8 text-sm",
+тФВ тФВ         sm: "h-7 text-xs",
+тФВ тФВ         lg: "h-12 text-sm group-data-[collapsible=icon]:p-0!",
+тФВ тФВ       },
+тФВ тФВ     },
+тФВ тФВ     defaultVariants: {
+тФВ тФВ       variant: "default",
+тФВ тФВ       size: "default",
+тФВ тФВ     },
+тФВ тФВ   }
+тФВ тФВ )
+тФВ тФВ 
+тФВ тФВ function SidebarMenuButton({
+тФВ тФВ   asChild = false,
+тФВ тФВ   isActive = false,
+тФВ тФВ   variant = "default",
+тФВ тФВ   size = "default",
+тФВ тФВ   tooltip,
+тФВ тФВ   className,
+тФВ тФВ   ...props
+тФВ тФВ }: React.ComponentProps<"button"> & {
+тФВ тФВ   asChild?: boolean
+тФВ тФВ   isActive?: boolean
+тФВ тФВ   tooltip?: string | React.ComponentProps<typeof TooltipContent>
+тФВ тФВ } & VariantProps<typeof sidebarMenuButtonVariants>) {
+тФВ тФВ   const Comp = asChild ? Slot.Root : "button"
+тФВ тФВ   const { isMobile, state } = useSidebar()
+тФВ тФВ 
+тФВ тФВ   const button = (
+тФВ тФВ     <Comp
+тФВ тФВ       data-slot="sidebar-menu-button"
+тФВ тФВ       data-sidebar="menu-button"
+тФВ тФВ       data-size={size}
+тФВ тФВ       data-active={isActive}
+тФВ тФВ       className={cn(sidebarMenuButtonVariants({ variant, size }), className)}
+тФВ тФВ       {...props}
+тФВ тФВ     />
+тФВ тФВ   )
+тФВ тФВ 
+тФВ тФВ   if (!tooltip) {
+тФВ тФВ     return button
+тФВ тФВ   }
+тФВ тФВ 
+тФВ тФВ   if (typeof tooltip === "string") {
+тФВ тФВ     tooltip = {
+тФВ тФВ       children: tooltip,
+тФВ тФВ     }
+тФВ тФВ   }
+тФВ тФВ 
+тФВ тФВ   return (
+тФВ тФВ     <Tooltip>
+тФВ тФВ       <TooltipTrigger asChild>{button}</TooltipTrigger>
+тФВ тФВ       <TooltipContent
+тФВ тФВ         side="right"
+тФВ тФВ         align="center"
+тФВ тФВ         hidden={state !== "collapsed" || isMobile}
+тФВ тФВ         {...tooltip}
+тФВ тФВ       />
+тФВ тФВ     </Tooltip>
+тФВ тФВ   )
+тФВ тФВ }
+тФВ тФВ 
+тФВ тФВ function SidebarMenuAction({
+тФВ тФВ   className,
+тФВ тФВ   asChild = false,
+тФВ тФВ   showOnHover = false,
+тФВ тФВ   ...props
+тФВ тФВ }: React.ComponentProps<"button"> & {
+тФВ тФВ   asChild?: boolean
+тФВ тФВ   showOnHover?: boolean
+тФВ тФВ }) {
+тФВ тФВ   const Comp = asChild ? Slot.Root : "button"
+тФВ тФВ 
+тФВ тФВ   return (
+тФВ тФВ     <Comp
+тФВ тФВ       data-slot="sidebar-menu-action"
+тФВ тФВ       data-sidebar="menu-action"
+тФВ тФВ       className={cn(
+тФВ тФВ         "absolute top-1.5 right-1 flex aspect-square w-5 items-center justify-center rounded-md p-0 text-sidebar-foreground ring-sidebar-ring outline-hidden transition-transform peer-hover/menu-button:text-sidebar-accent-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:ring-2 [&>svg]:size-4 [&>svg]:shrink-0",
+тФВ тФВ         // Increases the hit area of the button on mobile.
+тФВ тФВ         "after:absolute after:-inset-2 md:after:hidden",
+тФВ тФВ         "peer-data-[size=sm]/menu-button:top-1",
+тФВ тФВ         "peer-data-[size=default]/menu-button:top-1.5",
+тФВ тФВ         "peer-data-[size=lg]/menu-button:top-2.5",
+тФВ тФВ         "group-data-[collapsible=icon]:hidden",
+тФВ тФВ         showOnHover &&
+тФВ тФВ           "group-focus-within/menu-item:opacity-100 group-hover/menu-item:opacity-100 peer-data-[active=true]/menu-button:text-sidebar-accent-foreground data-[state=open]:opacity-100 md:opacity-0",
+тФВ тФВ         className
+тФВ тФВ       )}
+тФВ тФВ       {...props}
+тФВ тФВ     />
+тФВ тФВ   )
+тФВ тФВ }
+тФВ тФВ 
+тФВ тФВ function SidebarMenuBadge({
+тФВ тФВ   className,
+тФВ тФВ   ...props
+тФВ тФВ }: React.ComponentProps<"div">) {
+тФВ тФВ   return (
+тФВ тФВ     <div
+тФВ тФВ       data-slot="sidebar-menu-badge"
+тФВ тФВ       data-sidebar="menu-badge"
+тФВ тФВ       className={cn(
+тФВ тФВ         "pointer-events-none absolute right-1 flex h-5 min-w-5 items-center justify-center rounded-md px-1 text-xs font-medium text-sidebar-foreground tabular-nums select-none",
+тФВ тФВ         "peer-hover/menu-button:text-sidebar-accent-foreground peer-data-[active=true]/menu-button:text-sidebar-accent-foreground",
+тФВ тФВ         "peer-data-[size=sm]/menu-button:top-1",
+тФВ тФВ         "peer-data-[size=default]/menu-button:top-1.5",
+тФВ тФВ         "peer-data-[size=lg]/menu-button:top-2.5",
+тФВ тФВ         "group-data-[collapsible=icon]:hidden",
+тФВ тФВ         className
+тФВ тФВ       )}
+тФВ тФВ       {...props}
+тФВ тФВ     />
+тФВ тФВ   )
+тФВ тФВ }
+тФВ тФВ 
+тФВ тФВ function SidebarMenuSkeleton({
+тФВ тФВ   className,
+тФВ тФВ   showIcon = false,
+тФВ тФВ   ...props
+тФВ тФВ }: React.ComponentProps<"div"> & {
+тФВ тФВ   showIcon?: boolean
+тФВ тФВ }) {
+тФВ тФВ   // Random width between 50 to 90%.
+тФВ тФВ   const width = React.useMemo(() => {
+тФВ тФВ     return `${Math.floor(Math.random() * 40) + 50}%`
+тФВ тФВ   }, [])
+тФВ тФВ 
+тФВ тФВ   return (
+тФВ тФВ     <div
+тФВ тФВ       data-slot="sidebar-menu-skeleton"
+тФВ тФВ       data-sidebar="menu-skeleton"
+тФВ тФВ       className={cn("flex h-8 items-center gap-2 rounded-md px-2", className)}
+тФВ тФВ       {...props}
+тФВ тФВ     >
+тФВ тФВ       {showIcon && (
+тФВ тФВ         <Skeleton
+тФВ тФВ           className="size-4 rounded-md"
+тФВ тФВ           data-sidebar="menu-skeleton-icon"
+тФВ тФВ         />
+тФВ тФВ       )}
+тФВ тФВ       <Skeleton
+тФВ тФВ         className="h-4 max-w-(--skeleton-width) flex-1"
+тФВ тФВ         data-sidebar="menu-skeleton-text"
+тФВ тФВ         style={
+тФВ тФВ           {
+тФВ тФВ             "--skeleton-width": width,
+тФВ тФВ           } as React.CSSProperties
+тФВ тФВ         }
+тФВ тФВ       />
+тФВ тФВ     </div>
+тФВ тФВ   )
+тФВ тФВ }
+тФВ тФВ 
+тФВ тФВ function SidebarMenuSub({ className, ...props }: React.ComponentProps<"ul">) {
+тФВ тФВ   return (
+тФВ тФВ     <ul
+тФВ тФВ       data-slot="sidebar-menu-sub"
+тФВ тФВ       data-sidebar="menu-sub"
+тФВ тФВ       className={cn(
+тФВ тФВ         "mx-3.5 flex min-w-0 translate-x-px flex-col gap-1 border-l border-sidebar-border px-2.5 py-0.5",
+тФВ тФВ         "group-data-[collapsible=icon]:hidden",
+тФВ тФВ         className
+тФВ тФВ       )}
+тФВ тФВ       {...props}
+тФВ тФВ     />
+тФВ тФВ   )
+тФВ тФВ }
+тФВ тФВ 
+тФВ тФВ function SidebarMenuSubItem({
+тФВ тФВ   className,
+тФВ тФВ   ...props
+тФВ тФВ }: React.ComponentProps<"li">) {
+тФВ тФВ   return (
+тФВ тФВ     <li
+тФВ тФВ       data-slot="sidebar-menu-sub-item"
+тФВ тФВ       data-sidebar="menu-sub-item"
+тФВ тФВ       className={cn("group/menu-sub-item relative", className)}
+тФВ тФВ       {...props}
+тФВ тФВ     />
+тФВ тФВ   )
+тФВ тФВ }
+тФВ тФВ 
+тФВ тФВ function SidebarMenuSubButton({
+тФВ тФВ   asChild = false,
+тФВ тФВ   size = "md",
+тФВ тФВ   isActive = false,
+тФВ тФВ   className,
+тФВ тФВ   ...props
+тФВ тФВ }: React.ComponentProps<"a"> & {
+тФВ тФВ   asChild?: boolean
+тФВ тФВ   size?: "sm" | "md"
+тФВ тФВ   isActive?: boolean
+тФВ тФВ }) {
+тФВ тФВ   const Comp = asChild ? Slot.Root : "a"
+тФВ тФВ 
+тФВ тФВ   return (
+тФВ тФВ     <Comp
+тФВ тФВ       data-slot="sidebar-menu-sub-button"
+тФВ тФВ       data-sidebar="menu-sub-button"
+тФВ тФВ       data-size={size}
+тФВ тФВ       data-active={isActive}
+тФВ тФВ       className={cn(
+тФВ тФВ         "flex h-7 min-w-0 -translate-x-px items-center gap-2 overflow-hidden rounded-md px-2 text-sidebar-foreground ring-sidebar-ring outline-hidden hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:ring-2 active:bg-sidebar-accent active:text-sidebar-accent-foreground disabled:pointer-events-none disabled:opacity-50 aria-disabled:pointer-events-none aria-disabled:opacity-50 [&>span:last-child]:truncate [&>svg]:size-4 [&>svg]:shrink-0 [&>svg]:text-sidebar-accent-foreground",
+тФВ тФВ         "data-[active=true]:bg-sidebar-accent data-[active=true]:text-sidebar-accent-foreground",
+тФВ тФВ         size === "sm" && "text-xs",
+тФВ тФВ         size === "md" && "text-sm",
+тФВ тФВ         "group-data-[collapsible=icon]:hidden",
+тФВ тФВ         className
+тФВ тФВ       )}
+тФВ тФВ       {...props}
+тФВ тФВ     />
+тФВ тФВ   )
+тФВ тФВ }
+тФВ тФВ 
+тФВ тФВ export {
+тФВ тФВ   Sidebar,
+тФВ тФВ   SidebarContent,
+тФВ тФВ   SidebarFooter,
+тФВ тФВ   SidebarGroup,
+тФВ тФВ   SidebarGroupAction,
+тФВ тФВ   SidebarGroupContent,
+тФВ тФВ   SidebarGroupLabel,
+тФВ тФВ   SidebarHeader,
+тФВ тФВ   SidebarInput,
+тФВ тФВ   SidebarInset,
+тФВ тФВ   SidebarMenu,
+тФВ тФВ   SidebarMenuAction,
+тФВ тФВ   SidebarMenuBadge,
+тФВ тФВ   SidebarMenuButton,
+тФВ тФВ   SidebarMenuItem,
+тФВ тФВ   SidebarMenuSkeleton,
+тФВ тФВ   SidebarMenuSub,
+тФВ тФВ   SidebarMenuSubButton,
+тФВ тФВ   SidebarMenuSubItem,
+тФВ тФВ   SidebarProvider,
+тФВ тФВ   SidebarRail,
+тФВ тФВ   SidebarSeparator,
+тФВ тФВ   SidebarTrigger,
+тФВ тФВ   useSidebar,
+тФВ тФВ }
+тФВ тФВ 
+тФВ тФФтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФАтФА
+тФВ
+тФФ Run without --dry-run to apply.

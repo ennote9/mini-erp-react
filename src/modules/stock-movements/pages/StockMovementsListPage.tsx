@@ -14,7 +14,9 @@ import type { StockMovement } from "../model";
 import type { SourceDocumentType } from "../../../shared/domain";
 import { ListPageLayout } from "../../../shared/ui/list/ListPageLayout";
 import { EmptyState } from "../../../shared/ui/feedback/EmptyState";
+import { Badge } from "@/components/ui/badge";
 import { AgGridContainer, agGridDefaultColDef } from "../../../shared/ui/ag-grid";
+import { Input } from "@/components/ui/input";
 
 type RowData = StockMovement & {
   itemCode: string;
@@ -49,11 +51,11 @@ function MovementTypeCellRenderer(params: ICellRendererParams<RowData>) {
   const label = MOVEMENT_TYPE_LABEL[value] ?? value;
   const modifier = value === "receipt" || value === "shipment" ? value : "receipt";
   return (
-    <span
+    <Badge
       className={`list-table__badge list-table__badge--status list-table__badge--${modifier}`}
     >
       {label}
-    </span>
+    </Badge>
   );
 }
 
@@ -204,7 +206,7 @@ export function StockMovementsListPage() {
     <ListPageLayout
       header={null}
       controls={
-        <input
+        <Input
           type="search"
           className="list-page__search"
           placeholder="Search by item, warehouse or source document"
