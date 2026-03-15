@@ -1,9 +1,12 @@
 import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { AgGridReact } from "ag-grid-react";
+import type { ColDef, ICellRendererParams } from "ag-grid-community";
 import { warehouseRepository } from "../repository";
 import type { Warehouse } from "../model";
 import { ListPageLayout } from "../../../shared/ui/list/ListPageLayout";
 import { EmptyState } from "../../../shared/ui/feedback/EmptyState";
+import { AgGridContainer, agGridDefaultColDef } from "../../../shared/ui/ag-grid";
 
 type ActiveFilter = "all" | "active" | "inactive";
 
@@ -14,6 +17,21 @@ function applyActiveFilter(
   if (activeFilter === "active") return list.filter((x) => x.isActive);
   if (activeFilter === "inactive") return list.filter((x) => !x.isActive);
   return list;
+}
+
+function ActiveBadgeCellRenderer(params: ICellRendererParams<Warehouse>) {
+  const isActive = params.value as boolean;
+  const label = isActive ? "Active" : "Inactive";
+  return (
+    <span
+      className={
+        "list-table__badge" +
+        (isActive ? " list-table__badge--active" : " list-table__badge--inactive")
+      }
+    >
+      {label}
+    </span>
+  );
 }
 
 export function WarehousesListPage() {
@@ -35,6 +53,28 @@ export function WarehousesListPage() {
   const emptyHint = hasFilter
     ? "Try changing the search or filter."
     : "Create your first warehouse to organize inventory.";
+
+  const columnDefs = useMemo<ColDef<Warehouse>[]>(
+    () => [
+      {
+        field: "code",
+        headerName: "Code",
+        width: 140,
+      },
+      {
+        field: "name",
+        headerName: "Name",
+        minWidth: 180,
+      },
+      {
+        field: "isActive",
+        headerName: "Active",
+        width: 110,
+        cellRenderer: ActiveBadgeCellRenderer,
+      },
+    ],
+    [],
+  );
 
   return (
     <ListPageLayout
@@ -86,62 +126,15 @@ export function WarehousesListPage() {
       {isEmpty ? (
         <EmptyState title={emptyTitle} hint={emptyHint} />
       ) : (
-        <table className="list-table">
-          <thead>
-            <tr>
-              <th className="list-table__cell list-table__cell--checkbox">
-                <input type="checkbox" aria-label="Select all" disabled />
-              </th>
-              <th className="list-table__cell list-table__cell--code">Code</th>
-              <th className="list-table__cell list-table__cell--name">Name</th>
-              <th className="list-table__cell list-table__cell--active">
-                Active
-              </th>
-            </tr>
-          </thead>
-          <tbody>
-            {filteredRows.map((row) => (
-              <tr
-                key={row.id}
-                className="list-table__row list-table__row--clickable"
-                onClick={() => navigate(`/warehouses/${row.id}`)}
-                role="button"
-                tabIndex={0}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" || e.key === " ") {
-                    e.preventDefault();
-                    navigate(`/warehouses/${row.id}`);
-                  }
-                }}
-              >
-                <td
-                  className="list-table__cell list-table__cell--checkbox"
-                  onClick={(e) => e.stopPropagation()}
-                >
-                  <input type="checkbox" aria-label={`Select ${row.code}`} />
-                </td>
-                <td className="list-table__cell list-table__cell--code">
-                  {row.code}
-                </td>
-                <td className="list-table__cell list-table__cell--name">
-                  {row.name}
-                </td>
-                <td className="list-table__cell list-table__cell--active">
-                  <span
-                    className={
-                      "list-table__badge" +
-                      (row.isActive
-                        ? " list-table__badge--active"
-                        : " list-table__badge--inactive")
-                    }
-                  >
-                    {row.isActive ? "Active" : "Inactive"}
-                  </span>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+        <AgGridContainer themeClass="warehouses-grid">
+          <AgGridReact<Warehouse>
+            rowData={filteredRows}
+            columnDefs={columnDefs}
+            defaultColDef={agGridDefaultColDef}
+            getRowId={(params) => params.data.id}
+            onRowClicked={(e) => e.data && navigate(`/warehouses/${e.data.id}`)}
+          />
+        </AgGridContainer>
       )}
     </ListPageLayout>
   );
