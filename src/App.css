@@ -215,12 +215,41 @@ body,
 /* AG Grid pilot: minimal test uses inline style (500px). Restore when adding full grid. */
 /* .list-page__grid-wrapper { flex: 1; min-height: 450px; width: 100%; overflow: hidden; } */
 
-/* Stage 1: minimal dark grid — align AG Grid theme variables to ERP shell (no extra overrides) */
-.list-page__content .stock-movements-grid.ag-theme-quartz-dark {
+/* Stage 1: minimal dark grid — variables + direct styles so grid is visibly dark (override theme) */
+.stock-movements-grid.ag-theme-quartz-dark {
   --ag-background-color: #222;
   --ag-header-background-color: #252525;
   --ag-foreground-color: #e4e4e4;
   --ag-border-color: #333;
+  --ag-data-background-color: #222;
+  --ag-icon-font-color: #e4e4e4;
+}
+/* Direct background/color so grid body and header are visibly dark (override theme) */
+.stock-movements-grid .ag-root-wrapper {
+  background-color: #222 !important;
+}
+.stock-movements-grid .ag-header-viewport,
+.stock-movements-grid .ag-header-row,
+.stock-movements-grid .ag-header-cell {
+  background-color: #252525 !important;
+  color: #e4e4e4 !important;
+}
+.stock-movements-grid .ag-body-viewport,
+.stock-movements-grid .ag-center-cols-viewport,
+.stock-movements-grid .ag-row,
+.stock-movements-grid .ag-cell {
+  background-color: #222 !important;
+  color: #e4e4e4 !important;
+}
+.stock-movements-grid .ag-header-cell-text,
+.stock-movements-grid .ag-cell-wrapper {
+  color: #e4e4e4 !important;
+}
+.stock-movements-grid .ag-row-border {
+  border-color: #333 !important;
+}
+.stock-movements-grid .ag-icon {
+  color: #e4e4e4 !important;
 }
 
 .list-page__empty {
