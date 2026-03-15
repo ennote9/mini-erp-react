@@ -679,21 +679,26 @@ body,
   flex-shrink: 0;
 }
 
+/* shadcn-style breadcrumb (see components/ui/breadcrumb.tsx) */
 .doc-breadcrumb {
   font-size: 0.9rem;
+}
+
+.doc-breadcrumb ol {
   color: #888;
 }
 
-.doc-breadcrumb__link {
+.doc-breadcrumb a {
   color: #7eb8da;
   text-decoration: none;
 }
 
-.doc-breadcrumb__link:hover {
+.doc-breadcrumb a:hover {
   text-decoration: underline;
+  color: #7eb8da;
 }
 
-.doc-breadcrumb__current {
+.doc-breadcrumb [aria-current="page"] {
   color: #e4e4e4;
 }
 

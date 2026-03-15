@@ -11,7 +11,12 @@ import type { PlanningDocumentStatus } from "../../../shared/domain";
 import { ListPageLayout } from "../../../shared/ui/list/ListPageLayout";
 import { EmptyState } from "../../../shared/ui/feedback/EmptyState";
 import { StatusBadge } from "../../../shared/ui/feedback/StatusBadge";
-import { AgGridContainer, agGridDefaultColDef } from "../../../shared/ui/ag-grid";
+import {
+  AgGridContainer,
+  agGridDefaultColDef,
+  agGridRowNumberColDef,
+  agGridCheckboxSelectionColDef,
+} from "../../../shared/ui/ag-grid";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
@@ -89,6 +94,8 @@ export function SalesOrdersListPage() {
 
   const columnDefs = useMemo<ColDef<RowData>[]>(
     () => [
+      agGridRowNumberColDef,
+      agGridCheckboxSelectionColDef,
       {
         field: "number",
         headerName: "Number",
@@ -173,6 +180,7 @@ export function SalesOrdersListPage() {
             rowData={filteredRows}
             columnDefs={columnDefs}
             defaultColDef={agGridDefaultColDef}
+            rowSelection="multiple"
             getRowId={(params) => params.data.id}
             onRowClicked={(e) => e.data && navigate(`/sales-orders/${e.data.id}`)}
           />

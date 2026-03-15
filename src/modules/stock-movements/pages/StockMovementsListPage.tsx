@@ -15,7 +15,12 @@ import type { SourceDocumentType } from "../../../shared/domain";
 import { ListPageLayout } from "../../../shared/ui/list/ListPageLayout";
 import { EmptyState } from "../../../shared/ui/feedback/EmptyState";
 import { Badge } from "@/components/ui/badge";
-import { AgGridContainer, agGridDefaultColDef } from "../../../shared/ui/ag-grid";
+import {
+  AgGridContainer,
+  agGridDefaultColDef,
+  agGridRowNumberColDef,
+  agGridCheckboxSelectionColDef,
+} from "../../../shared/ui/ag-grid";
 import { Input } from "@/components/ui/input";
 
 type RowData = StockMovement & {
@@ -153,6 +158,8 @@ export function StockMovementsListPage() {
 
   const columnDefs = useMemo<ColDef<RowData>[]>(
     () => [
+      agGridRowNumberColDef,
+      agGridCheckboxSelectionColDef,
       {
         field: "datetime",
         headerName: "Date/Time",
@@ -224,6 +231,7 @@ export function StockMovementsListPage() {
             rowData={filteredRows}
             columnDefs={columnDefs}
             defaultColDef={agGridDefaultColDef}
+            rowSelection="multiple"
             getRowId={(params) => params.data.id}
           />
         </AgGridContainer>

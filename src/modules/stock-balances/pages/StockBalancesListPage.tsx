@@ -11,7 +11,12 @@ import { warehouseRepository } from "../../warehouses/repository";
 import type { StockBalance } from "../model";
 import { ListPageLayout } from "../../../shared/ui/list/ListPageLayout";
 import { EmptyState } from "../../../shared/ui/feedback/EmptyState";
-import { AgGridContainer, agGridDefaultColDef } from "../../../shared/ui/ag-grid";
+import {
+  AgGridContainer,
+  agGridDefaultColDef,
+  agGridRowNumberColDef,
+  agGridCheckboxSelectionColDef,
+} from "../../../shared/ui/ag-grid";
 import { Input } from "@/components/ui/input";
 
 type RowData = StockBalance & {
@@ -65,6 +70,8 @@ export function StockBalancesListPage() {
 
   const columnDefs = useMemo<ColDef<RowData>[]>(
     () => [
+      agGridRowNumberColDef,
+      agGridCheckboxSelectionColDef,
       {
         field: "itemCode",
         headerName: "Item Code",
@@ -111,6 +118,7 @@ export function StockBalancesListPage() {
             rowData={filteredRows}
             columnDefs={columnDefs}
             defaultColDef={agGridDefaultColDef}
+            rowSelection="multiple"
             getRowId={(params) => params.data.id}
           />
         </AgGridContainer>

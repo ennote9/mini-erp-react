@@ -10,7 +10,12 @@ import type { FactualDocumentStatus } from "../../../shared/domain";
 import { ListPageLayout } from "../../../shared/ui/list/ListPageLayout";
 import { EmptyState } from "../../../shared/ui/feedback/EmptyState";
 import { StatusBadge } from "../../../shared/ui/feedback/StatusBadge";
-import { AgGridContainer, agGridDefaultColDef } from "../../../shared/ui/ag-grid";
+import {
+  AgGridContainer,
+  agGridDefaultColDef,
+  agGridRowNumberColDef,
+  agGridCheckboxSelectionColDef,
+} from "../../../shared/ui/ag-grid";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
@@ -84,6 +89,8 @@ export function ShipmentsListPage() {
 
   const columnDefs = useMemo<ColDef<RowData>[]>(
     () => [
+      agGridRowNumberColDef,
+      agGridCheckboxSelectionColDef,
       {
         field: "number",
         headerName: "Number",
@@ -159,6 +166,7 @@ export function ShipmentsListPage() {
             rowData={filteredRows}
             columnDefs={columnDefs}
             defaultColDef={agGridDefaultColDef}
+            rowSelection="multiple"
             getRowId={(params) => params.data.id}
             onRowClicked={(e) => e.data && navigate(`/shipments/${e.data.id}`)}
           />

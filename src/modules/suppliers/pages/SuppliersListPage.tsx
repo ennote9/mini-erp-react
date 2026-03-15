@@ -10,7 +10,12 @@ import { supplierRepository } from "../repository";
 import type { Supplier } from "../model";
 import { ListPageLayout } from "../../../shared/ui/list/ListPageLayout";
 import { EmptyState } from "../../../shared/ui/feedback/EmptyState";
-import { AgGridContainer, agGridDefaultColDef } from "../../../shared/ui/ag-grid";
+import {
+  AgGridContainer,
+  agGridDefaultColDef,
+  agGridRowNumberColDef,
+  agGridCheckboxSelectionColDef,
+} from "../../../shared/ui/ag-grid";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
@@ -57,6 +62,8 @@ export function SuppliersListPage() {
 
   const columnDefs = useMemo<ColDef<Supplier>[]>(
     () => [
+      agGridRowNumberColDef,
+      agGridCheckboxSelectionColDef,
       {
         field: "code",
         headerName: "Code",
@@ -147,6 +154,7 @@ export function SuppliersListPage() {
             rowData={filteredRows}
             columnDefs={columnDefs}
             defaultColDef={agGridDefaultColDef}
+            rowSelection="multiple"
             getRowId={(params) => params.data.id}
             onRowClicked={(e) => e.data && navigate(`/suppliers/${e.data.id}`)}
           />

@@ -1,2 +1,6 @@
 export { AgGridContainer } from "./AgGridContainer";
-export { agGridDefaultColDef } from "./agGridDefaults";
+export {
+  agGridDefaultColDef,
+  agGridRowNumberColDef,
+  agGridCheckboxSelectionColDef,
+} from "./agGridDefaults";

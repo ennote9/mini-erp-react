@@ -6,7 +6,12 @@ import { warehouseRepository } from "../repository";
 import type { Warehouse } from "../model";
 import { ListPageLayout } from "../../../shared/ui/list/ListPageLayout";
 import { EmptyState } from "../../../shared/ui/feedback/EmptyState";
-import { AgGridContainer, agGridDefaultColDef } from "../../../shared/ui/ag-grid";
+import {
+  AgGridContainer,
+  agGridDefaultColDef,
+  agGridRowNumberColDef,
+  agGridCheckboxSelectionColDef,
+} from "../../../shared/ui/ag-grid";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
@@ -53,6 +58,8 @@ export function WarehousesListPage() {
 
   const columnDefs = useMemo<ColDef<Warehouse>[]>(
     () => [
+      agGridRowNumberColDef,
+      agGridCheckboxSelectionColDef,
       {
         field: "code",
         headerName: "Code",
@@ -131,6 +138,7 @@ export function WarehousesListPage() {
             rowData={filteredRows}
             columnDefs={columnDefs}
             defaultColDef={agGridDefaultColDef}
+            rowSelection="multiple"
             getRowId={(params) => params.data.id}
             onRowClicked={(e) => e.data && navigate(`/warehouses/${e.data.id}`)}
           />

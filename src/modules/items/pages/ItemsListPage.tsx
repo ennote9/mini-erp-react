@@ -10,7 +10,12 @@ import { itemRepository } from "../repository";
 import type { Item } from "../model";
 import { ListPageLayout } from "../../../shared/ui/list/ListPageLayout";
 import { EmptyState } from "../../../shared/ui/feedback/EmptyState";
-import { AgGridContainer, agGridDefaultColDef } from "../../../shared/ui/ag-grid";
+import {
+  AgGridContainer,
+  agGridDefaultColDef,
+  agGridRowNumberColDef,
+  agGridCheckboxSelectionColDef,
+} from "../../../shared/ui/ag-grid";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
@@ -57,6 +62,8 @@ export function ItemsListPage() {
 
   const columnDefs = useMemo<ColDef<Item>[]>(
     () => [
+      agGridRowNumberColDef,
+      agGridCheckboxSelectionColDef,
       {
         field: "code",
         headerName: "Code",
@@ -140,6 +147,7 @@ export function ItemsListPage() {
             rowData={filteredItems}
             columnDefs={columnDefs}
             defaultColDef={agGridDefaultColDef}
+            rowSelection="multiple"
             getRowId={(params) => params.data.id}
             onRowClicked={(e) => e.data && navigate(`/items/${e.data.id}`)}
           />
