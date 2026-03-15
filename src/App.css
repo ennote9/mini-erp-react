@@ -1,0 +1,597 @@
+:root {
+  font-family: Inter, Avenir, Helvetica, Arial, sans-serif;
+  font-size: 16px;
+  line-height: 24px;
+  font-weight: 400;
+  color: #e4e4e4;
+  background-color: #1a1a1a;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body,
+#root {
+  margin: 0;
+  min-height: 100vh;
+}
+
+/* --- App shell: desktop-first layout --- */
+.app-shell {
+  display: flex;
+  min-height: 100vh;
+}
+
+.app-workspace {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.app-page-content {
+  flex: 1;
+  padding: 1rem 1.5rem;
+}
+
+/* --- Sidebar --- */
+.app-sidebar {
+  width: 220px;
+  flex-shrink: 0;
+  background-color: #252525;
+  border-right: 1px solid #333;
+}
+
+.sidebar-nav {
+  padding: 0.75rem 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.sidebar-link {
+  display: block;
+  padding: 0.5rem 1rem;
+  color: #b0b0b0;
+  text-decoration: none;
+  font-size: 0.9rem;
+}
+
+.sidebar-link:hover {
+  color: #fff;
+  background-color: #333;
+}
+
+.sidebar-link--active {
+  color: #fff;
+  background-color: #396cd8;
+}
+
+.sidebar-group {
+  margin-top: 0.5rem;
+}
+
+.sidebar-group__title {
+  padding: 0.35rem 1rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #888;
+}
+
+.sidebar-group__links {
+  display: flex;
+  flex-direction: column;
+}
+
+/* --- Page top bar --- */
+.app-topbar {
+  padding: 0.75rem 1.5rem;
+  border-bottom: 1px solid #333;
+  background-color: #222;
+}
+
+.app-topbar__title {
+  margin: 0;
+  font-size: 1.25rem;
+  font-weight: 600;
+}
+
+/* --- List page (Items and future list pages) --- */
+.list-page {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+  min-height: 0;
+}
+
+/* Header zone: primary action only (page title is in shell top bar) */
+.list-page__header {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 1rem;
+  flex-shrink: 0;
+}
+
+.list-page__title {
+  margin: 0;
+  font-size: 1.1rem;
+  font-weight: 600;
+}
+
+.list-page__primary-action {
+  padding: 0.5rem 1rem;
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: #fff;
+  background-color: #396cd8;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.list-page__primary-action:hover:not(:disabled) {
+  background-color: #2d5ab8;
+}
+
+.list-page__primary-action:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* Controls zone: search and filters */
+.list-page__controls {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+  flex-shrink: 0;
+}
+
+.list-page__search {
+  min-width: 220px;
+  padding: 0.5rem 0.75rem;
+  font-size: 0.9rem;
+  color: #e4e4e4;
+  background-color: #252525;
+  border: 1px solid #444;
+  border-radius: 4px;
+}
+
+.list-page__search::placeholder {
+  color: #888;
+}
+
+.list-page__search:focus {
+  outline: none;
+  border-color: #396cd8;
+}
+
+.list-page__filters {
+  display: flex;
+  gap: 0.25rem;
+}
+
+.list-page__filter-chip {
+  padding: 0.4rem 0.75rem;
+  font-size: 0.85rem;
+  color: #b0b0b0;
+  background-color: #252525;
+  border: 1px solid #444;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.list-page__filter-chip:hover {
+  color: #e4e4e4;
+  border-color: #555;
+}
+
+.list-page__filter-chip--active {
+  color: #fff;
+  background-color: #396cd8;
+  border-color: #396cd8;
+}
+
+/* Content zone: table or empty state */
+.list-page__content {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  border: 1px solid #333;
+  border-radius: 4px;
+  background-color: #222;
+  overflow: auto;
+}
+
+/* AG Grid pilot: Stock Movements — container needs a defined height so the grid can render */
+.list-page__grid-wrapper {
+  flex: 1;
+  min-height: 450px;
+  width: 100%;
+  overflow: hidden;
+}
+
+/* Dark ERP alignment for Stock Movements AG Grid */
+.list-page__content .ag-theme-quartz-dark {
+  --ag-background-color: #222;
+  --ag-header-background-color: #252525;
+  --ag-foreground-color: #e4e4e4;
+  --ag-border-color: #333;
+  --ag-row-hover-color: rgba(255, 255, 255, 0.06);
+  --ag-selected-row-background-color: rgba(57, 108, 216, 0.2);
+  font-size: 0.9rem;
+}
+.list-page__content .ag-theme-quartz-dark .ag-header-cell,
+.list-page__content .ag-theme-quartz-dark .ag-header-group-cell {
+  color: #b0b0b0;
+  font-weight: 600;
+}
+.list-page__content .ag-theme-quartz-dark .ag-cell,
+.list-page__content .ag-theme-quartz-dark .ag-header-cell {
+  padding: 0.5rem 0.75rem;
+}
+
+.list-page__empty {
+  padding: 3rem 2rem;
+  text-align: center;
+  color: #888;
+}
+
+.list-page__empty-title {
+  margin: 0 0 0.25rem;
+  font-size: 1rem;
+  font-weight: 500;
+  color: #b0b0b0;
+}
+
+.list-page__empty-hint {
+  margin: 0;
+  font-size: 0.9rem;
+}
+
+/* --- List table --- */
+.list-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+}
+
+.list-table th,
+.list-table td {
+  padding: 0.5rem 0.75rem;
+  text-align: left;
+  border-bottom: 1px solid #333;
+}
+
+.list-table th {
+  font-weight: 600;
+  color: #b0b0b0;
+  background-color: #252525;
+  white-space: nowrap;
+}
+
+.list-table__row:hover {
+  background-color: #2a2a2a;
+}
+
+.list-table__cell--checkbox {
+  width: 2.5rem;
+  text-align: center;
+  vertical-align: middle;
+}
+
+.list-table__cell--code {
+  width: 120px;
+}
+
+.list-table__cell--name {
+  min-width: 160px;
+}
+
+.list-table__cell--uom {
+  width: 80px;
+}
+
+.list-table__cell--active {
+  width: 100px;
+}
+
+.list-table__cell--number {
+  width: 110px;
+}
+
+.list-table__cell--date {
+  width: 110px;
+}
+
+.list-table__cell--supplier,
+.list-table__cell--customer {
+  min-width: 140px;
+}
+
+.list-table__cell--warehouse {
+  min-width: 120px;
+}
+
+.list-table__cell--purchase-order,
+.list-table__cell--sales-order {
+  min-width: 130px;
+}
+
+.list-table__cell--status {
+  width: 100px;
+}
+
+.list-table__badge {
+  display: inline-block;
+  padding: 0.2rem 0.5rem;
+  font-size: 0.8rem;
+  font-weight: 500;
+  border-radius: 4px;
+}
+
+.list-table__badge--active {
+  color: #1a1a1a;
+  background-color: #6ab86a;
+}
+
+.list-table__badge--inactive {
+  color: #b0b0b0;
+  background-color: #444;
+}
+
+/* Document status badge variants */
+.list-table__badge--status.list-table__badge--draft {
+  color: #b0b0b0;
+  background-color: #444;
+}
+
+.list-table__badge--status.list-table__badge--confirmed {
+  color: #1a1a1a;
+  background-color: #7eb8da;
+}
+
+.list-table__badge--status.list-table__badge--closed {
+  color: #1a1a1a;
+  background-color: #6ab86a;
+}
+
+.list-table__badge--status.list-table__badge--cancelled {
+  color: #b0b0b0;
+  background-color: #555;
+}
+
+.list-table__badge--status.list-table__badge--posted {
+  color: #1a1a1a;
+  background-color: #6ab86a;
+}
+
+/* Movement type badges (Stock Movements list) */
+.list-table__badge--status.list-table__badge--receipt {
+  color: #1a1a1a;
+  background-color: #6ab86a;
+}
+
+.list-table__badge--status.list-table__badge--shipment {
+  color: #1a1a1a;
+  background-color: #7eb8da;
+}
+
+.list-table__link {
+  color: var(--color-link, #7eb8da);
+  text-decoration: none;
+}
+
+.list-table__link:hover {
+  text-decoration: underline;
+}
+
+.list-table__row--clickable {
+  cursor: pointer;
+}
+
+.list-table__cell--item {
+  min-width: 140px;
+}
+
+.list-table__cell--qty {
+  width: 80px;
+}
+
+/* --- Document page (PO, SO, Receipt, Shipment detail) --- */
+.doc-page {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.doc-page--not-found {
+  padding: 1rem 0;
+  color: #888;
+}
+
+.doc-page__breadcrumb {
+  flex-shrink: 0;
+}
+
+.doc-breadcrumb {
+  font-size: 0.9rem;
+  color: #888;
+}
+
+.doc-breadcrumb__link {
+  color: #7eb8da;
+  text-decoration: none;
+}
+
+.doc-breadcrumb__link:hover {
+  text-decoration: underline;
+}
+
+.doc-breadcrumb__current {
+  color: #e4e4e4;
+}
+
+.doc-page__header {
+  flex-shrink: 0;
+}
+
+.doc-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.doc-header__title-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.doc-header__title {
+  margin: 0;
+  font-size: 1.25rem;
+  font-weight: 600;
+}
+
+.doc-header__actions {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.doc-header__btn {
+  padding: 0.5rem 1rem;
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: #fff;
+  background-color: #396cd8;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.doc-header__btn:hover:not(:disabled) {
+  background-color: #2d5ab8;
+}
+
+.doc-header__btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.doc-header__btn--secondary {
+  background-color: #444;
+  color: #e4e4e4;
+}
+
+.doc-header__btn--secondary:hover:not(:disabled) {
+  background-color: #555;
+}
+
+.doc-page__summary {
+  flex-shrink: 0;
+  padding: 1rem;
+  border: 1px solid #333;
+  border-radius: 4px;
+  background-color: #222;
+}
+
+.doc-summary {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 0.5rem 1.5rem;
+  margin: 0;
+  font-size: 0.9rem;
+}
+
+.doc-summary__term {
+  color: #888;
+  font-weight: 500;
+}
+
+.doc-summary__value {
+  margin: 0;
+}
+
+.doc-page__content {
+  flex: 1;
+  min-height: 0;
+}
+
+.doc-lines__title {
+  margin: 0 0 0.5rem;
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.doc-lines__empty {
+  margin: 0;
+  color: #888;
+  font-size: 0.9rem;
+}
+
+.doc-lines__head {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 0.5rem;
+}
+
+.doc-lines__head .doc-lines__title {
+  margin: 0;
+}
+
+/* Document form (create / draft edit) */
+.doc-form__input,
+.doc-form__select {
+  width: 100%;
+  max-width: 280px;
+  padding: 0.4rem 0.5rem;
+  font-size: 0.9rem;
+  color: #e4e4e4;
+  background-color: #222;
+  border: 1px solid #444;
+  border-radius: 4px;
+}
+
+.doc-form__input:focus,
+.doc-form__select:focus {
+  outline: none;
+  border-color: #7eb8da;
+}
+
+.doc-form__select--cell {
+  max-width: 100%;
+  min-width: 140px;
+}
+
+.doc-form__input--qty {
+  max-width: 100px;
+}
+
+.doc-summary--form .doc-summary__row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.doc-form__error {
+  padding: 0.5rem 0.75rem;
+  color: #e4e4e4;
+  background-color: #5a2a2a;
+  border: 1px solid #8b3a3a;
+  border-radius: 4px;
+  font-size: 0.9rem;
+  margin-bottom: 0.5rem;
+}

@@ -1,0 +1,48 @@
+import type { Customer } from "./model";
+
+export type CreateCustomerInput = Omit<Customer, "id">;
+export type UpdateCustomerPatch = Partial<Omit<Customer, "id">>;
+
+const store: Customer[] = [];
+let nextId = 1;
+
+function nextIdStr(): string {
+  return String(nextId++);
+}
+
+export const customerRepository = {
+  list(): Customer[] {
+    return [...store];
+  },
+
+  getById(id: string): Customer | undefined {
+    return store.find((x) => x.id === id);
+  },
+
+  create(input: CreateCustomerInput): Customer {
+    const entity: Customer = { ...input, id: nextIdStr() };
+    store.push(entity);
+    return entity;
+  },
+
+  update(id: string, patch: UpdateCustomerPatch): Customer | undefined {
+    const i = store.findIndex((x) => x.id === id);
+    if (i === -1) return undefined;
+    store[i] = { ...store[i], ...patch };
+    return store[i];
+  },
+
+  search(query: string): Customer[] {
+    const q = query.trim().toLowerCase();
+    if (!q) return [...store];
+    return store.filter(
+      (x) =>
+        x.code.toLowerCase().includes(q) || x.name.toLowerCase().includes(q),
+    );
+  },
+};
+
+const seed: CreateCustomerInput[] = [
+  { code: "CUS-0001", name: "Beta Corp", isActive: true },
+];
+seed.forEach((s) => customerRepository.create(s));

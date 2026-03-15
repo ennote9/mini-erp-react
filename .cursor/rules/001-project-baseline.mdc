@@ -1,0 +1,39 @@
+---
+description: Mini ERP React project baseline rules
+alwaysApply: true
+---
+
+This project is a desktop-first mini ERP built with React + TypeScript + Tauri.
+
+Core rules:
+- Treat the docs folder as the source of truth before proposing or writing code.
+- Read docs/00_README.md first when the task relates to architecture or documentation structure.
+- Follow the product, status, validation, navigation, and UI rules from the docs before implementing anything.
+- Keep the app enterprise-oriented, desktop-first, and operationally dense.
+- Prefer reusable shells and patterns for:
+  - sidebar
+  - list pages
+  - document pages
+  - master-data pages
+  - form layouts
+- Do not invent new business logic when the docs already define it.
+- Do not add features outside MVP unless explicitly requested.
+- Keep strong TypeScript typing for entities, statuses, props, and UI contracts.
+- Prefer small reusable components over large monolithic pages.
+- Preserve consistency across all modules.
+
+UI direction:
+- Desktop ERP style
+- Serious and structured
+- Clean dark theme
+- Dense but readable
+- Strong list/grid UX
+- Strong document-page consistency
+- Avoid mobile-style patterns unless explicitly requested
+
+Implementation discipline:
+- Before coding, inspect relevant docs.
+- When working on list pages, follow the list-page and UI consistency docs.
+- When working on document pages, follow the document layout and navigation docs.
+- When working on statuses and validation, follow the domain/status/validation docs.
+- When something is ambiguous, prefer asking for clarification rather than inventing behavior.
