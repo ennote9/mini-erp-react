@@ -11,7 +11,6 @@ import type { Item } from "../model";
 import { ListPageLayout } from "../../../shared/ui/list/ListPageLayout";
 import { EmptyState } from "../../../shared/ui/feedback/EmptyState";
 import { AgGridContainer, agGridDefaultColDef } from "../../../shared/ui/ag-grid";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
@@ -26,18 +25,13 @@ function applyActiveFilter(
   return items;
 }
 
-function ActiveBadgeCellRenderer(params: ICellRendererParams<Item>) {
+function ActiveStatusCellRenderer(params: ICellRendererParams<Item>) {
   const isActive = params.value as boolean;
   const label = isActive ? "Active" : "Inactive";
   return (
-    <Badge
-      className={
-        "list-table__badge" +
-        (isActive ? " list-table__badge--active" : " list-table__badge--inactive")
-      }
-    >
+    <span className={isActive ? "status-plain-text status-plain-text--active" : "status-plain-text status-plain-text--inactive"}>
       {label}
-    </Badge>
+    </span>
   );
 }
 
@@ -72,6 +66,7 @@ export function ItemsListPage() {
         field: "name",
         headerName: "Name",
         minWidth: 160,
+        flex: 1,
       },
       {
         field: "uom",
@@ -82,7 +77,7 @@ export function ItemsListPage() {
         field: "isActive",
         headerName: "Active",
         width: 100,
-        cellRenderer: ActiveBadgeCellRenderer,
+        cellRenderer: ActiveStatusCellRenderer,
       },
     ],
     [],

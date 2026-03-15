@@ -36,7 +36,40 @@ body,
 
 .app-page-content {
   flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: auto;
   padding: 1rem 1.5rem;
+  scrollbar-width: thin;
+  scrollbar-color: #3f3f46 #0a0a0a;
+}
+
+.app-page-content:hover {
+  scrollbar-color: #525252 #171717;
+}
+
+.app-page-content::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.app-page-content::-webkit-scrollbar-track {
+  background: #0a0a0a;
+  border-radius: 4px;
+}
+
+.app-page-content::-webkit-scrollbar-thumb {
+  background: #3f3f46;
+  border-radius: 4px;
+}
+
+.app-page-content:hover::-webkit-scrollbar-thumb {
+  background: #525252;
+}
+
+.app-page-content::-webkit-scrollbar-thumb:hover {
+  background: #71717a;
 }
 
 /* --- Sidebar --- */
@@ -107,6 +140,7 @@ body,
 .list-page {
   display: flex;
   flex-direction: column;
+  flex: 1;
   gap: 1.25rem;
   min-height: 0;
 }
@@ -200,24 +234,123 @@ body,
   border-color: #396cd8;
 }
 
-/* Content zone: table or empty state — refined to align with shadcn dark surfaces */
+/* Content zone: table or empty state — refined for premium dark grid feel */
 .list-page__content {
   flex: 1;
   min-height: 0;
   display: flex;
   flex-direction: column;
-  border: 1px solid #2d2d2d;
+  border: 1px solid #3f3f46;
   border-radius: 0.5rem;
   background-color: #18181b;
   overflow: auto;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+  /* Scrollbar: subtle by default, clearer on hover (scoped to this area only) */
+  scrollbar-width: thin;
+  scrollbar-color: #3f3f46 #18181b;
 }
 
-/* AG Grid — shared dark theme for all list-page grids (shadcn-aligned surfaces, radius, hover/focus) */
+.list-page__content:hover {
+  scrollbar-color: #525252 #27272a;
+}
+
+.list-page__content::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.list-page__content::-webkit-scrollbar-track {
+  background: #18181b;
+  border-radius: 4px;
+}
+
+.list-page__content::-webkit-scrollbar-thumb {
+  background: #3f3f46;
+  border-radius: 4px;
+}
+
+.list-page__content:hover::-webkit-scrollbar-thumb {
+  background: #525252;
+}
+
+.list-page__content::-webkit-scrollbar-thumb:hover {
+  background: #71717a;
+}
+
+/* Sidebar scroll region — subtle scrollbar, clearer on hover; scoped to sidebar content only */
+[data-sidebar="content"] {
+  scrollbar-width: thin;
+  scrollbar-color: transparent transparent;
+}
+
+[data-sidebar="content"]:hover {
+  scrollbar-color: #525252 #27272a;
+}
+
+[data-sidebar="content"]::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+[data-sidebar="content"]::-webkit-scrollbar-track {
+  background: transparent;
+  border-radius: 3px;
+}
+
+[data-sidebar="content"]::-webkit-scrollbar-thumb {
+  background: transparent;
+  border-radius: 3px;
+}
+
+[data-sidebar="content"]:hover::-webkit-scrollbar-thumb {
+  background: #525252;
+}
+
+[data-sidebar="content"]::-webkit-scrollbar-thumb:hover {
+  background: #71717a;
+}
+
+/* AG Grid body viewport scrollbar — premium dark feel (vertical + horizontal); does not change overflow */
+.list-page__content .ag-theme-quartz-dark .ag-body-viewport {
+  scrollbar-width: thin;
+  scrollbar-gutter: stable;
+  scrollbar-color: #52525b #27272a;
+}
+
+.list-page__content .ag-theme-quartz-dark .ag-body-viewport:hover {
+  scrollbar-color: #71717a #3f3f46;
+}
+
+.list-page__content .ag-theme-quartz-dark .ag-body-viewport::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.list-page__content .ag-theme-quartz-dark .ag-body-viewport::-webkit-scrollbar-track {
+  background: #27272a;
+  border-radius: 4px;
+}
+
+.list-page__content .ag-theme-quartz-dark .ag-body-viewport::-webkit-scrollbar-thumb {
+  background: #52525b;
+  border-radius: 4px;
+}
+
+.list-page__content .ag-theme-quartz-dark .ag-body-viewport::-webkit-scrollbar-thumb:hover {
+  background: #71717a;
+}
+
+.list-page__content .ag-theme-quartz-dark .ag-body-viewport::-webkit-scrollbar-corner {
+  background: #27272a;
+  border-radius: 0 0 4px 0;
+}
+
+/* AG Grid — premium dark data grid (aligned with reference: shell, header, rows, lines) */
 .list-page__content > .ag-theme-quartz-dark {
   --ag-background-color: #18181b;
-  --ag-header-background-color: #27272a;
+  --ag-header-background-color: #1f1f23;
   --ag-foreground-color: #fafafa;
-  --ag-border-color: #27272a;
+  --ag-border-color: #3f3f46;
   --ag-row-hover-color: #27272a;
   --ag-selected-row-background-color: #27272a;
   --ag-range-selection-background-color: rgba(63, 63, 70, 0.4);
@@ -234,9 +367,20 @@ body,
 .list-page__content > .ag-theme-quartz-dark .ag-header-viewport,
 .list-page__content > .ag-theme-quartz-dark .ag-header-row,
 .list-page__content > .ag-theme-quartz-dark .ag-header-cell {
-  background-color: #27272a !important;
-  color: #fafafa !important;
-  border-bottom: 1px solid #27272a !important;
+  background-color: #1f1f23 !important;
+  color: #e4e4e7 !important;
+  border-bottom: 1px solid #52525b !important;
+}
+
+.list-page__content > .ag-theme-quartz-dark .ag-header-row {
+  min-height: 44px !important;
+}
+
+.list-page__content > .ag-theme-quartz-dark .ag-header-cell {
+  padding-top: 12px !important;
+  padding-bottom: 12px !important;
+  padding-left: 14px !important;
+  padding-right: 14px !important;
 }
 
 .list-page__content > .ag-theme-quartz-dark .ag-body-viewport,
@@ -247,20 +391,32 @@ body,
   color: #fafafa !important;
 }
 
+.list-page__content > .ag-theme-quartz-dark .ag-cell {
+  padding-top: 10px !important;
+  padding-bottom: 10px !important;
+  padding-left: 14px !important;
+  padding-right: 14px !important;
+}
+
 .list-page__content > .ag-theme-quartz-dark .ag-header-cell-text,
 .list-page__content > .ag-theme-quartz-dark .ag-cell-wrapper {
   color: #fafafa !important;
 }
 
+.list-page__content > .ag-theme-quartz-dark .ag-header-cell-text {
+  color: #e4e4e7 !important;
+  font-weight: 500;
+}
+
 .list-page__content > .ag-theme-quartz-dark .ag-row-border {
-  border-color: #27272a !important;
+  border-color: #3f3f46 !important;
 }
 
 .list-page__content > .ag-theme-quartz-dark .ag-icon {
   color: #a1a1aa !important;
 }
 
-/* Row hover — deliberate, not harsh */
+/* Row hover — clear but refined (reference-style) */
 .list-page__content > .ag-theme-quartz-dark .ag-row:hover .ag-cell {
   background-color: #27272a !important;
 }
@@ -287,6 +443,20 @@ body,
 .list-page__content > .receipts-grid.ag-theme-quartz-dark .ag-row,
 .list-page__content > .shipments-grid.ag-theme-quartz-dark .ag-row {
   cursor: pointer;
+}
+
+/* Active/Inactive as plain text only (no pill) — scoped to grid cells */
+.list-page__content .ag-theme-quartz-dark .ag-cell .status-plain-text {
+  font-size: inherit;
+  font-weight: 500;
+}
+
+.list-page__content .ag-theme-quartz-dark .ag-cell .status-plain-text--active {
+  color: #fafafa;
+}
+
+.list-page__content .ag-theme-quartz-dark .ag-cell .status-plain-text--inactive {
+  color: #a1a1aa;
 }
 
 .list-page__empty {
@@ -382,20 +552,25 @@ body,
 
 .list-table__badge {
   display: inline-block;
-  padding: 0.2rem 0.5rem;
-  font-size: 0.8rem;
+  padding: 0.25rem 0.5rem;
+  font-size: 0.75rem;
   font-weight: 500;
-  border-radius: 4px;
+  letter-spacing: 0.01em;
+  border-radius: 6px;
+  border: 1px solid transparent;
 }
 
 .list-table__badge--active {
-  color: #1a1a1a;
-  background-color: #6ab86a;
+  color: #fff;
+  background-color: #059669;
+  border-color: rgba(16, 185, 129, 0.4);
+  box-shadow: 0 0 0 1px rgba(16, 185, 129, 0.15);
 }
 
 .list-table__badge--inactive {
-  color: #b0b0b0;
-  background-color: #444;
+  color: #a1a1aa;
+  background-color: #3f3f46;
+  border-color: rgba(82, 82, 91, 0.5);
 }
 
 /* Document status badge variants */
