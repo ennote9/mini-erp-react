@@ -33,7 +33,9 @@ export function DocumentPageLayout({
         </div>
       )}
       <div className="doc-page__header">{header}</div>
-      <div className="doc-page__summary">{summary}</div>
+      {summary != null && summary !== false && (
+        <div className="doc-page__summary">{summary}</div>
+      )}
       <div className="doc-page__content">{children}</div>
     </div>
   );

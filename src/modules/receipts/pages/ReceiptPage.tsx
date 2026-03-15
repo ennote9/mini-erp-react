@@ -12,6 +12,8 @@ import { DocumentPageLayout } from "../../../shared/ui/object/DocumentPageLayout
 import { BackButton } from "../../../shared/ui/list/BackButton";
 import { StatusBadge } from "../../../shared/ui/feedback/StatusBadge";
 import { AgGridContainer } from "../../../shared/ui/ag-grid/AgGridContainer";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { agGridDefaultColDef } from "../../../shared/ui/ag-grid/agGridDefaults";
 
 type LineWithItem = ReceiptLine & { itemName: string; uom: string };
@@ -110,71 +112,65 @@ export function ReceiptPage() {
             <StatusBadge status={doc.status} />
           </div>
           <div className="doc-header__actions">
-            <button type="button" className="doc-header__btn" disabled>
+            <Button type="button" disabled>
               Save
-            </button>
+            </Button>
             {isDraft && (
-              <button
-                type="button"
-                className="doc-header__btn"
-                onClick={handlePost}
-              >
+              <Button type="button" onClick={handlePost}>
                 Post
-              </button>
+              </Button>
             )}
             {isDraft && (
-              <button
-                type="button"
-                className="doc-header__btn doc-header__btn--secondary"
-                onClick={handleCancelDocument}
-              >
+              <Button type="button" variant="outline" onClick={handleCancelDocument}>
                 Cancel document
-              </button>
+              </Button>
             )}
           </div>
         </div>
       }
       summary={
-        <>
-          {actionError && (
-            <div className="doc-form__error" role="alert">
-              {actionError}
-            </div>
-          )}
-          <dl className="doc-summary">
+        actionError ? (
+          <div
+            className="rounded-md border border-destructive/50 bg-destructive/10 px-4 py-3 text-sm text-destructive"
+            role="alert"
+          >
+            {actionError}
+          </div>
+        ) : null
+      }
+    >
+      <Card className="max-w-2xl border-0 shadow-none">
+        <CardHeader className="p-4 pb-1">
+          <CardTitle>Details</CardTitle>
+        </CardHeader>
+        <CardContent className="p-4 pt-2">
+          <dl className="doc-summary doc-summary--compact">
             <div className="doc-summary__row">
               <dt className="doc-summary__term">Number</dt>
               <dd className="doc-summary__value">{doc.number}</dd>
             </div>
-          <div className="doc-summary__row">
-            <dt className="doc-summary__term">Date</dt>
-            <dd className="doc-summary__value">{doc.date}</dd>
-          </div>
-          <div className="doc-summary__row">
-            <dt className="doc-summary__term">Related Purchase Order</dt>
-            <dd className="doc-summary__value">{purchaseOrderNumber}</dd>
-          </div>
-          <div className="doc-summary__row">
-            <dt className="doc-summary__term">Warehouse</dt>
-            <dd className="doc-summary__value">{warehouseName}</dd>
-          </div>
-          <div className="doc-summary__row">
-            <dt className="doc-summary__term">Status</dt>
-            <dd className="doc-summary__value">
-              <StatusBadge status={doc.status} />
-            </dd>
-          </div>
-          {doc.comment != null && doc.comment !== "" && (
             <div className="doc-summary__row">
-              <dt className="doc-summary__term">Comment</dt>
-              <dd className="doc-summary__value">{doc.comment}</dd>
+              <dt className="doc-summary__term">Date</dt>
+              <dd className="doc-summary__value">{doc.date}</dd>
             </div>
-          )}
+            <div className="doc-summary__row">
+              <dt className="doc-summary__term">Related Purchase Order</dt>
+              <dd className="doc-summary__value">{purchaseOrderNumber}</dd>
+            </div>
+            <div className="doc-summary__row">
+              <dt className="doc-summary__term">Warehouse</dt>
+              <dd className="doc-summary__value">{warehouseName}</dd>
+            </div>
+            {doc.comment != null && doc.comment !== "" && (
+              <div className="doc-summary__row">
+                <dt className="doc-summary__term">Comment</dt>
+                <dd className="doc-summary__value">{doc.comment}</dd>
+              </div>
+            )}
           </dl>
-        </>
-      }
-    >
-      <div className="doc-lines">
+        </CardContent>
+      </Card>
+      <div className="doc-lines mt-4">
         <h3 className="doc-lines__title">Lines</h3>
         {linesWithItem.length === 0 ? (
           <p className="doc-lines__empty">No lines.</p>

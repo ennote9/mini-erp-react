@@ -12,6 +12,11 @@ import { DocumentPageLayout } from "../../../shared/ui/object/DocumentPageLayout
 import { BackButton } from "../../../shared/ui/list/BackButton";
 import { StatusBadge } from "../../../shared/ui/feedback/StatusBadge";
 import { AgGridContainer } from "../../../shared/ui/ag-grid/AgGridContainer";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { cn } from "@/lib/utils";
 import { ItemSelectCellEditor } from "../../../shared/ui/ag-grid/ItemSelectCellEditor";
 import { agGridDefaultColDef } from "../../../shared/ui/ag-grid/agGridDefaults";
 import { todayYYYYMMDD, normalizeDateForPO } from "../dateUtils";
@@ -84,15 +89,16 @@ function poLinesEditableColumnDefs(
         if (!params.data) return null;
         const lineId = params.data._lineId;
         return (
-          <button
+          <Button
             type="button"
-            className="doc-header__btn doc-header__btn--secondary"
+            variant="outline"
+            size="sm"
             disabled={linesLength <= 1}
             onClick={() => onRemove(lineId)}
             aria-label="Remove line"
           >
             Remove
-          </button>
+          </Button>
         );
       },
     },
@@ -234,8 +240,7 @@ export function PurchaseOrderPage() {
       isNew ? undefined : id ?? undefined,
     );
     if (result.success) {
-      if (isNew) navigate(`/purchase-orders/${result.id}`);
-      else setRefresh((r) => r + 1);
+      navigate("/purchase-orders");
     } else {
       setSaveError(result.error);
     }
@@ -316,56 +321,39 @@ export function PurchaseOrderPage() {
           </div>
           <div className="doc-header__actions">
             {isEditable && (
-              <button
-                type="button"
-                className="doc-header__btn"
-                onClick={handleSave}
-              >
+              <Button type="button" onClick={handleSave}>
                 Save
-              </button>
+              </Button>
             )}
             {!isNew && isDraft && (
-              <button
-                type="button"
-                className="doc-header__btn"
-                onClick={handleConfirm}
-              >
+              <Button type="button" onClick={handleConfirm}>
                 Confirm
-              </button>
+              </Button>
             )}
             {!isNew && isConfirmed && (
-              <button
-                type="button"
-                className="doc-header__btn"
-                onClick={handleCreateReceipt}
-              >
+              <Button type="button" onClick={handleCreateReceipt}>
                 Create Receipt
-              </button>
+              </Button>
             )}
             {!isNew && (isDraft || isConfirmed) && (
-              <button
-                type="button"
-                className="doc-header__btn doc-header__btn--secondary"
-                onClick={handleCancelDocument}
-              >
+              <Button type="button" variant="outline" onClick={handleCancelDocument}>
                 Cancel document
-              </button>
+              </Button>
             )}
             {isEditable && (
-              <button
-                type="button"
-                className="doc-header__btn doc-header__btn--secondary"
-                onClick={handleCancel}
-              >
+              <Button type="button" variant="outline" onClick={handleCancel}>
                 Cancel
-              </button>
+              </Button>
             )}
           </div>
         </div>
       }
       summary={
         saveError ? (
-          <div className="doc-form__error" role="alert">
+          <div
+            className="rounded-md border border-destructive/50 bg-destructive/10 px-4 py-3 text-sm text-destructive"
+            role="alert"
+          >
             {saveError}
           </div>
         ) : null
@@ -373,101 +361,96 @@ export function PurchaseOrderPage() {
     >
       {isEditable ? (
         <>
-          <div className="doc-summary doc-summary--form">
-            <div className="doc-summary__row">
-              <label className="doc-summary__term" htmlFor="po-number">
-                Number
-              </label>
-              <span className="doc-summary__value" id="po-number">
-                {displayNumber}
-              </span>
-            </div>
-            <div className="doc-summary__row">
-              <label className="doc-summary__term" htmlFor="po-date">
-                Date *
-              </label>
-              <input
-                id="po-date"
-                type="date"
-                className="doc-form__input"
-                value={form.date}
-                onChange={(e) => setForm((f) => ({ ...f, date: e.target.value }))}
-              />
-            </div>
-            <div className="doc-summary__row">
-              <label className="doc-summary__term" htmlFor="po-supplier">
-                Supplier *
-              </label>
-              <select
-                id="po-supplier"
-                className="doc-form__select"
-                value={form.supplierId}
-                onChange={(e) =>
-                  setForm((f) => ({ ...f, supplierId: e.target.value }))
-                }
-              >
-                <option value="">Select supplier</option>
-                {activeSuppliers.map((s) => (
-                  <option key={s.id} value={s.id}>
-                    {s.name} ({s.code})
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div className="doc-summary__row">
-              <label className="doc-summary__term" htmlFor="po-warehouse">
-                Warehouse *
-              </label>
-              <select
-                id="po-warehouse"
-                className="doc-form__select"
-                value={form.warehouseId}
-                onChange={(e) =>
-                  setForm((f) => ({ ...f, warehouseId: e.target.value }))
-                }
-              >
-                <option value="">Select warehouse</option>
-                {activeWarehouses.map((w) => (
-                  <option key={w.id} value={w.id}>
-                    {w.name} ({w.code})
-                  </option>
-                ))}
-              </select>
-            </div>
-            {!isNew && (
-              <div className="doc-summary__row">
-                <dt className="doc-summary__term">Status</dt>
-                <dd className="doc-summary__value">
-                  <StatusBadge status={doc!.status} />
-                </dd>
+          <Card className="max-w-2xl border-0 shadow-none">
+            <CardHeader className="p-4 pb-1">
+              <CardTitle>Details</CardTitle>
+            </CardHeader>
+            <CardContent className="p-4 pt-2">
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div className="space-y-1.5">
+                  <Label htmlFor="po-number">Number</Label>
+                  <div id="po-number" className="flex h-10 items-center text-sm text-muted-foreground">
+                    {displayNumber}
+                  </div>
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="po-date">
+                    Date <span className="text-destructive">*</span>
+                  </Label>
+                  <Input
+                    id="po-date"
+                    type="date"
+                    value={form.date}
+                    onChange={(e) => setForm((f) => ({ ...f, date: e.target.value }))}
+                  />
+                </div>
+                <div className="space-y-1.5 sm:col-span-2">
+                  <Label htmlFor="po-supplier">
+                    Supplier <span className="text-destructive">*</span>
+                  </Label>
+                  <select
+                    id="po-supplier"
+                    value={form.supplierId}
+                    onChange={(e) =>
+                      setForm((f) => ({ ...f, supplierId: e.target.value }))
+                    }
+                    className={cn(
+                      "flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-base text-foreground",
+                      "focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50 md:text-sm",
+                    )}
+                  >
+                    <option value="">Select supplier</option>
+                    {activeSuppliers.map((s) => (
+                      <option key={s.id} value={s.id}>
+                        {s.name} ({s.code})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className="space-y-1.5 sm:col-span-2">
+                  <Label htmlFor="po-warehouse">
+                    Warehouse <span className="text-destructive">*</span>
+                  </Label>
+                  <select
+                    id="po-warehouse"
+                    value={form.warehouseId}
+                    onChange={(e) =>
+                      setForm((f) => ({ ...f, warehouseId: e.target.value }))
+                    }
+                    className={cn(
+                      "flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-base text-foreground",
+                      "focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50 md:text-sm",
+                    )}
+                  >
+                    <option value="">Select warehouse</option>
+                    {activeWarehouses.map((w) => (
+                      <option key={w.id} value={w.id}>
+                        {w.name} ({w.code})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className="space-y-1.5 sm:col-span-2">
+                  <Label htmlFor="po-comment">Comment</Label>
+                  <Input
+                    id="po-comment"
+                    type="text"
+                    value={form.comment}
+                    onChange={(e) =>
+                      setForm((f) => ({ ...f, comment: e.target.value }))
+                    }
+                    placeholder="Optional"
+                  />
+                </div>
               </div>
-            )}
-            <div className="doc-summary__row">
-              <label className="doc-summary__term" htmlFor="po-comment">
-                Comment
-              </label>
-              <input
-                id="po-comment"
-                type="text"
-                className="doc-form__input"
-                value={form.comment}
-                onChange={(e) =>
-                  setForm((f) => ({ ...f, comment: e.target.value }))
-                }
-                placeholder="Optional"
-              />
-            </div>
-          </div>
-          <div className="doc-lines">
+            </CardContent>
+          </Card>
+          <div className="doc-lines mt-4">
             <div className="doc-lines__head">
               <h3 className="doc-lines__title">Lines</h3>
-              <button
-                type="button"
-                className="doc-header__btn doc-header__btn--secondary"
-                onClick={addLine}
-              >
+              <Button type="button" variant="outline" size="sm" onClick={addLine}>
                 Add line
-              </button>
+              </Button>
             </div>
             <div className="doc-lines__grid">
               <AgGridContainer themeClass="doc-lines-grid">
@@ -487,37 +470,38 @@ export function PurchaseOrderPage() {
         </>
       ) : (
         <>
-          <dl className="doc-summary">
-            <div className="doc-summary__row">
-              <dt className="doc-summary__term">Number</dt>
-              <dd className="doc-summary__value">{doc!.number}</dd>
-            </div>
-            <div className="doc-summary__row">
-              <dt className="doc-summary__term">Date</dt>
-              <dd className="doc-summary__value">{normalizeDateForPO(doc!.date)}</dd>
-            </div>
-            <div className="doc-summary__row">
-              <dt className="doc-summary__term">Supplier</dt>
-              <dd className="doc-summary__value">{supplierName}</dd>
-            </div>
-            <div className="doc-summary__row">
-              <dt className="doc-summary__term">Warehouse</dt>
-              <dd className="doc-summary__value">{warehouseName}</dd>
-            </div>
-            <div className="doc-summary__row">
-              <dt className="doc-summary__term">Status</dt>
-              <dd className="doc-summary__value">
-                <StatusBadge status={doc!.status} />
-              </dd>
-            </div>
-            {doc!.comment != null && doc!.comment !== "" && (
-              <div className="doc-summary__row">
-                <dt className="doc-summary__term">Comment</dt>
-                <dd className="doc-summary__value">{doc!.comment}</dd>
-              </div>
-            )}
-          </dl>
-          <div className="doc-lines">
+          <Card className="max-w-2xl border-0 shadow-none">
+            <CardHeader className="p-4 pb-1">
+              <CardTitle>Details</CardTitle>
+            </CardHeader>
+            <CardContent className="p-4 pt-2">
+              <dl className="doc-summary doc-summary--compact">
+                <div className="doc-summary__row">
+                  <dt className="doc-summary__term">Number</dt>
+                  <dd className="doc-summary__value">{doc!.number}</dd>
+                </div>
+                <div className="doc-summary__row">
+                  <dt className="doc-summary__term">Date</dt>
+                  <dd className="doc-summary__value">{normalizeDateForPO(doc!.date)}</dd>
+                </div>
+                <div className="doc-summary__row">
+                  <dt className="doc-summary__term">Supplier</dt>
+                  <dd className="doc-summary__value">{supplierName}</dd>
+                </div>
+                <div className="doc-summary__row">
+                  <dt className="doc-summary__term">Warehouse</dt>
+                  <dd className="doc-summary__value">{warehouseName}</dd>
+                </div>
+                {doc!.comment != null && doc!.comment !== "" && (
+                  <div className="doc-summary__row">
+                    <dt className="doc-summary__term">Comment</dt>
+                    <dd className="doc-summary__value">{doc!.comment}</dd>
+                  </div>
+                )}
+              </dl>
+            </CardContent>
+          </Card>
+          <div className="doc-lines mt-4">
             <h3 className="doc-lines__title">Lines</h3>
             {linesWithItem.length === 0 ? (
               <p className="doc-lines__empty">No lines.</p>

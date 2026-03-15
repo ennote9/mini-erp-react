@@ -14,7 +14,6 @@ import type { StockMovement } from "../model";
 import type { SourceDocumentType } from "../../../shared/domain";
 import { ListPageLayout } from "../../../shared/ui/list/ListPageLayout";
 import { EmptyState } from "../../../shared/ui/feedback/EmptyState";
-import { Badge } from "@/components/ui/badge";
 import {
   AgGridContainer,
   agGridDefaultColDef,
@@ -55,14 +54,7 @@ function MovementTypeCellRenderer(params: ICellRendererParams<RowData>) {
   const value = params.value as string | undefined;
   if (value == null) return null;
   const label = MOVEMENT_TYPE_LABEL[value] ?? value;
-  const modifier = value === "receipt" || value === "shipment" ? value : "receipt";
-  return (
-    <Badge
-      className={`list-table__badge list-table__badge--status list-table__badge--${modifier}`}
-    >
-      {label}
-    </Badge>
-  );
+  return label;
 }
 
 function getSourceDocument(
