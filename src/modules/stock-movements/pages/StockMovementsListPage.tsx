@@ -35,15 +35,15 @@ export function StockMovementsListPage() {
         />
       }
     >
-      {/* Explicit fixed height: no flex, no 100%. Theme on grid root via className. */}
+      {/* Theme on wrapper so entire grid tree inherits dark variables. Fixed height only. */}
       <div
+        className="ag-theme-quartz-dark stock-movements-grid"
         style={{
           width: "100%",
           height: "500px",
         }}
       >
         <AgGridReact<MinimalRow>
-          className="ag-theme-quartz-dark"
           rowData={MINIMAL_ROW_DATA}
           columnDefs={columnDefs}
         />
