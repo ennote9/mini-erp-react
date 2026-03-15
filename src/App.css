@@ -212,33 +212,11 @@ body,
   overflow: auto;
 }
 
-/* AG Grid pilot: Stock Movements — container needs a defined height so the grid can render */
-.list-page__grid-wrapper {
-  flex: 1;
-  min-height: 450px;
-  width: 100%;
-  overflow: hidden;
-}
+/* AG Grid pilot: minimal test uses inline style (500px). Restore when adding full grid. */
+/* .list-page__grid-wrapper { flex: 1; min-height: 450px; width: 100%; overflow: hidden; } */
 
-/* Dark ERP alignment for Stock Movements AG Grid */
-.list-page__content .ag-theme-quartz-dark {
-  --ag-background-color: #222;
-  --ag-header-background-color: #252525;
-  --ag-foreground-color: #e4e4e4;
-  --ag-border-color: #333;
-  --ag-row-hover-color: rgba(255, 255, 255, 0.06);
-  --ag-selected-row-background-color: rgba(57, 108, 216, 0.2);
-  font-size: 0.9rem;
-}
-.list-page__content .ag-theme-quartz-dark .ag-header-cell,
-.list-page__content .ag-theme-quartz-dark .ag-header-group-cell {
-  color: #b0b0b0;
-  font-weight: 600;
-}
-.list-page__content .ag-theme-quartz-dark .ag-cell,
-.list-page__content .ag-theme-quartz-dark .ag-header-cell {
-  padding: 0.5rem 0.75rem;
-}
+/* Dark ERP overrides — disabled for minimal grid test; re-enable after grid renders */
+/* .list-page__content .ag-theme-quartz-dark { ... } */
 
 .list-page__empty {
   padding: 3rem 2rem;
