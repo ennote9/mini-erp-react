@@ -1,9 +1,16 @@
+/**
+ * Items list — AG Grid migration. Uses shared AgGridContainer and defaultColDef.
+ * Preserves search, All/Active/Inactive filters, New button, row navigation, empty state.
+ */
 import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { AgGridReact } from "ag-grid-react";
+import type { ColDef, ICellRendererParams } from "ag-grid-community";
 import { itemRepository } from "../repository";
 import type { Item } from "../model";
 import { ListPageLayout } from "../../../shared/ui/list/ListPageLayout";
 import { EmptyState } from "../../../shared/ui/feedback/EmptyState";
+import { AgGridContainer, agGridDefaultColDef } from "../../../shared/ui/ag-grid";
 
 type ActiveFilter = "all" | "active" | "inactive";
 
@@ -14,6 +21,21 @@ function applyActiveFilter(
   if (activeFilter === "active") return items.filter((x) => x.isActive);
   if (activeFilter === "inactive") return items.filter((x) => !x.isActive);
   return items;
+}
+
+function ActiveBadgeCellRenderer(params: ICellRendererParams<Item>) {
+  const isActive = params.value as boolean;
+  const label = isActive ? "Active" : "Inactive";
+  return (
+    <span
+      className={
+        "list-table__badge" +
+        (isActive ? " list-table__badge--active" : " list-table__badge--inactive")
+      }
+    >
+      {label}
+    </span>
+  );
 }
 
 export function ItemsListPage() {
@@ -35,6 +57,33 @@ export function ItemsListPage() {
   const emptyHint = hasActiveFilter
     ? "Try changing the search or filter."
     : "Create your first item to start working with inventory.";
+
+  const columnDefs = useMemo<ColDef<Item>[]>(
+    () => [
+      {
+        field: "code",
+        headerName: "Code",
+        width: 130,
+      },
+      {
+        field: "name",
+        headerName: "Name",
+        minWidth: 160,
+      },
+      {
+        field: "uom",
+        headerName: "UOM",
+        width: 90,
+      },
+      {
+        field: "isActive",
+        headerName: "Active",
+        width: 100,
+        cellRenderer: ActiveBadgeCellRenderer,
+      },
+    ],
+    [],
+  );
 
   return (
     <ListPageLayout
@@ -86,66 +135,15 @@ export function ItemsListPage() {
       {isEmpty ? (
         <EmptyState title={emptyTitle} hint={emptyHint} />
       ) : (
-        <table className="list-table">
-          <thead>
-            <tr>
-              <th className="list-table__cell list-table__cell--checkbox">
-                <input type="checkbox" aria-label="Select all" disabled />
-              </th>
-              <th className="list-table__cell list-table__cell--code">Code</th>
-              <th className="list-table__cell list-table__cell--name">Name</th>
-              <th className="list-table__cell list-table__cell--uom">UOM</th>
-              <th className="list-table__cell list-table__cell--active">
-                Active
-              </th>
-            </tr>
-          </thead>
-          <tbody>
-            {filteredItems.map((row) => (
-              <tr
-                key={row.id}
-                className="list-table__row list-table__row--clickable"
-                onClick={() => navigate(`/items/${row.id}`)}
-                role="button"
-                tabIndex={0}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" || e.key === " ") {
-                    e.preventDefault();
-                    navigate(`/items/${row.id}`);
-                  }
-                }}
-              >
-                <td
-                  className="list-table__cell list-table__cell--checkbox"
-                  onClick={(e) => e.stopPropagation()}
-                >
-                  <input type="checkbox" aria-label={`Select ${row.code}`} />
-                </td>
-                <td className="list-table__cell list-table__cell--code">
-                  {row.code}
-                </td>
-                <td className="list-table__cell list-table__cell--name">
-                  {row.name}
-                </td>
-                <td className="list-table__cell list-table__cell--uom">
-                  {row.uom}
-                </td>
-                <td className="list-table__cell list-table__cell--active">
-                  <span
-                    className={
-                      "list-table__badge" +
-                      (row.isActive
-                        ? " list-table__badge--active"
-                        : " list-table__badge--inactive")
-                    }
-                  >
-                    {row.isActive ? "Active" : "Inactive"}
-                  </span>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+        <AgGridContainer themeClass="items-grid">
+          <AgGridReact<Item>
+            rowData={filteredItems}
+            columnDefs={columnDefs}
+            defaultColDef={agGridDefaultColDef}
+            getRowId={(params) => params.data.id}
+            onRowClicked={(e) => e.data && navigate(`/items/${e.data.id}`)}
+          />
+        </AgGridContainer>
       )}
     </ListPageLayout>
   );

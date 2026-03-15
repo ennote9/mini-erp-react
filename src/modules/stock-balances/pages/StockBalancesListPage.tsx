@@ -1,10 +1,17 @@
+/**
+ * Stock Balances list — AG Grid migration (same pattern as Stock Movements).
+ * Repository-backed data, search, empty states, dark theme. Plain text columns only.
+ */
 import { useMemo, useState } from "react";
+import { AgGridReact } from "ag-grid-react";
+import type { ColDef } from "ag-grid-community";
 import { stockBalanceRepository } from "../repository";
 import { itemRepository } from "../../items/repository";
 import { warehouseRepository } from "../../warehouses/repository";
 import type { StockBalance } from "../model";
 import { ListPageLayout } from "../../../shared/ui/list/ListPageLayout";
 import { EmptyState } from "../../../shared/ui/feedback/EmptyState";
+import { AgGridContainer, agGridDefaultColDef } from "../../../shared/ui/ag-grid";
 
 type RowData = StockBalance & {
   itemCode: string;
@@ -55,6 +62,32 @@ export function StockBalancesListPage() {
     ? "Try changing the search."
     : "Balances will appear after posting receipts and shipments.";
 
+  const columnDefs = useMemo<ColDef<RowData>[]>(
+    () => [
+      {
+        field: "itemCode",
+        headerName: "Item Code",
+        width: 130,
+      },
+      {
+        field: "itemName",
+        headerName: "Item Name",
+        minWidth: 160,
+      },
+      {
+        field: "warehouseName",
+        headerName: "Warehouse",
+        minWidth: 140,
+      },
+      {
+        field: "qtyOnHand",
+        headerName: "Qty On Hand",
+        width: 120,
+      },
+    ],
+    [],
+  );
+
   return (
     <ListPageLayout
       header={null}
@@ -72,54 +105,14 @@ export function StockBalancesListPage() {
       {isEmpty ? (
         <EmptyState title={emptyTitle} hint={emptyHint} />
       ) : (
-        <table className="list-table">
-          <thead>
-            <tr>
-              <th className="list-table__cell list-table__cell--checkbox">
-                <input type="checkbox" aria-label="Select all" disabled />
-              </th>
-              <th className="list-table__cell list-table__cell--code">
-                Item Code
-              </th>
-              <th className="list-table__cell list-table__cell--name">
-                Item Name
-              </th>
-              <th className="list-table__cell list-table__cell--warehouse">
-                Warehouse
-              </th>
-              <th className="list-table__cell list-table__cell--number">
-                Qty On Hand
-              </th>
-            </tr>
-          </thead>
-          <tbody>
-            {filteredRows.map((row) => (
-              <tr key={row.id} className="list-table__row">
-                <td
-                  className="list-table__cell list-table__cell--checkbox"
-                  onClick={(e) => e.stopPropagation()}
-                >
-                  <input
-                    type="checkbox"
-                    aria-label={`Select ${row.itemCode}`}
-                  />
-                </td>
-                <td className="list-table__cell list-table__cell--code">
-                  {row.itemCode}
-                </td>
-                <td className="list-table__cell list-table__cell--name">
-                  {row.itemName}
-                </td>
-                <td className="list-table__cell list-table__cell--warehouse">
-                  {row.warehouseName}
-                </td>
-                <td className="list-table__cell list-table__cell--number">
-                  {row.qtyOnHand}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+        <AgGridContainer themeClass="stock-balances-grid">
+          <AgGridReact<RowData>
+            rowData={filteredRows}
+            columnDefs={columnDefs}
+            defaultColDef={agGridDefaultColDef}
+            getRowId={(params) => params.data.id}
+          />
+        </AgGridContainer>
       )}
     </ListPageLayout>
   );

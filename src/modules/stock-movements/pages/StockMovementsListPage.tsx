@@ -1,10 +1,10 @@
 /**
- * Stock Movements — Stage 2: real repository data, simple text columns, search, empty state.
- * No custom renderers (badge/link) yet. No Movement Type or Source Document columns yet.
+ * Stock Movements — Stage 4: Readability polish — Movement Type badge, wider columns, readable datetime.
  */
 import { useMemo, useState } from "react";
+import { Link } from "react-router-dom";
 import { AgGridReact } from "ag-grid-react";
-import type { ColDef } from "ag-grid-community";
+import type { ColDef, ICellRendererParams } from "ag-grid-community";
 import { stockMovementRepository } from "../repository";
 import { itemRepository } from "../../items/repository";
 import { warehouseRepository } from "../../warehouses/repository";
@@ -14,27 +14,86 @@ import type { StockMovement } from "../model";
 import type { SourceDocumentType } from "../../../shared/domain";
 import { ListPageLayout } from "../../../shared/ui/list/ListPageLayout";
 import { EmptyState } from "../../../shared/ui/feedback/EmptyState";
+import { AgGridContainer, agGridDefaultColDef } from "../../../shared/ui/ag-grid";
 
 type RowData = StockMovement & {
   itemCode: string;
   itemName: string;
   warehouseName: string;
   sourceDocumentLabel: string;
+  sourceDocumentHref: string | null;
 };
 
-function getSourceDocumentLabel(
+const MOVEMENT_TYPE_LABEL: Record<string, string> = {
+  receipt: "Receipt",
+  shipment: "Shipment",
+};
+
+const DATE_TIME_FORMAT: Intl.DateTimeFormatOptions = {
+  day: "2-digit",
+  month: "short",
+  year: "numeric",
+  hour: "2-digit",
+  minute: "2-digit",
+};
+
+function formatDateTime(isoString: string | null | undefined): string {
+  if (isoString == null) return "";
+  const d = new Date(isoString);
+  return Number.isNaN(d.getTime()) ? String(isoString) : d.toLocaleString(undefined, DATE_TIME_FORMAT);
+}
+
+function MovementTypeCellRenderer(params: ICellRendererParams<RowData>) {
+  const value = params.value as string | undefined;
+  if (value == null) return null;
+  const label = MOVEMENT_TYPE_LABEL[value] ?? value;
+  const modifier = value === "receipt" || value === "shipment" ? value : "receipt";
+  return (
+    <span
+      className={`list-table__badge list-table__badge--status list-table__badge--${modifier}`}
+    >
+      {label}
+    </span>
+  );
+}
+
+function getSourceDocument(
   sourceDocumentType: SourceDocumentType,
   sourceDocumentId: string,
-): string {
+): { label: string; href: string | null } {
   if (sourceDocumentType === "receipt") {
     const doc = receiptRepository.getById(sourceDocumentId);
-    return doc ? `Receipt ${doc.number}` : `Receipt ${sourceDocumentId}`;
+    return {
+      label: doc ? `Receipt ${doc.number}` : `Receipt ${sourceDocumentId}`,
+      href: `/receipts/${sourceDocumentId}`,
+    };
   }
   if (sourceDocumentType === "shipment") {
     const doc = shipmentRepository.getById(sourceDocumentId);
-    return doc ? `Shipment ${doc.number}` : `Shipment ${sourceDocumentId}`;
+    return {
+      label: doc ? `Shipment ${doc.number}` : `Shipment ${sourceDocumentId}`,
+      href: `/shipments/${sourceDocumentId}`,
+    };
   }
-  return sourceDocumentId;
+  return { label: sourceDocumentId, href: null };
+}
+
+function SourceDocumentCellRenderer(params: ICellRendererParams<RowData>) {
+  const data = params.data;
+  if (!data) return null;
+  const { sourceDocumentLabel, sourceDocumentHref } = data;
+  if (sourceDocumentHref) {
+    return (
+      <Link
+        to={sourceDocumentHref}
+        className="list-table__link"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {sourceDocumentLabel}
+      </Link>
+    );
+  }
+  return <span>{sourceDocumentLabel}</span>;
 }
 
 function filterBySearch(rows: RowData[], query: string): RowData[] {
@@ -58,16 +117,15 @@ export function StockMovementsListPage() {
       .map((m) => {
         const item = itemRepository.getById(m.itemId);
         const warehouse = warehouseRepository.getById(m.warehouseId);
-        const sourceDocumentLabel = getSourceDocumentLabel(
-          m.sourceDocumentType,
-          m.sourceDocumentId,
-        );
+        const { label: sourceDocumentLabel, href: sourceDocumentHref } =
+          getSourceDocument(m.sourceDocumentType, m.sourceDocumentId);
         return {
           ...m,
           itemCode: item?.code ?? m.itemId,
           itemName: item?.name ?? m.itemId,
           warehouseName: warehouse?.name ?? m.warehouseId,
           sourceDocumentLabel,
+          sourceDocumentHref,
         };
       })
       .sort(
@@ -96,43 +154,47 @@ export function StockMovementsListPage() {
       {
         field: "datetime",
         headerName: "Date/Time",
-        width: 180,
-        sortable: true,
-        resizable: true,
+        width: 200,
+        valueFormatter: (params) => formatDateTime(params.value),
+      },
+      {
+        field: "movementType",
+        headerName: "Movement Type",
+        width: 120,
+        cellRenderer: MovementTypeCellRenderer,
       },
       {
         field: "itemCode",
         headerName: "Item Code",
         width: 120,
-        sortable: true,
-        resizable: true,
       },
       {
         field: "itemName",
         headerName: "Item Name",
         minWidth: 160,
-        sortable: true,
-        resizable: true,
       },
       {
         field: "warehouseName",
         headerName: "Warehouse",
         minWidth: 120,
-        sortable: true,
-        resizable: true,
       },
       {
         field: "qtyDelta",
         headerName: "Qty Delta",
         width: 110,
-        sortable: true,
-        resizable: true,
         valueFormatter: (params) =>
           params.value != null
             ? params.value > 0
               ? `+${params.value}`
               : String(params.value)
             : "",
+      },
+      {
+        headerName: "Source Document",
+        minWidth: 180,
+        width: 180,
+        valueGetter: (params) => params.data?.sourceDocumentLabel ?? "",
+        cellRenderer: SourceDocumentCellRenderer,
       },
     ],
     [],
@@ -155,19 +217,14 @@ export function StockMovementsListPage() {
       {isEmpty ? (
         <EmptyState title={emptyTitle} hint={emptyHint} />
       ) : (
-        <div
-          className="ag-theme-quartz-dark stock-movements-grid"
-          style={{
-            width: "100%",
-            height: "500px",
-          }}
-        >
+        <AgGridContainer themeClass="stock-movements-grid">
           <AgGridReact<RowData>
             rowData={filteredRows}
             columnDefs={columnDefs}
+            defaultColDef={agGridDefaultColDef}
             getRowId={(params) => params.data.id}
           />
-        </div>
+        </AgGridContainer>
       )}
     </ListPageLayout>
   );

@@ -1,9 +1,16 @@
+/**
+ * Suppliers list — AG Grid migration. Uses shared AgGridContainer and defaultColDef.
+ * Preserves search, All/Active/Inactive filters, New button, row navigation, empty state.
+ */
 import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { AgGridReact } from "ag-grid-react";
+import type { ColDef, ICellRendererParams } from "ag-grid-community";
 import { supplierRepository } from "../repository";
 import type { Supplier } from "../model";
 import { ListPageLayout } from "../../../shared/ui/list/ListPageLayout";
 import { EmptyState } from "../../../shared/ui/feedback/EmptyState";
+import { AgGridContainer, agGridDefaultColDef } from "../../../shared/ui/ag-grid";
 
 type ActiveFilter = "all" | "active" | "inactive";
 
@@ -14,6 +21,21 @@ function applyActiveFilter(
   if (activeFilter === "active") return list.filter((x) => x.isActive);
   if (activeFilter === "inactive") return list.filter((x) => !x.isActive);
   return list;
+}
+
+function ActiveBadgeCellRenderer(params: ICellRendererParams<Supplier>) {
+  const isActive = params.value as boolean;
+  const label = isActive ? "Active" : "Inactive";
+  return (
+    <span
+      className={
+        "list-table__badge" +
+        (isActive ? " list-table__badge--active" : " list-table__badge--inactive")
+      }
+    >
+      {label}
+    </span>
+  );
 }
 
 export function SuppliersListPage() {
@@ -35,6 +57,40 @@ export function SuppliersListPage() {
   const emptyHint = hasFilter
     ? "Try changing the search or filter."
     : "Create your first supplier to start purchasing workflow.";
+
+  const columnDefs = useMemo<ColDef<Supplier>[]>(
+    () => [
+      {
+        field: "code",
+        headerName: "Code",
+        width: 140,
+      },
+      {
+        field: "name",
+        headerName: "Name",
+        minWidth: 180,
+      },
+      {
+        field: "phone",
+        headerName: "Phone",
+        width: 150,
+        valueFormatter: (params) => params.value ?? "—",
+      },
+      {
+        field: "email",
+        headerName: "Email",
+        minWidth: 180,
+        valueFormatter: (params) => params.value ?? "—",
+      },
+      {
+        field: "isActive",
+        headerName: "Active",
+        width: 110,
+        cellRenderer: ActiveBadgeCellRenderer,
+      },
+    ],
+    [],
+  );
 
   return (
     <ListPageLayout
@@ -86,70 +142,15 @@ export function SuppliersListPage() {
       {isEmpty ? (
         <EmptyState title={emptyTitle} hint={emptyHint} />
       ) : (
-        <table className="list-table">
-          <thead>
-            <tr>
-              <th className="list-table__cell list-table__cell--checkbox">
-                <input type="checkbox" aria-label="Select all" disabled />
-              </th>
-              <th className="list-table__cell list-table__cell--code">Code</th>
-              <th className="list-table__cell list-table__cell--name">Name</th>
-              <th className="list-table__cell list-table__cell--date">Phone</th>
-              <th className="list-table__cell list-table__cell--supplier">Email</th>
-              <th className="list-table__cell list-table__cell--active">
-                Active
-              </th>
-            </tr>
-          </thead>
-          <tbody>
-            {filteredRows.map((row) => (
-              <tr
-                key={row.id}
-                className="list-table__row list-table__row--clickable"
-                onClick={() => navigate(`/suppliers/${row.id}`)}
-                role="button"
-                tabIndex={0}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" || e.key === " ") {
-                    e.preventDefault();
-                    navigate(`/suppliers/${row.id}`);
-                  }
-                }}
-              >
-                <td
-                  className="list-table__cell list-table__cell--checkbox"
-                  onClick={(e) => e.stopPropagation()}
-                >
-                  <input type="checkbox" aria-label={`Select ${row.code}`} />
-                </td>
-                <td className="list-table__cell list-table__cell--code">
-                  {row.code}
-                </td>
-                <td className="list-table__cell list-table__cell--name">
-                  {row.name}
-                </td>
-                <td className="list-table__cell list-table__cell--date">
-                  {row.phone ?? "—"}
-                </td>
-                <td className="list-table__cell list-table__cell--supplier">
-                  {row.email ?? "—"}
-                </td>
-                <td className="list-table__cell list-table__cell--active">
-                  <span
-                    className={
-                      "list-table__badge" +
-                      (row.isActive
-                        ? " list-table__badge--active"
-                        : " list-table__badge--inactive")
-                    }
-                  >
-                    {row.isActive ? "Active" : "Inactive"}
-                  </span>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+        <AgGridContainer themeClass="suppliers-grid">
+          <AgGridReact<Supplier>
+            rowData={filteredRows}
+            columnDefs={columnDefs}
+            defaultColDef={agGridDefaultColDef}
+            getRowId={(params) => params.data.id}
+            onRowClicked={(e) => e.data && navigate(`/suppliers/${e.data.id}`)}
+          />
+        </AgGridContainer>
       )}
     </ListPageLayout>
   );

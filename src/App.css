@@ -252,6 +252,120 @@ body,
   color: #e4e4e4 !important;
 }
 
+/* Stock Balances AG Grid — same dark theme as Stock Movements */
+.stock-balances-grid.ag-theme-quartz-dark {
+  --ag-background-color: #222;
+  --ag-header-background-color: #252525;
+  --ag-foreground-color: #e4e4e4;
+  --ag-border-color: #333;
+  --ag-data-background-color: #222;
+  --ag-icon-font-color: #e4e4e4;
+}
+.stock-balances-grid .ag-root-wrapper {
+  background-color: #222 !important;
+}
+.stock-balances-grid .ag-header-viewport,
+.stock-balances-grid .ag-header-row,
+.stock-balances-grid .ag-header-cell {
+  background-color: #252525 !important;
+  color: #e4e4e4 !important;
+}
+.stock-balances-grid .ag-body-viewport,
+.stock-balances-grid .ag-center-cols-viewport,
+.stock-balances-grid .ag-row,
+.stock-balances-grid .ag-cell {
+  background-color: #222 !important;
+  color: #e4e4e4 !important;
+}
+.stock-balances-grid .ag-header-cell-text,
+.stock-balances-grid .ag-cell-wrapper {
+  color: #e4e4e4 !important;
+}
+.stock-balances-grid .ag-row-border {
+  border-color: #333 !important;
+}
+.stock-balances-grid .ag-icon {
+  color: #e4e4e4 !important;
+}
+
+/* Items AG Grid — same dark theme as Stock Movements / Stock Balances */
+.items-grid.ag-theme-quartz-dark {
+  --ag-background-color: #222;
+  --ag-header-background-color: #252525;
+  --ag-foreground-color: #e4e4e4;
+  --ag-border-color: #333;
+  --ag-data-background-color: #222;
+  --ag-icon-font-color: #e4e4e4;
+}
+.items-grid .ag-root-wrapper {
+  background-color: #222 !important;
+}
+.items-grid .ag-header-viewport,
+.items-grid .ag-header-row,
+.items-grid .ag-header-cell {
+  background-color: #252525 !important;
+  color: #e4e4e4 !important;
+}
+.items-grid .ag-body-viewport,
+.items-grid .ag-center-cols-viewport,
+.items-grid .ag-row,
+.items-grid .ag-cell {
+  background-color: #222 !important;
+  color: #e4e4e4 !important;
+}
+.items-grid .ag-row {
+  cursor: pointer;
+}
+.items-grid .ag-header-cell-text,
+.items-grid .ag-cell-wrapper {
+  color: #e4e4e4 !important;
+}
+.items-grid .ag-row-border {
+  border-color: #333 !important;
+}
+.items-grid .ag-icon {
+  color: #e4e4e4 !important;
+}
+
+/* Suppliers AG Grid — same dark theme as Items / Stock grids */
+.suppliers-grid.ag-theme-quartz-dark {
+  --ag-background-color: #222;
+  --ag-header-background-color: #252525;
+  --ag-foreground-color: #e4e4e4;
+  --ag-border-color: #333;
+  --ag-data-background-color: #222;
+  --ag-icon-font-color: #e4e4e4;
+}
+.suppliers-grid .ag-root-wrapper {
+  background-color: #222 !important;
+}
+.suppliers-grid .ag-header-viewport,
+.suppliers-grid .ag-header-row,
+.suppliers-grid .ag-header-cell {
+  background-color: #252525 !important;
+  color: #e4e4e4 !important;
+}
+.suppliers-grid .ag-body-viewport,
+.suppliers-grid .ag-center-cols-viewport,
+.suppliers-grid .ag-row,
+.suppliers-grid .ag-cell {
+  background-color: #222 !important;
+  color: #e4e4e4 !important;
+}
+.suppliers-grid .ag-row {
+  cursor: pointer;
+}
+.suppliers-grid .ag-header-cell-text,
+.suppliers-grid .ag-cell-wrapper {
+  color: #e4e4e4 !important;
+}
+.suppliers-grid .ag-row-border {
+  border-color: #333 !important;
+}
+.suppliers-grid .ag-icon {
+  color: #e4e4e4 !important;
+}
+
 .list-page__empty {
   padding: 3rem 2rem;
   text-align: center;
