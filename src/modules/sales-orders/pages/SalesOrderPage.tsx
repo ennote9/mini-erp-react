@@ -34,7 +34,7 @@ function defaultForm(nextLineId: number): FormState {
     customerId: "",
     warehouseId: "",
     comment: "",
-    lines: [{ itemId: "", qty: 0, _lineId: nextLineId }],
+    lines: [{ itemId: "", qty: 1, _lineId: nextLineId }],
   };
 }
 
@@ -42,6 +42,7 @@ function soLinesEditableColumnDefs(
   activeItems: { id: string; code: string; name: string }[],
   linesLength: number,
   onRemove: (lineId: number) => void,
+  onItemIdChange: (lineId: number, itemId: string) => void,
 ): ColDef<LineFormRow>[] {
   return [
     {
@@ -56,7 +57,7 @@ function soLinesEditableColumnDefs(
         return item ? `${item.name} (${item.code})` : p.value;
       },
       cellEditor: ItemSelectCellEditor,
-      cellEditorParams: { items: activeItems },
+      cellEditorParams: { items: activeItems, onItemSelected: onItemIdChange },
     },
     {
       field: "qty",
@@ -141,7 +142,7 @@ export function SalesOrderPage() {
               qty: l.qty,
               _lineId: idx,
             }))
-          : [{ itemId: "", qty: 0, _lineId: 0 }];
+          : [{ itemId: "", qty: 1, _lineId: 0 }];
       nextLineIdRef.current = linesWithId.length;
       setForm({
         date: normalizeDateForSO(doc.date),
@@ -248,13 +249,21 @@ export function SalesOrderPage() {
     const lineId = nextLineIdRef.current++;
     setForm((f) => ({
       ...f,
-      lines: [...f.lines, { itemId: "", qty: 0, _lineId: lineId }],
+      lines: [...f.lines, { itemId: "", qty: 1, _lineId: lineId }],
     }));
   };
   const removeLineByLineId = (lineId: number) => {
     setForm((f) => ({
       ...f,
       lines: f.lines.filter((l) => l._lineId !== lineId),
+    }));
+  };
+  const onItemIdChange = (lineId: number, itemId: string) => {
+    setForm((f) => ({
+      ...f,
+      lines: f.lines.map((l) =>
+        l._lineId === lineId ? { ...l, itemId } : l,
+      ),
     }));
   };
   const onLinesCellValueChanged = (e: CellValueChangedEvent<LineFormRow>) => {
@@ -464,7 +473,7 @@ export function SalesOrderPage() {
               <AgGridContainer themeClass="doc-lines-grid">
                 <AgGridReact<LineFormRow>
                   rowData={form.lines}
-                  columnDefs={soLinesEditableColumnDefs(activeItems, form.lines.length, removeLineByLineId)}
+                  columnDefs={soLinesEditableColumnDefs(activeItems, form.lines.length, removeLineByLineId, onItemIdChange)}
                   defaultColDef={agGridDefaultColDef}
                   getRowId={(p) => String(p.data._lineId)}
                   onCellValueChanged={onLinesCellValueChanged}
