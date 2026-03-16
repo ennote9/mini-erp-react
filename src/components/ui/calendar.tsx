@@ -10,6 +10,54 @@ import { UI } from "react-day-picker";
 
 export type CalendarProps = React.ComponentProps<typeof DayPicker>;
 
+type MonthProps = {
+  calendarMonth: unknown;
+  displayIndex: number;
+} & React.HTMLAttributes<HTMLDivElement>;
+
+function isPrevButton(c: React.ReactNode): boolean {
+  return React.isValidElement(c) && typeof (c.props as { className?: string }).className === "string" && (c.props as { className: string }).className.includes("button_previous");
+}
+function isNextButton(c: React.ReactNode): boolean {
+  return React.isValidElement(c) && typeof (c.props as { className?: string }).className === "string" && (c.props as { className: string }).className.includes("button_next");
+}
+function isCaption(c: React.ReactNode): boolean {
+  return React.isValidElement(c) && typeof (c.props as { className?: string }).className === "string" && (c.props as { className: string }).className.includes("month_caption");
+}
+
+/** Custom Month so header is one horizontal bar: [Prev] [Month/Year] [Next] instead of stacked */
+function MonthWithHeaderBar(props: MonthProps) {
+  const { children, className, ...rest } = props;
+  const list = React.Children.toArray(children);
+  const gridIndex = list.findIndex((c) => {
+    if (!React.isValidElement(c)) return false;
+    const p = c.props as { className?: string; role?: string };
+    return p.role === "grid" || (typeof p.className === "string" && p.className.includes("month_grid"));
+  });
+  const headerChildren = gridIndex >= 0 ? list.slice(0, gridIndex) : [];
+  const bodyChildren = gridIndex >= 0 ? list.slice(gridIndex) : list;
+
+  const prev = headerChildren.find(isPrevButton);
+  const next = headerChildren.find(isNextButton);
+  const caption = headerChildren.find(isCaption);
+
+  return (
+    <div className={cn("flex flex-col gap-0", className)} {...rest}>
+      {headerChildren.length > 0 && (
+        <div
+          className="rdp-calendar-header flex items-center gap-2 min-h-9 py-0 border-b border-border w-full"
+          role="presentation"
+        >
+          <div className="shrink-0">{prev ?? null}</div>
+          <div className="min-w-0 flex-1 flex justify-center items-center">{caption ?? null}</div>
+          <div className="shrink-0">{next ?? null}</div>
+        </div>
+      )}
+      {bodyChildren}
+    </div>
+  );
+}
+
 const startMonth = new Date(1900, 0, 1);
 const endMonth = new Date(2100, 11, 31);
 
@@ -69,7 +117,7 @@ function Calendar({
       classNames={{
         months: "flex flex-col gap-0",
         month: "flex flex-col gap-0",
-        month_caption: "rdp-header-bar flex justify-center items-center relative min-h-9 py-0 border-b border-border",
+        month_caption: "flex justify-center items-center relative min-h-9 py-0",
         dropdown_root: "flex items-center gap-2",
         dropdown: "rounded-md border border-input bg-background px-2 py-1.5 text-sm leading-none min-w-0",
         nav: "flex items-center gap-1",
@@ -103,6 +151,7 @@ function Calendar({
           dateLib ? dateLib.format(weekday, "EEE").slice(0, 2) : "",
       }}
       components={{
+        Month: MonthWithHeaderBar,
         Dropdown: DropdownOnlySelect,
         Chevron: ({ orientation }) => {
           const Icon = orientation === "left" ? ChevronLeft : ChevronRight;
