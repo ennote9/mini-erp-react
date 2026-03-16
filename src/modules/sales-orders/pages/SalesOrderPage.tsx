@@ -13,6 +13,7 @@ import { BackButton } from "../../../shared/ui/list/BackButton";
 import { StatusBadge } from "../../../shared/ui/feedback/StatusBadge";
 import { AgGridContainer } from "../../../shared/ui/ag-grid/AgGridContainer";
 import { Button } from "@/components/ui/button";
+import { DatePickerField } from "@/components/ui/date-picker-field";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -351,7 +352,7 @@ export function SalesOrderPage() {
       summary={
         saveError ? (
           <div
-            className="rounded-md border border-destructive/50 bg-destructive/10 px-4 py-3 text-sm text-destructive"
+            className="rounded-md border border-red-600/80 bg-destructive/25 px-4 py-1.5 text-sm text-red-600"
             role="alert"
           >
             {saveError}
@@ -377,11 +378,10 @@ export function SalesOrderPage() {
                   <Label htmlFor="so-date">
                     Date <span className="text-destructive">*</span>
                   </Label>
-                  <Input
+                  <DatePickerField
                     id="so-date"
-                    type="date"
                     value={form.date}
-                    onChange={(e) => setForm((f) => ({ ...f, date: e.target.value }))}
+                    onChange={(v) => setForm((f) => ({ ...f, date: v }))}
                   />
                 </div>
                 <div className="space-y-1.5 sm:col-span-2">

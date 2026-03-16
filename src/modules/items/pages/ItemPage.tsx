@@ -23,6 +23,11 @@ type FormState = {
   uom: string;
   isActive: boolean;
   description: string;
+  brand: string;
+  category: string;
+  barcode: string;
+  purchasePrice: string;
+  salePrice: string;
 };
 
 function defaultForm(): FormState {
@@ -32,6 +37,11 @@ function defaultForm(): FormState {
     uom: "",
     isActive: true,
     description: "",
+    brand: "",
+    category: "",
+    barcode: "",
+    purchasePrice: "",
+    salePrice: "",
   };
 }
 
@@ -61,10 +71,22 @@ export function ItemPage() {
         uom: item.uom,
         isActive: item.isActive,
         description: item.description ?? "",
+        brand: item.brand ?? "",
+        category: item.category ?? "",
+        barcode: item.barcode ?? "",
+        purchasePrice: item.purchasePrice !== undefined ? String(item.purchasePrice) : "",
+        salePrice: item.salePrice !== undefined ? String(item.salePrice) : "",
       });
       setSaveError(null);
     }
-  }, [id, isNew, item?.id, item?.code, item?.name, item?.uom, item?.isActive, item?.description]);
+  }, [id, isNew, item?.id, item?.code, item?.name, item?.uom, item?.isActive, item?.description, item?.brand, item?.category, item?.barcode, item?.purchasePrice, item?.salePrice]);
+
+  const parsePrice = (s: string): number | undefined => {
+    const t = s.trim();
+    if (t === "") return undefined;
+    const n = Number(t);
+    return Number.isNaN(n) ? undefined : n;
+  };
 
   const handleSave = () => {
     setSaveError(null);
@@ -75,6 +97,11 @@ export function ItemPage() {
         uom: form.uom,
         isActive: form.isActive,
         description: form.description || undefined,
+        brand: form.brand || undefined,
+        category: form.category || undefined,
+        barcode: form.barcode || undefined,
+        purchasePrice: parsePrice(form.purchasePrice),
+        salePrice: parsePrice(form.salePrice),
       },
       isNew ? undefined : id ?? undefined,
     );
@@ -136,7 +163,7 @@ export function ItemPage() {
       </div>
       {saveError && (
         <div
-          className="rounded-md border border-destructive/50 bg-destructive/10 px-4 py-3 text-sm text-destructive"
+          className="rounded-md border border-red-600/80 bg-destructive/25 px-4 py-1.5 text-sm text-red-600"
           role="alert"
         >
           {saveError}
@@ -185,6 +212,60 @@ export function ItemPage() {
                 value={form.uom}
                 onChange={(e) => setForm((f) => ({ ...f, uom: e.target.value }))}
                 placeholder="e.g. EA"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="item-brand">Brand</Label>
+              <Input
+                id="item-brand"
+                type="text"
+                value={form.brand}
+                onChange={(e) => setForm((f) => ({ ...f, brand: e.target.value }))}
+                placeholder="Optional"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="item-category">Category</Label>
+              <Input
+                id="item-category"
+                type="text"
+                value={form.category}
+                onChange={(e) => setForm((f) => ({ ...f, category: e.target.value }))}
+                placeholder="Optional"
+              />
+            </div>
+            <div className="space-y-2 sm:col-span-2">
+              <Label htmlFor="item-barcode">Barcode</Label>
+              <Input
+                id="item-barcode"
+                type="text"
+                value={form.barcode}
+                onChange={(e) => setForm((f) => ({ ...f, barcode: e.target.value }))}
+                placeholder="Optional"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="item-purchasePrice">Purchase price</Label>
+              <Input
+                id="item-purchasePrice"
+                type="number"
+                min={0}
+                step="0.01"
+                value={form.purchasePrice}
+                onChange={(e) => setForm((f) => ({ ...f, purchasePrice: e.target.value }))}
+                placeholder="0.00"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="item-salePrice">Sale price</Label>
+              <Input
+                id="item-salePrice"
+                type="number"
+                min={0}
+                step="0.01"
+                value={form.salePrice}
+                onChange={(e) => setForm((f) => ({ ...f, salePrice: e.target.value }))}
+                placeholder="0.00"
               />
             </div>
             <div className="flex items-center space-x-2 sm:col-span-2">

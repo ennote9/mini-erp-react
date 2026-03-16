@@ -140,7 +140,7 @@ export function SupplierPage() {
       </div>
       {saveError && (
         <div
-          className="rounded-md border border-destructive/50 bg-destructive/10 px-4 py-3 text-sm text-destructive"
+          className="rounded-md border border-red-600/80 bg-destructive/25 px-4 py-1.5 text-sm text-red-600"
           role="alert"
         >
           {saveError}

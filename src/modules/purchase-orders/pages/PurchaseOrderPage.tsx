@@ -1,7 +1,7 @@
 import { useParams, useNavigate } from "react-router-dom";
 import { useMemo, useState, useEffect, useRef, useCallback } from "react";
 import { AgGridReact } from "ag-grid-react";
-import type { ColDef, CellValueChangedEvent } from "ag-grid-community";
+import type { ColDef, SelectionChangedEvent } from "ag-grid-community";
 import { purchaseOrderRepository } from "../repository";
 import { confirm, cancelDocument, createReceipt, saveDraft } from "../service";
 import { supplierRepository } from "../../suppliers/repository";
@@ -13,11 +13,11 @@ import { BackButton } from "../../../shared/ui/list/BackButton";
 import { StatusBadge } from "../../../shared/ui/feedback/StatusBadge";
 import { AgGridContainer } from "../../../shared/ui/ag-grid/AgGridContainer";
 import { Button } from "@/components/ui/button";
+import { DatePickerField } from "@/components/ui/date-picker-field";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
-import { ItemSelectCellEditor } from "../../../shared/ui/ag-grid/ItemSelectCellEditor";
 import { agGridDefaultColDef } from "../../../shared/ui/ag-grid/agGridDefaults";
 import { todayYYYYMMDD, normalizeDateForPO } from "../dateUtils";
 
@@ -33,44 +33,38 @@ type FormState = {
   lines: LineFormRow[];
 };
 
-function defaultForm(nextLineId: number): FormState {
+function defaultForm(): FormState {
   return {
     date: todayYYYYMMDD(),
     supplierId: "",
     warehouseId: "",
     comment: "",
-    lines: [{ itemId: "", qty: 1, _lineId: nextLineId }],
+    lines: [],
   };
 }
 
-function poLinesEditableColumnDefs(
-  activeItems: { id: string; code: string; name: string }[],
+function poLinesDisplayColumnDefs(
   linesLength: number,
   onRemove: (lineId: number) => void,
 ): ColDef<LineFormRow>[] {
   return [
     {
       field: "itemId",
-      headerName: "Item *",
+      headerName: "Item",
       flex: 1,
       minWidth: 180,
-      editable: true,
+      editable: false,
       valueFormatter: (p) => {
         if (!p.value) return "";
         const item = itemRepository.getById(p.value);
         return item ? `${item.name} (${item.code})` : p.value;
       },
-      cellEditor: ItemSelectCellEditor,
-      cellEditorParams: { items: activeItems },
     },
     {
       field: "qty",
-      headerName: "Qty *",
+      headerName: "Qty",
       width: 100,
-      editable: true,
-      type: "numericColumn",
-      cellEditor: "agNumberCellEditor",
-      cellEditorParams: { min: 0 },
+      editable: false,
     },
     {
       headerName: "UOM",
@@ -129,12 +123,19 @@ export function PurchaseOrderPage() {
   );
 
   const nextLineIdRef = useRef(0);
-  const [form, setForm] = useState<FormState>(() => defaultForm(0));
+  const [form, setForm] = useState<FormState>(() => defaultForm());
+  const [editingLineId, setEditingLineId] = useState<number | null>(null);
+  const [lineEntryItemId, setLineEntryItemId] = useState("");
+  const [lineEntryQty, setLineEntryQty] = useState(1);
+  const linesGridRef = useRef<AgGridReact<LineFormRow> | null>(null);
 
   useEffect(() => {
     if (isNew) {
       nextLineIdRef.current = 0;
-      setForm(defaultForm(0));
+      setForm(defaultForm());
+      setEditingLineId(null);
+      setLineEntryItemId("");
+      setLineEntryQty(1);
       setSaveError(null);
       return;
     }
@@ -147,7 +148,7 @@ export function PurchaseOrderPage() {
               qty: l.qty,
               _lineId: idx,
             }))
-          : [{ itemId: "", qty: 1, _lineId: 0 }];
+          : [];
       nextLineIdRef.current = linesWithId.length;
       setForm({
         date: normalizeDateForPO(doc.date),
@@ -156,6 +157,9 @@ export function PurchaseOrderPage() {
         comment: doc.comment ?? "",
         lines: linesWithId,
       });
+      setEditingLineId(null);
+      setLineEntryItemId("");
+      setLineEntryQty(1);
       setSaveError(null);
     }
   }, [id, isNew, doc?.id, doc?.status, doc?.date, doc?.supplierId, doc?.warehouseId, doc?.comment, refresh]);
@@ -249,44 +253,74 @@ export function PurchaseOrderPage() {
     navigate("/purchase-orders");
   };
 
-  const addLine = () => {
-    const id = nextLineIdRef.current++;
-    setForm((f) => ({
-      ...f,
-      lines: [...f.lines, { itemId: "", qty: 1, _lineId: id }],
-    }));
-  };
   const removeLineByLineId = useCallback((lineId: number) => {
     setForm((f) => ({
       ...f,
       lines: f.lines.filter((l) => l._lineId !== lineId),
     }));
+    if (editingLineId === lineId) {
+      setEditingLineId(null);
+      setLineEntryItemId("");
+      setLineEntryQty(1);
+      linesGridRef.current?.api?.deselectAll();
+    }
+  }, [editingLineId]);
+
+  const addLineFromEntry = () => {
+    const itemId = lineEntryItemId.trim();
+    const qty = Number(lineEntryQty);
+    if (!itemId || !Number.isFinite(qty) || qty <= 0) return;
+    const _lineId = nextLineIdRef.current++;
+    setForm((f) => ({
+      ...f,
+      lines: [...f.lines, { itemId, qty, _lineId }],
+    }));
+    setLineEntryItemId("");
+    setLineEntryQty(1);
+  };
+
+  const updateLineFromEntry = () => {
+    if (editingLineId === null) return;
+    const itemId = lineEntryItemId.trim();
+    const qty = Number(lineEntryQty);
+    if (!itemId || !Number.isFinite(qty) || qty <= 0) return;
+    setForm((f) => ({
+      ...f,
+      lines: f.lines.map((l) =>
+        l._lineId === editingLineId ? { ...l, itemId, qty } : l,
+      ),
+    }));
+    setEditingLineId(null);
+    setLineEntryItemId("");
+    setLineEntryQty(1);
+    linesGridRef.current?.api?.deselectAll();
+  };
+
+  const cancelEdit = () => {
+    setEditingLineId(null);
+    setLineEntryItemId("");
+    setLineEntryQty(1);
+    linesGridRef.current?.api?.deselectAll();
+  };
+
+  const onLinesSelectionChanged = useCallback((e: SelectionChangedEvent<LineFormRow>) => {
+    const rows = e.api.getSelectedRows();
+    if (rows.length === 1 && rows[0]) {
+      const row = rows[0];
+      setEditingLineId(row._lineId);
+      setLineEntryItemId(row.itemId);
+      setLineEntryQty(row.qty);
+    }
   }, []);
 
-  const onLinesCellValueChanged = useCallback(
-    (e: CellValueChangedEvent<LineFormRow>) => {
-      if (!e.data || e.colDef.field == null) return;
-      const lineId = e.data._lineId;
-      const field = e.colDef.field as keyof LineFormRow;
-      const value = e.data[field];
-      setForm((f) => ({
-        ...f,
-        lines: f.lines.map((l) =>
-          l._lineId === lineId ? { ...l, [field]: value } : l,
-        ),
-      }));
-    },
-    [],
+  const lineEntryUom = useMemo(
+    () => (lineEntryItemId ? itemRepository.getById(lineEntryItemId)?.uom ?? "—" : "—"),
+    [lineEntryItemId],
   );
 
-  const editableColumnDefs = useMemo(
-    () =>
-      poLinesEditableColumnDefs(
-        activeItems,
-        form.lines.length,
-        removeLineByLineId,
-      ),
-    [activeItems, form.lines.length, removeLineByLineId],
+  const linesColumnDefs = useMemo(
+    () => poLinesDisplayColumnDefs(form.lines.length, removeLineByLineId),
+    [form.lines.length, removeLineByLineId],
   );
 
   if (!id) {
@@ -356,7 +390,7 @@ export function PurchaseOrderPage() {
       summary={
         saveError ? (
           <div
-            className="rounded-md border border-destructive/50 bg-destructive/10 px-4 py-3 text-sm text-destructive"
+            className="rounded-md border border-red-600/80 bg-destructive/25 px-4 py-1.5 text-sm text-red-600"
             role="alert"
           >
             {saveError}
@@ -382,11 +416,10 @@ export function PurchaseOrderPage() {
                   <Label htmlFor="po-date">
                     Date <span className="text-destructive">*</span>
                   </Label>
-                  <Input
+                  <DatePickerField
                     id="po-date"
-                    type="date"
                     value={form.date}
-                    onChange={(e) => setForm((f) => ({ ...f, date: e.target.value }))}
+                    onChange={(v) => setForm((f) => ({ ...f, date: v }))}
                   />
                 </div>
                 <div className="space-y-1.5 sm:col-span-2">
@@ -451,23 +484,97 @@ export function PurchaseOrderPage() {
             </CardContent>
           </Card>
           <div className="doc-lines mt-4">
-            <div className="doc-lines__head">
-              <h3 className="doc-lines__title">Lines</h3>
-              <Button type="button" variant="outline" size="sm" onClick={addLine}>
-                Add line
-              </Button>
-            </div>
+            <h3 className="doc-lines__title">Lines</h3>
+            {isEditable && (
+              <Card className="max-w-2xl border-0 shadow-none mb-4">
+                <CardContent className="p-4">
+                  <div className="grid gap-3 sm:grid-cols-2 md:grid-cols-4 items-end">
+                    <div className="space-y-1.5">
+                      <Label htmlFor="line-entry-item">
+                        Item <span className="text-destructive">*</span>
+                      </Label>
+                      <select
+                        id="line-entry-item"
+                        value={lineEntryItemId}
+                        onChange={(e) => setLineEntryItemId(e.target.value)}
+                        className={cn(
+                          "flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-base text-foreground",
+                          "focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50 md:text-sm",
+                        )}
+                      >
+                        <option value="">Select item</option>
+                        {activeItems.map((i) => (
+                          <option key={i.id} value={i.id}>
+                            {i.name} ({i.code})
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label htmlFor="line-entry-qty">
+                        Qty <span className="text-destructive">*</span>
+                      </Label>
+                      <Input
+                        id="line-entry-qty"
+                        type="number"
+                        min={1}
+                        value={lineEntryQty}
+                        onChange={(e) =>
+                          setLineEntryQty(Number(e.target.value) || 1)
+                        }
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label>UOM</Label>
+                      <div className="flex h-10 items-center text-sm text-muted-foreground">
+                        {lineEntryUom}
+                      </div>
+                    </div>
+                    <div className="flex gap-2 flex-wrap">
+                      {editingLineId === null ? (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={addLineFromEntry}
+                        >
+                          Add line
+                        </Button>
+                      ) : (
+                        <>
+                          <Button
+                            type="button"
+                            size="sm"
+                            onClick={updateLineFromEntry}
+                          >
+                            Update line
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={cancelEdit}
+                          >
+                            Cancel edit
+                          </Button>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
             <div className="doc-lines__grid">
               <AgGridContainer themeClass="doc-lines-grid">
                 <AgGridReact<LineFormRow>
+                  ref={linesGridRef}
                   rowData={form.lines}
-                  columnDefs={editableColumnDefs}
+                  columnDefs={linesColumnDefs}
                   defaultColDef={agGridDefaultColDef}
                   getRowId={(p) => String(p.data._lineId)}
-                  onCellValueChanged={onLinesCellValueChanged}
-                  singleClickEdit
-                  stopEditingWhenCellsLoseFocus
-                  suppressRowClickSelection
+                  rowSelection={isEditable ? "single" : undefined}
+                  onSelectionChanged={isEditable ? onLinesSelectionChanged : undefined}
+                  suppressRowClickSelection={false}
                 />
               </AgGridContainer>
             </div>

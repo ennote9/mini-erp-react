@@ -9,4 +9,9 @@ export interface Item {
   uom: string;
   isActive: boolean;
   description?: string;
+  brand?: string;
+  category?: string;
+  barcode?: string;
+  purchasePrice?: number;
+  salePrice?: number;
 }

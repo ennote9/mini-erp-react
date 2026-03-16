@@ -585,11 +585,12 @@ body,
   background-color: #3f3f46 !important;
 }
 
-/* Focused cell — no visible ring */
+/* Focused cell — light gray outline (not blue), subtle */
 .list-page__content > .ag-theme-quartz-dark .ag-cell-focus,
 .list-page__content > .ag-theme-quartz-dark .ag-cell:focus {
-  outline: none;
-  box-shadow: none;
+  outline: none !important;
+  box-shadow: 0 0 0 1px #888 !important;
+  border-color: #888 !important;
 }
 
 /* Clickable list grids: row pointer cursor */
@@ -623,12 +624,25 @@ body,
   background-color: #fff !important;
   border-color: #fff !important;
 }
+/* Checked + focused: keep fill white, outline light gray */
+.list-page__content .ag-theme-quartz-dark .ag-checkbox-input-wrapper.ag-checked:focus,
+.list-page__content .ag-theme-quartz-dark .ag-checkbox-input-wrapper.ag-checked:focus-within {
+  background-color: #fff !important;
+  border-color: #fff !important;
+  box-shadow: 0 0 0 1px #888 !important;
+}
 .list-page__content .ag-theme-quartz-dark .ag-checkbox-input-wrapper.ag-checked::after,
 .list-page__content .ag-theme-quartz-dark .ag-checkbox-input-wrapper.ag-checked .ag-icon {
   color: #171717 !important;
 }
 .list-page__content .ag-theme-quartz-dark .ag-checkbox-input-wrapper:not(.ag-checked) {
   border-color: #71717a !important;
+}
+/* Unchecked + focused: light gray outline */
+.list-page__content .ag-theme-quartz-dark .ag-checkbox-input-wrapper:focus,
+.list-page__content .ag-theme-quartz-dark .ag-checkbox-input-wrapper:focus-within {
+  border-color: #888 !important;
+  box-shadow: 0 0 0 1px #888 !important;
 }
 
 .list-page__empty {
@@ -808,6 +822,8 @@ body,
   display: flex;
   flex-direction: column;
   gap: 1.25rem;
+  flex: 1;
+  min-height: 0;
 }
 
 .doc-page--not-found {
@@ -914,6 +930,12 @@ body,
   background-color: var(--background);
 }
 
+/* Error alert in summary: no container border so the red message is not double-framed */
+.doc-page__summary:has([role="alert"]) {
+  border: none;
+  padding: 0;
+}
+
 .doc-summary {
   display: grid;
   grid-template-columns: auto 1fr;
@@ -938,6 +960,8 @@ body,
 .doc-page__content {
   flex: 1;
   min-height: 0;
+  display: flex;
+  flex-direction: column;
 }
 
 .doc-lines__title {
@@ -963,11 +987,18 @@ body,
   margin: 0;
 }
 
+.doc-lines {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+}
+
 .doc-lines__grid {
   display: flex;
   flex-direction: column;
+  flex: 1;
   min-height: 120px;
-  height: 240px;
 }
 .doc-lines__grid .ag-theme-quartz-dark {
   height: 100%;
@@ -1008,8 +1039,9 @@ body,
 }
 .doc-page .ag-theme-quartz-dark .ag-cell-focus,
 .doc-page .ag-theme-quartz-dark .ag-cell:focus {
-  outline: none;
-  box-shadow: none;
+  outline: none !important;
+  box-shadow: 0 0 0 1px #888 !important;
+  border-color: #888 !important;
 }
 
 /* Document form (create / draft edit) */
@@ -1040,6 +1072,13 @@ body,
   max-width: 100px;
 }
 
+/* Date input: make native calendar icon visible on dark background */
+input[type="date"]::-webkit-calendar-picker-indicator {
+  opacity: 1;
+  filter: invert(1);
+  cursor: pointer;
+}
+
 .doc-summary--form .doc-summary__row {
   display: flex;
   align-items: center;
@@ -1054,4 +1093,25 @@ body,
   border-radius: 4px;
   font-size: 0.9rem;
   margin-bottom: 0.5rem;
+}
+
+/* Calendar: compact vertical spacing so grid looks cohesive */
+.rdp-root .rdp-month_caption {
+  height: auto;
+  min-height: 1.75rem;
+}
+.rdp-root .rdp-weekday {
+  padding: 0;
+}
+.rdp-root .rdp-week {
+  margin: 0;
+}
+.rdp-root .rdp-month_grid {
+  border-spacing: 0;
+}
+.rdp-root .rdp-months {
+  gap: 0;
+}
+.rdp-root .rdp-month {
+  gap: 0;
 }

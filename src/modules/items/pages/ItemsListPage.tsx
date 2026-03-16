@@ -81,9 +81,37 @@ export function ItemsListPage() {
         flex: 1,
       },
       {
+        field: "brand",
+        headerName: "Brand",
+        width: 110,
+      },
+      {
+        field: "category",
+        headerName: "Category",
+        width: 120,
+      },
+      {
         field: "uom",
         headerName: "UOM",
         width: 90,
+      },
+      {
+        field: "purchasePrice",
+        headerName: "Purchase price",
+        width: 120,
+        valueFormatter: (params) =>
+          params.value != null && typeof params.value === "number"
+            ? params.value.toFixed(2)
+            : "",
+      },
+      {
+        field: "salePrice",
+        headerName: "Sale price",
+        width: 100,
+        valueFormatter: (params) =>
+          params.value != null && typeof params.value === "number"
+            ? params.value.toFixed(2)
+            : "",
       },
       {
         field: "isActive",

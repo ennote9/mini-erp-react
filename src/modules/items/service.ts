@@ -15,10 +15,23 @@ export type SaveItemInput = {
   uom: string;
   isActive: boolean;
   description?: string;
+  brand?: string;
+  category?: string;
+  barcode?: string;
+  purchasePrice?: number;
+  salePrice?: number;
 };
 export type SaveItemResult =
   | { success: true; id: string }
   | { success: false; error: string };
+
+function validatePrice(value: number | undefined, fieldName: string): string | null {
+  if (value === undefined) return null;
+  if (typeof value !== "number" || Number.isNaN(value))
+    return `${fieldName} must be a valid number.`;
+  if (value < 0) return `${fieldName} cannot be negative.`;
+  return null;
+}
 
 function validateSaveItem(data: SaveItemInput, existingId?: string): string | null {
   const codeErr = validateItemCode(data.code);
@@ -30,6 +43,11 @@ function validateSaveItem(data: SaveItemInput, existingId?: string): string | nu
     return `Name must be at least ${NAME_MIN_LENGTH} characters.`;
   const uomErr = validateUOM(data.uom);
   if (uomErr) return uomErr;
+
+  const purchaseErr = validatePrice(data.purchasePrice, "Purchase price");
+  if (purchaseErr) return purchaseErr;
+  const saleErr = validatePrice(data.salePrice, "Sale price");
+  if (saleErr) return saleErr;
 
   const codeNormalized = normalizeCode(data.code);
   const duplicate = itemRepository.list().find(
@@ -50,25 +68,31 @@ export function saveItem(
   const name = normalizeTrim(data.name);
   const uom = normalizeUOM(data.uom);
   const description = normalizeTrim(data.description) || undefined;
+  const brand = normalizeTrim(data.brand) || undefined;
+  const category = normalizeTrim(data.category) || undefined;
+  const barcode = normalizeTrim(data.barcode) || undefined;
+  const purchasePrice = data.purchasePrice !== undefined ? Number(data.purchasePrice) : undefined;
+  const salePrice = data.salePrice !== undefined ? Number(data.salePrice) : undefined;
 
-  if (existingId) {
-    const updated = itemRepository.update(existingId, {
-      code,
-      name,
-      uom,
-      isActive: data.isActive,
-      description,
-    });
-    if (!updated) return { success: false, error: "Item not found." };
-    return { success: true, id: existingId };
-  }
-  const created = itemRepository.create({
+  const patch = {
     code,
     name,
     uom,
     isActive: data.isActive,
     description,
-  });
+    brand,
+    category,
+    barcode,
+    purchasePrice,
+    salePrice,
+  };
+
+  if (existingId) {
+    const updated = itemRepository.update(existingId, patch);
+    if (!updated) return { success: false, error: "Item not found." };
+    return { success: true, id: existingId };
+  }
+  const created = itemRepository.create(patch);
   return { success: true, id: created.id };
 }
 
