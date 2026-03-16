@@ -15,10 +15,24 @@ export type SaveSupplierInput = {
   phone?: string;
   email?: string;
   comment?: string;
+  contactPerson?: string;
+  taxId?: string;
+  address?: string;
+  city?: string;
+  country?: string;
+  paymentTermsDays?: number;
 };
 export type SaveSupplierResult =
   | { success: true; id: string }
   | { success: false; error: string };
+
+function validatePaymentTermsDays(value: number | undefined): string | null {
+  if (value === undefined) return null;
+  if (typeof value !== "number" || Number.isNaN(value))
+    return "Payment terms must be a valid number.";
+  if (value < 0) return "Payment terms cannot be negative.";
+  return null;
+}
 
 function validateSaveSupplier(
   data: SaveSupplierInput,
@@ -40,6 +54,9 @@ function validateSaveSupplier(
   const emailErr = validateEmail(data.email);
   if (emailErr) return emailErr;
 
+  const paymentErr = validatePaymentTermsDays(data.paymentTermsDays);
+  if (paymentErr) return paymentErr;
+
   const codeNormalized = normalizeCode(data.code);
   const duplicate = supplierRepository.list().find(
     (x) => x.code.toUpperCase() === codeNormalized && x.id !== existingId,
@@ -60,27 +77,35 @@ export function saveSupplier(
   const phone = normalizeTrim(data.phone) || undefined;
   const email = normalizeTrim(data.email) || undefined;
   const comment = normalizeTrim(data.comment) || undefined;
+  const contactPerson = normalizeTrim(data.contactPerson) || undefined;
+  const taxId = normalizeTrim(data.taxId) || undefined;
+  const address = normalizeTrim(data.address) || undefined;
+  const city = normalizeTrim(data.city) || undefined;
+  const country = normalizeTrim(data.country) || undefined;
+  const paymentTermsDays =
+    data.paymentTermsDays !== undefined ? Number(data.paymentTermsDays) : undefined;
 
-  if (existingId) {
-    const updated = supplierRepository.update(existingId, {
-      code,
-      name,
-      isActive: data.isActive,
-      phone,
-      email,
-      comment,
-    });
-    if (!updated) return { success: false, error: "Supplier not found." };
-    return { success: true, id: existingId };
-  }
-  const created = supplierRepository.create({
+  const patch = {
     code,
     name,
     isActive: data.isActive,
     phone,
     email,
     comment,
-  });
+    contactPerson,
+    taxId,
+    address,
+    city,
+    country,
+    paymentTermsDays,
+  };
+
+  if (existingId) {
+    const updated = supplierRepository.update(existingId, patch);
+    if (!updated) return { success: false, error: "Supplier not found." };
+    return { success: true, id: existingId };
+  }
+  const created = supplierRepository.create(patch);
   return { success: true, id: created.id };
 }
 

@@ -10,4 +10,11 @@ export interface Customer {
   phone?: string;
   email?: string;
   comment?: string;
+  contactPerson?: string;
+  taxId?: string;
+  billingAddress?: string;
+  shippingAddress?: string;
+  city?: string;
+  country?: string;
+  paymentTermsDays?: number;
 }

@@ -24,6 +24,12 @@ type FormState = {
   phone: string;
   email: string;
   comment: string;
+  contactPerson: string;
+  taxId: string;
+  address: string;
+  city: string;
+  country: string;
+  paymentTermsDays: string;
 };
 
 function defaultForm(): FormState {
@@ -34,6 +40,12 @@ function defaultForm(): FormState {
     phone: "",
     email: "",
     comment: "",
+    contactPerson: "",
+    taxId: "",
+    address: "",
+    city: "",
+    country: "",
+    paymentTermsDays: "",
   };
 }
 
@@ -64,10 +76,23 @@ export function SupplierPage() {
         phone: supplier.phone ?? "",
         email: supplier.email ?? "",
         comment: supplier.comment ?? "",
+        contactPerson: supplier.contactPerson ?? "",
+        taxId: supplier.taxId ?? "",
+        address: supplier.address ?? "",
+        city: supplier.city ?? "",
+        country: supplier.country ?? "",
+        paymentTermsDays: supplier.paymentTermsDays !== undefined ? String(supplier.paymentTermsDays) : "",
       });
       setSaveError(null);
     }
-  }, [id, isNew, supplier?.id, supplier?.code, supplier?.name, supplier?.isActive, supplier?.phone, supplier?.email, supplier?.comment]);
+  }, [id, isNew, supplier?.id, supplier?.code, supplier?.name, supplier?.isActive, supplier?.phone, supplier?.email, supplier?.comment, supplier?.contactPerson, supplier?.taxId, supplier?.address, supplier?.city, supplier?.country, supplier?.paymentTermsDays]);
+
+  const parsePaymentTerms = (s: string): number | undefined => {
+    const t = s.trim();
+    if (t === "") return undefined;
+    const n = Number(t);
+    return Number.isNaN(n) ? undefined : n;
+  };
 
   const handleSave = () => {
     setSaveError(null);
@@ -79,6 +104,12 @@ export function SupplierPage() {
         phone: form.phone || undefined,
         email: form.email || undefined,
         comment: form.comment || undefined,
+        contactPerson: form.contactPerson || undefined,
+        taxId: form.taxId || undefined,
+        address: form.address || undefined,
+        city: form.city || undefined,
+        country: form.country || undefined,
+        paymentTermsDays: parsePaymentTerms(form.paymentTermsDays),
       },
       isNew ? undefined : id ?? undefined,
     );
@@ -177,6 +208,68 @@ export function SupplierPage() {
                 value={form.name}
                 onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
                 placeholder="Supplier name"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="supplier-contactPerson">Contact person</Label>
+              <Input
+                id="supplier-contactPerson"
+                type="text"
+                value={form.contactPerson}
+                onChange={(e) => setForm((f) => ({ ...f, contactPerson: e.target.value }))}
+                placeholder="Optional"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="supplier-taxId">Tax ID</Label>
+              <Input
+                id="supplier-taxId"
+                type="text"
+                value={form.taxId}
+                onChange={(e) => setForm((f) => ({ ...f, taxId: e.target.value }))}
+                placeholder="Optional"
+              />
+            </div>
+            <div className="space-y-2 sm:col-span-2">
+              <Label htmlFor="supplier-address">Address</Label>
+              <Input
+                id="supplier-address"
+                type="text"
+                value={form.address}
+                onChange={(e) => setForm((f) => ({ ...f, address: e.target.value }))}
+                placeholder="Optional"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="supplier-city">City</Label>
+              <Input
+                id="supplier-city"
+                type="text"
+                value={form.city}
+                onChange={(e) => setForm((f) => ({ ...f, city: e.target.value }))}
+                placeholder="Optional"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="supplier-country">Country</Label>
+              <Input
+                id="supplier-country"
+                type="text"
+                value={form.country}
+                onChange={(e) => setForm((f) => ({ ...f, country: e.target.value }))}
+                placeholder="Optional"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="supplier-paymentTermsDays">Payment terms (days)</Label>
+              <Input
+                id="supplier-paymentTermsDays"
+                type="number"
+                min={0}
+                step={1}
+                value={form.paymentTermsDays}
+                onChange={(e) => setForm((f) => ({ ...f, paymentTermsDays: e.target.value }))}
+                placeholder="e.g. 30"
               />
             </div>
             <div className="space-y-2">

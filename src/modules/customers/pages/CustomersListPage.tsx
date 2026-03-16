@@ -77,6 +77,12 @@ export function CustomersListPage() {
         flex: 1,
       },
       {
+        field: "contactPerson",
+        headerName: "Contact person",
+        width: 140,
+        valueFormatter: (params) => params.value ?? "—",
+      },
+      {
         field: "phone",
         headerName: "Phone",
         width: 150,
@@ -87,6 +93,21 @@ export function CustomersListPage() {
         headerName: "Email",
         minWidth: 180,
         valueFormatter: (params) => params.value ?? "—",
+      },
+      {
+        field: "city",
+        headerName: "City",
+        width: 120,
+        valueFormatter: (params) => params.value ?? "—",
+      },
+      {
+        field: "paymentTermsDays",
+        headerName: "Payment terms",
+        width: 120,
+        valueFormatter: (params) =>
+          params.value != null && typeof params.value === "number"
+            ? `${params.value} days`
+            : "—",
       },
       {
         field: "isActive",

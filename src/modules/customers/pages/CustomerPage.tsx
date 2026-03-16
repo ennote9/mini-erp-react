@@ -24,6 +24,13 @@ type FormState = {
   phone: string;
   email: string;
   comment: string;
+  contactPerson: string;
+  taxId: string;
+  billingAddress: string;
+  shippingAddress: string;
+  city: string;
+  country: string;
+  paymentTermsDays: string;
 };
 
 function defaultForm(): FormState {
@@ -34,6 +41,13 @@ function defaultForm(): FormState {
     phone: "",
     email: "",
     comment: "",
+    contactPerson: "",
+    taxId: "",
+    billingAddress: "",
+    shippingAddress: "",
+    city: "",
+    country: "",
+    paymentTermsDays: "",
   };
 }
 
@@ -64,10 +78,24 @@ export function CustomerPage() {
         phone: customer.phone ?? "",
         email: customer.email ?? "",
         comment: customer.comment ?? "",
+        contactPerson: customer.contactPerson ?? "",
+        taxId: customer.taxId ?? "",
+        billingAddress: customer.billingAddress ?? "",
+        shippingAddress: customer.shippingAddress ?? "",
+        city: customer.city ?? "",
+        country: customer.country ?? "",
+        paymentTermsDays: customer.paymentTermsDays !== undefined ? String(customer.paymentTermsDays) : "",
       });
       setSaveError(null);
     }
-  }, [id, isNew, customer?.id, customer?.code, customer?.name, customer?.isActive, customer?.phone, customer?.email, customer?.comment]);
+  }, [id, isNew, customer?.id, customer?.code, customer?.name, customer?.isActive, customer?.phone, customer?.email, customer?.comment, customer?.contactPerson, customer?.taxId, customer?.billingAddress, customer?.shippingAddress, customer?.city, customer?.country, customer?.paymentTermsDays]);
+
+  const parsePaymentTerms = (s: string): number | undefined => {
+    const t = s.trim();
+    if (t === "") return undefined;
+    const n = Number(t);
+    return Number.isNaN(n) ? undefined : n;
+  };
 
   const handleSave = () => {
     setSaveError(null);
@@ -79,6 +107,13 @@ export function CustomerPage() {
         phone: form.phone || undefined,
         email: form.email || undefined,
         comment: form.comment || undefined,
+        contactPerson: form.contactPerson || undefined,
+        taxId: form.taxId || undefined,
+        billingAddress: form.billingAddress || undefined,
+        shippingAddress: form.shippingAddress || undefined,
+        city: form.city || undefined,
+        country: form.country || undefined,
+        paymentTermsDays: parsePaymentTerms(form.paymentTermsDays),
       },
       isNew ? undefined : id ?? undefined,
     );
@@ -177,6 +212,78 @@ export function CustomerPage() {
                 value={form.name}
                 onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
                 placeholder="Customer name"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="customer-contactPerson">Contact person</Label>
+              <Input
+                id="customer-contactPerson"
+                type="text"
+                value={form.contactPerson}
+                onChange={(e) => setForm((f) => ({ ...f, contactPerson: e.target.value }))}
+                placeholder="Optional"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="customer-taxId">Tax ID</Label>
+              <Input
+                id="customer-taxId"
+                type="text"
+                value={form.taxId}
+                onChange={(e) => setForm((f) => ({ ...f, taxId: e.target.value }))}
+                placeholder="Optional"
+              />
+            </div>
+            <div className="space-y-2 sm:col-span-2">
+              <Label htmlFor="customer-billingAddress">Billing address</Label>
+              <Input
+                id="customer-billingAddress"
+                type="text"
+                value={form.billingAddress}
+                onChange={(e) => setForm((f) => ({ ...f, billingAddress: e.target.value }))}
+                placeholder="Optional"
+              />
+            </div>
+            <div className="space-y-2 sm:col-span-2">
+              <Label htmlFor="customer-shippingAddress">Shipping address</Label>
+              <Input
+                id="customer-shippingAddress"
+                type="text"
+                value={form.shippingAddress}
+                onChange={(e) => setForm((f) => ({ ...f, shippingAddress: e.target.value }))}
+                placeholder="Optional"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="customer-city">City</Label>
+              <Input
+                id="customer-city"
+                type="text"
+                value={form.city}
+                onChange={(e) => setForm((f) => ({ ...f, city: e.target.value }))}
+                placeholder="Optional"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="customer-country">Country</Label>
+              <Input
+                id="customer-country"
+                type="text"
+                value={form.country}
+                onChange={(e) => setForm((f) => ({ ...f, country: e.target.value }))}
+                placeholder="Optional"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="customer-paymentTermsDays">Payment terms (days)</Label>
+              <Input
+                id="customer-paymentTermsDays"
+                type="number"
+                min={0}
+                step={1}
+                value={form.paymentTermsDays}
+                onChange={(e) => setForm((f) => ({ ...f, paymentTermsDays: e.target.value }))}
+                placeholder="e.g. 30"
               />
             </div>
             <div className="space-y-2">

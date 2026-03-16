@@ -10,4 +10,10 @@ export interface Supplier {
   phone?: string;
   email?: string;
   comment?: string;
+  contactPerson?: string;
+  taxId?: string;
+  address?: string;
+  city?: string;
+  country?: string;
+  paymentTermsDays?: number;
 }
