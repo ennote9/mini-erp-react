@@ -1,5 +1,5 @@
 import { useParams, useNavigate } from "react-router-dom";
-import { useMemo, useState, useEffect, useRef } from "react";
+import { useMemo, useState, useEffect, useRef, useCallback } from "react";
 import { AgGridReact } from "ag-grid-react";
 import type { ColDef, CellValueChangedEvent } from "ag-grid-community";
 import { purchaseOrderRepository } from "../repository";
@@ -47,7 +47,6 @@ function poLinesEditableColumnDefs(
   activeItems: { id: string; code: string; name: string }[],
   linesLength: number,
   onRemove: (lineId: number) => void,
-  onItemIdChange: (lineId: number, itemId: string) => void,
 ): ColDef<LineFormRow>[] {
   return [
     {
@@ -62,7 +61,7 @@ function poLinesEditableColumnDefs(
         return item ? `${item.name} (${item.code})` : p.value;
       },
       cellEditor: ItemSelectCellEditor,
-      cellEditorParams: { items: activeItems, onItemSelected: onItemIdChange },
+      cellEditorParams: { items: activeItems },
     },
     {
       field: "qty",
@@ -257,32 +256,38 @@ export function PurchaseOrderPage() {
       lines: [...f.lines, { itemId: "", qty: 1, _lineId: id }],
     }));
   };
-  const removeLineByLineId = (lineId: number) => {
+  const removeLineByLineId = useCallback((lineId: number) => {
     setForm((f) => ({
       ...f,
       lines: f.lines.filter((l) => l._lineId !== lineId),
     }));
-  };
-  const onItemIdChange = (lineId: number, itemId: string) => {
-    setForm((f) => ({
-      ...f,
-      lines: f.lines.map((l) =>
-        l._lineId === lineId ? { ...l, itemId } : l,
+  }, []);
+
+  const onLinesCellValueChanged = useCallback(
+    (e: CellValueChangedEvent<LineFormRow>) => {
+      if (!e.data || e.colDef.field == null) return;
+      const lineId = e.data._lineId;
+      const field = e.colDef.field as keyof LineFormRow;
+      const value = e.data[field];
+      setForm((f) => ({
+        ...f,
+        lines: f.lines.map((l) =>
+          l._lineId === lineId ? { ...l, [field]: value } : l,
+        ),
+      }));
+    },
+    [],
+  );
+
+  const editableColumnDefs = useMemo(
+    () =>
+      poLinesEditableColumnDefs(
+        activeItems,
+        form.lines.length,
+        removeLineByLineId,
       ),
-    }));
-  };
-  const onLinesCellValueChanged = (e: CellValueChangedEvent<LineFormRow>) => {
-    if (!e.data || e.colDef.field == null) return;
-    const lineId = e.data._lineId;
-    const field = e.colDef.field as keyof LineFormRow;
-    const value = e.data[field];
-    setForm((f) => ({
-      ...f,
-      lines: f.lines.map((l) =>
-        l._lineId === lineId ? { ...l, [field]: value } : l,
-      ),
-    }));
-  };
+    [activeItems, form.lines.length, removeLineByLineId],
+  );
 
   if (!id) {
     return (
@@ -456,7 +461,7 @@ export function PurchaseOrderPage() {
               <AgGridContainer themeClass="doc-lines-grid">
                 <AgGridReact<LineFormRow>
                   rowData={form.lines}
-                  columnDefs={poLinesEditableColumnDefs(activeItems, form.lines.length, removeLineByLineId, onItemIdChange)}
+                  columnDefs={editableColumnDefs}
                   defaultColDef={agGridDefaultColDef}
                   getRowId={(p) => String(p.data._lineId)}
                   onCellValueChanged={onLinesCellValueChanged}
