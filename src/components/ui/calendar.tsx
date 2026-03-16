@@ -62,18 +62,19 @@ function Calendar({
         "rdp-root px-3 py-2 text-[15px]",
         "[--rdp-day-height:28px][--rdp-day-width:28px]",
         "[--rdp-day_button-height:26px][--rdp-day_button-width:26px]",
-        "[--rdp-nav_button-height:28px][--rdp-nav_button-width:28px]",
+        "[--rdp-nav_button-height:2.25rem][--rdp-nav_button-width:2.25rem]",
+        "[--rdp-nav-height:2.25rem]",
         className
       )}
       classNames={{
         months: "flex flex-col gap-0",
         month: "flex flex-col gap-0",
-        month_caption: "flex justify-center py-2 relative items-center gap-2 min-h-9",
-        dropdown_root: "flex items-center gap-1",
+        month_caption: "rdp-header-bar flex justify-center items-center relative min-h-9 py-0 border-b border-border",
+        dropdown_root: "flex items-center gap-2",
         dropdown: "rounded-md border border-input bg-background px-2 py-1.5 text-sm leading-none min-w-0",
         nav: "flex items-center gap-1",
-        button_previous: "size-7 shrink-0 rounded-md border border-input bg-background flex items-center justify-center hover:bg-accent/50",
-        button_next: "size-7 shrink-0 rounded-md border border-input bg-background flex items-center justify-center hover:bg-accent/50",
+        button_previous: "h-9 w-9 shrink-0 rounded-md border border-input bg-background flex items-center justify-center hover:bg-accent/50",
+        button_next: "h-9 w-9 shrink-0 rounded-md border border-input bg-background flex items-center justify-center hover:bg-accent/50",
         month_grid: "w-full border-collapse",
         weekdays: "flex gap-0",
         weekday:

@@ -1114,3 +1114,19 @@ input[type="date"]::-webkit-calendar-picker-indicator {
 .rdp-root .rdp-month {
   gap: 0;
 }
+
+/* Calendar header: one coherent top bar with nav and month/year aligned */
+.rdp-root.rdp-root .rdp-header-bar.rdp-month_caption {
+  min-height: 2.25rem;
+  margin-inline-start: 2.25rem;
+  margin-inline-end: 2.25rem;
+}
+.rdp-root[data-nav-layout="around"] .rdp-button_previous,
+.rdp-root[data-nav-layout="around"] .rdp-button_next {
+  height: 2.25rem;
+  width: 2.25rem;
+  top: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
