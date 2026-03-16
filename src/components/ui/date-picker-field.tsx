@@ -154,12 +154,12 @@ export function DatePickerField({
             onSelect={handleSelect}
             defaultMonth={date}
           />
-          <div className="flex justify-end border-t border-border px-2 py-1.5">
+          <div className="flex justify-end px-2 py-1 border-t border-border/50">
             <Button
               type="button"
               variant="ghost"
               size="sm"
-              className="h-7 min-h-7 px-2.5 text-sm font-normal"
+              className="h-6 min-h-6 px-2 text-xs font-normal text-muted-foreground hover:text-foreground"
               onClick={handleToday}
             >
               Сегодня

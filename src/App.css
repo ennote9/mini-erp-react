@@ -1115,7 +1115,7 @@ input[type="date"]::-webkit-calendar-picker-indicator {
   gap: 0;
 }
 
-/* Calendar header bar: single row is built by custom Month component */
+/* Calendar header bar: single row, same height */
 .rdp-root .rdp-calendar-header .rdp-month_caption {
-  min-height: 2.25rem;
+  height: 2rem;
 }
