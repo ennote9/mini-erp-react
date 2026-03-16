@@ -113,7 +113,12 @@ export function DatePickerField({
   }, [onChange]);
 
   return (
-    <div className={cn("flex gap-1", className)}>
+    <div
+      className={cn(
+        "flex h-10 w-full rounded-md border border-input bg-background overflow-hidden focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2 focus-within:ring-offset-background",
+        className
+      )}
+    >
       <Input
         id={id}
         type="text"
@@ -122,25 +127,26 @@ export function DatePickerField({
         onBlur={handleInputBlur}
         placeholder={placeholder}
         disabled={disabled}
-        className="flex-1 min-w-0"
+        className="flex-1 min-w-0 h-full rounded-none border-0 bg-transparent focus-visible:ring-0 focus-visible:ring-offset-0"
         autoComplete="off"
       />
       <Popover open={open} onOpenChange={setOpen}>
         <PopoverTrigger asChild>
           <Button
             type="button"
-            variant="outline"
+            variant="ghost"
             size="icon"
             disabled={disabled}
-            className="h-10 w-10 shrink-0"
+            className="h-full w-10 shrink-0 rounded-none border-l border-input hover:bg-accent/50"
             aria-label="Открыть календарь"
           >
             <CalendarIcon className="h-4 w-4" />
           </Button>
         </PopoverTrigger>
         <PopoverContent
-          className="w-auto p-0 rounded-md border shadow-md overflow-hidden"
-          align="end"
+          className="w-auto p-0 min-w-[240px] rounded-lg border border-border bg-popover shadow-lg overflow-hidden"
+          align="start"
+          sideOffset={2}
         >
           <Calendar
             mode="single"
@@ -148,13 +154,12 @@ export function DatePickerField({
             onSelect={handleSelect}
             defaultMonth={date}
           />
-          <div className="flex justify-end border-t border-border px-0.5 py-0.5">
+          <div className="flex justify-end border-t border-border px-2 py-1.5">
             <Button
               type="button"
               variant="ghost"
               size="sm"
-              className="h-6 min-h-6 px-2 leading-none font-normal shrink-0"
-              style={{ fontSize: "15px" }}
+              className="h-7 min-h-7 px-2.5 text-sm font-normal"
               onClick={handleToday}
             >
               Сегодня

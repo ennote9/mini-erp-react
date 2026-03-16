@@ -1098,7 +1098,6 @@ input[type="date"]::-webkit-calendar-picker-indicator {
 /* Calendar: compact vertical spacing so grid looks cohesive */
 .rdp-root .rdp-month_caption {
   height: auto;
-  min-height: 1.75rem;
 }
 .rdp-root .rdp-weekday {
   padding: 0;
