@@ -16,6 +16,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { actionIssue, type Issue } from "../../../shared/issues";
 
 type FormState = {
   code: string;
@@ -61,6 +62,7 @@ export function CustomerPage() {
   );
 
   const [form, setForm] = useState<FormState>(defaultForm);
+  const [pageIssues, setPageIssues] = useState<Issue[]>([]);
 
   useEffect(() => {
     if (isNew) {
@@ -94,6 +96,7 @@ export function CustomerPage() {
   };
 
   const handleSave = () => {
+    setPageIssues([]);
     const result = saveCustomer(
       {
         code: form.code,
@@ -115,6 +118,7 @@ export function CustomerPage() {
     if (result.success) {
       navigate("/customers");
     } else {
+      setPageIssues([actionIssue(result.error)]);
     }
   };
 
@@ -167,6 +171,15 @@ export function CustomerPage() {
           </div>
         </div>
       </div>
+      {pageIssues.length > 0 && (
+        <div className="mt-2 max-w-2xl rounded border border-zinc-700 bg-zinc-900/80 px-3 py-2 text-sm text-red-400">
+          <ul className="list-disc list-inside space-y-0.5">
+            {pageIssues.map((issue, idx) => (
+              <li key={idx}>{issue.message}</li>
+            ))}
+          </ul>
+        </div>
+      )}
       <Card className="mt-4 max-w-2xl border-0 shadow-none">
         <CardHeader className="p-2 pb-0.5">
           <CardTitle className="text-[0.9rem] font-semibold">Details</CardTitle>
