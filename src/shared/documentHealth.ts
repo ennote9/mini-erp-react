@@ -1,6 +1,7 @@
 /**
- * Document-level health for PO and SO: errors (block confirm), warnings (do not block).
- * Uses shared Issue model; line-level flags for grid row styling.
+ * Document-level health for PO and SO.
+ * Returns shared Issue[] (severity: error | warning) and lineHealth for row styling.
+ * Callers derive error/warning message lists via getDocumentErrors/getDocumentWarnings(health.issues).
  * No stock/availability logic here.
  */
 
@@ -9,7 +10,7 @@ import { normalizeTrim } from "./validation";
 import { parseDocumentLineQty } from "./documentValidation";
 
 export type DocumentHealth = {
-  /** Document-level issues (errors and warnings) for strip/panel and confirm blocking. */
+  /** Document-level issues; use getDocumentErrors/getDocumentWarnings(issues) for message lists. */
   issues: Issue[];
   /** Per-line: 'error' | 'warning' | null. Key = _lineId (number). Used for row styling. */
   lineHealth: Map<number, "error" | "warning" | null>;
