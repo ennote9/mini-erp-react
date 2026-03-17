@@ -21,7 +21,7 @@ import { cn } from "@/lib/utils";
 import { agGridDefaultColDef } from "../../../shared/ui/ag-grid/agGridDefaults";
 import { todayYYYYMMDD, normalizeDateForSO } from "../dateUtils";
 import { getSalesOrderHealth } from "../../../shared/documentHealth";
-import { getErrorAndWarningMessages, actionIssue, combineIssues, hasErrors, type Issue } from "../../../shared/issues";
+import { getErrorAndWarningMessages, actionIssue, combineIssues, hasErrors, issueListContainsMessage, type Issue } from "../../../shared/issues";
 import { DocumentIssueStrip } from "../../../shared/ui/feedback/DocumentIssueStrip";
 
 type LineWithItem = SalesOrderLine & { itemName: string };
@@ -166,6 +166,10 @@ export function SalesOrderPage() {
   const linesGridRef = useRef<AgGridReact<LineFormRow> | null>(null);
 
   useEffect(() => {
+    setActionIssues([]);
+  }, [form.customerId, form.warehouseId, form.lines]);
+
+  useEffect(() => {
     if (isNew) {
       nextLineIdRef.current = 0;
       setForm(defaultForm());
@@ -247,21 +251,21 @@ export function SalesOrderPage() {
     setActionIssues([]);
     const result = confirm(id);
     if (result.success) setRefresh((r) => r + 1);
-    else setActionIssues([actionIssue(result.error)]);
+    else if (!issueListContainsMessage(health.issues, result.error)) setActionIssues([actionIssue(result.error)]);
   };
   const handleCancelDocument = () => {
     if (!id || isNew) return;
     setActionIssues([]);
     const result = cancelDocument(id);
     if (result.success) setRefresh((r) => r + 1);
-    else setActionIssues([actionIssue(result.error)]);
+    else if (!issueListContainsMessage(health.issues, result.error)) setActionIssues([actionIssue(result.error)]);
   };
   const handleCreateShipment = () => {
     if (!id || isNew) return;
     setActionIssues([]);
     const result = createShipment(id);
     if (result.success) navigate(`/shipments/${result.shipmentId}`);
-    else setActionIssues([actionIssue(result.error)]);
+    else if (!issueListContainsMessage(health.issues, result.error)) setActionIssues([actionIssue(result.error)]);
   };
 
   const handleSave = () => {
@@ -287,7 +291,7 @@ export function SalesOrderPage() {
     );
     if (result.success) {
       navigate("/sales-orders");
-    } else {
+    } else if (!issueListContainsMessage(health.issues, result.error)) {
       setActionIssues([actionIssue(result.error)]);
     }
   };

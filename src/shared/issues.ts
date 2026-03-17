@@ -26,7 +26,25 @@ export const issueSeverityClassName: Record<IssueSeverity, string> = {
   info: "text-zinc-400",
 };
 
-/** Single-pass: error and warning message arrays (for strip/panel). Used by PO/SO. */
+/** Normalize message for display deduplication: trim and collapse internal whitespace. */
+function normalizeMessageKey(msg: string): string {
+  return msg.trim().replace(/\s+/g, " ");
+}
+
+/** Deduplicate by normalized key, preserving first occurrence text and order. */
+function dedupeByNormalizedKey(messages: string[]): string[] {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const msg of messages) {
+    const key = normalizeMessageKey(msg);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(msg);
+  }
+  return out;
+}
+
+/** Single-pass: error and warning message arrays (for strip/panel). Deduplicated by normalized text. Used by PO/SO. */
 export function getErrorAndWarningMessages(issues: Issue[]): {
   errors: string[];
   warnings: string[];
@@ -37,7 +55,16 @@ export function getErrorAndWarningMessages(issues: Issue[]): {
     if (i.severity === "error") errors.push(i.message);
     else if (i.severity === "warning") warnings.push(i.message);
   }
-  return { errors, warnings };
+  return {
+    errors: dedupeByNormalizedKey(errors),
+    warnings: dedupeByNormalizedKey(warnings),
+  };
+}
+
+/** True if any issue in the list has the same normalized message (for avoiding duplicate action issues). */
+export function issueListContainsMessage(issues: Issue[], message: string): boolean {
+  const key = normalizeMessageKey(message);
+  return issues.some((i) => normalizeMessageKey(i.message) === key);
 }
 
 /** Combine multiple issue arrays into one (e.g. health.issues + actionIssues). */
