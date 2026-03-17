@@ -249,11 +249,6 @@ export function SalesOrderPage() {
     () => warehouseRepository.list().filter((w) => w.isActive),
     [],
   );
-  const activeItems = useMemo(
-    () => itemRepository.list().filter((i) => i.isActive),
-    [],
-  );
-
   const handleConfirm = () => {
     if (!id || isNew) return;
     setActionIssues([]);
@@ -663,7 +658,7 @@ export function SalesOrderPage() {
                         id="line-entry-item"
                         value={lineEntryItemId}
                         onChange={handleLineEntryItemChange}
-                        items={activeItems}
+                        items={itemRepository.list()}
                         placeholder="Search by code, barcode or name…"
                       />
                     </div>

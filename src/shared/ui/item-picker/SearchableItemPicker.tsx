@@ -126,7 +126,7 @@ export function SearchableItemPicker({
     if (e.key === "Enter") {
       e.preventDefault();
       const item = options[highlightedIndex];
-      if (item) {
+      if (item && item.isActive) {
         onChange(item.id);
         setInputValue(getItemLabel(item));
         setIsOpen(false);
@@ -135,6 +135,7 @@ export function SearchableItemPicker({
   };
 
   const selectItem = (item: Item) => {
+    if (!item.isActive) return;
     onChange(item.id);
     setInputValue(getItemLabel(item));
     setIsOpen(false);
@@ -182,27 +183,38 @@ export function SearchableItemPicker({
               No matches
             </li>
           ) : (
-            options.map((item, idx) => (
-              <li
-                key={item.id}
-                id={id ? `${id}-option-${item.id}` : undefined}
-                role="option"
-                aria-selected={highlightedIndex === idx}
-                className={cn(
-                  "cursor-pointer px-2 py-1.5 text-sm",
-                  highlightedIndex === idx
-                    ? "bg-accent text-accent-foreground"
-                    : "hover:bg-accent/60",
-                )}
-                onMouseEnter={() => setHighlightedIndex(idx)}
-                onMouseDown={(e) => {
-                  e.preventDefault();
-                  selectItem(item);
-                }}
-              >
-                {getItemLabel(item)}
-              </li>
-            ))
+            options.map((item, idx) => {
+              const inactive = !item.isActive;
+              return (
+                <li
+                  key={item.id}
+                  id={id ? `${id}-option-${item.id}` : undefined}
+                  role="option"
+                  aria-selected={highlightedIndex === idx}
+                  aria-disabled={inactive}
+                  className={cn(
+                    "px-2 py-1.5 text-sm",
+                    inactive
+                      ? "cursor-not-allowed text-muted-foreground opacity-70"
+                      : "cursor-pointer",
+                    !inactive && highlightedIndex === idx
+                      ? "bg-accent text-accent-foreground"
+                      : !inactive && "hover:bg-accent/60",
+                    inactive && highlightedIndex === idx && "bg-muted/50",
+                  )}
+                  onMouseEnter={() => setHighlightedIndex(idx)}
+                  onMouseDown={(e) => {
+                    e.preventDefault();
+                    selectItem(item);
+                  }}
+                >
+                  {getItemLabel(item)}
+                  {inactive && (
+                    <span className="ml-1.5 text-xs text-muted-foreground">(Inactive)</span>
+                  )}
+                </li>
+              );
+            })
           )}
         </ul>
       )}
