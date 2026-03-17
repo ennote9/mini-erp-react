@@ -193,6 +193,7 @@ export function PurchaseOrderPage() {
     unitPrice: number;
   } | null>(null);
   const [actionIssues, setActionIssues] = useState<Issue[]>([]);
+  const [selectedLineIds, setSelectedLineIds] = useState<number[]>([]);
   const linesGridRef = useRef<AgGridReact<LineFormRow> | null>(null);
   const lineEntryItemPickerRef = useRef<SearchableItemPickerRef | null>(null);
 
@@ -425,6 +426,8 @@ export function PurchaseOrderPage() {
 
   const onLinesSelectionChanged = useCallback((e: SelectionChangedEvent<LineFormRow>) => {
     const rows = e.api.getSelectedRows();
+    const ids = rows.map((r) => r._lineId);
+    setSelectedLineIds(ids);
     setDuplicateChoicePending(null);
     if (rows.length === 1 && rows[0]) {
       const row = rows[0];
@@ -432,8 +435,30 @@ export function PurchaseOrderPage() {
       setLineEntryItemId(row.itemId);
       setLineEntryQty(row.qty);
       setLineEntryUnitPrice(typeof row.unitPrice === "number" && !Number.isNaN(row.unitPrice) ? row.unitPrice : 0);
+    } else {
+      setEditingLineId(null);
+      setLineEntryItemId("");
+      setLineEntryQty(1);
+      setLineEntryUnitPrice(0);
     }
   }, []);
+
+  const removeSelectedLines = useCallback(() => {
+    const ids = new Set(selectedLineIds);
+    setForm((f) => ({
+      ...f,
+      lines: f.lines.filter((l) => !ids.has(l._lineId)),
+    }));
+    linesGridRef.current?.api?.deselectAll();
+    setSelectedLineIds([]);
+    setDuplicateChoicePending(null);
+    if (editingLineId !== null && ids.has(editingLineId)) {
+      setEditingLineId(null);
+      setLineEntryItemId("");
+      setLineEntryQty(1);
+      setLineEntryUnitPrice(0);
+    }
+  }, [selectedLineIds, editingLineId]);
 
   const handleLineEntryItemChange = (itemId: string) => {
     setLineEntryItemId(itemId);
@@ -771,6 +796,16 @@ export function PurchaseOrderPage() {
                 </CardContent>
               </Card>
             )}
+            {selectedLineIds.length > 0 && (
+              <div className="mt-2 flex flex-wrap items-center gap-2 rounded border border-border bg-muted/30 px-2 py-1.5 text-sm">
+                <span className="text-muted-foreground">
+                  {selectedLineIds.length === 1 ? "1 line selected" : `${selectedLineIds.length} lines selected`}
+                </span>
+                <Button type="button" variant="outline" size="sm" onClick={removeSelectedLines}>
+                  Remove selected lines
+                </Button>
+              </div>
+            )}
             <div className="doc-lines__grid">
               <AgGridContainer themeClass="doc-lines-grid">
                 <AgGridReact<LineFormRow>
@@ -780,7 +815,7 @@ export function PurchaseOrderPage() {
                   defaultColDef={agGridDefaultColDef}
                   getRowId={(p) => String(p.data._lineId)}
                   getRowClass={getRowClass}
-                  rowSelection={isEditable ? "single" : undefined}
+                  rowSelection={isEditable ? "multiple" : undefined}
                   onSelectionChanged={isEditable ? onLinesSelectionChanged : undefined}
                   suppressRowClickSelection={false}
                 />
