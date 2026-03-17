@@ -54,8 +54,6 @@ function defaultForm(): FormState {
 export function CustomerPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const [saveError, setSaveError] = useState<string | null>(null);
-
   const isNew = id === "new";
   const customer = useMemo(
     () => (id && !isNew ? customerRepository.getById(id) : undefined),
@@ -67,7 +65,6 @@ export function CustomerPage() {
   useEffect(() => {
     if (isNew) {
       setForm(defaultForm());
-      setSaveError(null);
       return;
     }
     if (customer) {
@@ -86,7 +83,6 @@ export function CustomerPage() {
         country: customer.country ?? "",
         paymentTermsDays: customer.paymentTermsDays !== undefined ? String(customer.paymentTermsDays) : "",
       });
-      setSaveError(null);
     }
   }, [id, isNew, customer?.id, customer?.code, customer?.name, customer?.isActive, customer?.phone, customer?.email, customer?.comment, customer?.contactPerson, customer?.taxId, customer?.billingAddress, customer?.shippingAddress, customer?.city, customer?.country, customer?.paymentTermsDays]);
 
@@ -98,7 +94,6 @@ export function CustomerPage() {
   };
 
   const handleSave = () => {
-    setSaveError(null);
     const result = saveCustomer(
       {
         code: form.code,
@@ -120,7 +115,6 @@ export function CustomerPage() {
     if (result.success) {
       navigate("/customers");
     } else {
-      setSaveError(result.error);
     }
   };
 
@@ -173,17 +167,9 @@ export function CustomerPage() {
           </div>
         </div>
       </div>
-      {saveError && (
-        <div
-          className="rounded-md border border-red-600/80 bg-destructive/25 px-4 py-1.5 text-sm text-red-600"
-          role="alert"
-        >
-          {saveError}
-        </div>
-      )}
       <Card className="mt-4 max-w-2xl border-0 shadow-none">
         <CardHeader className="p-2 pb-0.5">
-          <CardTitle className="text-sm font-semibold">Details</CardTitle>
+          <CardTitle className="text-[0.9rem] font-semibold">Details</CardTitle>
           <CardDescription className="text-xs">
             Code, name, contact and status for this customer.
           </CardDescription>

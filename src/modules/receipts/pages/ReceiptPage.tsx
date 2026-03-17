@@ -29,7 +29,6 @@ function receiptLinesColumnDefs(): ColDef<LineWithItem>[] {
 export function ReceiptPage() {
   const { id } = useParams<{ id: string }>();
   const [refresh, setRefresh] = useState(0);
-  const [actionError, setActionError] = useState<string | null>(null);
   const doc = useMemo(
     () => (id ? receiptRepository.getById(id) : undefined),
     [id, refresh],
@@ -68,23 +67,13 @@ export function ReceiptPage() {
 
   const handlePost = () => {
     if (!id) return;
-    setActionError(null);
     const result = post(id);
-    if (result.success) {
-      setRefresh((r) => r + 1);
-    } else {
-      setActionError(result.error);
-    }
+    if (result.success) setRefresh((r) => r + 1);
   };
   const handleCancelDocument = () => {
     if (!id) return;
-    setActionError(null);
     const result = cancelDocument(id);
-    if (result.success) {
-      setRefresh((r) => r + 1);
-    } else {
-      setActionError(result.error);
-    }
+    if (result.success) setRefresh((r) => r + 1);
   };
 
   if (!id || !doc) {
@@ -128,20 +117,11 @@ export function ReceiptPage() {
           </div>
         </div>
       }
-      summary={
-        actionError ? (
-          <div
-            className="rounded-md border border-red-600/80 bg-destructive/25 px-4 py-1.5 text-sm text-red-600"
-            role="alert"
-          >
-            {actionError}
-          </div>
-        ) : null
-      }
+      summary={null}
     >
       <Card className="max-w-2xl border-0 shadow-none">
         <CardHeader className="p-4 pb-1">
-          <CardTitle>Details</CardTitle>
+          <CardTitle className="text-[0.9rem] font-semibold">Details</CardTitle>
         </CardHeader>
         <CardContent className="p-4 pt-2">
           <dl className="doc-summary doc-summary--compact">

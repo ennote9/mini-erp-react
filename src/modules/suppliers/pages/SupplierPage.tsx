@@ -52,8 +52,6 @@ function defaultForm(): FormState {
 export function SupplierPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const [saveError, setSaveError] = useState<string | null>(null);
-
   const isNew = id === "new";
   const supplier = useMemo(
     () => (id && !isNew ? supplierRepository.getById(id) : undefined),
@@ -65,7 +63,6 @@ export function SupplierPage() {
   useEffect(() => {
     if (isNew) {
       setForm(defaultForm());
-      setSaveError(null);
       return;
     }
     if (supplier) {
@@ -83,7 +80,6 @@ export function SupplierPage() {
         country: supplier.country ?? "",
         paymentTermsDays: supplier.paymentTermsDays !== undefined ? String(supplier.paymentTermsDays) : "",
       });
-      setSaveError(null);
     }
   }, [id, isNew, supplier?.id, supplier?.code, supplier?.name, supplier?.isActive, supplier?.phone, supplier?.email, supplier?.comment, supplier?.contactPerson, supplier?.taxId, supplier?.address, supplier?.city, supplier?.country, supplier?.paymentTermsDays]);
 
@@ -95,7 +91,6 @@ export function SupplierPage() {
   };
 
   const handleSave = () => {
-    setSaveError(null);
     const result = saveSupplier(
       {
         code: form.code,
@@ -116,7 +111,6 @@ export function SupplierPage() {
     if (result.success) {
       navigate("/suppliers");
     } else {
-      setSaveError(result.error);
     }
   };
 
@@ -169,17 +163,9 @@ export function SupplierPage() {
           </div>
         </div>
       </div>
-      {saveError && (
-        <div
-          className="rounded-md border border-red-600/80 bg-destructive/25 px-4 py-1.5 text-sm text-red-600"
-          role="alert"
-        >
-          {saveError}
-        </div>
-      )}
       <Card className="mt-4 max-w-2xl border-0 shadow-none">
         <CardHeader className="p-2 pb-0.5">
-          <CardTitle className="text-sm font-semibold">Details</CardTitle>
+          <CardTitle className="text-[0.9rem] font-semibold">Details</CardTitle>
           <CardDescription className="text-xs">
             Code, name, contact and status for this supplier.
           </CardDescription>

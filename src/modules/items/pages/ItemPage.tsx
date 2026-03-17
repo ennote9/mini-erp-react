@@ -48,8 +48,6 @@ function defaultForm(): FormState {
 export function ItemPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const [saveError, setSaveError] = useState<string | null>(null);
-
   const isNew = id === "new";
   const item = useMemo(
     () => (id && !isNew ? itemRepository.getById(id) : undefined),
@@ -61,7 +59,6 @@ export function ItemPage() {
   useEffect(() => {
     if (isNew) {
       setForm(defaultForm());
-      setSaveError(null);
       return;
     }
     if (item) {
@@ -77,7 +74,6 @@ export function ItemPage() {
         purchasePrice: item.purchasePrice !== undefined ? String(item.purchasePrice) : "",
         salePrice: item.salePrice !== undefined ? String(item.salePrice) : "",
       });
-      setSaveError(null);
     }
   }, [id, isNew, item?.id, item?.code, item?.name, item?.uom, item?.isActive, item?.description, item?.brand, item?.category, item?.barcode, item?.purchasePrice, item?.salePrice]);
 
@@ -89,7 +85,6 @@ export function ItemPage() {
   };
 
   const handleSave = () => {
-    setSaveError(null);
     const result = saveItem(
       {
         code: form.code,
@@ -108,7 +103,6 @@ export function ItemPage() {
     if (result.success) {
       navigate("/items");
     } else {
-      setSaveError(result.error);
     }
   };
 
@@ -161,17 +155,9 @@ export function ItemPage() {
           </div>
         </div>
       </div>
-      {saveError && (
-        <div
-          className="rounded-md border border-red-600/80 bg-destructive/25 px-4 py-1.5 text-sm text-red-600"
-          role="alert"
-        >
-          {saveError}
-        </div>
-      )}
       <Card className="mt-4 max-w-2xl border-0 shadow-none">
         <CardHeader className="p-2 pb-0.5">
-          <CardTitle className="text-sm font-semibold">Details</CardTitle>
+          <CardTitle className="text-[0.9rem] font-semibold">Details</CardTitle>
           <CardDescription className="text-xs">
             Code, name, unit of measure and status for this item.
           </CardDescription>

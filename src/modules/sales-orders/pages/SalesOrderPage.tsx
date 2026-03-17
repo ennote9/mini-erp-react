@@ -21,6 +21,7 @@ import { cn } from "@/lib/utils";
 import { agGridDefaultColDef } from "../../../shared/ui/ag-grid/agGridDefaults";
 import { todayYYYYMMDD, normalizeDateForSO } from "../dateUtils";
 import { getSalesOrderHealth } from "../../../shared/documentHealth";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 type LineWithItem = SalesOrderLine & { itemName: string };
 
@@ -144,8 +145,6 @@ export function SalesOrderPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const [refresh, setRefresh] = useState(0);
-  const [saveError, setSaveError] = useState<string | null>(null);
-
   const isNew = id === "new";
   const doc = useMemo(
     () => (id && !isNew ? salesOrderRepository.getById(id) : undefined),
@@ -172,7 +171,6 @@ export function SalesOrderPage() {
       setLineEntryItemId("");
       setLineEntryQty(1);
       setLineEntryUnitPrice(0);
-      setSaveError(null);
       return;
     }
     if (doc?.status === "draft" && id) {
@@ -198,7 +196,6 @@ export function SalesOrderPage() {
       setLineEntryItemId("");
       setLineEntryQty(1);
       setLineEntryUnitPrice(0);
-      setSaveError(null);
     }
   }, [id, isNew, doc?.id, doc?.status, doc?.date, doc?.customerId, doc?.warehouseId, doc?.comment, refresh]);
 
@@ -263,7 +260,6 @@ export function SalesOrderPage() {
   };
 
   const handleSave = () => {
-    setSaveError(null);
     const linesToSave = form.lines
       .filter(
         (l) => l.itemId.trim() !== "" && typeof l.qty === "number" && l.qty > 0,
@@ -286,7 +282,6 @@ export function SalesOrderPage() {
     if (result.success) {
       navigate("/sales-orders");
     } else {
-      setSaveError(result.error);
     }
   };
 
@@ -454,6 +449,68 @@ export function SalesOrderPage() {
             {!isNew && <StatusBadge status={doc!.status} />}
           </div>
           <div className="doc-header__right">
+            {isEditable && (health.errors.length > 0 || health.warnings.length > 0) && (
+              <div className="doc-health-strip-wrap">
+                <div className="doc-health-strip" role="status" aria-live="polite">
+                  <span className="doc-health-strip__label">Document issues</span>
+                  <span className="doc-health-strip__sep">·</span>
+                  {health.errors.length > 0 && (
+                    <span className="doc-health-strip__errors">
+                      {health.errors.length} {health.errors.length === 1 ? "error" : "errors"}
+                    </span>
+                  )}
+                  {health.errors.length > 0 && health.warnings.length > 0 && (
+                    <span className="doc-health-strip__sep">·</span>
+                  )}
+                  {health.warnings.length > 0 && (
+                    <span className="doc-health-strip__warnings">
+                      {health.warnings.length} {health.warnings.length === 1 ? "warning" : "warnings"}
+                    </span>
+                  )}
+                  {(() => {
+                    const allIssues = [...health.errors, ...health.warnings];
+                    const visible = allIssues.slice(0, 2);
+                    const moreCount = allIssues.length - 2;
+                    return (
+                      <>
+                        {visible.map((msg, i) => (
+                          <span key={i} className="doc-health-strip__msg">
+                            <span className="doc-health-strip__sep">·</span>
+                            {msg}
+                          </span>
+                        ))}
+                        {moreCount > 0 && (
+                          <TooltipProvider delayDuration={0}>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <span className="doc-health-strip__more">
+                                  <span className="doc-health-strip__sep">·</span>
+                                  +{moreCount} more
+                                </span>
+                              </TooltipTrigger>
+                              <TooltipContent
+                                side="bottom"
+                                align="start"
+                                className="max-w-sm bg-zinc-900 border border-zinc-700 text-zinc-200 text-left"
+                              >
+                                <ul className="list-disc list-inside space-y-1 text-xs">
+                                  {health.errors.map((m, i) => (
+                                    <li key={`e-${i}`} className="text-red-400">{m}</li>
+                                  ))}
+                                  {health.warnings.map((m, i) => (
+                                    <li key={`w-${i}`} className="text-amber-400">{m}</li>
+                                  ))}
+                                </ul>
+                              </TooltipContent>
+                            </Tooltip>
+                          </TooltipProvider>
+                        )}
+                      </>
+                    );
+                  })()}
+                </div>
+              </div>
+            )}
             <div className="doc-header__actions">
               {isEditable && (
                 <Button type="button" onClick={handleSave}>
@@ -486,52 +543,16 @@ export function SalesOrderPage() {
                 </Button>
               )}
             </div>
-            {isEditable && (health.errors.length > 0 || health.warnings.length > 0) && (
-              <div className="doc-health-panel" role="status" aria-live="polite">
-                <div className="doc-health-panel__title">Document issues</div>
-                <div className="doc-health-panel__counts">
-                  {health.errors.length > 0 && (
-                    <span className="doc-health-panel__errors">
-                      {health.errors.length} {health.errors.length === 1 ? "error" : "errors"}
-                    </span>
-                  )}
-                  {health.errors.length > 0 && health.warnings.length > 0 && (
-                    <span className="doc-health-panel__sep"> · </span>
-                  )}
-                  {health.warnings.length > 0 && (
-                    <span className="doc-health-panel__warnings">
-                      {health.warnings.length} {health.warnings.length === 1 ? "warning" : "warnings"}
-                    </span>
-                  )}
-                </div>
-                <div className="doc-health-panel__lines">
-                  {[...health.errors, ...health.warnings].slice(0, 2).map((msg, i) => (
-                    <div key={i} className="doc-health-panel__line">
-                      {msg}
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
           </div>
         </div>
       }
-      summary={
-        saveError ? (
-          <div
-            className="rounded-md border border-red-600/80 bg-destructive/25 px-4 py-1.5 text-sm text-red-600"
-            role="alert"
-          >
-            {saveError}
-          </div>
-        ) : null
-      }
+      summary={null}
     >
       {isEditable ? (
         <>
           <Card className="max-w-2xl border-0 shadow-none">
             <CardHeader className="p-2 pb-0.5">
-              <CardTitle className="text-sm font-semibold">Details</CardTitle>
+              <CardTitle className="text-[0.9rem] font-semibold">Details</CardTitle>
             </CardHeader>
             <CardContent className="p-2 pt-1">
               <div className="grid grid-cols-2 gap-x-3 gap-y-1">
@@ -738,7 +759,7 @@ export function SalesOrderPage() {
         <>
           <Card className="max-w-2xl border-0 shadow-none">
             <CardHeader className="p-2 pb-0.5">
-              <CardTitle className="text-sm font-semibold">Details</CardTitle>
+              <CardTitle className="text-[0.9rem] font-semibold">Details</CardTitle>
             </CardHeader>
             <CardContent className="p-2 pt-1">
               <dl className="doc-summary doc-summary--compact doc-summary--dense">
