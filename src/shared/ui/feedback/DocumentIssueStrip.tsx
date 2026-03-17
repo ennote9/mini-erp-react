@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { ChevronDown, ChevronUp } from "lucide-react";
 
 export type DocumentIssueStripProps = {
@@ -15,7 +15,13 @@ export type DocumentIssueStripProps = {
  */
 export function DocumentIssueStrip({ errors, warnings }: DocumentIssueStripProps) {
   const [expanded, setExpanded] = useState(false);
-  const hasAny = errors.length > 0 || warnings.length > 0;
+  const totalCount = errors.length + warnings.length;
+  const hasAny = totalCount > 0;
+
+  useEffect(() => {
+    if (totalCount <= 1) setExpanded(false);
+  }, [totalCount]);
+
   if (!hasAny) return null;
 
   return (
@@ -47,7 +53,7 @@ export function DocumentIssueStrip({ errors, warnings }: DocumentIssueStripProps
             <span className="doc-health-strip__msg">{warnings[0]}</span>
           </>
         ) : null}
-        {errors.length + warnings.length > 1 && (
+        {totalCount > 1 && (
           <button
             type="button"
             className="doc-health-strip__chevron"
@@ -64,7 +70,7 @@ export function DocumentIssueStrip({ errors, warnings }: DocumentIssueStripProps
           </button>
         )}
       </div>
-      {expanded && hasAny && (
+      {expanded && totalCount > 1 && (
         <div className="doc-health-strip-panel">
           {errors.length > 0 && (
             <div className="doc-health-strip-panel__section">
