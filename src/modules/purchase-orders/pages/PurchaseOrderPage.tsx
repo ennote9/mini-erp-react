@@ -789,7 +789,7 @@ export function PurchaseOrderPage() {
                       )}
                     </div>
                   </div>
-                  <div className="doc-lines__action-row min-h-14 mt-1.5 flex justify-end items-center gap-2 flex-wrap">
+                  <div className="doc-lines__duplicate-helper min-h-14 mt-1.5 flex justify-end items-center">
                     {duplicateChoicePending && editingLineId === null && (
                       <div className="flex flex-wrap items-center gap-2 rounded border border-border bg-muted/30 px-2 py-1.5 text-sm">
                         <span className="text-muted-foreground">This item is already in the lines.</span>
@@ -811,19 +811,23 @@ export function PurchaseOrderPage() {
                         </Button>
                       </div>
                     )}
-                    {selectedLineIds.length > 0 && (
-                      <div className="flex flex-wrap items-center gap-2 rounded border border-border bg-muted/30 px-2 py-1.5 text-sm">
-                        <span className="text-muted-foreground">
-                          {selectedLineIds.length === 1 ? "1 line selected" : `${selectedLineIds.length} lines selected`}
-                        </span>
-                        <Button type="button" variant="outline" size="sm" onClick={removeSelectedLines}>
-                          Remove selected lines
-                        </Button>
-                      </div>
-                    )}
                   </div>
                 </CardContent>
               </Card>
+            )}
+            {isEditable && (
+              <div className="doc-lines__toolbar min-h-10 mb-1.5 flex items-center gap-2 flex-wrap">
+                {selectedLineIds.length > 0 && (
+                  <div className="flex flex-wrap items-center gap-2 rounded border border-border bg-muted/30 px-2 py-1.5 text-sm">
+                    <span className="text-muted-foreground">
+                      {selectedLineIds.length === 1 ? "1 line selected" : `${selectedLineIds.length} lines selected`}
+                    </span>
+                    <Button type="button" variant="outline" size="sm" onClick={removeSelectedLines}>
+                      Remove selected lines
+                    </Button>
+                  </div>
+                )}
+              </div>
             )}
             <div className="doc-lines__grid">
               <AgGridContainer themeClass="doc-lines-grid">
