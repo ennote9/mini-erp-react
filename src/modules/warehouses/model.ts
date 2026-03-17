@@ -8,4 +8,10 @@ export interface Warehouse {
   name: string;
   isActive: boolean;
   comment?: string;
+  warehouseType?: string;
+  address?: string;
+  city?: string;
+  country?: string;
+  contactPerson?: string;
+  phone?: string;
 }

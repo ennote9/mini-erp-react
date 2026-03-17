@@ -77,6 +77,26 @@ export function WarehousesListPage() {
         flex: 1,
       },
       {
+        field: "warehouseType",
+        headerName: "Type",
+        width: 120,
+      },
+      {
+        field: "city",
+        headerName: "City",
+        width: 140,
+      },
+      {
+        field: "contactPerson",
+        headerName: "Contact person",
+        width: 150,
+      },
+      {
+        field: "phone",
+        headerName: "Phone",
+        width: 140,
+      },
+      {
         field: "isActive",
         headerName: "Active",
         width: 110,

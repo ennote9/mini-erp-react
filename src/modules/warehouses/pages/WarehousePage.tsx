@@ -22,6 +22,12 @@ type FormState = {
   name: string;
   isActive: boolean;
   comment: string;
+  warehouseType: string;
+  address: string;
+  city: string;
+  country: string;
+  contactPerson: string;
+  phone: string;
 };
 
 function defaultForm(): FormState {
@@ -30,6 +36,12 @@ function defaultForm(): FormState {
     name: "",
     isActive: true,
     comment: "",
+    warehouseType: "",
+    address: "",
+    city: "",
+    country: "",
+    contactPerson: "",
+    phone: "",
   };
 }
 
@@ -58,10 +70,16 @@ export function WarehousePage() {
         name: warehouse.name,
         isActive: warehouse.isActive,
         comment: warehouse.comment ?? "",
+        warehouseType: warehouse.warehouseType ?? "",
+        address: warehouse.address ?? "",
+        city: warehouse.city ?? "",
+        country: warehouse.country ?? "",
+        contactPerson: warehouse.contactPerson ?? "",
+        phone: warehouse.phone ?? "",
       });
       setSaveError(null);
     }
-  }, [id, isNew, warehouse?.id, warehouse?.code, warehouse?.name, warehouse?.isActive, warehouse?.comment]);
+  }, [id, isNew, warehouse]);
 
   const handleSave = () => {
     setSaveError(null);
@@ -71,6 +89,12 @@ export function WarehousePage() {
         name: form.name,
         isActive: form.isActive,
         comment: form.comment || undefined,
+        warehouseType: form.warehouseType || undefined,
+        address: form.address || undefined,
+        city: form.city || undefined,
+        country: form.country || undefined,
+        contactPerson: form.contactPerson || undefined,
+        phone: form.phone || undefined,
       },
       isNew ? undefined : id ?? undefined,
     );
@@ -171,6 +195,18 @@ export function WarehousePage() {
                 placeholder="Warehouse name"
               />
             </div>
+            <div className="space-y-2">
+              <Label htmlFor="warehouse-type">Type</Label>
+              <Input
+                id="warehouse-type"
+                type="text"
+                value={form.warehouseType}
+                onChange={(e) =>
+                  setForm((f) => ({ ...f, warehouseType: e.target.value }))
+                }
+                placeholder="e.g. Main, Distribution"
+              />
+            </div>
             <div className="flex items-center space-x-2 sm:col-span-2">
               <Checkbox
                 id="warehouse-active"
@@ -197,6 +233,78 @@ export function WarehousePage() {
                 placeholder="Optional"
                 rows={3}
                 className="resize-none"
+              />
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+      <Card className="mt-6 max-w-2xl border-0 shadow-none">
+        <CardHeader>
+          <CardTitle>Address &amp; contact</CardTitle>
+          <CardDescription>
+            Address, city, country and contact details.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="grid gap-6 sm:grid-cols-2">
+            <div className="space-y-2 sm:col-span-2">
+              <Label htmlFor="warehouse-address">Address</Label>
+              <Input
+                id="warehouse-address"
+                type="text"
+                value={form.address}
+                onChange={(e) =>
+                  setForm((f) => ({ ...f, address: e.target.value }))
+                }
+                placeholder="Street address"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="warehouse-city">City</Label>
+              <Input
+                id="warehouse-city"
+                type="text"
+                value={form.city}
+                onChange={(e) =>
+                  setForm((f) => ({ ...f, city: e.target.value }))
+                }
+                placeholder="City"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="warehouse-country">Country</Label>
+              <Input
+                id="warehouse-country"
+                type="text"
+                value={form.country}
+                onChange={(e) =>
+                  setForm((f) => ({ ...f, country: e.target.value }))
+                }
+                placeholder="Country"
+              />
+            </div>
+            <div className="space-y-2 sm:col-span-2">
+              <Label htmlFor="warehouse-contact-person">Contact person</Label>
+              <Input
+                id="warehouse-contact-person"
+                type="text"
+                value={form.contactPerson}
+                onChange={(e) =>
+                  setForm((f) => ({ ...f, contactPerson: e.target.value }))
+                }
+                placeholder="Name"
+              />
+            </div>
+            <div className="space-y-2 sm:col-span-2">
+              <Label htmlFor="warehouse-phone">Phone</Label>
+              <Input
+                id="warehouse-phone"
+                type="text"
+                value={form.phone}
+                onChange={(e) =>
+                  setForm((f) => ({ ...f, phone: e.target.value }))
+                }
+                placeholder="e.g. +1 312 555 0100"
               />
             </div>
           </div>
