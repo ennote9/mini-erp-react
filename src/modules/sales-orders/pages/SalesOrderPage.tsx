@@ -704,23 +704,13 @@ export function SalesOrderPage() {
             </CardContent>
           </Card>
           <div className="doc-lines mt-2">
-            <div className="doc-lines__header flex items-center justify-between gap-2 flex-wrap mb-1.5 min-h-8 max-w-2xl">
+            <div className="doc-lines__header mb-1.5 max-w-2xl">
               <h3 className="doc-lines__title">Lines</h3>
-              {isEditable && selectedLineIds.length >= 2 && (
-                <div className="flex items-center gap-2 rounded border border-border bg-muted/30 px-2 py-1.5 text-sm">
-                  <span className="text-muted-foreground">
-                    {selectedLineIds.length === 1 ? "1 line selected" : `${selectedLineIds.length} lines selected`}
-                  </span>
-                  <Button type="button" variant="outline" size="sm" onClick={removeSelectedLines}>
-                    Remove selected lines
-                  </Button>
-                </div>
-              )}
             </div>
             {isEditable && (
               <Card className="max-w-2xl border-0 shadow-none mb-1.5">
                 <CardContent className="p-2">
-                  <div className="grid grid-cols-2 md:grid-cols-[1fr_1fr_1fr_auto] gap-x-2 gap-y-0 items-end">
+                  <div className="grid grid-cols-2 md:grid-cols-[1fr_1fr_1fr_auto_260px] gap-x-2 gap-y-0 items-end">
                     <div className="flex flex-col gap-0.5">
                       <Label htmlFor="line-entry-item" className="text-sm">
                         Item <span className="text-destructive">*</span>
@@ -773,60 +763,67 @@ export function SalesOrderPage() {
                         className="h-8 text-sm"
                       />
                     </div>
-                    <div className="relative">
-                      <div className="flex gap-1.5 flex-shrink-0">
-                        {editingLineId === null ? (
+                    <div className="flex gap-1.5 flex-shrink-0">
+                      {editingLineId === null ? (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={addLineFromEntry}
+                        >
+                          Add line
+                        </Button>
+                      ) : (
+                        <>
+                          <Button
+                            type="button"
+                            size="sm"
+                            onClick={updateLineFromEntry}
+                          >
+                            Update line
+                          </Button>
                           <Button
                             type="button"
                             variant="outline"
                             size="sm"
-                            onClick={addLineFromEntry}
+                            onClick={cancelEdit}
                           >
-                            Add line
+                            Cancel edit
                           </Button>
-                        ) : (
-                          <>
-                            <Button
-                              type="button"
-                              size="sm"
-                              onClick={updateLineFromEntry}
-                            >
-                              Update line
-                            </Button>
-                            <Button
-                              type="button"
-                              variant="outline"
-                              size="sm"
-                              onClick={cancelEdit}
-                            >
-                              Cancel edit
-                            </Button>
-                          </>
-                        )}
-                      </div>
-                      {duplicateChoicePending && editingLineId === null && (
-                        <div className="doc-lines__duplicate-panel absolute left-0 right-0 top-full z-10 mt-1 rounded border border-border bg-muted/95 px-2 py-1.5 shadow-md">
-                          <p className="mb-1.5 text-xs text-muted-foreground">This item is already in the lines.</p>
-                          <div className="flex flex-wrap gap-1.5">
-                            <Button
-                              type="button"
-                              variant="default"
-                              size="sm"
-                              onClick={handleDuplicateIncreaseQty}
-                            >
-                              Increase quantity in existing line
-                            </Button>
-                            <Button
-                              type="button"
-                              variant="outline"
-                              size="sm"
-                              onClick={handleDuplicateCancel}
-                            >
-                              Cancel
-                            </Button>
-                          </div>
-                        </div>
+                        </>
                       )}
+                    </div>
+                    <div className="doc-lines__contextual-slot min-h-9 flex items-center">
+                      {duplicateChoicePending && editingLineId === null ? (
+                        <div className="flex flex-wrap items-center gap-2 rounded border border-border bg-muted/30 px-2 py-1.5 text-sm">
+                          <span className="text-muted-foreground text-xs whitespace-nowrap">Item already exists</span>
+                          <Button
+                            type="button"
+                            variant="default"
+                            size="sm"
+                            onClick={handleDuplicateIncreaseQty}
+                          >
+                            Increase quantity
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={handleDuplicateCancel}
+                          >
+                            Cancel
+                          </Button>
+                        </div>
+                      ) : selectedLineIds.length >= 2 ? (
+                        <div className="flex flex-wrap items-center gap-2 rounded border border-border bg-muted/30 px-2 py-1.5 text-sm">
+                          <span className="text-muted-foreground whitespace-nowrap">
+                            {selectedLineIds.length} lines selected
+                          </span>
+                          <Button type="button" variant="outline" size="sm" onClick={removeSelectedLines}>
+                            Remove selected lines
+                          </Button>
+                        </div>
+                      ) : null}
                     </div>
                   </div>
                 </CardContent>
