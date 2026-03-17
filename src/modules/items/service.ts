@@ -1,5 +1,6 @@
 import { itemRepository } from "./repository";
 import { brandRepository } from "../brands/repository";
+import { categoryRepository } from "../categories/repository";
 import {
   validateRequired,
   validateItemCode,
@@ -17,7 +18,7 @@ export type SaveItemInput = {
   isActive: boolean;
   description?: string;
   brandId?: string;
-  category?: string;
+  categoryId?: string;
   barcode?: string;
   purchasePrice?: number;
   salePrice?: number;
@@ -56,6 +57,12 @@ function validateSaveItem(data: SaveItemInput, existingId?: string): string | nu
     if (!brand.isActive) return "Selected brand is not active.";
   }
 
+  if (data.categoryId !== undefined && data.categoryId !== "") {
+    const category = categoryRepository.getById(data.categoryId);
+    if (!category) return "Selected category not found.";
+    if (!category.isActive) return "Selected category is not active.";
+  }
+
   const codeNormalized = normalizeCode(data.code);
   const duplicate = itemRepository.list().find(
     (x) => x.code.toUpperCase() === codeNormalized && x.id !== existingId,
@@ -76,7 +83,7 @@ export function saveItem(
   const uom = normalizeUOM(data.uom);
   const description = normalizeTrim(data.description) || undefined;
   const brandId = data.brandId && data.brandId.trim() !== "" ? data.brandId.trim() : undefined;
-  const category = normalizeTrim(data.category) || undefined;
+  const categoryId = data.categoryId && data.categoryId.trim() !== "" ? data.categoryId.trim() : undefined;
   const barcode = normalizeTrim(data.barcode) || undefined;
   const purchasePrice = data.purchasePrice !== undefined ? Number(data.purchasePrice) : undefined;
   const salePrice = data.salePrice !== undefined ? Number(data.salePrice) : undefined;
@@ -88,7 +95,7 @@ export function saveItem(
     isActive: data.isActive,
     description,
     brandId,
-    category,
+    categoryId,
     barcode,
     purchasePrice,
     salePrice,

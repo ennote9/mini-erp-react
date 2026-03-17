@@ -5,6 +5,7 @@ const PAGE_TITLES: Record<string, string> = {
   "/": "Dashboard",
   "/items": "Items",
   "/brands": "Brands",
+  "/categories": "Categories",
   "/suppliers": "Suppliers",
   "/customers": "Customers",
   "/warehouses": "Warehouses",
@@ -19,6 +20,7 @@ const PAGE_TITLES: Record<string, string> = {
 function getPageTitle(pathname: string): string {
   if (pathname.match(/^\/items\/[^/]+$/)) return "Item";
   if (pathname.match(/^\/brands\/[^/]+$/)) return "Brand";
+  if (pathname.match(/^\/categories\/[^/]+$/)) return "Category";
   if (pathname.match(/^\/suppliers\/[^/]+$/)) return "Supplier";
   if (pathname.match(/^\/customers\/[^/]+$/)) return "Customer";
   if (pathname.match(/^\/warehouses\/[^/]+$/)) return "Warehouse";

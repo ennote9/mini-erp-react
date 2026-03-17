@@ -1,6 +1,7 @@
 import type { ComponentType } from "react";
 import {
   ArrowLeftRight,
+  FolderOpen,
   LayoutDashboard,
   Package,
   PackageCheck,
@@ -35,6 +36,7 @@ const nav = [
     links: [
       { label: "Items", to: "/items", icon: Package },
       { label: "Brands", to: "/brands", icon: Tag },
+      { label: "Categories", to: "/categories", icon: FolderOpen },
       { label: "Suppliers", to: "/suppliers", icon: Truck },
       { label: "Customers", to: "/customers", icon: Users },
       { label: "Warehouses", to: "/warehouses", icon: Warehouse },

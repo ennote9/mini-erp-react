@@ -10,7 +10,7 @@ export interface Item {
   isActive: boolean;
   description?: string;
   brandId?: string;
-  category?: string;
+  categoryId?: string;
   barcode?: string;
   purchasePrice?: number;
   salePrice?: number;

@@ -2,6 +2,7 @@ import { useParams, useNavigate } from "react-router-dom";
 import { useMemo, useState, useEffect } from "react";
 import { itemRepository } from "../repository";
 import { brandRepository } from "../../brands/repository";
+import { categoryRepository } from "../../categories/repository";
 import { saveItem } from "../service";
 import { Breadcrumb } from "../../../shared/ui/object/Breadcrumb";
 import { BackButton } from "../../../shared/ui/list/BackButton";
@@ -29,7 +30,7 @@ type FormState = {
   isActive: boolean;
   description: string;
   brandId: string;
-  category: string;
+  categoryId: string;
   barcode: string;
   purchasePrice: string;
   salePrice: string;
@@ -43,7 +44,7 @@ function defaultForm(): FormState {
     isActive: true,
     description: "",
     brandId: "",
-    category: "",
+    categoryId: "",
     barcode: "",
     purchasePrice: "",
     salePrice: "",
@@ -85,6 +86,17 @@ export function ItemPage() {
     return active;
   }, [form.brandId]);
 
+  const categoryOptions = useMemo(() => {
+    const active = categoryRepository.list().filter((c) => c.isActive);
+    const currentId = form.categoryId;
+    if (!currentId) return active;
+    const current = categoryRepository.getById(currentId);
+    if (current && !current.isActive && !active.some((c) => c.id === currentId)) {
+      return [current, ...active];
+    }
+    return active;
+  }, [form.categoryId]);
+
   useEffect(() => {
     setActionIssues([]);
   }, [form.code, form.name, form.uom, form.purchasePrice, form.salePrice]);
@@ -111,13 +123,13 @@ export function ItemPage() {
         isActive: item.isActive,
         description: item.description ?? "",
         brandId: item.brandId ?? "",
-        category: item.category ?? "",
+        categoryId: item.categoryId ?? "",
         barcode: item.barcode ?? "",
         purchasePrice: item.purchasePrice !== undefined ? String(item.purchasePrice) : "",
         salePrice: item.salePrice !== undefined ? String(item.salePrice) : "",
       });
     }
-  }, [id, isNew, item?.id, item?.code, item?.name, item?.uom, item?.isActive, item?.description, item?.brandId, item?.category, item?.barcode, item?.purchasePrice, item?.salePrice]);
+  }, [id, isNew, item?.id, item?.code, item?.name, item?.uom, item?.isActive, item?.description, item?.brandId, item?.categoryId, item?.barcode, item?.purchasePrice, item?.salePrice]);
 
   const parsePrice = (s: string): number | undefined => {
     const t = s.trim();
@@ -136,7 +148,7 @@ export function ItemPage() {
         isActive: form.isActive,
         description: form.description || undefined,
         brandId: form.brandId || undefined,
-        category: form.category || undefined,
+        categoryId: form.categoryId || undefined,
         barcode: form.barcode || undefined,
         purchasePrice: parsePrice(form.purchasePrice),
         salePrice: parsePrice(form.salePrice),
@@ -273,14 +285,22 @@ export function ItemPage() {
             </div>
             <div className="flex flex-col gap-0.5">
               <Label htmlFor="item-category" className="text-sm">Category</Label>
-              <Input
+              <select
                 id="item-category"
-                type="text"
-                value={form.category}
-                onChange={(e) => setForm((f) => ({ ...f, category: e.target.value }))}
-                placeholder="Optional"
-                className="h-8 text-sm"
-              />
+                value={form.categoryId}
+                onChange={(e) => setForm((f) => ({ ...f, categoryId: e.target.value }))}
+                className={cn(
+                  "flex h-8 w-full rounded border border-input bg-background px-2 py-1 text-sm text-foreground",
+                  "focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50",
+                )}
+              >
+                <option value="">—</option>
+                {categoryOptions.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.name} {!c.isActive ? "(inactive)" : ""}
+                  </option>
+                ))}
+              </select>
             </div>
             <div className="flex flex-col gap-0.5 sm:col-span-2">
               <Label htmlFor="item-barcode" className="text-sm">Barcode</Label>
