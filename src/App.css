@@ -1175,7 +1175,7 @@ body,
   background-color: #3f3f46 !important;
 }
 
-/* Single-row edit mode: distinct from bulk selection (editingLineId row) */
+/* Single-row edit mode: distinct from bulk selection (editingLineId row) “editing row”, */
 .doc-page .ag-theme-quartz-dark .ag-row.ag-row-selected.doc-lines__row--editing .ag-cell {
   background-color: #2a2a2e !important;
   border-left: 3px solid #a1a1aa;
