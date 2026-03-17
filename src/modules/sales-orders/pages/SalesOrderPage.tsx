@@ -21,7 +21,7 @@ import { cn } from "@/lib/utils";
 import { agGridDefaultColDef } from "../../../shared/ui/ag-grid/agGridDefaults";
 import { todayYYYYMMDD, normalizeDateForSO } from "../dateUtils";
 import { getSalesOrderHealth } from "../../../shared/documentHealth";
-import { getDocumentErrors, getDocumentWarnings, actionIssue, combineIssues, hasErrors, type Issue } from "../../../shared/issues";
+import { getErrorAndWarningMessages, actionIssue, combineIssues, hasErrors, type Issue } from "../../../shared/issues";
 import { ChevronDown, ChevronUp } from "lucide-react";
 
 type LineWithItem = SalesOrderLine & { itemName: string };
@@ -416,8 +416,10 @@ export function SalesOrderPage() {
     () => combineIssues(health.issues, actionIssues),
     [health.issues, actionIssues],
   );
-  const combinedErrors = useMemo(() => getDocumentErrors(combinedIssues), [combinedIssues]);
-  const combinedWarnings = useMemo(() => getDocumentWarnings(combinedIssues), [combinedIssues]);
+  const { errors: combinedErrors, warnings: combinedWarnings } = useMemo(
+    () => getErrorAndWarningMessages(combinedIssues),
+    [combinedIssues],
+  );
 
   const getRowClass = useCallback(
     (params: { data?: LineFormRow }) => {
