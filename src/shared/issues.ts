@@ -28,3 +28,8 @@ export function getDocumentErrors(issues: Issue[]): string[] {
 export function getDocumentWarnings(issues: Issue[]): string[] {
   return issues.filter((i) => i.severity === "warning").map((i) => i.message);
 }
+
+/** Create an action-scope error issue (e.g. save/confirm/cancel/create-receipt failure). */
+export function actionIssue(message: string): Issue {
+  return { severity: "error", scope: "action", message };
+}

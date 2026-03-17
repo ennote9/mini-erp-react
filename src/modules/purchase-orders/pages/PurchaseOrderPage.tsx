@@ -21,7 +21,7 @@ import { cn } from "@/lib/utils";
 import { agGridDefaultColDef } from "../../../shared/ui/ag-grid/agGridDefaults";
 import { todayYYYYMMDD, normalizeDateForPO } from "../dateUtils";
 import { getPurchaseOrderHealth } from "../../../shared/documentHealth";
-import { getDocumentErrors, getDocumentWarnings } from "../../../shared/issues";
+import { getDocumentErrors, getDocumentWarnings, actionIssue, type Issue } from "../../../shared/issues";
 import { ChevronDown, ChevronUp } from "lucide-react";
 
 type LineWithItem = PurchaseOrderLine & { itemName: string };
@@ -163,6 +163,7 @@ export function PurchaseOrderPage() {
   const [lineEntryQty, setLineEntryQty] = useState(1);
   const [lineEntryUnitPrice, setLineEntryUnitPrice] = useState(0);
   const [healthStripExpanded, setHealthStripExpanded] = useState(false);
+  const [actionIssues, setActionIssues] = useState<Issue[]>([]);
   const linesGridRef = useRef<AgGridReact<LineFormRow> | null>(null);
 
   useEffect(() => {
@@ -244,24 +245,28 @@ export function PurchaseOrderPage() {
 
   const handleConfirm = () => {
     if (!id || isNew) return;
+    setActionIssues([]);
     const result = confirm(id);
     if (result.success) setRefresh((r) => r + 1);
-    else alert(result.error);
+    else setActionIssues([actionIssue(result.error)]);
   };
   const handleCancelDocument = () => {
     if (!id || isNew) return;
+    setActionIssues([]);
     const result = cancelDocument(id);
     if (result.success) setRefresh((r) => r + 1);
-    else alert(result.error);
+    else setActionIssues([actionIssue(result.error)]);
   };
   const handleCreateReceipt = () => {
     if (!id || isNew) return;
+    setActionIssues([]);
     const result = createReceipt(id);
     if (result.success) navigate(`/receipts/${result.receiptId}`);
-    else alert(result.error);
+    else setActionIssues([actionIssue(result.error)]);
   };
 
   const handleSave = () => {
+    setActionIssues([]);
     const linesToSave = form.lines
       .filter(
         (l) => l.itemId.trim() !== "" && typeof l.qty === "number" && l.qty > 0,
@@ -284,6 +289,7 @@ export function PurchaseOrderPage() {
     if (result.success) {
       navigate("/purchase-orders");
     } else {
+      setActionIssues([actionIssue(result.error)]);
     }
   };
 
@@ -406,8 +412,13 @@ export function PurchaseOrderPage() {
     [form.supplierId, form.warehouseId, form.lines],
   );
 
-  const errors = useMemo(() => getDocumentErrors(health.issues), [health.issues]);
-  const warnings = useMemo(() => getDocumentWarnings(health.issues), [health.issues]);
+  const combinedIssues = useMemo(
+    () => [...health.issues, ...actionIssues],
+    [health.issues, actionIssues],
+  );
+  const combinedErrors = useMemo(() => getDocumentErrors(combinedIssues), [combinedIssues]);
+  const combinedWarnings = useMemo(() => getDocumentWarnings(combinedIssues), [combinedIssues]);
+  const documentErrors = useMemo(() => getDocumentErrors(health.issues), [health.issues]);
 
   const getRowClass = useCallback(
     (params: { data?: LineFormRow }) => {
@@ -454,36 +465,36 @@ export function PurchaseOrderPage() {
             {!isNew && <StatusBadge status={doc!.status} />}
           </div>
           <div className="doc-header__right">
-            {isEditable && (errors.length > 0 || warnings.length > 0) && (
+            {isEditable && (combinedErrors.length > 0 || combinedWarnings.length > 0) && (
               <div className="doc-health-strip-wrap">
                 <div className="doc-health-strip" role="status" aria-live="polite">
                   <span className="doc-health-strip__label">Document issues</span>
                   <span className="doc-health-strip__sep">·</span>
-                  {errors.length > 0 && (
+                  {combinedErrors.length > 0 && (
                     <span className="doc-health-strip__errors">
-                      {errors.length} {errors.length === 1 ? "error" : "errors"}
+                      {combinedErrors.length} {combinedErrors.length === 1 ? "error" : "errors"}
                     </span>
                   )}
-                  {errors.length > 0 && warnings.length > 0 && (
+                  {combinedErrors.length > 0 && combinedWarnings.length > 0 && (
                     <span className="doc-health-strip__sep">·</span>
                   )}
-                  {warnings.length > 0 && (
+                  {combinedWarnings.length > 0 && (
                     <span className="doc-health-strip__warnings">
-                      {warnings.length} {warnings.length === 1 ? "warning" : "warnings"}
+                      {combinedWarnings.length} {combinedWarnings.length === 1 ? "warning" : "warnings"}
                     </span>
                   )}
-                  {errors.length > 1 ? null : errors.length === 1 ? (
+                  {combinedErrors.length > 1 ? null : combinedErrors.length === 1 ? (
                     <>
                       <span className="doc-health-strip__sep">·</span>
-                      <span className="doc-health-strip__msg">{errors[0]}</span>
+                      <span className="doc-health-strip__msg">{combinedErrors[0]}</span>
                     </>
-                  ) : errors.length === 0 && warnings.length === 1 ? (
+                  ) : combinedErrors.length === 0 && combinedWarnings.length === 1 ? (
                     <>
                       <span className="doc-health-strip__sep">·</span>
-                      <span className="doc-health-strip__msg">{warnings[0]}</span>
+                      <span className="doc-health-strip__msg">{combinedWarnings[0]}</span>
                     </>
                   ) : null}
-                  {errors.length + warnings.length > 1 && (
+                  {combinedErrors.length + combinedWarnings.length > 1 && (
                     <button
                       type="button"
                       className="doc-health-strip__chevron"
@@ -500,13 +511,13 @@ export function PurchaseOrderPage() {
                     </button>
                   )}
                 </div>
-                {healthStripExpanded && (errors.length > 0 || warnings.length > 0) && (
+                {healthStripExpanded && (combinedErrors.length > 0 || combinedWarnings.length > 0) && (
                   <div className="doc-health-strip-panel">
-                    {errors.length > 0 && (
+                    {combinedErrors.length > 0 && (
                       <div className="doc-health-strip-panel__section">
                         <div className="doc-health-strip-panel__section-title">Errors</div>
                         <ul className="doc-health-strip-panel__list" role="list">
-                          {errors.map((msg, i) => (
+                          {combinedErrors.map((msg, i) => (
                             <li
                               key={i}
                               className="doc-health-strip-panel__item doc-health-strip-panel__item--error"
@@ -518,11 +529,11 @@ export function PurchaseOrderPage() {
                         </ul>
                       </div>
                     )}
-                    {warnings.length > 0 && (
+                    {combinedWarnings.length > 0 && (
                       <div className="doc-health-strip-panel__section">
                         <div className="doc-health-strip-panel__section-title">Warnings</div>
                         <ul className="doc-health-strip-panel__list" role="list">
-                          {warnings.map((msg, i) => (
+                          {combinedWarnings.map((msg, i) => (
                             <li
                               key={i}
                               className="doc-health-strip-panel__item doc-health-strip-panel__item--warning"
@@ -548,8 +559,8 @@ export function PurchaseOrderPage() {
                 <Button
                   type="button"
                   onClick={handleConfirm}
-                  disabled={errors.length > 0}
-                  title={errors.length > 0 ? "Fix errors before confirming." : undefined}
+                  disabled={documentErrors.length > 0}
+                  title={documentErrors.length > 0 ? "Fix errors before confirming." : undefined}
                 >
                   Confirm
                 </Button>
