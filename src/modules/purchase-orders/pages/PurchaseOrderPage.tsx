@@ -23,7 +23,7 @@ import { todayYYYYMMDD, normalizeDateForPO } from "../dateUtils";
 import { getPurchaseOrderHealth } from "../../../shared/documentHealth";
 import { getErrorAndWarningMessages, actionIssue, combineIssues, hasErrors, issueListContainsMessage, type Issue } from "../../../shared/issues";
 import { DocumentIssueStrip } from "../../../shared/ui/feedback/DocumentIssueStrip";
-import { SearchableItemPicker } from "../../../shared/ui/item-picker/SearchableItemPicker";
+import { SearchableItemPicker, type SearchableItemPickerRef } from "../../../shared/ui/item-picker/SearchableItemPicker";
 
 type LineWithItem = PurchaseOrderLine & { itemName: string };
 
@@ -50,8 +50,32 @@ function defaultForm(): FormState {
 function poLinesDisplayColumnDefs(
   linesLength: number,
   onRemove: (lineId: number) => void,
+  lineHealth: Map<number, "error" | "warning" | null>,
 ): ColDef<LineFormRow>[] {
   return [
+    {
+      headerName: "",
+      width: 40,
+      sortable: false,
+      cellRenderer: (params: { data?: LineFormRow }) => {
+        if (!params.data) return null;
+        const h = lineHealth.get(params.data._lineId) ?? null;
+        const title =
+          h === "error"
+            ? "Missing item or invalid quantity"
+            : h === "warning"
+              ? "Zero unit price or zero line amount"
+              : "OK";
+        const mod = h === "error" ? "error" : h === "warning" ? "warning" : "ok";
+        return (
+          <span
+            className={cn("doc-lines__status", `doc-lines__status--${mod}`)}
+            title={title}
+            aria-label={title}
+          />
+        );
+      },
+    },
     {
       field: "itemId",
       headerName: "Item",
@@ -170,6 +194,7 @@ export function PurchaseOrderPage() {
   } | null>(null);
   const [actionIssues, setActionIssues] = useState<Issue[]>([]);
   const linesGridRef = useRef<AgGridReact<LineFormRow> | null>(null);
+  const lineEntryItemPickerRef = useRef<SearchableItemPickerRef | null>(null);
 
   useEffect(() => {
     setActionIssues([]);
@@ -337,6 +362,7 @@ export function PurchaseOrderPage() {
     setLineEntryItemId("");
     setLineEntryQty(1);
     setLineEntryUnitPrice(0);
+    setTimeout(() => lineEntryItemPickerRef.current?.focus(), 0);
   };
 
   const handleDuplicateIncreaseQty = () => {
@@ -360,10 +386,12 @@ export function PurchaseOrderPage() {
     setLineEntryItemId("");
     setLineEntryQty(1);
     setLineEntryUnitPrice(0);
+    setTimeout(() => lineEntryItemPickerRef.current?.focus(), 0);
   };
 
   const handleDuplicateCancel = () => {
     setDuplicateChoicePending(null);
+    setTimeout(() => lineEntryItemPickerRef.current?.focus(), 0);
   };
 
   const updateLineFromEntry = () => {
@@ -406,11 +434,6 @@ export function PurchaseOrderPage() {
       setLineEntryUnitPrice(typeof row.unitPrice === "number" && !Number.isNaN(row.unitPrice) ? row.unitPrice : 0);
     }
   }, []);
-
-  const linesColumnDefs = useMemo(
-    () => poLinesDisplayColumnDefs(form.lines.length, removeLineByLineId),
-    [form.lines.length, removeLineByLineId],
-  );
 
   const handleLineEntryItemChange = (itemId: string) => {
     setLineEntryItemId(itemId);
@@ -469,6 +492,11 @@ export function PurchaseOrderPage() {
       return h === "error" ? "doc-lines__row--error" : h === "warning" ? "doc-lines__row--warning" : undefined;
     },
     [health.lineHealth],
+  );
+
+  const linesColumnDefs = useMemo(
+    () => poLinesDisplayColumnDefs(form.lines.length, removeLineByLineId, health.lineHealth),
+    [form.lines.length, removeLineByLineId, health.lineHealth],
   );
 
   if (!id) {
@@ -645,6 +673,7 @@ export function PurchaseOrderPage() {
                         Item <span className="text-destructive">*</span>
                       </Label>
                       <SearchableItemPicker
+                        ref={lineEntryItemPickerRef}
                         id="line-entry-item"
                         value={lineEntryItemId}
                         onChange={handleLineEntryItemChange}
@@ -664,6 +693,12 @@ export function PurchaseOrderPage() {
                         onChange={(e) =>
                           setLineEntryQty(Number(e.target.value) || 1)
                         }
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter" && editingLineId === null) {
+                            e.preventDefault();
+                            addLineFromEntry();
+                          }
+                        }}
                         className="h-8 text-sm"
                       />
                     </div>

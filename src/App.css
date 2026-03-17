@@ -1199,6 +1199,24 @@ body,
   background-color: rgba(251, 191, 36, 0.1) !important;
 }
 
+/* Row-status column: compact dot + tooltip */
+.doc-lines__status {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.doc-lines__status--error {
+  background-color: #dc2626;
+}
+.doc-lines__status--warning {
+  background-color: #d97706;
+}
+.doc-lines__status--ok {
+  background-color: #6b7280;
+}
+
 /* Document form (create / draft edit) */
 .doc-form__input,
 .doc-form__select {

@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect, useMemo } from "react";
+import React, { useState, useRef, useEffect, useMemo, forwardRef, useImperativeHandle } from "react";
 import type { Item } from "../../../modules/items/model";
 import { itemRepository } from "../../../modules/items/repository";
 import { searchItemsForOrderEntry } from "../../../modules/items/orderEntrySearch";
@@ -10,6 +10,8 @@ function getItemLabel(item: Item): string {
   return `${item.name} (${item.code})`;
 }
 
+export type SearchableItemPickerRef = { focus: () => void };
+
 export type SearchableItemPickerProps = {
   value: string;
   onChange: (itemId: string) => void;
@@ -19,20 +21,29 @@ export type SearchableItemPickerProps = {
   className?: string;
 };
 
-export function SearchableItemPicker({
-  value,
-  onChange,
-  items,
-  id,
-  placeholder = "Search by code, barcode or name…",
-  className,
-}: SearchableItemPickerProps) {
+export const SearchableItemPicker = forwardRef<SearchableItemPickerRef, SearchableItemPickerProps>(function SearchableItemPicker(
+  {
+    value,
+    onChange,
+    items,
+    id,
+    placeholder = "Search by code, barcode or name…",
+    className,
+  },
+  ref,
+) {
   const [inputValue, setInputValue] = useState("");
   const [isOpen, setIsOpen] = useState(false);
   const [highlightedIndex, setHighlightedIndex] = useState(0);
   const containerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLUListElement>(null);
+
+  useImperativeHandle(ref, () => ({
+    focus: () => {
+      inputRef.current?.focus();
+    },
+  }), []);
 
   const selectedItem = value ? items.find((i) => i.id === value) : undefined;
   const displayText = value
@@ -220,4 +231,4 @@ export function SearchableItemPicker({
       )}
     </div>
   );
-}
+});
