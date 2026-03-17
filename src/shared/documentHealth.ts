@@ -1,7 +1,7 @@
 /**
  * Document-level health for PO and SO.
  * Returns shared Issue[] (severity: error | warning) and lineHealth for row styling.
- * Callers derive error/warning message lists via getDocumentErrors/getDocumentWarnings(health.issues).
+ * Callers derive error/warning message lists via getErrorAndWarningMessages(health.issues).
  * No stock/availability logic here.
  */
 
@@ -10,7 +10,7 @@ import { normalizeTrim } from "./validation";
 import { parseDocumentLineQty } from "./documentValidation";
 
 export type DocumentHealth = {
-  /** Document-level issues; use getDocumentErrors/getDocumentWarnings(issues) for message lists. */
+  /** Document-level issues; use getErrorAndWarningMessages(issues) for message lists. */
   issues: Issue[];
   /** Per-line: 'error' | 'warning' | null. Key = _lineId (number). Used for row styling. */
   lineHealth: Map<number, "error" | "warning" | null>;

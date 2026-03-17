@@ -19,19 +19,6 @@ export type Issue = {
   code?: string;
 };
 
-/** Issues filtered by severity. Reusable building block. */
-export function getIssuesBySeverity(
-  issues: Issue[],
-  severity: IssueSeverity,
-): Issue[] {
-  return issues.filter((i) => i.severity === severity);
-}
-
-/** Extract message strings from an issue list. */
-export function getIssueMessages(issues: Issue[]): string[] {
-  return issues.map((i) => i.message);
-}
-
 /** Single-pass: error and warning message arrays (for strip/panel). */
 export function getErrorAndWarningMessages(issues: Issue[]): {
   errors: string[];
@@ -44,16 +31,6 @@ export function getErrorAndWarningMessages(issues: Issue[]): {
     else if (i.severity === "warning") warnings.push(i.message);
   }
   return { errors, warnings };
-}
-
-/** Document-level error messages from an issue list (for strip/panel and confirm blocking). */
-export function getDocumentErrors(issues: Issue[]): string[] {
-  return getIssueMessages(getIssuesBySeverity(issues, "error"));
-}
-
-/** Document-level warning messages from an issue list (for strip/panel). */
-export function getDocumentWarnings(issues: Issue[]): string[] {
-  return getIssueMessages(getIssuesBySeverity(issues, "warning"));
 }
 
 /** Combine multiple issue arrays into one (e.g. health.issues + actionIssues). */
