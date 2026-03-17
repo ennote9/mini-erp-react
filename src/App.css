@@ -896,6 +896,7 @@ body,
 .doc-health-strip-wrap {
   flex: 1;
   min-width: 0;
+  position: relative;
 }
 
 .doc-header__actions {
@@ -915,7 +916,7 @@ body,
   padding: 0.25rem 0.5rem;
   border-radius: 4px;
   border: 1px solid #3f3f3f;
-  background-color: hsl(0 0% 10%);
+  background-color: var(--background);
   color: #a3a3a3;
   min-width: 0;
   max-width: 100%;
@@ -944,15 +945,69 @@ body,
   min-width: 0;
 }
 
-.doc-health-strip__more {
+.doc-health-strip__chevron {
   flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  padding: 0;
+  margin: 0;
+  border: none;
+  background: none;
   cursor: pointer;
   color: #a3a3a3;
-  text-decoration: underline;
-  text-underline-offset: 2px;
 }
-.doc-health-strip__more:hover {
+.doc-health-strip__chevron:hover {
   color: #d4d4d4;
+}
+.doc-health-strip__chevron-icon {
+  width: 0.875rem;
+  height: 0.875rem;
+}
+
+.doc-health-strip-panel {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  margin-top: 2px;
+  min-width: 12rem;
+  max-width: 24rem;
+  padding: 0.375rem 0.5rem;
+  border-radius: 4px;
+  border: 1px solid #3f3f3f;
+  background-color: var(--background);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+  z-index: 50;
+}
+.doc-health-strip-panel__section {
+  margin-bottom: 0.375rem;
+}
+.doc-health-strip-panel__section:last-child {
+  margin-bottom: 0;
+}
+.doc-health-strip-panel__section-title {
+  font-size: 0.65rem;
+  font-weight: 600;
+  color: #737373;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  margin-bottom: 0.2rem;
+}
+.doc-health-strip-panel__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.doc-health-strip-panel__item {
+  font-size: 0.7rem;
+  line-height: 1.35;
+  padding: 0.2rem 0;
+  color: #d4d4d4;
+}
+.doc-health-strip-panel__item--error {
+  color: #f87171;
+}
+.doc-health-strip-panel__item--warning {
+  color: #fbbf24;
 }
 
 /* Doc header buttons — same style as Create (primary) and list outline (secondary) */

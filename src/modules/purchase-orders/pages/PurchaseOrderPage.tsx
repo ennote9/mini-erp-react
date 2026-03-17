@@ -21,7 +21,7 @@ import { cn } from "@/lib/utils";
 import { agGridDefaultColDef } from "../../../shared/ui/ag-grid/agGridDefaults";
 import { todayYYYYMMDD, normalizeDateForPO } from "../dateUtils";
 import { getPurchaseOrderHealth } from "../../../shared/documentHealth";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { ChevronDown, ChevronUp } from "lucide-react";
 
 type LineWithItem = PurchaseOrderLine & { itemName: string };
 
@@ -161,6 +161,7 @@ export function PurchaseOrderPage() {
   const [lineEntryItemId, setLineEntryItemId] = useState("");
   const [lineEntryQty, setLineEntryQty] = useState(1);
   const [lineEntryUnitPrice, setLineEntryUnitPrice] = useState(0);
+  const [healthStripExpanded, setHealthStripExpanded] = useState(false);
   const linesGridRef = useRef<AgGridReact<LineFormRow> | null>(null);
 
   useEffect(() => {
@@ -467,48 +468,70 @@ export function PurchaseOrderPage() {
                       {health.warnings.length} {health.warnings.length === 1 ? "warning" : "warnings"}
                     </span>
                   )}
-                  {(() => {
-                    const allIssues = [...health.errors, ...health.warnings];
-                    const visible = allIssues.slice(0, 2);
-                    const moreCount = allIssues.length - 2;
-                    return (
-                      <>
-                        {visible.map((msg, i) => (
-                          <span key={i} className="doc-health-strip__msg">
-                            <span className="doc-health-strip__sep">·</span>
-                            {msg}
-                          </span>
-                        ))}
-                        {moreCount > 0 && (
-                          <TooltipProvider delayDuration={0}>
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <span className="doc-health-strip__more">
-                                  <span className="doc-health-strip__sep">·</span>
-                                  +{moreCount} more
-                                </span>
-                              </TooltipTrigger>
-                              <TooltipContent
-                                side="bottom"
-                                align="start"
-                                className="max-w-sm bg-zinc-900 border border-zinc-700 text-zinc-200 text-left"
-                              >
-                                <ul className="list-disc list-inside space-y-1 text-xs">
-                                  {health.errors.map((m, i) => (
-                                    <li key={`e-${i}`} className="text-red-400">{m}</li>
-                                  ))}
-                                  {health.warnings.map((m, i) => (
-                                    <li key={`w-${i}`} className="text-amber-400">{m}</li>
-                                  ))}
-                                </ul>
-                              </TooltipContent>
-                            </Tooltip>
-                          </TooltipProvider>
-                        )}
-                      </>
-                    );
-                  })()}
+                  {health.errors.length > 1 ? null : health.errors.length === 1 ? (
+                    <>
+                      <span className="doc-health-strip__sep">·</span>
+                      <span className="doc-health-strip__msg">{health.errors[0]}</span>
+                    </>
+                  ) : health.errors.length === 0 && health.warnings.length === 1 ? (
+                    <>
+                      <span className="doc-health-strip__sep">·</span>
+                      <span className="doc-health-strip__msg">{health.warnings[0]}</span>
+                    </>
+                  ) : null}
+                  {health.errors.length + health.warnings.length > 1 && (
+                    <button
+                      type="button"
+                      className="doc-health-strip__chevron"
+                      onClick={() => setHealthStripExpanded((v) => !v)}
+                      aria-expanded={healthStripExpanded}
+                      aria-label={healthStripExpanded ? "Collapse issues" : "Show full issue list"}
+                    >
+                      <span className="doc-health-strip__sep">·</span>
+                      {healthStripExpanded ? (
+                        <ChevronUp className="doc-health-strip__chevron-icon" aria-hidden />
+                      ) : (
+                        <ChevronDown className="doc-health-strip__chevron-icon" aria-hidden />
+                      )}
+                    </button>
+                  )}
                 </div>
+                {healthStripExpanded && (health.errors.length > 0 || health.warnings.length > 0) && (
+                  <div className="doc-health-strip-panel">
+                    {health.errors.length > 0 && (
+                      <div className="doc-health-strip-panel__section">
+                        <div className="doc-health-strip-panel__section-title">Errors</div>
+                        <ul className="doc-health-strip-panel__list" role="list">
+                          {health.errors.map((msg, i) => (
+                            <li
+                              key={i}
+                              className="doc-health-strip-panel__item doc-health-strip-panel__item--error"
+                              role="listitem"
+                            >
+                              {msg}
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                    {health.warnings.length > 0 && (
+                      <div className="doc-health-strip-panel__section">
+                        <div className="doc-health-strip-panel__section-title">Warnings</div>
+                        <ul className="doc-health-strip-panel__list" role="list">
+                          {health.warnings.map((msg, i) => (
+                            <li
+                              key={i}
+                              className="doc-health-strip-panel__item doc-health-strip-panel__item--warning"
+                              role="listitem"
+                            >
+                              {msg}
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             )}
             <div className="doc-header__actions">
