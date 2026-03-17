@@ -704,7 +704,7 @@ export function PurchaseOrderPage() {
             </CardContent>
           </Card>
           <div className="doc-lines mt-2">
-            <div className="doc-lines__header flex items-center justify-between gap-2 flex-wrap mb-1.5">
+            <div className="doc-lines__header flex items-center justify-between gap-2 flex-wrap mb-1.5 min-h-8 max-w-2xl">
               <h3 className="doc-lines__title">Lines</h3>
               {isEditable && selectedLineIds.length >= 2 && (
                 <div className="flex items-center gap-2 rounded border border-border bg-muted/30 px-2 py-1.5 text-sm">
@@ -802,9 +802,9 @@ export function PurchaseOrderPage() {
                         )}
                       </div>
                       {duplicateChoicePending && editingLineId === null && (
-                        <div className="doc-lines__duplicate-panel absolute right-0 top-full z-10 mt-1 min-w-[220px] rounded border border-border bg-muted/95 px-2 py-1.5 shadow-md">
+                        <div className="doc-lines__duplicate-panel absolute left-0 right-0 top-full z-10 mt-1 rounded border border-border bg-muted/95 px-2 py-1.5 shadow-md">
                           <p className="mb-1.5 text-xs text-muted-foreground">This item is already in the lines.</p>
-                          <div className="flex gap-1.5">
+                          <div className="flex flex-wrap gap-1.5">
                             <Button
                               type="button"
                               variant="default"
