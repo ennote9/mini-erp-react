@@ -706,7 +706,7 @@ export function PurchaseOrderPage() {
           <div className="doc-lines mt-2">
             <div className="doc-lines__header flex items-center justify-between gap-2 flex-wrap mb-1.5">
               <h3 className="doc-lines__title">Lines</h3>
-              {isEditable && selectedLineIds.length > 0 && (
+              {isEditable && selectedLineIds.length >= 2 && (
                 <div className="flex items-center gap-2 rounded border border-border bg-muted/30 px-2 py-1.5 text-sm">
                   <span className="text-muted-foreground">
                     {selectedLineIds.length === 1 ? "1 line selected" : `${selectedLineIds.length} lines selected`}
