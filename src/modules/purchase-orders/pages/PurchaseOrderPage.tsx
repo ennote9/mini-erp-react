@@ -454,23 +454,6 @@ export function PurchaseOrderPage() {
             {!isNew && <StatusBadge status={doc!.status} />}
           </div>
           <div className="doc-header__right">
-            {isEditable && (health.errors.length > 0 || health.warnings.length > 0) && (
-              <div className="doc-health-summary" role="status" aria-live="polite">
-                {health.errors.length > 0 && (
-                  <span className="doc-health-summary__errors">
-                    {health.errors.length} {health.errors.length === 1 ? "error" : "errors"}
-                  </span>
-                )}
-                {health.errors.length > 0 && health.warnings.length > 0 && (
-                  <span className="doc-health-summary__sep"> · </span>
-                )}
-                {health.warnings.length > 0 && (
-                  <span className="doc-health-summary__warnings">
-                    {health.warnings.length} {health.warnings.length === 1 ? "warning" : "warnings"}
-                  </span>
-                )}
-              </div>
-            )}
             <div className="doc-header__actions">
               {isEditable && (
                 <Button type="button" onClick={handleSave}>
@@ -503,6 +486,33 @@ export function PurchaseOrderPage() {
                 </Button>
               )}
             </div>
+            {isEditable && (health.errors.length > 0 || health.warnings.length > 0) && (
+              <div className="doc-health-panel" role="status" aria-live="polite">
+                <div className="doc-health-panel__title">Document issues</div>
+                <div className="doc-health-panel__counts">
+                  {health.errors.length > 0 && (
+                    <span className="doc-health-panel__errors">
+                      {health.errors.length} {health.errors.length === 1 ? "error" : "errors"}
+                    </span>
+                  )}
+                  {health.errors.length > 0 && health.warnings.length > 0 && (
+                    <span className="doc-health-panel__sep"> · </span>
+                  )}
+                  {health.warnings.length > 0 && (
+                    <span className="doc-health-panel__warnings">
+                      {health.warnings.length} {health.warnings.length === 1 ? "warning" : "warnings"}
+                    </span>
+                  )}
+                </div>
+                <div className="doc-health-panel__lines">
+                  {[...health.errors, ...health.warnings].slice(0, 2).map((msg, i) => (
+                    <div key={i} className="doc-health-panel__line">
+                      {msg}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         </div>
       }
