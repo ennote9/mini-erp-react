@@ -23,6 +23,7 @@ import { todayYYYYMMDD, normalizeDateForSO } from "../dateUtils";
 import { getSalesOrderHealth } from "../../../shared/documentHealth";
 import { getErrorAndWarningMessages, actionIssue, combineIssues, hasErrors, issueListContainsMessage, type Issue } from "../../../shared/issues";
 import { DocumentIssueStrip } from "../../../shared/ui/feedback/DocumentIssueStrip";
+import { SearchableItemPicker } from "../../../shared/ui/item-picker/SearchableItemPicker";
 
 type LineWithItem = SalesOrderLine & { itemName: string };
 
@@ -606,22 +607,13 @@ export function SalesOrderPage() {
                       <Label htmlFor="line-entry-item" className="text-sm">
                         Item <span className="text-destructive">*</span>
                       </Label>
-                      <select
+                      <SearchableItemPicker
                         id="line-entry-item"
                         value={lineEntryItemId}
-                        onChange={(e) => handleLineEntryItemChange(e.target.value)}
-                        className={cn(
-                          "flex h-8 w-full rounded border border-input bg-background px-2 py-1 text-sm text-foreground",
-                          "focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50",
-                        )}
-                      >
-                        <option value="">Select item</option>
-                        {activeItems.map((i) => (
-                          <option key={i.id} value={i.id}>
-                            {i.name} ({i.code})
-                          </option>
-                        ))}
-                      </select>
+                        onChange={handleLineEntryItemChange}
+                        items={activeItems}
+                        placeholder="Search by code, barcode or name…"
+                      />
                     </div>
                     <div className="flex flex-col gap-0.5">
                       <Label htmlFor="line-entry-qty" className="text-sm">
