@@ -16,8 +16,9 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { actionIssue, type Issue } from "../../../shared/issues";
-import { IssueBlock } from "../../../shared/ui/feedback/IssueBlock";
+import { actionIssue, combineIssues, getErrorAndWarningMessages, issueListContainsMessage, type Issue } from "../../../shared/issues";
+import { getWarehouseFormHealth } from "../../../shared/masterDataHealth";
+import { DocumentIssueStrip } from "../../../shared/ui/feedback/DocumentIssueStrip";
 
 type FormState = {
   code: string;
@@ -57,7 +58,30 @@ export function WarehousePage() {
   );
 
   const [form, setForm] = useState<FormState>(defaultForm);
-  const [pageIssues, setPageIssues] = useState<Issue[]>([]);
+  const [actionIssues, setActionIssues] = useState<Issue[]>([]);
+
+  const health = useMemo(
+    () =>
+      getWarehouseFormHealth({
+        code: form.code,
+        name: form.name,
+        phone: form.phone,
+      }),
+    [form.code, form.name, form.phone],
+  );
+
+  useEffect(() => {
+    setActionIssues([]);
+  }, [form.code, form.name, form.phone]);
+
+  const combinedIssues = useMemo(
+    () => combineIssues(health.issues, actionIssues),
+    [health.issues, actionIssues],
+  );
+  const { errors: combinedErrors, warnings: combinedWarnings } = useMemo(
+    () => getErrorAndWarningMessages(combinedIssues),
+    [combinedIssues],
+  );
 
   useEffect(() => {
     if (isNew) {
@@ -81,7 +105,7 @@ export function WarehousePage() {
   }, [id, isNew, warehouse]);
 
   const handleSave = () => {
-    setPageIssues([]);
+    setActionIssues([]);
     const result = saveWarehouse(
       {
         code: form.code,
@@ -99,8 +123,8 @@ export function WarehousePage() {
     );
     if (result.success) {
       navigate("/warehouses");
-    } else {
-      setPageIssues([actionIssue(result.error)]);
+    } else if (!issueListContainsMessage(health.issues, result.error)) {
+      setActionIssues([actionIssue(result.error)]);
     }
   };
 
@@ -143,17 +167,21 @@ export function WarehousePage() {
           <div className="doc-header__title-row">
             <h2 className="doc-header__title">{displayTitle}</h2>
           </div>
-          <div className="doc-header__actions">
-            <Button type="button" onClick={handleSave}>
-              Save
-            </Button>
-            <Button type="button" variant="outline" onClick={handleCancel}>
-              Cancel
-            </Button>
+          <div className="doc-header__right">
+            {(combinedErrors.length > 0 || combinedWarnings.length > 0) && (
+              <DocumentIssueStrip errors={combinedErrors} warnings={combinedWarnings} />
+            )}
+            <div className="doc-header__actions">
+              <Button type="button" onClick={handleSave}>
+                Save
+              </Button>
+              <Button type="button" variant="outline" onClick={handleCancel}>
+                Cancel
+              </Button>
+            </div>
           </div>
         </div>
       </div>
-      <IssueBlock issues={pageIssues} />
       <Card className="mt-4 max-w-2xl border-0 shadow-none">
         <CardHeader className="p-2 pb-0.5">
           <CardTitle className="text-[0.9rem] font-semibold">Details</CardTitle>
