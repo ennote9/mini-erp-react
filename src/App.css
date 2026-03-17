@@ -619,17 +619,17 @@ body,
   color: #a1a1aa;
 }
 
-/* Checkbox: white when checked (instead of blue) */
+/* Checkbox: white when checked (no blue), no visible outline/ring */
 .list-page__content .ag-theme-quartz-dark .ag-checkbox-input-wrapper.ag-checked {
   background-color: #fff !important;
   border-color: #fff !important;
 }
-/* Checked + focused: keep fill white, outline light gray */
 .list-page__content .ag-theme-quartz-dark .ag-checkbox-input-wrapper.ag-checked:focus,
 .list-page__content .ag-theme-quartz-dark .ag-checkbox-input-wrapper.ag-checked:focus-within {
   background-color: #fff !important;
   border-color: #fff !important;
-  box-shadow: 0 0 0 1px #888 !important;
+  outline: none !important;
+  box-shadow: none !important;
 }
 .list-page__content .ag-theme-quartz-dark .ag-checkbox-input-wrapper.ag-checked::after,
 .list-page__content .ag-theme-quartz-dark .ag-checkbox-input-wrapper.ag-checked .ag-icon {
@@ -638,11 +638,11 @@ body,
 .list-page__content .ag-theme-quartz-dark .ag-checkbox-input-wrapper:not(.ag-checked) {
   border-color: #71717a !important;
 }
-/* Unchecked + focused: light gray outline */
 .list-page__content .ag-theme-quartz-dark .ag-checkbox-input-wrapper:focus,
 .list-page__content .ag-theme-quartz-dark .ag-checkbox-input-wrapper:focus-within {
-  border-color: #888 !important;
-  box-shadow: 0 0 0 1px #888 !important;
+  outline: none !important;
+  box-shadow: none !important;
+  border-color: #71717a !important;
 }
 
 .list-page__empty {
@@ -1138,6 +1138,7 @@ body,
   --ag-border-color: #2a2a2a;
   --ag-row-height: 36px;
   --ag-row-hover-color: hsl(0 0% 12%);
+  --ag-selected-row-background-color: #3f3f46;
 }
 .doc-page .ag-theme-quartz-dark .ag-root-wrapper {
   background-color: var(--background) !important;
@@ -1167,6 +1168,37 @@ body,
   outline: none !important;
   box-shadow: 0 0 0 1px #888 !important;
   border-color: #888 !important;
+}
+
+/* Doc-page grid: selected row — neutral (no blue) */
+.doc-page .ag-theme-quartz-dark .ag-row.ag-row-selected .ag-cell {
+  background-color: #3f3f46 !important;
+}
+
+/* Doc-page grid: checkboxes — white when checked, no blue outline/ring */
+.doc-page .ag-theme-quartz-dark .ag-checkbox-input-wrapper.ag-checked {
+  background-color: #fff !important;
+  border-color: #fff !important;
+}
+.doc-page .ag-theme-quartz-dark .ag-checkbox-input-wrapper.ag-checked:focus,
+.doc-page .ag-theme-quartz-dark .ag-checkbox-input-wrapper.ag-checked:focus-within {
+  background-color: #fff !important;
+  border-color: #fff !important;
+  outline: none !important;
+  box-shadow: none !important;
+}
+.doc-page .ag-theme-quartz-dark .ag-checkbox-input-wrapper.ag-checked::after,
+.doc-page .ag-theme-quartz-dark .ag-checkbox-input-wrapper.ag-checked .ag-icon {
+  color: #171717 !important;
+}
+.doc-page .ag-theme-quartz-dark .ag-checkbox-input-wrapper:not(.ag-checked) {
+  border-color: #71717a !important;
+}
+.doc-page .ag-theme-quartz-dark .ag-checkbox-input-wrapper:focus,
+.doc-page .ag-theme-quartz-dark .ag-checkbox-input-wrapper:focus-within {
+  outline: none !important;
+  box-shadow: none !important;
+  border-color: #71717a !important;
 }
 
 /* Document health summary (errors / warnings) */
