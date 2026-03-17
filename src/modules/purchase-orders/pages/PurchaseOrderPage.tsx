@@ -758,71 +758,69 @@ export function PurchaseOrderPage() {
                         className="h-8 text-sm"
                       />
                     </div>
-                    <div className="flex flex-col items-end gap-1.5 min-w-0">
-                      <div className="flex gap-1.5 flex-shrink-0">
-                        {editingLineId === null ? (
+                    <div className="flex gap-1.5 flex-shrink-0">
+                      {editingLineId === null ? (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={addLineFromEntry}
+                        >
+                          Add line
+                        </Button>
+                      ) : (
+                        <>
+                          <Button
+                            type="button"
+                            size="sm"
+                            onClick={updateLineFromEntry}
+                          >
+                            Update line
+                          </Button>
                           <Button
                             type="button"
                             variant="outline"
                             size="sm"
-                            onClick={addLineFromEntry}
+                            onClick={cancelEdit}
                           >
-                            Add line
+                            Cancel edit
                           </Button>
-                        ) : (
-                          <>
-                            <Button
-                              type="button"
-                              size="sm"
-                              onClick={updateLineFromEntry}
-                            >
-                              Update line
-                            </Button>
-                            <Button
-                              type="button"
-                              variant="outline"
-                              size="sm"
-                              onClick={cancelEdit}
-                            >
-                              Cancel edit
-                            </Button>
-                          </>
-                        )}
-                      </div>
-                      <div className="doc-lines__action-area min-h-14 w-full flex flex-col justify-center gap-1.5">
-                        {duplicateChoicePending && editingLineId === null && (
-                          <div className="flex flex-wrap items-center gap-2 rounded border border-border bg-muted/30 px-2 py-1.5 text-sm">
-                            <span className="text-muted-foreground">This item is already in the lines.</span>
-                            <Button
-                              type="button"
-                              variant="default"
-                              size="sm"
-                              onClick={handleDuplicateIncreaseQty}
-                            >
-                              Increase quantity in existing line
-                            </Button>
-                            <Button
-                              type="button"
-                              variant="outline"
-                              size="sm"
-                              onClick={handleDuplicateCancel}
-                            >
-                              Cancel
-                            </Button>
-                          </div>
-                        )}
-                        {selectedLineIds.length > 0 && (
-                          <div className="flex flex-wrap items-center gap-2 rounded border border-border bg-muted/30 px-2 py-1.5 text-sm">
-                            <span className="text-muted-foreground">
-                              {selectedLineIds.length === 1 ? "1 line selected" : `${selectedLineIds.length} lines selected`}
-                            </span>
-                            <Button type="button" variant="outline" size="sm" onClick={removeSelectedLines}>
-                              Remove selected lines
-                            </Button>
-                          </div>
-                        )}
-                      </div>
+                        </>
+                      )}
                     </div>
+                  </div>
+                  <div className="doc-lines__action-row min-h-14 mt-1.5 flex justify-end items-center gap-2 flex-wrap">
+                    {duplicateChoicePending && editingLineId === null && (
+                      <div className="flex flex-wrap items-center gap-2 rounded border border-border bg-muted/30 px-2 py-1.5 text-sm">
+                        <span className="text-muted-foreground">This item is already in the lines.</span>
+                        <Button
+                          type="button"
+                          variant="default"
+                          size="sm"
+                          onClick={handleDuplicateIncreaseQty}
+                        >
+                          Increase quantity in existing line
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={handleDuplicateCancel}
+                        >
+                          Cancel
+                        </Button>
+                      </div>
+                    )}
+                    {selectedLineIds.length > 0 && (
+                      <div className="flex flex-wrap items-center gap-2 rounded border border-border bg-muted/30 px-2 py-1.5 text-sm">
+                        <span className="text-muted-foreground">
+                          {selectedLineIds.length === 1 ? "1 line selected" : `${selectedLineIds.length} lines selected`}
+                        </span>
+                        <Button type="button" variant="outline" size="sm" onClick={removeSelectedLines}>
+                          Remove selected lines
+                        </Button>
+                      </div>
+                    )}
                   </div>
                 </CardContent>
               </Card>
