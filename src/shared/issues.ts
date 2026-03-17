@@ -52,3 +52,12 @@ export function hasWarnings(issues: Issue[]): boolean {
 export function actionIssue(message: string): Issue {
   return { severity: "error", scope: "action", message };
 }
+
+/** Create a field-scope issue (e.g. required header field or form field). */
+export function fieldIssue(
+  severity: IssueSeverity,
+  field: string,
+  message: string,
+): Issue {
+  return { severity, scope: "field", field, message };
+}

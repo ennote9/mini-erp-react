@@ -6,6 +6,7 @@
  */
 
 import type { Issue } from "./issues";
+import { fieldIssue } from "./issues";
 import { normalizeTrim } from "./validation";
 import { parseDocumentLineQty } from "./documentValidation";
 
@@ -39,10 +40,10 @@ export function getPurchaseOrderHealth(input: PurchaseOrderHealthInput): Documen
   const lineHealth = new Map<number, "error" | "warning" | null>();
 
   if (normalizeTrim(input.supplierId) === "") {
-    issues.push(docIssue("error", "Supplier is required."));
+    issues.push(fieldIssue("error", "supplierId", "Supplier is required."));
   }
   if (normalizeTrim(input.warehouseId) === "") {
-    issues.push(docIssue("error", "Warehouse is required."));
+    issues.push(fieldIssue("error", "warehouseId", "Warehouse is required."));
   }
 
   const lines = input.lines ?? [];
@@ -123,10 +124,10 @@ export function getSalesOrderHealth(input: SalesOrderHealthInput): DocumentHealt
   const lineHealth = new Map<number, "error" | "warning" | null>();
 
   if (normalizeTrim(input.customerId) === "") {
-    issues.push(docIssue("error", "Customer is required."));
+    issues.push(fieldIssue("error", "customerId", "Customer is required."));
   }
   if (normalizeTrim(input.warehouseId) === "") {
-    issues.push(docIssue("error", "Warehouse is required."));
+    issues.push(fieldIssue("error", "warehouseId", "Warehouse is required."));
   }
 
   const lines = input.lines ?? [];
