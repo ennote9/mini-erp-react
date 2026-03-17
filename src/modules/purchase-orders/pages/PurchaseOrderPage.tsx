@@ -163,6 +163,11 @@ export function PurchaseOrderPage() {
   const [lineEntryItemId, setLineEntryItemId] = useState("");
   const [lineEntryQty, setLineEntryQty] = useState(1);
   const [lineEntryUnitPrice, setLineEntryUnitPrice] = useState(0);
+  const [duplicateChoicePending, setDuplicateChoicePending] = useState<{
+    itemId: string;
+    qty: number;
+    unitPrice: number;
+  } | null>(null);
   const [actionIssues, setActionIssues] = useState<Issue[]>([]);
   const linesGridRef = useRef<AgGridReact<LineFormRow> | null>(null);
 
@@ -178,6 +183,7 @@ export function PurchaseOrderPage() {
       setLineEntryItemId("");
       setLineEntryQty(1);
       setLineEntryUnitPrice(0);
+      setDuplicateChoicePending(null);
       return;
     }
     if (doc?.status === "draft" && id) {
@@ -203,6 +209,7 @@ export function PurchaseOrderPage() {
       setLineEntryItemId("");
       setLineEntryQty(1);
       setLineEntryUnitPrice(0);
+      setDuplicateChoicePending(null);
     }
   }, [id, isNew, doc?.id, doc?.status, doc?.date, doc?.supplierId, doc?.warehouseId, doc?.comment, refresh]);
 
@@ -302,6 +309,7 @@ export function PurchaseOrderPage() {
   };
 
   const removeLineByLineId = useCallback((lineId: number) => {
+    setDuplicateChoicePending(null);
     setForm((f) => ({
       ...f,
       lines: f.lines.filter((l) => l._lineId !== lineId),
@@ -321,11 +329,53 @@ export function PurchaseOrderPage() {
     if (!itemId || !Number.isFinite(qty) || qty <= 0) return;
     const rawPrice = Number(lineEntryUnitPrice);
     const unitPrice = Number.isFinite(rawPrice) && rawPrice >= 0 ? rawPrice : 0;
+    const isDuplicate = form.lines.some((l) => l.itemId === itemId);
+    if (isDuplicate) {
+      setDuplicateChoicePending({ itemId, qty, unitPrice });
+      return;
+    }
     const _lineId = nextLineIdRef.current++;
     setForm((f) => ({
       ...f,
       lines: [...f.lines, { itemId, qty, unitPrice, _lineId }],
     }));
+    setLineEntryItemId("");
+    setLineEntryQty(1);
+    setLineEntryUnitPrice(0);
+  };
+
+  const handleDuplicateIncreaseQty = () => {
+    if (!duplicateChoicePending) return;
+    const { itemId, qty: addQty } = duplicateChoicePending;
+    const idx = form.lines.findIndex((l) => l.itemId === itemId);
+    if (idx === -1) {
+      setDuplicateChoicePending(null);
+      setLineEntryItemId("");
+      setLineEntryQty(1);
+      setLineEntryUnitPrice(0);
+      return;
+    }
+    setForm((f) => ({
+      ...f,
+      lines: f.lines.map((l, i) =>
+        i === idx ? { ...l, qty: l.qty + addQty } : l,
+      ),
+    }));
+    setDuplicateChoicePending(null);
+    setLineEntryItemId("");
+    setLineEntryQty(1);
+    setLineEntryUnitPrice(0);
+  };
+
+  const handleDuplicateAddSeparate = () => {
+    if (!duplicateChoicePending) return;
+    const { itemId, qty, unitPrice } = duplicateChoicePending;
+    const _lineId = nextLineIdRef.current++;
+    setForm((f) => ({
+      ...f,
+      lines: [...f.lines, { itemId, qty, unitPrice, _lineId }],
+    }));
+    setDuplicateChoicePending(null);
     setLineEntryItemId("");
     setLineEntryQty(1);
     setLineEntryUnitPrice(0);
@@ -356,11 +406,13 @@ export function PurchaseOrderPage() {
     setLineEntryItemId("");
     setLineEntryQty(1);
     setLineEntryUnitPrice(0);
+    setDuplicateChoicePending(null);
     linesGridRef.current?.api?.deselectAll();
   };
 
   const onLinesSelectionChanged = useCallback((e: SelectionChangedEvent<LineFormRow>) => {
     const rows = e.api.getSelectedRows();
+    setDuplicateChoicePending(null);
     if (rows.length === 1 && rows[0]) {
       const row = rows[0];
       setEditingLineId(row._lineId);
@@ -675,6 +727,27 @@ export function PurchaseOrderPage() {
                       )}
                     </div>
                   </div>
+                  {duplicateChoicePending && editingLineId === null && (
+                    <div className="mt-2 flex flex-wrap items-center gap-2 rounded border border-border bg-muted/30 px-2 py-1.5 text-sm">
+                      <span className="text-muted-foreground">This item is already in the lines.</span>
+                      <Button
+                        type="button"
+                        variant="default"
+                        size="sm"
+                        onClick={handleDuplicateIncreaseQty}
+                      >
+                        Increase quantity in existing line
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={handleDuplicateAddSeparate}
+                      >
+                        Add as separate line
+                      </Button>
+                    </div>
+                  )}
                 </CardContent>
               </Card>
             )}
