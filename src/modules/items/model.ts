@@ -9,7 +9,7 @@ export interface Item {
   uom: string;
   isActive: boolean;
   description?: string;
-  brand?: string;
+  brandId?: string;
   category?: string;
   barcode?: string;
   purchasePrice?: number;

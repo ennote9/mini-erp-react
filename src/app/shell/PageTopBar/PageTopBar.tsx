@@ -4,6 +4,7 @@ import { SidebarTrigger } from "@/components/ui/sidebar";
 const PAGE_TITLES: Record<string, string> = {
   "/": "Dashboard",
   "/items": "Items",
+  "/brands": "Brands",
   "/suppliers": "Suppliers",
   "/customers": "Customers",
   "/warehouses": "Warehouses",
@@ -17,6 +18,7 @@ const PAGE_TITLES: Record<string, string> = {
 
 function getPageTitle(pathname: string): string {
   if (pathname.match(/^\/items\/[^/]+$/)) return "Item";
+  if (pathname.match(/^\/brands\/[^/]+$/)) return "Brand";
   if (pathname.match(/^\/suppliers\/[^/]+$/)) return "Supplier";
   if (pathname.match(/^\/customers\/[^/]+$/)) return "Customer";
   if (pathname.match(/^\/warehouses\/[^/]+$/)) return "Warehouse";

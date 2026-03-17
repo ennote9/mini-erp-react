@@ -58,6 +58,25 @@ export function getItemFormHealth(input: ItemFormHealthInput): { issues: Issue[]
   return { issues };
 }
 
+export type BrandFormHealthInput = {
+  code: string;
+  name: string;
+};
+
+export function getBrandFormHealth(input: BrandFormHealthInput): { issues: Issue[] } {
+  const issues: Issue[] = [];
+  const codeErr = validateRequired(input.code, "Code");
+  if (codeErr) issues.push(fieldIssue("error", "code", codeErr));
+  const nameErr = validateRequired(input.name, "Name");
+  if (nameErr) issues.push(fieldIssue("error", "name", nameErr));
+  else {
+    const t = normalizeTrim(input.name);
+    if (t.length > 0 && t.length < NAME_MIN_LENGTH)
+      issues.push(fieldIssue("error", "name", `Name must be at least ${NAME_MIN_LENGTH} characters.`));
+  }
+  return { issues };
+}
+
 export type CustomerFormHealthInput = {
   code: string;
   name: string;

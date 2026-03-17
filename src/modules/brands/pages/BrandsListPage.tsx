@@ -1,14 +1,9 @@
-/**
- * Items list — AG Grid migration. Uses shared AgGridContainer and defaultColDef.
- * Preserves search, All/Active/Inactive filters, New button, row navigation, empty state.
- */
 import React, { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { AgGridReact } from "ag-grid-react";
 import type { ColDef, ICellRendererParams } from "ag-grid-community";
-import { itemRepository } from "../repository";
-import { brandRepository } from "../../brands/repository";
-import type { Item } from "../model";
+import { brandRepository } from "../repository";
+import type { Brand } from "../model";
 import { ListPageLayout } from "../../../shared/ui/list/ListPageLayout";
 import { EmptyState } from "../../../shared/ui/feedback/EmptyState";
 import {
@@ -28,15 +23,15 @@ import {
 type ActiveFilter = "all" | "active" | "inactive";
 
 function applyActiveFilter(
-  items: Item[],
+  list: Brand[],
   activeFilter: ActiveFilter,
-): Item[] {
-  if (activeFilter === "active") return items.filter((x) => x.isActive);
-  if (activeFilter === "inactive") return items.filter((x) => !x.isActive);
-  return items;
+): Brand[] {
+  if (activeFilter === "active") return list.filter((x) => x.isActive);
+  if (activeFilter === "inactive") return list.filter((x) => !x.isActive);
+  return list;
 }
 
-function ActiveStatusCellRenderer(params: ICellRendererParams<Item>) {
+function ActiveStatusCellRenderer(params: ICellRendererParams<Brand>) {
   const isActive = params.value as boolean;
   const label = isActive ? "Active" : "Inactive";
   return (
@@ -46,83 +41,51 @@ function ActiveStatusCellRenderer(params: ICellRendererParams<Item>) {
   );
 }
 
-export function ItemsListPage() {
+export function BrandsListPage() {
   const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState("");
   const [activeFilter, setActiveFilter] = useState<ActiveFilter>("all");
 
-  const filteredItems = useMemo(() => {
-    const searched = itemRepository.search(searchQuery);
+  const filteredRows = useMemo(() => {
+    const searched = brandRepository.search(searchQuery);
     return applyActiveFilter(searched, activeFilter);
   }, [searchQuery, activeFilter]);
 
-  const isEmpty = filteredItems.length === 0;
-  const hasActiveFilter = activeFilter !== "all" || searchQuery.trim() !== "";
+  const isEmpty = filteredRows.length === 0;
+  const hasFilter = activeFilter !== "all" || searchQuery.trim() !== "";
 
-  const emptyTitle = hasActiveFilter
-    ? "No items match current search or filters"
-    : "No items yet";
-  const emptyHint = hasActiveFilter
+  const emptyTitle = hasFilter
+    ? "No brands match current search or filters"
+    : "No brands yet";
+  const emptyHint = hasFilter
     ? "Try changing the search or filter."
-    : "Create your first item to start working with inventory.";
+    : "Create your first brand to use in items.";
 
-  const columnDefs = useMemo<ColDef<Item>[]>(
+  const columnDefs = useMemo<ColDef<Brand>[]>(
     () => [
       agGridRowNumberColDef,
       agGridCheckboxSelectionColDef,
       {
         field: "code",
         headerName: "Code",
-        width: 130,
+        width: 140,
       },
       {
         field: "name",
         headerName: "Name",
-        minWidth: 160,
+        minWidth: 180,
         flex: 1,
       },
       {
-        headerName: "Brand",
-        width: 110,
-        valueGetter: (params) => {
-          const id = params.data?.brandId;
-          if (!id) return "";
-          const b = brandRepository.getById(id);
-          return b?.name ?? "";
-        },
-      },
-      {
-        field: "category",
-        headerName: "Category",
-        width: 120,
-      },
-      {
-        field: "uom",
-        headerName: "UOM",
-        width: 90,
-      },
-      {
-        field: "purchasePrice",
-        headerName: "Purchase price",
-        width: 120,
-        valueFormatter: (params) =>
-          params.value != null && typeof params.value === "number"
-            ? params.value.toFixed(2)
-            : "",
-      },
-      {
-        field: "salePrice",
-        headerName: "Sale price",
-        width: 100,
-        valueFormatter: (params) =>
-          params.value != null && typeof params.value === "number"
-            ? params.value.toFixed(2)
-            : "",
+        field: "comment",
+        headerName: "Comment",
+        minWidth: 160,
+        valueFormatter: (params) => params.value ?? "—",
       },
       {
         field: "isActive",
         headerName: "Active",
-        width: 100,
+        width: 110,
         cellRenderer: ActiveStatusCellRenderer,
       },
     ],
@@ -158,15 +121,15 @@ export function ItemsListPage() {
             placeholder="Search"
             value={searchQuery}
             onChange={setSearchQuery}
-            aria-label="Search items"
-            resultCount={filteredItems.length}
+            aria-label="Search brands"
+            resultCount={filteredRows.length}
           />
           <Button
             type="button"
             variant="default"
             size="sm"
             className="rounded-md bg-white text-black hover:bg-gray-200"
-            onClick={() => navigate("/items/new")}
+            onClick={() => navigate("/brands/new")}
           >
             Create
           </Button>
@@ -176,14 +139,14 @@ export function ItemsListPage() {
       {isEmpty ? (
         <EmptyState title={emptyTitle} hint={emptyHint} />
       ) : (
-        <AgGridContainer themeClass="items-grid">
-          <AgGridReact<Item>
-            rowData={filteredItems}
+        <AgGridContainer themeClass="brands-grid">
+          <AgGridReact<Brand>
+            rowData={filteredRows}
             columnDefs={columnDefs}
             defaultColDef={agGridDefaultColDef}
             rowSelection="multiple"
             getRowId={(params) => params.data.id}
-            onRowClicked={(e) => e.data && navigate(`/items/${e.data.id}`)}
+            onRowClicked={(e) => e.data && navigate(`/brands/${e.data.id}`)}
           />
         </AgGridContainer>
       )}

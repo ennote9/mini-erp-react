@@ -2,6 +2,7 @@ import { Routes, Route } from "react-router-dom";
 import { AppShell } from "./shell/AppShell";
 import { DashboardPage } from "../modules/dashboard";
 import { ItemsListPage, ItemPage } from "../modules/items";
+import { BrandsListPage, BrandPage } from "../modules/brands";
 import { SuppliersListPage, SupplierPage } from "../modules/suppliers";
 import { CustomersListPage, CustomerPage } from "../modules/customers";
 import { WarehousesListPage, WarehousePage } from "../modules/warehouses";
@@ -29,6 +30,8 @@ export function AppRoutes() {
         <Route index element={<DashboardPage />} />
         <Route path="items" element={<ItemsListPage />} />
         <Route path="items/:id" element={<ItemPage />} />
+        <Route path="brands" element={<BrandsListPage />} />
+        <Route path="brands/:id" element={<BrandPage />} />
         <Route path="suppliers" element={<SuppliersListPage />} />
         <Route path="suppliers/:id" element={<SupplierPage />} />
         <Route path="customers" element={<CustomersListPage />} />

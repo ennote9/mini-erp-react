@@ -8,6 +8,7 @@ import {
   Scale,
   ShoppingBag,
   ShoppingCart,
+  Tag,
   Truck,
   User,
   Users,
@@ -33,6 +34,7 @@ const nav = [
     label: "Master Data",
     links: [
       { label: "Items", to: "/items", icon: Package },
+      { label: "Brands", to: "/brands", icon: Tag },
       { label: "Suppliers", to: "/suppliers", icon: Truck },
       { label: "Customers", to: "/customers", icon: Users },
       { label: "Warehouses", to: "/warehouses", icon: Warehouse },
