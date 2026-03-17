@@ -22,7 +22,7 @@ import { agGridDefaultColDef } from "../../../shared/ui/ag-grid/agGridDefaults";
 import { todayYYYYMMDD, normalizeDateForPO } from "../dateUtils";
 import { getPurchaseOrderHealth } from "../../../shared/documentHealth";
 import { getErrorAndWarningMessages, actionIssue, combineIssues, hasErrors, type Issue } from "../../../shared/issues";
-import { ChevronDown, ChevronUp } from "lucide-react";
+import { DocumentIssueStrip } from "../../../shared/ui/feedback/DocumentIssueStrip";
 
 type LineWithItem = PurchaseOrderLine & { itemName: string };
 
@@ -162,7 +162,6 @@ export function PurchaseOrderPage() {
   const [lineEntryItemId, setLineEntryItemId] = useState("");
   const [lineEntryQty, setLineEntryQty] = useState(1);
   const [lineEntryUnitPrice, setLineEntryUnitPrice] = useState(0);
-  const [healthStripExpanded, setHealthStripExpanded] = useState(false);
   const [actionIssues, setActionIssues] = useState<Issue[]>([]);
   const linesGridRef = useRef<AgGridReact<LineFormRow> | null>(null);
 
@@ -467,88 +466,7 @@ export function PurchaseOrderPage() {
           </div>
           <div className="doc-header__right">
             {isEditable && (combinedErrors.length > 0 || combinedWarnings.length > 0) && (
-              <div className="doc-health-strip-wrap">
-                <div className="doc-health-strip" role="status" aria-live="polite">
-                  <span className="doc-health-strip__label">Document issues</span>
-                  <span className="doc-health-strip__sep">·</span>
-                  {combinedErrors.length > 0 && (
-                    <span className="doc-health-strip__errors">
-                      {combinedErrors.length} {combinedErrors.length === 1 ? "error" : "errors"}
-                    </span>
-                  )}
-                  {combinedErrors.length > 0 && combinedWarnings.length > 0 && (
-                    <span className="doc-health-strip__sep">·</span>
-                  )}
-                  {combinedWarnings.length > 0 && (
-                    <span className="doc-health-strip__warnings">
-                      {combinedWarnings.length} {combinedWarnings.length === 1 ? "warning" : "warnings"}
-                    </span>
-                  )}
-                  {combinedErrors.length > 1 ? null : combinedErrors.length === 1 ? (
-                    <>
-                      <span className="doc-health-strip__sep">·</span>
-                      <span className="doc-health-strip__msg">{combinedErrors[0]}</span>
-                    </>
-                  ) : combinedErrors.length === 0 && combinedWarnings.length === 1 ? (
-                    <>
-                      <span className="doc-health-strip__sep">·</span>
-                      <span className="doc-health-strip__msg">{combinedWarnings[0]}</span>
-                    </>
-                  ) : null}
-                  {combinedErrors.length + combinedWarnings.length > 1 && (
-                    <button
-                      type="button"
-                      className="doc-health-strip__chevron"
-                      onClick={() => setHealthStripExpanded((v) => !v)}
-                      aria-expanded={healthStripExpanded}
-                      aria-label={healthStripExpanded ? "Collapse issues" : "Show full issue list"}
-                    >
-                      <span className="doc-health-strip__sep">·</span>
-                      {healthStripExpanded ? (
-                        <ChevronUp className="doc-health-strip__chevron-icon" aria-hidden />
-                      ) : (
-                        <ChevronDown className="doc-health-strip__chevron-icon" aria-hidden />
-                      )}
-                    </button>
-                  )}
-                </div>
-                {healthStripExpanded && (combinedErrors.length > 0 || combinedWarnings.length > 0) && (
-                  <div className="doc-health-strip-panel">
-                    {combinedErrors.length > 0 && (
-                      <div className="doc-health-strip-panel__section">
-                        <div className="doc-health-strip-panel__section-title">Errors</div>
-                        <ul className="doc-health-strip-panel__list" role="list">
-                          {combinedErrors.map((msg, i) => (
-                            <li
-                              key={i}
-                              className="doc-health-strip-panel__item doc-health-strip-panel__item--error"
-                              role="listitem"
-                            >
-                              {msg}
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
-                    )}
-                    {combinedWarnings.length > 0 && (
-                      <div className="doc-health-strip-panel__section">
-                        <div className="doc-health-strip-panel__section-title">Warnings</div>
-                        <ul className="doc-health-strip-panel__list" role="list">
-                          {combinedWarnings.map((msg, i) => (
-                            <li
-                              key={i}
-                              className="doc-health-strip-panel__item doc-health-strip-panel__item--warning"
-                              role="listitem"
-                            >
-                              {msg}
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
+              <DocumentIssueStrip errors={combinedErrors} warnings={combinedWarnings} />
             )}
             <div className="doc-header__actions">
               {isEditable && (
