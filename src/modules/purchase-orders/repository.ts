@@ -1,11 +1,12 @@
 import type { PurchaseOrder, PurchaseOrderLine } from "./model";
 import { todayYYYYMMDD } from "./dateUtils";
+import { itemRepository } from "../items/repository";
 
 export type CreatePurchaseOrderHeaderInput = Omit<
   PurchaseOrder,
   "id" | "number"
 >;
-export type PurchaseOrderLineInput = { itemId: string; qty: number };
+export type PurchaseOrderLineInput = { itemId: string; qty: number; unitPrice: number };
 export type UpdatePurchaseOrderPatch = Partial<
   Omit<PurchaseOrder, "id" | "number">
 >;
@@ -58,6 +59,7 @@ export const purchaseOrderRepository = {
         purchaseOrderId: id,
         itemId: l.itemId,
         qty: l.qty,
+        unitPrice: typeof l.unitPrice === "number" && !Number.isNaN(l.unitPrice) ? l.unitPrice : 0,
       });
     }
     return doc;
@@ -79,11 +81,13 @@ export const purchaseOrderRepository = {
     lineStore.push(...existing);
     const newLines: PurchaseOrderLine[] = [];
     for (const l of lines) {
+      const unitPrice = typeof l.unitPrice === "number" && !Number.isNaN(l.unitPrice) ? l.unitPrice : 0;
       const line: PurchaseOrderLine = {
         id: nextLineId(),
         purchaseOrderId: documentId,
         itemId: l.itemId,
         qty: l.qty,
+        unitPrice,
       };
       lineStore.push(line);
       newLines.push(line);
@@ -95,6 +99,7 @@ export const purchaseOrderRepository = {
 // Minimal seed: one draft PO (date in YYYY-MM-DD, local today)
 const wh = "1";
 const sup = "1";
+const seedItem = itemRepository.getById("1");
 purchaseOrderRepository.create(
   {
     date: todayYYYYMMDD(),
@@ -102,5 +107,5 @@ purchaseOrderRepository.create(
     warehouseId: wh,
     status: "draft",
   },
-  [{ itemId: "1", qty: 10 }],
+  [{ itemId: "1", qty: 10, unitPrice: seedItem?.purchasePrice ?? 0 }],
 );

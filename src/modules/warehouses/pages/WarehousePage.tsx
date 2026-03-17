@@ -162,17 +162,17 @@ export function WarehousePage() {
           {saveError}
         </div>
       )}
-      <Card className="mt-6 max-w-2xl border-0 shadow-none">
-        <CardHeader>
-          <CardTitle>Details</CardTitle>
-          <CardDescription>
+      <Card className="mt-4 max-w-2xl border-0 shadow-none">
+        <CardHeader className="p-2 pb-0.5">
+          <CardTitle className="text-sm font-semibold">Details</CardTitle>
+          <CardDescription className="text-xs">
             Code, name and status for this warehouse.
           </CardDescription>
         </CardHeader>
-        <CardContent>
-          <div className="grid gap-6 sm:grid-cols-2">
-            <div className="space-y-2 sm:col-span-2">
-              <Label htmlFor="warehouse-code">
+        <CardContent className="p-2 pt-1">
+          <div className="grid gap-2 sm:grid-cols-2">
+            <div className="flex flex-col gap-0.5 sm:col-span-2">
+              <Label htmlFor="warehouse-code" className="text-sm">
                 Code <span className="text-destructive">*</span>
               </Label>
               <Input
@@ -181,10 +181,11 @@ export function WarehousePage() {
                 value={form.code}
                 onChange={(e) => setForm((f) => ({ ...f, code: e.target.value }))}
                 placeholder="e.g. WH-001"
+                className="h-8 text-sm"
               />
             </div>
-            <div className="space-y-2 sm:col-span-2">
-              <Label htmlFor="warehouse-name">
+            <div className="flex flex-col gap-0.5 sm:col-span-2">
+              <Label htmlFor="warehouse-name" className="text-sm">
                 Name <span className="text-destructive">*</span>
               </Label>
               <Input
@@ -193,10 +194,11 @@ export function WarehousePage() {
                 value={form.name}
                 onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
                 placeholder="Warehouse name"
+                className="h-8 text-sm"
               />
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="warehouse-type">Type</Label>
+            <div className="flex flex-col gap-0.5">
+              <Label htmlFor="warehouse-type" className="text-sm">Type</Label>
               <Input
                 id="warehouse-type"
                 type="text"
@@ -205,6 +207,7 @@ export function WarehousePage() {
                   setForm((f) => ({ ...f, warehouseType: e.target.value }))
                 }
                 placeholder="e.g. Main, Distribution"
+                className="h-8 text-sm"
               />
             </div>
             <div className="flex items-center space-x-2 sm:col-span-2">
@@ -217,13 +220,13 @@ export function WarehousePage() {
               />
               <Label
                 htmlFor="warehouse-active"
-                className="cursor-pointer font-normal"
+                className="cursor-pointer text-sm font-normal"
               >
                 Active
               </Label>
             </div>
-            <div className="space-y-2 sm:col-span-2">
-              <Label htmlFor="warehouse-comment">Comment</Label>
+            <div className="flex flex-col gap-0.5 sm:col-span-2">
+              <Label htmlFor="warehouse-comment" className="text-sm">Comment</Label>
               <Textarea
                 id="warehouse-comment"
                 value={form.comment}
@@ -231,24 +234,24 @@ export function WarehousePage() {
                   setForm((f) => ({ ...f, comment: e.target.value }))
                 }
                 placeholder="Optional"
-                rows={3}
-                className="resize-none"
+                rows={2}
+                className="resize-none min-h-[4.5rem] text-sm"
               />
             </div>
           </div>
         </CardContent>
       </Card>
-      <Card className="mt-6 max-w-2xl border-0 shadow-none">
-        <CardHeader>
-          <CardTitle>Address &amp; contact</CardTitle>
-          <CardDescription>
+      <Card className="mt-4 max-w-2xl border-0 shadow-none">
+        <CardHeader className="p-2 pb-0.5">
+          <CardTitle className="text-sm font-semibold">Address &amp; contact</CardTitle>
+          <CardDescription className="text-xs">
             Address, city, country and contact details.
           </CardDescription>
         </CardHeader>
-        <CardContent>
-          <div className="grid gap-6 sm:grid-cols-2">
-            <div className="space-y-2 sm:col-span-2">
-              <Label htmlFor="warehouse-address">Address</Label>
+        <CardContent className="p-2 pt-1">
+          <div className="grid gap-2 sm:grid-cols-2">
+            <div className="flex flex-col gap-0.5 sm:col-span-2">
+              <Label htmlFor="warehouse-address" className="text-sm">Address</Label>
               <Input
                 id="warehouse-address"
                 type="text"
@@ -257,10 +260,11 @@ export function WarehousePage() {
                   setForm((f) => ({ ...f, address: e.target.value }))
                 }
                 placeholder="Street address"
+                className="h-8 text-sm"
               />
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="warehouse-city">City</Label>
+            <div className="flex flex-col gap-0.5">
+              <Label htmlFor="warehouse-city" className="text-sm">City</Label>
               <Input
                 id="warehouse-city"
                 type="text"
@@ -269,10 +273,11 @@ export function WarehousePage() {
                   setForm((f) => ({ ...f, city: e.target.value }))
                 }
                 placeholder="City"
+                className="h-8 text-sm"
               />
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="warehouse-country">Country</Label>
+            <div className="flex flex-col gap-0.5">
+              <Label htmlFor="warehouse-country" className="text-sm">Country</Label>
               <Input
                 id="warehouse-country"
                 type="text"
@@ -281,10 +286,11 @@ export function WarehousePage() {
                   setForm((f) => ({ ...f, country: e.target.value }))
                 }
                 placeholder="Country"
+                className="h-8 text-sm"
               />
             </div>
-            <div className="space-y-2 sm:col-span-2">
-              <Label htmlFor="warehouse-contact-person">Contact person</Label>
+            <div className="flex flex-col gap-0.5 sm:col-span-2">
+              <Label htmlFor="warehouse-contact-person" className="text-sm">Contact person</Label>
               <Input
                 id="warehouse-contact-person"
                 type="text"
@@ -293,10 +299,11 @@ export function WarehousePage() {
                   setForm((f) => ({ ...f, contactPerson: e.target.value }))
                 }
                 placeholder="Name"
+                className="h-8 text-sm"
               />
             </div>
-            <div className="space-y-2 sm:col-span-2">
-              <Label htmlFor="warehouse-phone">Phone</Label>
+            <div className="flex flex-col gap-0.5 sm:col-span-2">
+              <Label htmlFor="warehouse-phone" className="text-sm">Phone</Label>
               <Input
                 id="warehouse-phone"
                 type="text"
@@ -305,6 +312,7 @@ export function WarehousePage() {
                   setForm((f) => ({ ...f, phone: e.target.value }))
                 }
                 placeholder="e.g. +1 312 555 0100"
+                className="h-8 text-sm"
               />
             </div>
           </div>

@@ -21,9 +21,9 @@ import { cn } from "@/lib/utils";
 import { agGridDefaultColDef } from "../../../shared/ui/ag-grid/agGridDefaults";
 import { todayYYYYMMDD, normalizeDateForSO } from "../dateUtils";
 
-type LineWithItem = SalesOrderLine & { itemName: string; uom: string };
+type LineWithItem = SalesOrderLine & { itemName: string };
 
-type LineFormRow = { itemId: string; qty: number; _lineId: number };
+type LineFormRow = { itemId: string; qty: number; unitPrice: number; _lineId: number };
 
 type FormState = {
   date: string;
@@ -63,15 +63,29 @@ function soLinesDisplayColumnDefs(
     {
       field: "qty",
       headerName: "Qty",
-      width: 100,
+      width: 80,
       editable: false,
     },
     {
-      headerName: "UOM",
-      width: 80,
+      field: "unitPrice",
+      headerName: "Unit price",
+      width: 100,
+      editable: false,
+      valueFormatter: (p) =>
+        typeof p.value === "number" && !Number.isNaN(p.value)
+          ? p.value.toFixed(2)
+          : "0.00",
+    },
+    {
+      headerName: "Line amount",
+      width: 110,
+      editable: false,
       valueGetter: (p) => {
-        const itemId = p.data?.itemId;
-        return itemId ? itemRepository.getById(itemId)?.uom ?? "—" : "—";
+        const qty = p.data?.qty;
+        const unitPrice = p.data?.unitPrice;
+        if (typeof qty !== "number" || typeof unitPrice !== "number") return "0.00";
+        const amount = qty * unitPrice;
+        return Number.isNaN(amount) ? "0.00" : amount.toFixed(2);
       },
     },
     {
@@ -101,8 +115,27 @@ function soLinesDisplayColumnDefs(
 function soLinesReadOnlyColumnDefs(): ColDef<LineWithItem>[] {
   return [
     { field: "itemName", headerName: "Item", flex: 1, minWidth: 120 },
-    { field: "qty", headerName: "Qty", width: 100 },
-    { field: "uom", headerName: "UOM", width: 80 },
+    { field: "qty", headerName: "Qty", width: 80 },
+    {
+      field: "unitPrice",
+      headerName: "Unit price",
+      width: 100,
+      valueFormatter: (p) =>
+        typeof p.value === "number" && !Number.isNaN(p.value)
+          ? p.value.toFixed(2)
+          : "0.00",
+    },
+    {
+      headerName: "Line amount",
+      width: 110,
+      valueGetter: (p) => {
+        const qty = p.data?.qty;
+        const unitPrice = p.data?.unitPrice;
+        if (typeof qty !== "number" || typeof unitPrice !== "number") return "0.00";
+        const amount = qty * unitPrice;
+        return Number.isNaN(amount) ? "0.00" : amount.toFixed(2);
+      },
+    },
   ];
 }
 
@@ -127,6 +160,7 @@ export function SalesOrderPage() {
   const [editingLineId, setEditingLineId] = useState<number | null>(null);
   const [lineEntryItemId, setLineEntryItemId] = useState("");
   const [lineEntryQty, setLineEntryQty] = useState(1);
+  const [lineEntryUnitPrice, setLineEntryUnitPrice] = useState(0);
   const linesGridRef = useRef<AgGridReact<LineFormRow> | null>(null);
 
   useEffect(() => {
@@ -136,6 +170,7 @@ export function SalesOrderPage() {
       setEditingLineId(null);
       setLineEntryItemId("");
       setLineEntryQty(1);
+      setLineEntryUnitPrice(0);
       setSaveError(null);
       return;
     }
@@ -146,6 +181,7 @@ export function SalesOrderPage() {
           ? draftLines.map((l, idx) => ({
               itemId: l.itemId,
               qty: l.qty,
+              unitPrice: typeof l.unitPrice === "number" && !Number.isNaN(l.unitPrice) ? l.unitPrice : 0,
               _lineId: idx,
             }))
           : [];
@@ -160,6 +196,7 @@ export function SalesOrderPage() {
       setEditingLineId(null);
       setLineEntryItemId("");
       setLineEntryQty(1);
+      setLineEntryUnitPrice(0);
       setSaveError(null);
     }
   }, [id, isNew, doc?.id, doc?.status, doc?.date, doc?.customerId, doc?.warehouseId, doc?.comment, refresh]);
@@ -184,7 +221,6 @@ export function SalesOrderPage() {
       return {
         ...line,
         itemName: item?.name ?? line.itemId,
-        uom: item?.uom ?? "—",
       };
     });
   }, [lines]);
@@ -231,7 +267,11 @@ export function SalesOrderPage() {
       .filter(
         (l) => l.itemId.trim() !== "" && typeof l.qty === "number" && l.qty > 0,
       )
-      .map(({ itemId, qty }) => ({ itemId, qty }));
+      .map(({ itemId, qty, unitPrice }) => ({
+        itemId,
+        qty,
+        unitPrice: typeof unitPrice === "number" && !Number.isNaN(unitPrice) && unitPrice >= 0 ? unitPrice : 0,
+      }));
     const result = saveDraft(
       {
         date: normalizeDateForSO(form.date),
@@ -262,6 +302,7 @@ export function SalesOrderPage() {
       setEditingLineId(null);
       setLineEntryItemId("");
       setLineEntryQty(1);
+      setLineEntryUnitPrice(0);
       linesGridRef.current?.api?.deselectAll();
     }
   }, [editingLineId]);
@@ -270,13 +311,16 @@ export function SalesOrderPage() {
     const itemId = lineEntryItemId.trim();
     const qty = Number(lineEntryQty);
     if (!itemId || !Number.isFinite(qty) || qty <= 0) return;
+    const rawPrice = Number(lineEntryUnitPrice);
+    const unitPrice = Number.isFinite(rawPrice) && rawPrice >= 0 ? rawPrice : 0;
     const _lineId = nextLineIdRef.current++;
     setForm((f) => ({
       ...f,
-      lines: [...f.lines, { itemId, qty, _lineId }],
+      lines: [...f.lines, { itemId, qty, unitPrice, _lineId }],
     }));
     setLineEntryItemId("");
     setLineEntryQty(1);
+    setLineEntryUnitPrice(0);
   };
 
   const updateLineFromEntry = () => {
@@ -284,15 +328,18 @@ export function SalesOrderPage() {
     const itemId = lineEntryItemId.trim();
     const qty = Number(lineEntryQty);
     if (!itemId || !Number.isFinite(qty) || qty <= 0) return;
+    const rawPrice = Number(lineEntryUnitPrice);
+    const unitPrice = Number.isFinite(rawPrice) && rawPrice >= 0 ? rawPrice : 0;
     setForm((f) => ({
       ...f,
       lines: f.lines.map((l) =>
-        l._lineId === editingLineId ? { ...l, itemId, qty } : l,
+        l._lineId === editingLineId ? { ...l, itemId, qty, unitPrice } : l,
       ),
     }));
     setEditingLineId(null);
     setLineEntryItemId("");
     setLineEntryQty(1);
+    setLineEntryUnitPrice(0);
     linesGridRef.current?.api?.deselectAll();
   };
 
@@ -300,6 +347,7 @@ export function SalesOrderPage() {
     setEditingLineId(null);
     setLineEntryItemId("");
     setLineEntryQty(1);
+    setLineEntryUnitPrice(0);
     linesGridRef.current?.api?.deselectAll();
   };
 
@@ -310,18 +358,45 @@ export function SalesOrderPage() {
       setEditingLineId(row._lineId);
       setLineEntryItemId(row.itemId);
       setLineEntryQty(row.qty);
+      setLineEntryUnitPrice(typeof row.unitPrice === "number" && !Number.isNaN(row.unitPrice) ? row.unitPrice : 0);
     }
   }, []);
-
-  const lineEntryUom = useMemo(
-    () => (lineEntryItemId ? itemRepository.getById(lineEntryItemId)?.uom ?? "—" : "—"),
-    [lineEntryItemId],
-  );
 
   const linesColumnDefs = useMemo(
     () => soLinesDisplayColumnDefs(form.lines.length, removeLineByLineId),
     [form.lines.length, removeLineByLineId],
   );
+
+  const handleLineEntryItemChange = (itemId: string) => {
+    setLineEntryItemId(itemId);
+    const item = itemId ? itemRepository.getById(itemId) : undefined;
+    const price = item?.salePrice;
+    setLineEntryUnitPrice(typeof price === "number" && !Number.isNaN(price) && price >= 0 ? price : 0);
+  };
+
+  const totals = useMemo(() => {
+    let totalQty = 0;
+    let totalAmount = 0;
+    for (const l of form.lines) {
+      const q = typeof l.qty === "number" && !Number.isNaN(l.qty) ? l.qty : 0;
+      const p = typeof l.unitPrice === "number" && !Number.isNaN(l.unitPrice) ? l.unitPrice : 0;
+      totalQty += q;
+      totalAmount += q * p;
+    }
+    return { totalQty, totalAmount };
+  }, [form.lines]);
+
+  const readonlyTotals = useMemo(() => {
+    let totalQty = 0;
+    let totalAmount = 0;
+    for (const l of lines) {
+      const q = typeof l.qty === "number" && !Number.isNaN(l.qty) ? l.qty : 0;
+      const p = typeof l.unitPrice === "number" && !Number.isNaN(l.unitPrice) ? l.unitPrice : 0;
+      totalQty += q;
+      totalAmount += q * p;
+    }
+    return { totalQty, totalAmount };
+  }, [lines]);
 
   if (!id) {
     return (
@@ -401,29 +476,30 @@ export function SalesOrderPage() {
       {isEditable ? (
         <>
           <Card className="max-w-2xl border-0 shadow-none">
-            <CardHeader className="p-4 pb-1">
-              <CardTitle>Details</CardTitle>
+            <CardHeader className="p-2 pb-0.5">
+              <CardTitle className="text-sm font-semibold">Details</CardTitle>
             </CardHeader>
-            <CardContent className="p-4 pt-2">
-              <div className="grid gap-3 sm:grid-cols-2">
-                <div className="space-y-1.5">
-                  <Label htmlFor="so-number">Number</Label>
-                  <div id="so-number" className="flex h-10 items-center text-sm text-muted-foreground">
+            <CardContent className="p-2 pt-1">
+              <div className="grid grid-cols-2 gap-x-3 gap-y-1">
+                <div className="flex flex-col gap-0.5">
+                  <Label htmlFor="so-number" className="text-sm">Number</Label>
+                  <div id="so-number" className="flex h-8 items-center text-sm text-muted-foreground">
                     {displayNumber}
                   </div>
                 </div>
-                <div className="space-y-1.5">
-                  <Label htmlFor="so-date">
+                <div className="flex flex-col gap-0.5">
+                  <Label htmlFor="so-date" className="text-sm">
                     Date <span className="text-destructive">*</span>
                   </Label>
                   <DatePickerField
                     id="so-date"
                     value={form.date}
                     onChange={(v) => setForm((f) => ({ ...f, date: v }))}
+                    className="h-8 [&_input]:text-sm"
                   />
                 </div>
-                <div className="space-y-1.5 sm:col-span-2">
-                  <Label htmlFor="so-customer">
+                <div className="flex flex-col gap-0.5">
+                  <Label htmlFor="so-customer" className="text-sm">
                     Customer <span className="text-destructive">*</span>
                   </Label>
                   <select
@@ -433,8 +509,8 @@ export function SalesOrderPage() {
                       setForm((f) => ({ ...f, customerId: e.target.value }))
                     }
                     className={cn(
-                      "flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-base text-foreground",
-                      "focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50 md:text-sm",
+                      "flex h-8 w-full rounded border border-input bg-background px-2 py-1 text-sm text-foreground",
+                      "focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50",
                     )}
                   >
                     <option value="">Select customer</option>
@@ -445,8 +521,8 @@ export function SalesOrderPage() {
                     ))}
                   </select>
                 </div>
-                <div className="space-y-1.5 sm:col-span-2">
-                  <Label htmlFor="so-warehouse">
+                <div className="flex flex-col gap-0.5">
+                  <Label htmlFor="so-warehouse" className="text-sm">
                     Warehouse <span className="text-destructive">*</span>
                   </Label>
                   <select
@@ -456,8 +532,8 @@ export function SalesOrderPage() {
                       setForm((f) => ({ ...f, warehouseId: e.target.value }))
                     }
                     className={cn(
-                      "flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-base text-foreground",
-                      "focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50 md:text-sm",
+                      "flex h-8 w-full rounded border border-input bg-background px-2 py-1 text-sm text-foreground",
+                      "focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50",
                     )}
                   >
                     <option value="">Select warehouse</option>
@@ -468,8 +544,8 @@ export function SalesOrderPage() {
                     ))}
                   </select>
                 </div>
-                <div className="space-y-1.5 sm:col-span-2">
-                  <Label htmlFor="so-comment">Comment</Label>
+                <div className="col-span-2 flex flex-col gap-0.5">
+                  <Label htmlFor="so-comment" className="text-sm">Comment</Label>
                   <Input
                     id="so-comment"
                     type="text"
@@ -478,28 +554,29 @@ export function SalesOrderPage() {
                       setForm((f) => ({ ...f, comment: e.target.value }))
                     }
                     placeholder="Optional"
+                    className="h-8 text-sm"
                   />
                 </div>
               </div>
             </CardContent>
           </Card>
-          <div className="doc-lines mt-4">
+          <div className="doc-lines mt-2">
             <h3 className="doc-lines__title">Lines</h3>
             {isEditable && (
-              <Card className="max-w-2xl border-0 shadow-none mb-4">
-                <CardContent className="p-4">
-                  <div className="grid gap-3 sm:grid-cols-2 md:grid-cols-4 items-end">
-                    <div className="space-y-1.5">
-                      <Label htmlFor="line-entry-item">
+              <Card className="max-w-2xl border-0 shadow-none mb-1.5">
+                <CardContent className="p-2">
+                  <div className="grid grid-cols-2 md:grid-cols-[1fr_1fr_1fr_auto] gap-x-2 gap-y-0 items-end">
+                    <div className="flex flex-col gap-0.5">
+                      <Label htmlFor="line-entry-item" className="text-sm">
                         Item <span className="text-destructive">*</span>
                       </Label>
                       <select
                         id="line-entry-item"
                         value={lineEntryItemId}
-                        onChange={(e) => setLineEntryItemId(e.target.value)}
+                        onChange={(e) => handleLineEntryItemChange(e.target.value)}
                         className={cn(
-                          "flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-base text-foreground",
-                          "focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50 md:text-sm",
+                          "flex h-8 w-full rounded border border-input bg-background px-2 py-1 text-sm text-foreground",
+                          "focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50",
                         )}
                       >
                         <option value="">Select item</option>
@@ -510,8 +587,8 @@ export function SalesOrderPage() {
                         ))}
                       </select>
                     </div>
-                    <div className="space-y-1.5">
-                      <Label htmlFor="line-entry-qty">
+                    <div className="flex flex-col gap-0.5">
+                      <Label htmlFor="line-entry-qty" className="text-sm">
                         Qty <span className="text-destructive">*</span>
                       </Label>
                       <Input
@@ -522,15 +599,27 @@ export function SalesOrderPage() {
                         onChange={(e) =>
                           setLineEntryQty(Number(e.target.value) || 1)
                         }
+                        className="h-8 text-sm"
                       />
                     </div>
-                    <div className="space-y-1.5">
-                      <Label>UOM</Label>
-                      <div className="flex h-10 items-center text-sm text-muted-foreground">
-                        {lineEntryUom}
-                      </div>
+                    <div className="flex flex-col gap-0.5">
+                      <Label htmlFor="line-entry-unit-price" className="text-sm">
+                        Unit price
+                      </Label>
+                      <Input
+                        id="line-entry-unit-price"
+                        type="number"
+                        min={0}
+                        step={0.01}
+                        value={lineEntryUnitPrice}
+                        onChange={(e) => {
+                          const v = Number(e.target.value);
+                          setLineEntryUnitPrice(Number.isFinite(v) && v >= 0 ? v : 0);
+                        }}
+                        className="h-8 text-sm"
+                      />
                     </div>
-                    <div className="flex gap-2 flex-wrap">
+                    <div className="flex gap-1.5 flex-shrink-0">
                       {editingLineId === null ? (
                         <Button
                           type="button"
@@ -578,16 +667,26 @@ export function SalesOrderPage() {
                 />
               </AgGridContainer>
             </div>
+            {form.lines.length > 0 && (
+              <div className="doc-lines__totals mt-1.5 flex gap-6 text-sm">
+                <span>
+                  <strong>Total qty:</strong> {totals.totalQty}
+                </span>
+                <span>
+                  <strong>Total amount:</strong> {totals.totalAmount.toFixed(2)}
+                </span>
+              </div>
+            )}
           </div>
         </>
       ) : (
         <>
           <Card className="max-w-2xl border-0 shadow-none">
-            <CardHeader className="p-4 pb-1">
-              <CardTitle>Details</CardTitle>
+            <CardHeader className="p-2 pb-0.5">
+              <CardTitle className="text-sm font-semibold">Details</CardTitle>
             </CardHeader>
-            <CardContent className="p-4 pt-2">
-              <dl className="doc-summary doc-summary--compact">
+            <CardContent className="p-2 pt-1">
+              <dl className="doc-summary doc-summary--compact doc-summary--dense">
                 <div className="doc-summary__row">
                   <dt className="doc-summary__term">Number</dt>
                   <dd className="doc-summary__value">{doc!.number}</dd>
@@ -613,22 +712,32 @@ export function SalesOrderPage() {
               </dl>
             </CardContent>
           </Card>
-          <div className="doc-lines mt-4">
+          <div className="doc-lines mt-2">
             <h3 className="doc-lines__title">Lines</h3>
             {linesWithItem.length === 0 ? (
               <p className="doc-lines__empty">No lines.</p>
             ) : (
-              <div className="doc-lines__grid">
-                <AgGridContainer themeClass="doc-lines-grid">
-                  <AgGridReact<LineWithItem>
-                    rowData={linesWithItem}
-                    columnDefs={soLinesReadOnlyColumnDefs()}
-                    defaultColDef={agGridDefaultColDef}
-                    getRowId={(p) => p.data.id}
-                    suppressRowClickSelection
-                  />
-                </AgGridContainer>
-              </div>
+              <>
+                <div className="doc-lines__grid">
+                  <AgGridContainer themeClass="doc-lines-grid">
+                    <AgGridReact<LineWithItem>
+                      rowData={linesWithItem}
+                      columnDefs={soLinesReadOnlyColumnDefs()}
+                      defaultColDef={agGridDefaultColDef}
+                      getRowId={(p) => p.data.id}
+                      suppressRowClickSelection
+                    />
+                  </AgGridContainer>
+                </div>
+                <div className="doc-lines__totals mt-1.5 flex gap-6 text-sm">
+                  <span>
+                    <strong>Total qty:</strong> {readonlyTotals.totalQty}
+                  </span>
+                  <span>
+                    <strong>Total amount:</strong> {readonlyTotals.totalAmount.toFixed(2)}
+                  </span>
+                </div>
+              </>
             )}
           </div>
         </>

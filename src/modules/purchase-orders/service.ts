@@ -6,7 +6,7 @@ import { itemRepository } from "../items/repository";
 import { normalizeDateForPO, validateDateForPO } from "./dateUtils";
 import {
   validateDocumentLines,
-  normalizeDocumentLines,
+  parseDocumentLineQty,
   normalizeDocumentComment,
 } from "../../shared/documentValidation";
 import { normalizeTrim } from "../../shared/validation";
@@ -22,7 +22,7 @@ export type SaveDraftInput = {
   supplierId: string;
   warehouseId: string;
   comment?: string;
-  lines: Array<{ itemId: string; qty: number }>;
+  lines: Array<{ itemId: string; qty: number; unitPrice?: number }>;
 };
 export type SaveDraftResult =
   | { success: true; id: string }
@@ -46,6 +46,24 @@ function validateSaveDraft(data: SaveDraftInput): string | null {
   return null;
 }
 
+function normalizePOLines(
+  lines: Array<{ itemId: string; qty: number; unitPrice?: number }>,
+): Array<{ itemId: string; qty: number; unitPrice: number }> {
+  return lines.map((l) => {
+    const qty = parseDocumentLineQty(l.qty) ?? 1;
+    const rawPrice = l.unitPrice;
+    const unitPrice =
+      typeof rawPrice === "number" && !Number.isNaN(rawPrice) && rawPrice >= 0
+        ? rawPrice
+        : 0;
+    return {
+      itemId: normalizeTrim(l.itemId),
+      qty,
+      unitPrice,
+    };
+  });
+}
+
 export function saveDraft(
   data: SaveDraftInput,
   existingId?: string,
@@ -57,7 +75,7 @@ export function saveDraft(
   const supplierId = normalizeTrim(data.supplierId);
   const warehouseId = normalizeTrim(data.warehouseId);
   const comment = normalizeDocumentComment(data.comment);
-  const lines = normalizeDocumentLines(data.lines);
+  const lines = normalizePOLines(data.lines);
 
   const header = {
     date,

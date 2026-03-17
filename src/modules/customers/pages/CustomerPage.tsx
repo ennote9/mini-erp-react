@@ -181,17 +181,17 @@ export function CustomerPage() {
           {saveError}
         </div>
       )}
-      <Card className="mt-6 max-w-2xl border-0 shadow-none">
-        <CardHeader>
-          <CardTitle>Details</CardTitle>
-          <CardDescription>
+      <Card className="mt-4 max-w-2xl border-0 shadow-none">
+        <CardHeader className="p-2 pb-0.5">
+          <CardTitle className="text-sm font-semibold">Details</CardTitle>
+          <CardDescription className="text-xs">
             Code, name, contact and status for this customer.
           </CardDescription>
         </CardHeader>
-        <CardContent>
-          <div className="grid gap-6 sm:grid-cols-2">
-            <div className="space-y-2 sm:col-span-2">
-              <Label htmlFor="customer-code">
+        <CardContent className="p-2 pt-1">
+          <div className="grid gap-2 sm:grid-cols-2">
+            <div className="flex flex-col gap-0.5 sm:col-span-2">
+              <Label htmlFor="customer-code" className="text-sm">
                 Code <span className="text-destructive">*</span>
               </Label>
               <Input
@@ -200,10 +200,11 @@ export function CustomerPage() {
                 value={form.code}
                 onChange={(e) => setForm((f) => ({ ...f, code: e.target.value }))}
                 placeholder="e.g. CUS-0001"
+                className="h-8 text-sm"
               />
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="customer-name">
+            <div className="flex flex-col gap-0.5">
+              <Label htmlFor="customer-name" className="text-sm">
                 Name <span className="text-destructive">*</span>
               </Label>
               <Input
@@ -212,70 +213,77 @@ export function CustomerPage() {
                 value={form.name}
                 onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
                 placeholder="Customer name"
+                className="h-8 text-sm"
               />
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="customer-contactPerson">Contact person</Label>
+            <div className="flex flex-col gap-0.5">
+              <Label htmlFor="customer-contactPerson" className="text-sm">Contact person</Label>
               <Input
                 id="customer-contactPerson"
                 type="text"
                 value={form.contactPerson}
                 onChange={(e) => setForm((f) => ({ ...f, contactPerson: e.target.value }))}
                 placeholder="Optional"
+                className="h-8 text-sm"
               />
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="customer-taxId">Tax ID</Label>
+            <div className="flex flex-col gap-0.5">
+              <Label htmlFor="customer-taxId" className="text-sm">Tax ID</Label>
               <Input
                 id="customer-taxId"
                 type="text"
                 value={form.taxId}
                 onChange={(e) => setForm((f) => ({ ...f, taxId: e.target.value }))}
                 placeholder="Optional"
+                className="h-8 text-sm"
               />
             </div>
-            <div className="space-y-2 sm:col-span-2">
-              <Label htmlFor="customer-billingAddress">Billing address</Label>
+            <div className="flex flex-col gap-0.5 sm:col-span-2">
+              <Label htmlFor="customer-billingAddress" className="text-sm">Billing address</Label>
               <Input
                 id="customer-billingAddress"
                 type="text"
                 value={form.billingAddress}
                 onChange={(e) => setForm((f) => ({ ...f, billingAddress: e.target.value }))}
                 placeholder="Optional"
+                className="h-8 text-sm"
               />
             </div>
-            <div className="space-y-2 sm:col-span-2">
-              <Label htmlFor="customer-shippingAddress">Shipping address</Label>
+            <div className="flex flex-col gap-0.5 sm:col-span-2">
+              <Label htmlFor="customer-shippingAddress" className="text-sm">Shipping address</Label>
               <Input
                 id="customer-shippingAddress"
                 type="text"
                 value={form.shippingAddress}
                 onChange={(e) => setForm((f) => ({ ...f, shippingAddress: e.target.value }))}
                 placeholder="Optional"
+                className="h-8 text-sm"
               />
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="customer-city">City</Label>
+            <div className="flex flex-col gap-0.5">
+              <Label htmlFor="customer-city" className="text-sm">City</Label>
               <Input
                 id="customer-city"
                 type="text"
                 value={form.city}
                 onChange={(e) => setForm((f) => ({ ...f, city: e.target.value }))}
                 placeholder="Optional"
+                className="h-8 text-sm"
               />
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="customer-country">Country</Label>
+            <div className="flex flex-col gap-0.5">
+              <Label htmlFor="customer-country" className="text-sm">Country</Label>
               <Input
                 id="customer-country"
                 type="text"
                 value={form.country}
                 onChange={(e) => setForm((f) => ({ ...f, country: e.target.value }))}
                 placeholder="Optional"
+                className="h-8 text-sm"
               />
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="customer-paymentTermsDays">Payment terms (days)</Label>
+            <div className="flex flex-col gap-0.5">
+              <Label htmlFor="customer-paymentTermsDays" className="text-sm">Payment terms (days)</Label>
               <Input
                 id="customer-paymentTermsDays"
                 type="number"
@@ -284,16 +292,18 @@ export function CustomerPage() {
                 value={form.paymentTermsDays}
                 onChange={(e) => setForm((f) => ({ ...f, paymentTermsDays: e.target.value }))}
                 placeholder="e.g. 30"
+                className="h-8 text-sm"
               />
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="customer-phone">Phone</Label>
+            <div className="flex flex-col gap-0.5">
+              <Label htmlFor="customer-phone" className="text-sm">Phone</Label>
               <Input
                 id="customer-phone"
                 type="text"
                 value={form.phone}
                 onChange={(e) => setForm((f) => ({ ...f, phone: e.target.value }))}
                 placeholder="Optional"
+                className="h-8 text-sm"
               />
             </div>
             <div className="flex items-center space-x-2 sm:col-span-2">
@@ -306,23 +316,24 @@ export function CustomerPage() {
               />
               <Label
                 htmlFor="customer-active"
-                className="cursor-pointer font-normal"
+                className="cursor-pointer text-sm font-normal"
               >
                 Active
               </Label>
             </div>
-            <div className="space-y-2 sm:col-span-2">
-              <Label htmlFor="customer-email">Email</Label>
+            <div className="flex flex-col gap-0.5 sm:col-span-2">
+              <Label htmlFor="customer-email" className="text-sm">Email</Label>
               <Input
                 id="customer-email"
                 type="text"
                 value={form.email}
                 onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))}
                 placeholder="Optional"
+                className="h-8 text-sm"
               />
             </div>
-            <div className="space-y-2 sm:col-span-2">
-              <Label htmlFor="customer-comment">Comment</Label>
+            <div className="flex flex-col gap-0.5 sm:col-span-2">
+              <Label htmlFor="customer-comment" className="text-sm">Comment</Label>
               <Textarea
                 id="customer-comment"
                 value={form.comment}
@@ -330,8 +341,8 @@ export function CustomerPage() {
                   setForm((f) => ({ ...f, comment: e.target.value }))
                 }
                 placeholder="Optional"
-                rows={3}
-                className="resize-none"
+                rows={2}
+                className="resize-none min-h-[4.5rem] text-sm"
               />
             </div>
           </div>

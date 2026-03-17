@@ -22,4 +22,5 @@ export interface SalesOrderLine {
   salesOrderId: string;
   itemId: string;
   qty: number;
+  unitPrice: number;
 }

@@ -22,4 +22,5 @@ export interface PurchaseOrderLine {
   purchaseOrderId: string;
   itemId: string;
   qty: number;
+  unitPrice: number;
 }

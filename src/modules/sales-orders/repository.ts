@@ -1,11 +1,12 @@
 import type { SalesOrder, SalesOrderLine } from "./model";
 import { todayYYYYMMDD } from "./dateUtils";
+import { itemRepository } from "../items/repository";
 
 export type CreateSalesOrderHeaderInput = Omit<
   SalesOrder,
   "id" | "number"
 >;
-export type SalesOrderLineInput = { itemId: string; qty: number };
+export type SalesOrderLineInput = { itemId: string; qty: number; unitPrice: number };
 export type UpdateSalesOrderPatch = Partial<
   Omit<SalesOrder, "id" | "number">
 >;
@@ -58,6 +59,7 @@ export const salesOrderRepository = {
         salesOrderId: id,
         itemId: l.itemId,
         qty: l.qty,
+        unitPrice: typeof l.unitPrice === "number" && !Number.isNaN(l.unitPrice) ? l.unitPrice : 0,
       });
     }
     return doc;
@@ -79,11 +81,13 @@ export const salesOrderRepository = {
     lineStore.push(...existing);
     const newLines: SalesOrderLine[] = [];
     for (const l of lines) {
+      const unitPrice = typeof l.unitPrice === "number" && !Number.isNaN(l.unitPrice) ? l.unitPrice : 0;
       const line: SalesOrderLine = {
         id: nextLineId(),
         salesOrderId: documentId,
         itemId: l.itemId,
         qty: l.qty,
+        unitPrice,
       };
       lineStore.push(line);
       newLines.push(line);
@@ -93,6 +97,7 @@ export const salesOrderRepository = {
 };
 
 // Minimal seed: one draft SO (date in YYYY-MM-DD, local today)
+const seedItem = itemRepository.getById("1");
 salesOrderRepository.create(
   {
     date: todayYYYYMMDD(),
@@ -100,5 +105,5 @@ salesOrderRepository.create(
     warehouseId: "1",
     status: "draft",
   },
-  [{ itemId: "1", qty: 5 }],
+  [{ itemId: "1", qty: 5, unitPrice: seedItem?.salePrice ?? 0 }],
 );

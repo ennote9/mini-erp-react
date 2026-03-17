@@ -169,17 +169,17 @@ export function ItemPage() {
           {saveError}
         </div>
       )}
-      <Card className="mt-6 max-w-2xl border-0 shadow-none">
-        <CardHeader>
-          <CardTitle>Details</CardTitle>
-          <CardDescription>
+      <Card className="mt-4 max-w-2xl border-0 shadow-none">
+        <CardHeader className="p-2 pb-0.5">
+          <CardTitle className="text-sm font-semibold">Details</CardTitle>
+          <CardDescription className="text-xs">
             Code, name, unit of measure and status for this item.
           </CardDescription>
         </CardHeader>
-        <CardContent>
-          <div className="grid gap-6 sm:grid-cols-2">
-            <div className="space-y-2 sm:col-span-2">
-              <Label htmlFor="item-code">
+        <CardContent className="p-2 pt-1">
+          <div className="grid gap-2 sm:grid-cols-2">
+            <div className="flex flex-col gap-0.5 sm:col-span-2">
+              <Label htmlFor="item-code" className="text-sm">
                 Code <span className="text-destructive">*</span>
               </Label>
               <Input
@@ -188,10 +188,11 @@ export function ItemPage() {
                 value={form.code}
                 onChange={(e) => setForm((f) => ({ ...f, code: e.target.value }))}
                 placeholder="e.g. ITEM-001"
+                className="h-8 text-sm"
               />
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="item-name">
+            <div className="flex flex-col gap-0.5">
+              <Label htmlFor="item-name" className="text-sm">
                 Name <span className="text-destructive">*</span>
               </Label>
               <Input
@@ -200,10 +201,11 @@ export function ItemPage() {
                 value={form.name}
                 onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
                 placeholder="Item name"
+                className="h-8 text-sm"
               />
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="item-uom">
+            <div className="flex flex-col gap-0.5">
+              <Label htmlFor="item-uom" className="text-sm">
                 UOM <span className="text-destructive">*</span>
               </Label>
               <Input
@@ -212,40 +214,44 @@ export function ItemPage() {
                 value={form.uom}
                 onChange={(e) => setForm((f) => ({ ...f, uom: e.target.value }))}
                 placeholder="e.g. EA"
+                className="h-8 text-sm"
               />
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="item-brand">Brand</Label>
+            <div className="flex flex-col gap-0.5">
+              <Label htmlFor="item-brand" className="text-sm">Brand</Label>
               <Input
                 id="item-brand"
                 type="text"
                 value={form.brand}
                 onChange={(e) => setForm((f) => ({ ...f, brand: e.target.value }))}
                 placeholder="Optional"
+                className="h-8 text-sm"
               />
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="item-category">Category</Label>
+            <div className="flex flex-col gap-0.5">
+              <Label htmlFor="item-category" className="text-sm">Category</Label>
               <Input
                 id="item-category"
                 type="text"
                 value={form.category}
                 onChange={(e) => setForm((f) => ({ ...f, category: e.target.value }))}
                 placeholder="Optional"
+                className="h-8 text-sm"
               />
             </div>
-            <div className="space-y-2 sm:col-span-2">
-              <Label htmlFor="item-barcode">Barcode</Label>
+            <div className="flex flex-col gap-0.5 sm:col-span-2">
+              <Label htmlFor="item-barcode" className="text-sm">Barcode</Label>
               <Input
                 id="item-barcode"
                 type="text"
                 value={form.barcode}
                 onChange={(e) => setForm((f) => ({ ...f, barcode: e.target.value }))}
                 placeholder="Optional"
+                className="h-8 text-sm"
               />
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="item-purchasePrice">Purchase price</Label>
+            <div className="flex flex-col gap-0.5">
+              <Label htmlFor="item-purchasePrice" className="text-sm">Purchase price</Label>
               <Input
                 id="item-purchasePrice"
                 type="number"
@@ -254,10 +260,11 @@ export function ItemPage() {
                 value={form.purchasePrice}
                 onChange={(e) => setForm((f) => ({ ...f, purchasePrice: e.target.value }))}
                 placeholder="0.00"
+                className="h-8 text-sm"
               />
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="item-salePrice">Sale price</Label>
+            <div className="flex flex-col gap-0.5">
+              <Label htmlFor="item-salePrice" className="text-sm">Sale price</Label>
               <Input
                 id="item-salePrice"
                 type="number"
@@ -266,6 +273,7 @@ export function ItemPage() {
                 value={form.salePrice}
                 onChange={(e) => setForm((f) => ({ ...f, salePrice: e.target.value }))}
                 placeholder="0.00"
+                className="h-8 text-sm"
               />
             </div>
             <div className="flex items-center space-x-2 sm:col-span-2">
@@ -278,13 +286,13 @@ export function ItemPage() {
               />
               <Label
                 htmlFor="item-active"
-                className="cursor-pointer font-normal"
+                className="cursor-pointer text-sm font-normal"
               >
                 Active
               </Label>
             </div>
-            <div className="space-y-2 sm:col-span-2">
-              <Label htmlFor="item-description">Description</Label>
+            <div className="flex flex-col gap-0.5 sm:col-span-2">
+              <Label htmlFor="item-description" className="text-sm">Description</Label>
               <Textarea
                 id="item-description"
                 value={form.description}
@@ -292,8 +300,8 @@ export function ItemPage() {
                   setForm((f) => ({ ...f, description: e.target.value }))
                 }
                 placeholder="Optional"
-                rows={3}
-                className="resize-none"
+                rows={2}
+                className="resize-none h-auto min-h-[4.5rem] text-sm"
               />
             </div>
           </div>

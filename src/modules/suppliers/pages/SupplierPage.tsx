@@ -177,17 +177,17 @@ export function SupplierPage() {
           {saveError}
         </div>
       )}
-      <Card className="mt-6 max-w-2xl border-0 shadow-none">
-        <CardHeader>
-          <CardTitle>Details</CardTitle>
-          <CardDescription>
+      <Card className="mt-4 max-w-2xl border-0 shadow-none">
+        <CardHeader className="p-2 pb-0.5">
+          <CardTitle className="text-sm font-semibold">Details</CardTitle>
+          <CardDescription className="text-xs">
             Code, name, contact and status for this supplier.
           </CardDescription>
         </CardHeader>
-        <CardContent>
-          <div className="grid gap-6 sm:grid-cols-2">
-            <div className="space-y-2 sm:col-span-2">
-              <Label htmlFor="supplier-code">
+        <CardContent className="p-2 pt-1">
+          <div className="grid gap-2 sm:grid-cols-2">
+            <div className="flex flex-col gap-0.5 sm:col-span-2">
+              <Label htmlFor="supplier-code" className="text-sm">
                 Code <span className="text-destructive">*</span>
               </Label>
               <Input
@@ -196,10 +196,11 @@ export function SupplierPage() {
                 value={form.code}
                 onChange={(e) => setForm((f) => ({ ...f, code: e.target.value }))}
                 placeholder="e.g. SUP-0001"
+                className="h-8 text-sm"
               />
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="supplier-name">
+            <div className="flex flex-col gap-0.5">
+              <Label htmlFor="supplier-name" className="text-sm">
                 Name <span className="text-destructive">*</span>
               </Label>
               <Input
@@ -208,60 +209,66 @@ export function SupplierPage() {
                 value={form.name}
                 onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
                 placeholder="Supplier name"
+                className="h-8 text-sm"
               />
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="supplier-contactPerson">Contact person</Label>
+            <div className="flex flex-col gap-0.5">
+              <Label htmlFor="supplier-contactPerson" className="text-sm">Contact person</Label>
               <Input
                 id="supplier-contactPerson"
                 type="text"
                 value={form.contactPerson}
                 onChange={(e) => setForm((f) => ({ ...f, contactPerson: e.target.value }))}
                 placeholder="Optional"
+                className="h-8 text-sm"
               />
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="supplier-taxId">Tax ID</Label>
+            <div className="flex flex-col gap-0.5">
+              <Label htmlFor="supplier-taxId" className="text-sm">Tax ID</Label>
               <Input
                 id="supplier-taxId"
                 type="text"
                 value={form.taxId}
                 onChange={(e) => setForm((f) => ({ ...f, taxId: e.target.value }))}
                 placeholder="Optional"
+                className="h-8 text-sm"
               />
             </div>
-            <div className="space-y-2 sm:col-span-2">
-              <Label htmlFor="supplier-address">Address</Label>
+            <div className="flex flex-col gap-0.5 sm:col-span-2">
+              <Label htmlFor="supplier-address" className="text-sm">Address</Label>
               <Input
                 id="supplier-address"
                 type="text"
                 value={form.address}
                 onChange={(e) => setForm((f) => ({ ...f, address: e.target.value }))}
                 placeholder="Optional"
+                className="h-8 text-sm"
               />
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="supplier-city">City</Label>
+            <div className="flex flex-col gap-0.5">
+              <Label htmlFor="supplier-city" className="text-sm">City</Label>
               <Input
                 id="supplier-city"
                 type="text"
                 value={form.city}
                 onChange={(e) => setForm((f) => ({ ...f, city: e.target.value }))}
                 placeholder="Optional"
+                className="h-8 text-sm"
               />
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="supplier-country">Country</Label>
+            <div className="flex flex-col gap-0.5">
+              <Label htmlFor="supplier-country" className="text-sm">Country</Label>
               <Input
                 id="supplier-country"
                 type="text"
                 value={form.country}
                 onChange={(e) => setForm((f) => ({ ...f, country: e.target.value }))}
                 placeholder="Optional"
+                className="h-8 text-sm"
               />
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="supplier-paymentTermsDays">Payment terms (days)</Label>
+            <div className="flex flex-col gap-0.5">
+              <Label htmlFor="supplier-paymentTermsDays" className="text-sm">Payment terms (days)</Label>
               <Input
                 id="supplier-paymentTermsDays"
                 type="number"
@@ -270,16 +277,18 @@ export function SupplierPage() {
                 value={form.paymentTermsDays}
                 onChange={(e) => setForm((f) => ({ ...f, paymentTermsDays: e.target.value }))}
                 placeholder="e.g. 30"
+                className="h-8 text-sm"
               />
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="supplier-phone">Phone</Label>
+            <div className="flex flex-col gap-0.5">
+              <Label htmlFor="supplier-phone" className="text-sm">Phone</Label>
               <Input
                 id="supplier-phone"
                 type="text"
                 value={form.phone}
                 onChange={(e) => setForm((f) => ({ ...f, phone: e.target.value }))}
                 placeholder="Optional"
+                className="h-8 text-sm"
               />
             </div>
             <div className="flex items-center space-x-2 sm:col-span-2">
@@ -292,23 +301,24 @@ export function SupplierPage() {
               />
               <Label
                 htmlFor="supplier-active"
-                className="cursor-pointer font-normal"
+                className="cursor-pointer text-sm font-normal"
               >
                 Active
               </Label>
             </div>
-            <div className="space-y-2 sm:col-span-2">
-              <Label htmlFor="supplier-email">Email</Label>
+            <div className="flex flex-col gap-0.5 sm:col-span-2">
+              <Label htmlFor="supplier-email" className="text-sm">Email</Label>
               <Input
                 id="supplier-email"
                 type="text"
                 value={form.email}
                 onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))}
                 placeholder="Optional"
+                className="h-8 text-sm"
               />
             </div>
-            <div className="space-y-2 sm:col-span-2">
-              <Label htmlFor="supplier-comment">Comment</Label>
+            <div className="flex flex-col gap-0.5 sm:col-span-2">
+              <Label htmlFor="supplier-comment" className="text-sm">Comment</Label>
               <Textarea
                 id="supplier-comment"
                 value={form.comment}
@@ -316,8 +326,8 @@ export function SupplierPage() {
                   setForm((f) => ({ ...f, comment: e.target.value }))
                 }
                 placeholder="Optional"
-                rows={3}
-                className="resize-none"
+                rows={2}
+                className="resize-none min-h-[4.5rem] text-sm"
               />
             </div>
           </div>
