@@ -21,7 +21,7 @@ import { cn } from "@/lib/utils";
 import { agGridDefaultColDef } from "../../../shared/ui/ag-grid/agGridDefaults";
 import { todayYYYYMMDD, normalizeDateForPO } from "../dateUtils";
 import { getPurchaseOrderHealth } from "../../../shared/documentHealth";
-import { getDocumentErrors, getDocumentWarnings, actionIssue, type Issue } from "../../../shared/issues";
+import { getDocumentErrors, getDocumentWarnings, actionIssue, combineIssues, hasErrors, type Issue } from "../../../shared/issues";
 import { ChevronDown, ChevronUp } from "lucide-react";
 
 type LineWithItem = PurchaseOrderLine & { itemName: string };
@@ -413,12 +413,11 @@ export function PurchaseOrderPage() {
   );
 
   const combinedIssues = useMemo(
-    () => [...health.issues, ...actionIssues],
+    () => combineIssues(health.issues, actionIssues),
     [health.issues, actionIssues],
   );
   const combinedErrors = useMemo(() => getDocumentErrors(combinedIssues), [combinedIssues]);
   const combinedWarnings = useMemo(() => getDocumentWarnings(combinedIssues), [combinedIssues]);
-  const documentErrors = useMemo(() => getDocumentErrors(health.issues), [health.issues]);
 
   const getRowClass = useCallback(
     (params: { data?: LineFormRow }) => {
@@ -559,8 +558,8 @@ export function PurchaseOrderPage() {
                 <Button
                   type="button"
                   onClick={handleConfirm}
-                  disabled={documentErrors.length > 0}
-                  title={documentErrors.length > 0 ? "Fix errors before confirming." : undefined}
+                  disabled={hasErrors(health.issues)}
+                  title={hasErrors(health.issues) ? "Fix errors before confirming." : undefined}
                 >
                   Confirm
                 </Button>

@@ -29,6 +29,21 @@ export function getDocumentWarnings(issues: Issue[]): string[] {
   return issues.filter((i) => i.severity === "warning").map((i) => i.message);
 }
 
+/** Combine multiple issue arrays into one (e.g. health.issues + actionIssues). */
+export function combineIssues(...groups: Issue[][]): Issue[] {
+  return groups.flat();
+}
+
+/** True if the list contains at least one error. */
+export function hasErrors(issues: Issue[]): boolean {
+  return issues.some((i) => i.severity === "error");
+}
+
+/** True if the list contains at least one warning. */
+export function hasWarnings(issues: Issue[]): boolean {
+  return issues.some((i) => i.severity === "warning");
+}
+
 /** Create an action-scope error issue (e.g. save/confirm/cancel/create-receipt failure). */
 export function actionIssue(message: string): Issue {
   return { severity: "error", scope: "action", message };
