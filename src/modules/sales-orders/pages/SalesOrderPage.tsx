@@ -20,6 +20,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import { agGridDefaultColDef } from "../../../shared/ui/ag-grid/agGridDefaults";
 import { todayYYYYMMDD, normalizeDateForSO } from "../dateUtils";
+import { getSalesOrderHealth } from "../../../shared/documentHealth";
 
 type LineWithItem = SalesOrderLine & { itemName: string };
 
@@ -398,6 +399,25 @@ export function SalesOrderPage() {
     return { totalQty, totalAmount };
   }, [lines]);
 
+  const health = useMemo(
+    () =>
+      getSalesOrderHealth({
+        customerId: form.customerId,
+        warehouseId: form.warehouseId,
+        lines: form.lines,
+      }),
+    [form.customerId, form.warehouseId, form.lines],
+  );
+
+  const getRowClass = useCallback(
+    (params: { data?: LineFormRow }) => {
+      if (!params.data) return undefined;
+      const h = health.lineHealth.get(params.data._lineId);
+      return h === "error" ? "doc-lines__row--error" : h === "warning" ? "doc-lines__row--warning" : undefined;
+    },
+    [health.lineHealth],
+  );
+
   if (!id) {
     return (
       <div className="doc-page doc-page--not-found">
@@ -433,32 +453,56 @@ export function SalesOrderPage() {
             <h2 className="doc-header__title">{displayTitle}</h2>
             {!isNew && <StatusBadge status={doc!.status} />}
           </div>
-          <div className="doc-header__actions">
-            {isEditable && (
-              <Button type="button" onClick={handleSave}>
-                Save
-              </Button>
+          <div className="doc-header__right">
+            {isEditable && (health.errors.length > 0 || health.warnings.length > 0) && (
+              <div className="doc-health-summary" role="status" aria-live="polite">
+                {health.errors.length > 0 && (
+                  <span className="doc-health-summary__errors">
+                    {health.errors.length} {health.errors.length === 1 ? "error" : "errors"}
+                  </span>
+                )}
+                {health.errors.length > 0 && health.warnings.length > 0 && (
+                  <span className="doc-health-summary__sep"> · </span>
+                )}
+                {health.warnings.length > 0 && (
+                  <span className="doc-health-summary__warnings">
+                    {health.warnings.length} {health.warnings.length === 1 ? "warning" : "warnings"}
+                  </span>
+                )}
+              </div>
             )}
-            {!isNew && isDraft && (
-              <Button type="button" onClick={handleConfirm}>
-                Confirm
-              </Button>
-            )}
-            {!isNew && isConfirmed && (
-              <Button type="button" onClick={handleCreateShipment}>
-                Create Shipment
-              </Button>
-            )}
-            {!isNew && (isDraft || isConfirmed) && (
-              <Button type="button" variant="outline" onClick={handleCancelDocument}>
-                Cancel document
-              </Button>
-            )}
-            {isEditable && (
-              <Button type="button" variant="outline" onClick={handleCancel}>
-                Cancel
-              </Button>
-            )}
+            <div className="doc-header__actions">
+              {isEditable && (
+                <Button type="button" onClick={handleSave}>
+                  Save
+                </Button>
+              )}
+              {!isNew && isDraft && (
+                <Button
+                  type="button"
+                  onClick={handleConfirm}
+                  disabled={health.errors.length > 0}
+                  title={health.errors.length > 0 ? "Fix errors before confirming." : undefined}
+                >
+                  Confirm
+                </Button>
+              )}
+              {!isNew && isConfirmed && (
+                <Button type="button" onClick={handleCreateShipment}>
+                  Create Shipment
+                </Button>
+              )}
+              {!isNew && (isDraft || isConfirmed) && (
+                <Button type="button" variant="outline" onClick={handleCancelDocument}>
+                  Cancel document
+                </Button>
+              )}
+              {isEditable && (
+                <Button type="button" variant="outline" onClick={handleCancel}>
+                  Cancel
+                </Button>
+              )}
+            </div>
           </div>
         </div>
       }
@@ -661,6 +705,7 @@ export function SalesOrderPage() {
                   columnDefs={linesColumnDefs}
                   defaultColDef={agGridDefaultColDef}
                   getRowId={(p) => String(p.data._lineId)}
+                  getRowClass={getRowClass}
                   rowSelection={isEditable ? "single" : undefined}
                   onSelectionChanged={isEditable ? onLinesSelectionChanged : undefined}
                   suppressRowClickSelection={false}
