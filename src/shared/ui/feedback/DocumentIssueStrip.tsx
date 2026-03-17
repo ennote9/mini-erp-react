@@ -42,17 +42,17 @@ export function DocumentIssueStrip({ errors, warnings }: DocumentIssueStripProps
             {warnings.length} {warnings.length === 1 ? "warning" : "warnings"}
           </span>
         )}
-        {errors.length > 1 ? null : errors.length === 1 ? (
+        {totalCount === 1 && (errors.length === 1 ? (
           <>
             <span className="doc-health-strip__sep">·</span>
             <span className="doc-health-strip__msg">{errors[0]}</span>
           </>
-        ) : errors.length === 0 && warnings.length === 1 ? (
+        ) : warnings.length === 1 ? (
           <>
             <span className="doc-health-strip__sep">·</span>
             <span className="doc-health-strip__msg">{warnings[0]}</span>
           </>
-        ) : null}
+        ) : null)}
         {totalCount > 1 && (
           <button
             type="button"

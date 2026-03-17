@@ -77,6 +77,15 @@ function soLinesDisplayColumnDefs(
       },
     },
     {
+      checkboxSelection: true,
+      headerCheckboxSelection: true,
+      width: 44,
+      minWidth: 44,
+      maxWidth: 44,
+      sortable: false,
+      resizable: false,
+    },
+    {
       field: "itemId",
       headerName: "Item",
       flex: 1,
@@ -196,6 +205,7 @@ export function SalesOrderPage() {
   const [selectedLineIds, setSelectedLineIds] = useState<number[]>([]);
   const linesGridRef = useRef<AgGridReact<LineFormRow> | null>(null);
   const lineEntryItemPickerRef = useRef<SearchableItemPickerRef | null>(null);
+  const lineEntryQtyInputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
     setActionIssues([]);
@@ -465,6 +475,12 @@ export function SalesOrderPage() {
     const item = itemId ? itemRepository.getById(itemId) : undefined;
     const price = item?.salePrice;
     setLineEntryUnitPrice(typeof price === "number" && !Number.isNaN(price) && price >= 0 ? price : 0);
+    if (itemId && editingLineId === null) {
+      setTimeout(() => {
+        lineEntryQtyInputRef.current?.focus();
+        lineEntryQtyInputRef.current?.select();
+      }, 0);
+    }
   };
 
   const totals = useMemo(() => {
@@ -711,6 +727,7 @@ export function SalesOrderPage() {
                         Qty <span className="text-destructive">*</span>
                       </Label>
                       <Input
+                        ref={lineEntryQtyInputRef}
                         id="line-entry-qty"
                         type="number"
                         min={1}

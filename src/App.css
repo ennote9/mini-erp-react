@@ -1183,20 +1183,12 @@ body,
   color: #fbbf24;
 }
 
-/* Line-level feedback in document lines grid */
+/* Line-level feedback in document lines grid: text color only, no background/border */
 .doc-page .ag-theme-quartz-dark .doc-lines__row--error .ag-cell {
-  background-color: rgba(248, 113, 113, 0.08) !important;
-  border-left: 2px solid #dc2626;
-}
-.doc-page .ag-theme-quartz-dark .ag-row.doc-lines__row--error:hover .ag-cell {
-  background-color: rgba(248, 113, 113, 0.12) !important;
+  color: #f87171;
 }
 .doc-page .ag-theme-quartz-dark .doc-lines__row--warning .ag-cell {
-  background-color: rgba(251, 191, 36, 0.06) !important;
-  border-left: 2px solid #d97706;
-}
-.doc-page .ag-theme-quartz-dark .ag-row.doc-lines__row--warning:hover .ag-cell {
-  background-color: rgba(251, 191, 36, 0.1) !important;
+  color: #fbbf24;
 }
 
 /* Row-status column: compact dot + tooltip */
