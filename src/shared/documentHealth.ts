@@ -1,20 +1,25 @@
 /**
  * Document-level health for PO and SO: errors (block confirm), warnings (do not block).
- * Line-level flags for grid row styling.
+ * Uses shared Issue model; line-level flags for grid row styling.
  * No stock/availability logic here.
  */
 
+import type { Issue } from "./issues";
 import { normalizeTrim } from "./validation";
 import { parseDocumentLineQty } from "./documentValidation";
 
 export type DocumentHealth = {
-  errors: string[];
-  warnings: string[];
-  /** Per-line: 'error' | 'warning' | null. Key = _lineId (number). */
+  /** Document-level issues (errors and warnings) for strip/panel and confirm blocking. */
+  issues: Issue[];
+  /** Per-line: 'error' | 'warning' | null. Key = _lineId (number). Used for row styling. */
   lineHealth: Map<number, "error" | "warning" | null>;
 };
 
 type LineFormRow = { itemId: string; qty: number; unitPrice: number; _lineId: number };
+
+function docIssue(severity: Issue["severity"], message: string): Issue {
+  return { severity, scope: "document", message };
+}
 
 function lineAmount(line: LineFormRow): number {
   const q = typeof line.qty === "number" && !Number.isNaN(line.qty) ? line.qty : 0;
@@ -29,15 +34,14 @@ export type PurchaseOrderHealthInput = {
 };
 
 export function getPurchaseOrderHealth(input: PurchaseOrderHealthInput): DocumentHealth {
-  const errors: string[] = [];
-  const warnings: string[] = [];
+  const issues: Issue[] = [];
   const lineHealth = new Map<number, "error" | "warning" | null>();
 
   if (normalizeTrim(input.supplierId) === "") {
-    errors.push("Supplier is required.");
+    issues.push(docIssue("error", "Supplier is required."));
   }
   if (normalizeTrim(input.warehouseId) === "") {
-    errors.push("Warehouse is required.");
+    issues.push(docIssue("error", "Warehouse is required."));
   }
 
   const lines = input.lines ?? [];
@@ -52,9 +56,6 @@ export function getPurchaseOrderHealth(input: PurchaseOrderHealthInput): Documen
 
     if (hasStructuralError) {
       lineHealth.set(line._lineId, "error");
-      if (itemIdTrimmed === "") {
-        // per-line error message not duplicated at doc level; doc-level "no valid lines" or "lines have issues" is enough
-      }
     } else {
       validLineCount += 1;
       const up = typeof line.unitPrice === "number" && !Number.isNaN(line.unitPrice) ? line.unitPrice : 0;
@@ -71,37 +72,43 @@ export function getPurchaseOrderHealth(input: PurchaseOrderHealthInput): Documen
   }
 
   if (lines.length === 0) {
-    errors.push("At least one line is required.");
+    issues.push(docIssue("error", "At least one line is required."));
   } else {
     if (validLineCount === 0) {
-      errors.push("At least one valid line is required (item and quantity).");
+      issues.push(docIssue("error", "At least one valid line is required (item and quantity)."));
     }
     const hasAnyEmptyItem = lines.some((l) => normalizeTrim(l.itemId) === "");
     if (hasAnyEmptyItem) {
-      errors.push("One or more lines have no item.");
+      issues.push(docIssue("error", "One or more lines have no item."));
     }
     const hasAnyInvalidQty = lines.some((l) => parseDocumentLineQty(l.qty) === null);
     if (hasAnyInvalidQty) {
-      errors.push("One or more lines have invalid or zero quantity.");
+      issues.push(docIssue("error", "One or more lines have invalid or zero quantity."));
     }
   }
 
   if (linesWithZeroPrice > 0) {
-    warnings.push(
-      linesWithZeroPrice === 1
-        ? "1 line has zero unit price."
-        : `${linesWithZeroPrice} lines have zero unit price.`,
+    issues.push(
+      docIssue(
+        "warning",
+        linesWithZeroPrice === 1
+          ? "1 line has zero unit price."
+          : `${linesWithZeroPrice} lines have zero unit price.`,
+      ),
     );
   }
   if (linesWithZeroAmount > 0) {
-    warnings.push(
-      linesWithZeroAmount === 1
-        ? "1 line has zero line amount."
-        : `${linesWithZeroAmount} lines have zero line amount.`,
+    issues.push(
+      docIssue(
+        "warning",
+        linesWithZeroAmount === 1
+          ? "1 line has zero line amount."
+          : `${linesWithZeroAmount} lines have zero line amount.`,
+      ),
     );
   }
 
-  return { errors, warnings, lineHealth };
+  return { issues, lineHealth };
 }
 
 export type SalesOrderHealthInput = {
@@ -111,15 +118,14 @@ export type SalesOrderHealthInput = {
 };
 
 export function getSalesOrderHealth(input: SalesOrderHealthInput): DocumentHealth {
-  const errors: string[] = [];
-  const warnings: string[] = [];
+  const issues: Issue[] = [];
   const lineHealth = new Map<number, "error" | "warning" | null>();
 
   if (normalizeTrim(input.customerId) === "") {
-    errors.push("Customer is required.");
+    issues.push(docIssue("error", "Customer is required."));
   }
   if (normalizeTrim(input.warehouseId) === "") {
-    errors.push("Warehouse is required.");
+    issues.push(docIssue("error", "Warehouse is required."));
   }
 
   const lines = input.lines ?? [];
@@ -150,35 +156,41 @@ export function getSalesOrderHealth(input: SalesOrderHealthInput): DocumentHealt
   }
 
   if (lines.length === 0) {
-    errors.push("At least one line is required.");
+    issues.push(docIssue("error", "At least one line is required."));
   } else {
     if (validLineCount === 0) {
-      errors.push("At least one valid line is required (item and quantity).");
+      issues.push(docIssue("error", "At least one valid line is required (item and quantity)."));
     }
     const hasAnyEmptyItem = lines.some((l) => normalizeTrim(l.itemId) === "");
     if (hasAnyEmptyItem) {
-      errors.push("One or more lines have no item.");
+      issues.push(docIssue("error", "One or more lines have no item."));
     }
     const hasAnyInvalidQty = lines.some((l) => parseDocumentLineQty(l.qty) === null);
     if (hasAnyInvalidQty) {
-      errors.push("One or more lines have invalid or zero quantity.");
+      issues.push(docIssue("error", "One or more lines have invalid or zero quantity."));
     }
   }
 
   if (linesWithZeroPrice > 0) {
-    warnings.push(
-      linesWithZeroPrice === 1
-        ? "1 line has zero unit price."
-        : `${linesWithZeroPrice} lines have zero unit price.`,
+    issues.push(
+      docIssue(
+        "warning",
+        linesWithZeroPrice === 1
+          ? "1 line has zero unit price."
+          : `${linesWithZeroPrice} lines have zero unit price.`,
+      ),
     );
   }
   if (linesWithZeroAmount > 0) {
-    warnings.push(
-      linesWithZeroAmount === 1
-        ? "1 line has zero line amount."
-        : `${linesWithZeroAmount} lines have zero line amount.`,
+    issues.push(
+      docIssue(
+        "warning",
+        linesWithZeroAmount === 1
+          ? "1 line has zero line amount."
+          : `${linesWithZeroAmount} lines have zero line amount.`,
+      ),
     );
   }
 
-  return { errors, warnings, lineHealth };
+  return { issues, lineHealth };
 }

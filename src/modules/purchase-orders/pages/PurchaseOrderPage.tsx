@@ -21,6 +21,7 @@ import { cn } from "@/lib/utils";
 import { agGridDefaultColDef } from "../../../shared/ui/ag-grid/agGridDefaults";
 import { todayYYYYMMDD, normalizeDateForPO } from "../dateUtils";
 import { getPurchaseOrderHealth } from "../../../shared/documentHealth";
+import { getDocumentErrors, getDocumentWarnings } from "../../../shared/issues";
 import { ChevronDown, ChevronUp } from "lucide-react";
 
 type LineWithItem = PurchaseOrderLine & { itemName: string };
@@ -405,6 +406,9 @@ export function PurchaseOrderPage() {
     [form.supplierId, form.warehouseId, form.lines],
   );
 
+  const errors = useMemo(() => getDocumentErrors(health.issues), [health.issues]);
+  const warnings = useMemo(() => getDocumentWarnings(health.issues), [health.issues]);
+
   const getRowClass = useCallback(
     (params: { data?: LineFormRow }) => {
       if (!params.data) return undefined;
@@ -450,36 +454,36 @@ export function PurchaseOrderPage() {
             {!isNew && <StatusBadge status={doc!.status} />}
           </div>
           <div className="doc-header__right">
-            {isEditable && (health.errors.length > 0 || health.warnings.length > 0) && (
+            {isEditable && (errors.length > 0 || warnings.length > 0) && (
               <div className="doc-health-strip-wrap">
                 <div className="doc-health-strip" role="status" aria-live="polite">
                   <span className="doc-health-strip__label">Document issues</span>
                   <span className="doc-health-strip__sep">·</span>
-                  {health.errors.length > 0 && (
+                  {errors.length > 0 && (
                     <span className="doc-health-strip__errors">
-                      {health.errors.length} {health.errors.length === 1 ? "error" : "errors"}
+                      {errors.length} {errors.length === 1 ? "error" : "errors"}
                     </span>
                   )}
-                  {health.errors.length > 0 && health.warnings.length > 0 && (
+                  {errors.length > 0 && warnings.length > 0 && (
                     <span className="doc-health-strip__sep">·</span>
                   )}
-                  {health.warnings.length > 0 && (
+                  {warnings.length > 0 && (
                     <span className="doc-health-strip__warnings">
-                      {health.warnings.length} {health.warnings.length === 1 ? "warning" : "warnings"}
+                      {warnings.length} {warnings.length === 1 ? "warning" : "warnings"}
                     </span>
                   )}
-                  {health.errors.length > 1 ? null : health.errors.length === 1 ? (
+                  {errors.length > 1 ? null : errors.length === 1 ? (
                     <>
                       <span className="doc-health-strip__sep">·</span>
-                      <span className="doc-health-strip__msg">{health.errors[0]}</span>
+                      <span className="doc-health-strip__msg">{errors[0]}</span>
                     </>
-                  ) : health.errors.length === 0 && health.warnings.length === 1 ? (
+                  ) : errors.length === 0 && warnings.length === 1 ? (
                     <>
                       <span className="doc-health-strip__sep">·</span>
-                      <span className="doc-health-strip__msg">{health.warnings[0]}</span>
+                      <span className="doc-health-strip__msg">{warnings[0]}</span>
                     </>
                   ) : null}
-                  {health.errors.length + health.warnings.length > 1 && (
+                  {errors.length + warnings.length > 1 && (
                     <button
                       type="button"
                       className="doc-health-strip__chevron"
@@ -496,13 +500,13 @@ export function PurchaseOrderPage() {
                     </button>
                   )}
                 </div>
-                {healthStripExpanded && (health.errors.length > 0 || health.warnings.length > 0) && (
+                {healthStripExpanded && (errors.length > 0 || warnings.length > 0) && (
                   <div className="doc-health-strip-panel">
-                    {health.errors.length > 0 && (
+                    {errors.length > 0 && (
                       <div className="doc-health-strip-panel__section">
                         <div className="doc-health-strip-panel__section-title">Errors</div>
                         <ul className="doc-health-strip-panel__list" role="list">
-                          {health.errors.map((msg, i) => (
+                          {errors.map((msg, i) => (
                             <li
                               key={i}
                               className="doc-health-strip-panel__item doc-health-strip-panel__item--error"
@@ -514,11 +518,11 @@ export function PurchaseOrderPage() {
                         </ul>
                       </div>
                     )}
-                    {health.warnings.length > 0 && (
+                    {warnings.length > 0 && (
                       <div className="doc-health-strip-panel__section">
                         <div className="doc-health-strip-panel__section-title">Warnings</div>
                         <ul className="doc-health-strip-panel__list" role="list">
-                          {health.warnings.map((msg, i) => (
+                          {warnings.map((msg, i) => (
                             <li
                               key={i}
                               className="doc-health-strip-panel__item doc-health-strip-panel__item--warning"
@@ -544,8 +548,8 @@ export function PurchaseOrderPage() {
                 <Button
                   type="button"
                   onClick={handleConfirm}
-                  disabled={health.errors.length > 0}
-                  title={health.errors.length > 0 ? "Fix errors before confirming." : undefined}
+                  disabled={errors.length > 0}
+                  title={errors.length > 0 ? "Fix errors before confirming." : undefined}
                 >
                   Confirm
                 </Button>
