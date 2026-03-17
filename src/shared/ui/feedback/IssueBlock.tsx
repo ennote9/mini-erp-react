@@ -1,4 +1,5 @@
 import type { Issue } from "../../issues";
+import { issueSeverityClassName } from "../../issues";
 import { cn } from "@/lib/utils";
 
 type IssueBlockProps = {
@@ -6,12 +7,6 @@ type IssueBlockProps = {
   issues: Issue[];
   /** Optional class for the container. */
   className?: string;
-};
-
-const severityClass: Record<Issue["severity"], string> = {
-  error: "text-red-400",
-  warning: "text-amber-400",
-  info: "text-zinc-400",
 };
 
 /**
@@ -32,7 +27,7 @@ export function IssueBlock({ issues, className }: IssueBlockProps) {
         {issues.map((issue, idx) => (
           <li
             key={idx}
-            className={severityClass[issue.severity] ?? severityClass.error}
+            className={issueSeverityClassName[issue.severity] ?? issueSeverityClassName.error}
           >
             {issue.message}
           </li>

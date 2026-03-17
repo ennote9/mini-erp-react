@@ -11,6 +11,8 @@ import type { ShipmentLine } from "../model";
 import { DocumentPageLayout } from "../../../shared/ui/object/DocumentPageLayout";
 import { BackButton } from "../../../shared/ui/list/BackButton";
 import { StatusBadge } from "../../../shared/ui/feedback/StatusBadge";
+import { IssueBlock } from "../../../shared/ui/feedback/IssueBlock";
+import { actionIssue, type Issue } from "../../../shared/issues";
 import { AgGridContainer } from "../../../shared/ui/ag-grid/AgGridContainer";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -29,6 +31,7 @@ function shipmentLinesColumnDefs(): ColDef<LineWithItem>[] {
 export function ShipmentPage() {
   const { id } = useParams<{ id: string }>();
   const [refresh, setRefresh] = useState(0);
+  const [actionIssues, setActionIssues] = useState<Issue[]>([]);
   const doc = useMemo(
     () => (id ? shipmentRepository.getById(id) : undefined),
     [id, refresh],
@@ -67,13 +70,17 @@ export function ShipmentPage() {
 
   const handlePost = () => {
     if (!id) return;
+    setActionIssues([]);
     const result = post(id);
     if (result.success) setRefresh((r) => r + 1);
+    else setActionIssues([actionIssue(result.error)]);
   };
   const handleCancelDocument = () => {
     if (!id) return;
+    setActionIssues([]);
     const result = cancelDocument(id);
     if (result.success) setRefresh((r) => r + 1);
+    else setActionIssues([actionIssue(result.error)]);
   };
 
   if (!id || !doc) {
@@ -119,6 +126,7 @@ export function ShipmentPage() {
       }
       summary={null}
     >
+      <IssueBlock issues={actionIssues} />
       <Card className="max-w-2xl border-0 shadow-none">
         <CardHeader className="p-4 pb-1">
           <CardTitle className="text-[0.9rem] font-semibold">Details</CardTitle>

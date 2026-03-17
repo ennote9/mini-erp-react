@@ -19,6 +19,13 @@ export type Issue = {
   code?: string;
 };
 
+/** Tailwind classes for severity in shared issue presentation (e.g. IssueBlock). */
+export const issueSeverityClassName: Record<IssueSeverity, string> = {
+  error: "text-red-400",
+  warning: "text-amber-400",
+  info: "text-zinc-400",
+};
+
 /** Single-pass: error and warning message arrays (for strip/panel). Used by PO/SO. */
 export function getErrorAndWarningMessages(issues: Issue[]): {
   errors: string[];
