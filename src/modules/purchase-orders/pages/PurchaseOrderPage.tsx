@@ -362,18 +362,8 @@ export function PurchaseOrderPage() {
     setLineEntryUnitPrice(0);
   };
 
-  const handleDuplicateAddSeparate = () => {
-    if (!duplicateChoicePending) return;
-    const { itemId, qty, unitPrice } = duplicateChoicePending;
-    const _lineId = nextLineIdRef.current++;
-    setForm((f) => ({
-      ...f,
-      lines: [...f.lines, { itemId, qty, unitPrice, _lineId }],
-    }));
+  const handleDuplicateCancel = () => {
     setDuplicateChoicePending(null);
-    setLineEntryItemId("");
-    setLineEntryQty(1);
-    setLineEntryUnitPrice(0);
   };
 
   const updateLineFromEntry = () => {
@@ -737,9 +727,9 @@ export function PurchaseOrderPage() {
                         type="button"
                         variant="outline"
                         size="sm"
-                        onClick={handleDuplicateAddSeparate}
+                        onClick={handleDuplicateCancel}
                       >
-                        Add as separate line
+                        Cancel
                       </Button>
                     </div>
                   )}
