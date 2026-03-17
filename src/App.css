@@ -1175,6 +1175,22 @@ body,
   background-color: #3f3f46 !important;
 }
 
+/* Single-row edit mode: distinct from bulk selection (editingLineId row) */
+.doc-page .ag-theme-quartz-dark .ag-row.ag-row-selected.doc-lines__row--editing .ag-cell {
+  background-color: #2a2a2e !important;
+  border-left: 3px solid #a1a1aa;
+}
+.doc-page .ag-theme-quartz-dark .ag-row.ag-row-selected.doc-lines__row--editing:hover .ag-cell {
+  background-color: #2e2e32 !important;
+}
+
+/* Lines grid: unify Remove button height with entry/slot buttons */
+.doc-page .doc-lines__grid .ag-theme-quartz-dark .doc-lines__cell-remove .doc-lines__row-remove-btn,
+.doc-page .doc-lines__grid .ag-theme-quartz-dark .doc-lines__cell-remove button {
+  height: 2rem !important;
+  min-height: 2rem !important;
+}
+
 /* Doc-page grid: checkboxes — white when checked, no blue outline/ring */
 .doc-page .ag-theme-quartz-dark .ag-checkbox-input-wrapper.ag-checked {
   background-color: #fff !important;

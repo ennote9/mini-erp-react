@@ -129,6 +129,7 @@ function poLinesDisplayColumnDefs(
       headerName: "",
       width: 90,
       sortable: false,
+      cellClass: "doc-lines__cell-remove",
       cellRenderer: (params: { data?: LineFormRow }) => {
         if (!params.data) return null;
         const lineId = params.data._lineId;
@@ -137,6 +138,7 @@ function poLinesDisplayColumnDefs(
             type="button"
             variant="outline"
             size="sm"
+            className="h-8 doc-lines__row-remove-btn"
             disabled={linesLength <= 1}
             onClick={() => onRemove(lineId)}
             aria-label="Remove line"
@@ -529,10 +531,14 @@ export function PurchaseOrderPage() {
   const getRowClass = useCallback(
     (params: { data?: LineFormRow }) => {
       if (!params.data) return undefined;
+      const parts: string[] = [];
+      if (params.data._lineId === editingLineId) parts.push("doc-lines__row--editing");
       const h = health.lineHealth.get(params.data._lineId);
-      return h === "error" ? "doc-lines__row--error" : h === "warning" ? "doc-lines__row--warning" : undefined;
+      if (h === "error") parts.push("doc-lines__row--error");
+      else if (h === "warning") parts.push("doc-lines__row--warning");
+      return parts.length > 0 ? parts.join(" ") : undefined;
     },
-    [health.lineHealth],
+    [health.lineHealth, editingLineId],
   );
 
   const linesColumnDefs = useMemo(
@@ -760,12 +766,13 @@ export function PurchaseOrderPage() {
                         className="h-8 text-sm"
                       />
                     </div>
-                    <div className="flex gap-1.5 flex-shrink-0">
+                    <div className="flex gap-1.5 flex-shrink-0 items-center">
                       {editingLineId === null ? (
                         <Button
                           type="button"
                           variant="outline"
                           size="sm"
+                          className="h-8"
                           onClick={addLineFromEntry}
                         >
                           Add line
@@ -775,6 +782,7 @@ export function PurchaseOrderPage() {
                           <Button
                             type="button"
                             size="sm"
+                            className="h-8"
                             onClick={updateLineFromEntry}
                           >
                             Update line
@@ -783,6 +791,7 @@ export function PurchaseOrderPage() {
                             type="button"
                             variant="outline"
                             size="sm"
+                            className="h-8"
                             onClick={cancelEdit}
                           >
                             Cancel edit
@@ -792,33 +801,39 @@ export function PurchaseOrderPage() {
                     </div>
                     <div className="doc-lines__contextual-slot min-h-9 flex items-center">
                       {duplicateChoicePending && editingLineId === null ? (
-                        <div className="flex flex-wrap items-center gap-2 rounded border border-border bg-muted/30 px-2 py-1.5 text-sm">
-                          <span className="text-muted-foreground text-xs whitespace-nowrap">Item already exists</span>
-                          <Button
-                            type="button"
-                            variant="default"
-                            size="sm"
-                            onClick={handleDuplicateIncreaseQty}
-                          >
-                            Increase quantity
-                          </Button>
-                          <Button
-                            type="button"
-                            variant="outline"
-                            size="sm"
-                            onClick={handleDuplicateCancel}
-                          >
-                            Cancel
-                          </Button>
+                        <div className="flex flex-col gap-1 py-0.5">
+                          <span className="text-muted-foreground text-xs leading-tight">Item already exists</span>
+                          <div className="flex items-center gap-1.5">
+                            <Button
+                              type="button"
+                              variant="default"
+                              size="sm"
+                              className="h-8"
+                              onClick={handleDuplicateIncreaseQty}
+                            >
+                              Increase quantity
+                            </Button>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              className="h-8"
+                              onClick={handleDuplicateCancel}
+                            >
+                              Cancel
+                            </Button>
+                          </div>
                         </div>
                       ) : selectedLineIds.length >= 2 ? (
-                        <div className="flex flex-wrap items-center gap-2 rounded border border-border bg-muted/30 px-2 py-1.5 text-sm">
-                          <span className="text-muted-foreground whitespace-nowrap">
+                        <div className="flex flex-col gap-1 py-0.5">
+                          <span className="text-muted-foreground text-xs leading-tight">
                             {selectedLineIds.length} lines selected
                           </span>
-                          <Button type="button" variant="outline" size="sm" onClick={removeSelectedLines}>
-                            Remove selected lines
-                          </Button>
+                          <div className="flex items-center gap-1.5">
+                            <Button type="button" variant="outline" size="sm" className="h-8" onClick={removeSelectedLines}>
+                              Remove selected lines
+                            </Button>
+                          </div>
                         </div>
                       ) : null}
                     </div>
