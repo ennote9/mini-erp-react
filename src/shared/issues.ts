@@ -19,7 +19,7 @@ export type Issue = {
   code?: string;
 };
 
-/** Single-pass: error and warning message arrays (for strip/panel). */
+/** Single-pass: error and warning message arrays (for strip/panel). Used by PO/SO. */
 export function getErrorAndWarningMessages(issues: Issue[]): {
   errors: string[];
   warnings: string[];
