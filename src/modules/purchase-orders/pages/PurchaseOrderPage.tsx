@@ -27,7 +27,7 @@ import { DocumentIssueStrip } from "../../../shared/ui/feedback/DocumentIssueStr
 import { SearchableItemPicker, type SearchableItemPickerRef } from "../../../shared/ui/item-picker/SearchableItemPicker";
 import { SelectField } from "@/components/ui/select-field";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { ChevronDown, FileSpreadsheet } from "lucide-react";
+import { ChevronDown, FileSpreadsheet, File, FolderOpen, X } from "lucide-react";
 import {
   buildLinesXlsxBuffer,
   buildDocumentXlsxBuffer,
@@ -36,7 +36,7 @@ import {
 } from "../poExport";
 import { save } from "@tauri-apps/plugin-dialog";
 import { invoke } from "@tauri-apps/api/core";
-import { openPath, revealItemInDir } from "@tauri-apps/plugin-opener";
+import { revealItemInDir } from "@tauri-apps/plugin-opener";
 
 type LineWithItem = PurchaseOrderLine & { itemName: string };
 
@@ -644,26 +644,27 @@ export function PurchaseOrderPage() {
 
   const runExportWithSaveAs = useCallback(
     async (defaultFilename: string, buildBuffer: () => Promise<ArrayBuffer>) => {
-      const buffer = await buildBuffer();
-      const hasTauri = typeof (window as unknown as { __TAURI__?: unknown }).__TAURI__ !== "undefined";
-      if (hasTauri) {
-        try {
-          const path = await save({
-            defaultPath: defaultFilename,
-            filters: [{ name: "Excel", extensions: ["xlsx"] }],
-          });
-          if (path == null) return;
-          const bytes = new Uint8Array(buffer);
-          let binary = "";
-          for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
-          const contentsBase64 = btoa(binary);
-          await invoke("write_export_file", { path, contentsBase64 });
-          const filename = path.replace(/^.*[/\\]/, "") || defaultFilename;
-          setExportSuccess({ path, filename });
-        } catch (err) {
-          console.error("Export failed", err);
-        }
-      } else {
+      try {
+        const path = await save({
+          defaultPath: defaultFilename,
+          filters: [{ name: "Excel", extensions: ["xlsx"] }],
+        });
+        if (path == null) return;
+
+        const buffer = await buildBuffer();
+        const bytes = new Uint8Array(buffer);
+        let binary = "";
+        for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
+        const contentsBase64 = btoa(binary);
+
+        await invoke("write_export_file", { path, contentsBase64 });
+        const filename = path.replace(/^.*[/\\]/, "") || defaultFilename;
+        setExportSuccess({ path, filename });
+      } catch (err) {
+        // If we're not running inside Tauri or the dialog/command fails,
+        // fall back to a browser download (best-effort).
+        console.error("Export failed", err);
+        const buffer = await buildBuffer();
         const blob = new Blob([buffer], {
           type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         });
@@ -923,10 +924,10 @@ export function PurchaseOrderPage() {
               <h3 className="doc-lines__title">Lines</h3>
             </div>
             {isEditable && (
-              <div className="flex items-end justify-between gap-2 w-full mb-1.5">
-                <Card className="max-w-2xl border-0 shadow-none flex-1 min-w-0">
+              <div className="flex items-end gap-2 w-full mb-1.5">
+                <Card className="border-0 shadow-none flex-1 min-w-0">
                   <CardContent className="p-2 pb-0">
-                    <div className="grid grid-cols-2 md:grid-cols-[1fr_1fr_1fr_auto_260px] gap-x-2 gap-y-0 items-end">
+                    <div className="grid grid-cols-2 md:grid-cols-[minmax(200px,240px)_auto_auto_auto_260px] gap-x-2 gap-y-0 items-end w-max max-w-full">
                     <div className="flex flex-col gap-0.5">
                       <Label htmlFor="line-entry-item" className="text-sm">
                         Item <span className="text-destructive">*</span>
@@ -1066,155 +1067,220 @@ export function PurchaseOrderPage() {
                   </div>
                 </CardContent>
               </Card>
-                <div className="flex items-stretch rounded-md border border-input shrink-0">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    className="h-8 rounded-r-none border-0 border-r border-input gap-1.5"
-                    onClick={handleExportMain}
-                  >
-                    <FileSpreadsheet className="h-4 w-4 shrink-0" />
-                    Export
-                  </Button>
-                  <Popover open={exportOpen} onOpenChange={setExportOpen}>
-                    <PopoverTrigger asChild>
+                <div className="flex flex-row items-center gap-2 shrink-0">
+                  {exportSuccess && (
+                    <div className="h-8 w-max flex items-center gap-1.5 rounded-md border border-input bg-background px-2 text-sm shrink-0">
+                      <span className="text-muted-foreground text-xs">Export completed:</span>
+                      <span className="font-medium text-xs truncate max-w-[12rem]" title={exportSuccess.filename}>{exportSuccess.filename}</span>
                       <Button
                         type="button"
-                        variant="outline"
+                        variant="ghost"
                         size="icon"
-                        className="h-8 w-8 shrink-0 rounded-l-none border-0 shadow-none"
-                        aria-label="Export options"
+                        className="h-7 w-7 shrink-0 text-muted-foreground hover:text-foreground"
+                        title="Open file"
+                        aria-label="Open file"
+                        onClick={async () => {
+                          const path = exportSuccess.path;
+                          console.log("[Export] Open file handler started", { path });
+                          try {
+                            await invoke("open_export_file", { path });
+                            console.log("[Export] Open file succeeded");
+                            setExportSuccess(null);
+                          } catch (err) {
+                            console.error("[Export] Open file failed", err);
+                            setExportSuccess(null);
+                          }
+                        }}
                       >
-                        <ChevronDown className="h-4 w-4" />
+                        <File className="h-4 w-4" />
                       </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="!w-max min-w-0 p-1.5" align="end" side="top">
-                      <div className="flex flex-col gap-0.5">
-                        <button
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        className="h-7 w-7 shrink-0 text-muted-foreground hover:text-foreground"
+                        title="Open folder"
+                        aria-label="Open folder"
+                        onClick={() => {
+                          revealItemInDir(exportSuccess.path);
+                          setExportSuccess(null);
+                        }}
+                      >
+                        <FolderOpen className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        className="h-6 w-6 shrink-0 text-muted-foreground/80 hover:text-muted-foreground"
+                        title="Dismiss"
+                        aria-label="Dismiss"
+                        onClick={() => setExportSuccess(null)}
+                      >
+                        <X className="h-3 w-3" />
+                      </Button>
+                    </div>
+                  )}
+                  <div className="flex items-stretch rounded-md border border-input shrink-0">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="h-8 rounded-r-none border-0 border-r border-input gap-1.5"
+                      onClick={handleExportMain}
+                    >
+                      <FileSpreadsheet className="h-4 w-4 shrink-0" />
+                      Export
+                    </Button>
+                    <Popover open={exportOpen} onOpenChange={setExportOpen}>
+                      <PopoverTrigger asChild>
+                        <Button
                           type="button"
-                          disabled={exportSelectedDisabled}
-                          className="w-full rounded-sm px-1.5 py-1 text-left text-sm hover:bg-accent disabled:cursor-not-allowed disabled:opacity-50"
-                          title={exportSelectedDisabled ? (!isEditable ? "Selection is available in edit mode only." : "Select one or more lines in the grid first.") : undefined}
-                          onClick={() => {
-                            setExportOpen(false);
-                            if (!exportSelectedDisabled) handleExportSelected();
-                          }}
+                          variant="outline"
+                          size="icon"
+                          className="h-8 w-8 shrink-0 rounded-l-none border-0 shadow-none"
+                          aria-label="Export options"
                         >
-                          Export selected lines
-                        </button>
-                        <button
-                          type="button"
-                          className="w-full rounded-sm px-1.5 py-1 text-left text-sm hover:bg-accent"
-                          onClick={() => {
-                            setExportOpen(false);
-                            handleExportAll();
-                          }}
-                        >
-                          Export all lines
-                        </button>
-                      </div>
-                    </PopoverContent>
-                  </Popover>
+                          <ChevronDown className="h-4 w-4" />
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="!w-max min-w-0 p-1.5" align="end" side="top">
+                        <div className="flex flex-col gap-0.5">
+                          <button
+                            type="button"
+                            disabled={exportSelectedDisabled}
+                            className="w-full rounded-sm px-1.5 py-1 text-left text-sm hover:bg-accent disabled:cursor-not-allowed disabled:opacity-50"
+                            title={exportSelectedDisabled ? (!isEditable ? "Selection is available in edit mode only." : "Select one or more lines in the grid first.") : undefined}
+                            onClick={() => {
+                              setExportOpen(false);
+                              if (!exportSelectedDisabled) handleExportSelected();
+                            }}
+                          >
+                            Export selected lines
+                          </button>
+                          <button
+                            type="button"
+                            className="w-full rounded-sm px-1.5 py-1 text-left text-sm hover:bg-accent"
+                            onClick={() => {
+                              setExportOpen(false);
+                              handleExportAll();
+                            }}
+                          >
+                            Export all lines
+                          </button>
+                        </div>
+                      </PopoverContent>
+                    </Popover>
+                  </div>
                 </div>
               </div>
             )}
             {!isEditable && (
-              <div className="flex justify-end w-full mb-1.5">
-                <div className="flex items-stretch rounded-md border border-input shrink-0">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    className="h-8 rounded-r-none border-0 border-r border-input gap-1.5"
-                    onClick={handleExportMain}
-                  >
-                    <FileSpreadsheet className="h-4 w-4 shrink-0" />
-                    Export
-                  </Button>
-                  <Popover open={exportOpen} onOpenChange={setExportOpen}>
-                    <PopoverTrigger asChild>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="icon"
-                        className="h-8 w-8 shrink-0 rounded-l-none border-0 shadow-none"
-                        aria-label="Export options"
-                      >
-                        <ChevronDown className="h-4 w-4" />
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="!w-max min-w-0 p-1.5" align="end" side="top">
-                      <div className="flex flex-col gap-0.5">
-                        <button
-                          type="button"
-                          disabled={exportSelectedDisabled}
-                          className="w-full rounded-sm px-1.5 py-1 text-left text-sm hover:bg-accent disabled:cursor-not-allowed disabled:opacity-50"
-                          title={exportSelectedDisabled ? (!isEditable ? "Selection is available in edit mode only." : "Select one or more lines in the grid first.") : undefined}
-                          onClick={() => {
-                            setExportOpen(false);
-                            if (!exportSelectedDisabled) handleExportSelected();
-                          }}
-                        >
-                          Export selected lines
-                        </button>
-                        <button
-                          type="button"
-                          className="w-full rounded-sm px-1.5 py-1 text-left text-sm hover:bg-accent"
-                          onClick={() => {
-                            setExportOpen(false);
-                            handleExportAll();
-                          }}
-                        >
-                          Export all lines
-                        </button>
-                      </div>
-                    </PopoverContent>
-                  </Popover>
-                </div>
-              </div>
-            )}
-            {exportSuccess && (
-              <div className="mb-1.5 flex items-center gap-2 rounded-md border border-input bg-muted/30 px-2 py-1.5 text-sm">
-                <span className="text-muted-foreground">Export completed:</span>
-                <span className="font-medium">{exportSuccess.filename}</span>
-                {typeof (window as unknown as { __TAURI__?: unknown }).__TAURI__ !== "undefined" && (
-                  <>
+              <div className="flex flex-row items-center justify-end gap-2 w-full mb-1.5">
+                {exportSuccess && (
+                  <div className="h-8 w-max flex items-center gap-1.5 rounded-md border border-input bg-background px-2 text-sm shrink-0">
+                    <span className="text-muted-foreground text-xs">Export completed:</span>
+                    <span className="font-medium text-xs truncate max-w-[12rem]" title={exportSuccess.filename}>{exportSuccess.filename}</span>
                     <Button
                       type="button"
                       variant="ghost"
-                      size="sm"
-                      className="h-7 gap-1 text-xs"
-                      onClick={() => {
-                        openPath(exportSuccess.path);
-                        setExportSuccess(null);
+                      size="icon"
+                      className="h-7 w-7 shrink-0 text-muted-foreground hover:text-foreground"
+                      title="Open file"
+                      aria-label="Open file"
+                      onClick={async () => {
+                        const path = exportSuccess.path;
+                        console.log("[Export] Open file handler started", { path });
+                        try {
+                          await invoke("open_export_file", { path });
+                          console.log("[Export] Open file succeeded");
+                          setExportSuccess(null);
+                        } catch (err) {
+                          console.error("[Export] Open file failed", err);
+                          setExportSuccess(null);
+                        }
                       }}
                     >
-                      Open file
+                      <File className="h-4 w-4" />
                     </Button>
                     <Button
                       type="button"
                       variant="ghost"
-                      size="sm"
-                      className="h-7 gap-1 text-xs"
+                      size="icon"
+                      className="h-7 w-7 shrink-0 text-muted-foreground hover:text-foreground"
+                      title="Open folder"
+                      aria-label="Open folder"
                       onClick={() => {
                         revealItemInDir(exportSuccess.path);
                         setExportSuccess(null);
                       }}
                     >
-                      Open folder
+                      <FolderOpen className="h-4 w-4" />
                     </Button>
-                  </>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="h-6 w-6 shrink-0 text-muted-foreground/80 hover:text-muted-foreground"
+                      title="Dismiss"
+                      aria-label="Dismiss"
+                      onClick={() => setExportSuccess(null)}
+                    >
+                      <X className="h-3 w-3" />
+                    </Button>
+                  </div>
                 )}
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  className="ml-auto h-7 text-xs"
-                  onClick={() => setExportSuccess(null)}
-                >
-                  Dismiss
-                </Button>
+                <div className="flex items-stretch rounded-md border border-input shrink-0">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="h-8 rounded-r-none border-0 border-r border-input gap-1.5"
+                    onClick={handleExportMain}
+                  >
+                    <FileSpreadsheet className="h-4 w-4 shrink-0" />
+                    Export
+                  </Button>
+                  <Popover open={exportOpen} onOpenChange={setExportOpen}>
+                    <PopoverTrigger asChild>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="icon"
+                        className="h-8 w-8 shrink-0 rounded-l-none border-0 shadow-none"
+                        aria-label="Export options"
+                      >
+                        <ChevronDown className="h-4 w-4" />
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="!w-max min-w-0 p-1.5" align="end" side="top">
+                      <div className="flex flex-col gap-0.5">
+                        <button
+                          type="button"
+                          disabled={exportSelectedDisabled}
+                          className="w-full rounded-sm px-1.5 py-1 text-left text-sm hover:bg-accent disabled:cursor-not-allowed disabled:opacity-50"
+                          title={exportSelectedDisabled ? (!isEditable ? "Selection is available in edit mode only." : "Select one or more lines in the grid first.") : undefined}
+                          onClick={() => {
+                            setExportOpen(false);
+                            if (!exportSelectedDisabled) handleExportSelected();
+                          }}
+                        >
+                          Export selected lines
+                        </button>
+                        <button
+                          type="button"
+                          className="w-full rounded-sm px-1.5 py-1 text-left text-sm hover:bg-accent"
+                          onClick={() => {
+                            setExportOpen(false);
+                            handleExportAll();
+                          }}
+                        >
+                          Export all lines
+                        </button>
+                      </div>
+                    </PopoverContent>
+                  </Popover>
+                </div>
               </div>
             )}
             <div className="doc-lines__grid">

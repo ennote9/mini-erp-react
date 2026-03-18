@@ -12,12 +12,41 @@ fn write_export_file(path: String, contents_base64: String) -> Result<(), String
     Ok(())
 }
 
+/// Opens the given file path with the system default application.
+#[tauri::command]
+fn open_export_file(path: String) -> Result<(), String> {
+    if !std::path::Path::new(&path).exists() {
+        return Err(format!("File not found: {}", path));
+    }
+    let status = if cfg!(target_os = "windows") {
+        std::process::Command::new("cmd")
+            .args(["/C", "start", "", &path])
+            .status()
+            .map_err(|e| e.to_string())?
+    } else if cfg!(target_os = "macos") {
+        std::process::Command::new("open")
+            .arg(&path)
+            .status()
+            .map_err(|e| e.to_string())?
+    } else {
+        std::process::Command::new("xdg-open")
+            .arg(&path)
+            .status()
+            .map_err(|e| e.to_string())?
+    };
+    if status.success() {
+        Ok(())
+    } else {
+        Err(format!("open failed with status: {:?}", status))
+    }
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
-        .invoke_handler(tauri::generate_handler![greet, write_export_file])
+        .invoke_handler(tauri::generate_handler![greet, write_export_file, open_export_file])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }
