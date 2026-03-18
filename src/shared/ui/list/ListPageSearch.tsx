@@ -9,6 +9,10 @@ type Props = {
   "aria-label": string;
   /** Show "X results" on the right only when value is non-empty */
   resultCount?: number;
+  /** Optional id for the input (for labels / a11y). */
+  id?: string;
+  /** Optional name for the input (defaults to "search" for form semantics). */
+  name?: string;
 };
 
 /**
@@ -21,6 +25,8 @@ export function ListPageSearch({
   onChange,
   "aria-label": ariaLabel,
   resultCount,
+  id,
+  name = "search",
 }: Props) {
   const [focused, setFocused] = useState(false);
   const showLeftOverlay = value === "" && !focused;
@@ -53,6 +59,8 @@ export function ListPageSearch({
       )}
       <input
         type="search"
+        id={id}
+        name={name}
         className="list-page-search__input"
         value={value}
         onChange={(e) => onChange(e.target.value)}

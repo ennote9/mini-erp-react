@@ -1,23 +1,13 @@
 /* Override react-day-picker: current day = red text only (loaded after rdp style) */
 .rdp-root .rdp-day.rdp-today:not(.rdp-outside) {
   background: transparent !important;
-  vertical-align: middle !important;
 }
 .rdp-root .rdp-today:not(.rdp-outside) {
   color: #ef4444 !important;
-  font-size: 15px !important;
-  font-weight: 400 !important;
-  line-height: 1 !important;
 }
 .rdp-root .rdp-today:not(.rdp-outside) .rdp-day_button,
 .rdp-root .rdp-today.rdp-selected:not(.rdp-outside) .rdp-day_button {
   background: transparent !important;
   border: 2px solid transparent !important;
   color: inherit !important;
-  font-size: 15px !important;
-  font-weight: 400 !important;
-  line-height: 1 !important;
-  display: flex !important;
-  align-items: center !important;
-  justify-content: center !important;
 }
