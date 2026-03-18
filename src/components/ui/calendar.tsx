@@ -41,7 +41,7 @@ function MonthWithHeaderBar(props: MonthProps) {
     <div className={cn("flex flex-col gap-0", className)} {...rest}>
       {headerChildren.length > 0 && (
         <div
-          className="rdp-calendar-header flex items-center gap-1 h-8 py-0 w-full bg-muted/40 rounded-t-md"
+          className="rdp-calendar-header flex items-center gap-1 h-8 py-0 w-full rounded-t-md"
           role="presentation"
         >
           <div className="shrink-0">{prev}</div>
@@ -149,6 +149,7 @@ function Calendar({
         "[--rdp-day_button-height:26px][--rdp-day_button-width:26px]",
         "[--rdp-nav_button-height:2rem][--rdp-nav_button-width:2rem]",
         "[--rdp-nav-height:2rem]",
+        "[--rdp-today-color:var(--destructive)]",
         className
       )}
       classNames={{
@@ -165,16 +166,17 @@ function Calendar({
         weekday:
           "text-muted-foreground rounded w-[28px] min-w-[28px] font-normal text-[0.75em] leading-none text-center py-1",
         week: "flex w-full gap-0 mt-0 mb-0",
-        day: "relative p-0 text-center leading-none w-[28px] min-w-[28px] focus-within:relative [&:has([data-selected])]:bg-zinc-600 [&:has([data-selected].day-outside)]:bg-zinc-600/70 [&:has([data-selected].day-range-end)]:rounded-r",
+        day: "relative p-0 text-center leading-none w-[28px] min-w-[28px] focus-within:relative [&:has([data-selected])]:bg-zinc-600 [&:has([data-selected].day-outside)]:bg-zinc-600/70 [&:has([data-selected].day-range-end)]:rounded-r [&:has(.today)]:!bg-transparent",
         day_button: cn(
-          "h-[26px] w-[26px] min-w-[26px] p-0 font-normal aria-selected:opacity-100 rounded-md leading-none border-2 border-transparent aria-selected:border-white hover:bg-accent/40",
-          buttonVariants({ variant: "ghost", size: "icon" })
+          "min-w-[26px] p-0 font-normal aria-selected:opacity-100 rounded-md leading-none border-2 border-transparent aria-selected:border-white hover:bg-accent/40",
+          buttonVariants({ variant: "ghost", size: "icon" }),
+          "h-[26px] w-[39px] min-w-[39px]"
         ),
         range_start: "day-range-start rounded-s-md",
         range_end: "day-range-end rounded-e-md",
         selected:
           "bg-zinc-600 text-foreground border-2 border-white rounded-md hover:bg-zinc-500 focus:bg-zinc-500",
-        today: "bg-zinc-600/60 text-foreground",
+        today: "rdp-today today !bg-transparent !border-transparent !border-2 text-destructive",
         outside:
           "day-outside text-muted-foreground opacity-50 aria-selected:bg-accent/50 aria-selected:text-muted-foreground aria-selected:opacity-30",
         disabled: "text-muted-foreground opacity-50",

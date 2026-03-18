@@ -278,7 +278,7 @@ export function ItemPage() {
                 <option value="">—</option>
                 {brandOptions.map((b) => (
                   <option key={b.id} value={b.id}>
-                    {b.name} {!b.isActive ? "(inactive)" : ""}
+                    {b.code} - {b.name} {!b.isActive ? "(inactive)" : ""}
                   </option>
                 ))}
               </select>
@@ -297,7 +297,7 @@ export function ItemPage() {
                 <option value="">—</option>
                 {categoryOptions.map((c) => (
                   <option key={c.id} value={c.id}>
-                    {c.name} {!c.isActive ? "(inactive)" : ""}
+                    {c.code} - {c.name} {!c.isActive ? "(inactive)" : ""}
                   </option>
                 ))}
               </select>

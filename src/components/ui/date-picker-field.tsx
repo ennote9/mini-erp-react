@@ -154,7 +154,7 @@ export function DatePickerField({
             onSelect={handleSelect}
             defaultMonth={date}
           />
-          <div className="flex justify-end px-2 py-1 border-t border-border/50">
+          <div className="flex justify-end px-2 py-1">
             <Button
               type="button"
               variant="ghost"

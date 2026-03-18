@@ -1097,6 +1097,7 @@ body,
 }
 
 .doc-lines__title {
+  position: static;
   margin: 0 0 0.125rem;
   font-size: 0.9rem;
   font-weight: 600;
@@ -1120,6 +1121,7 @@ body,
 }
 
 .doc-lines {
+  position: static;
   display: flex;
   flex-direction: column;
   flex: 1;
@@ -1339,3 +1341,4 @@ input[type="date"]::-webkit-calendar-picker-indicator {
 .rdp-root .rdp-calendar-header .rdp-month_caption {
   height: 2rem;
 }
+

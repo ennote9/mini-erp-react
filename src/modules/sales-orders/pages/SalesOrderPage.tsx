@@ -620,7 +620,7 @@ export function SalesOrderPage() {
               <CardTitle className="text-[0.9rem] font-semibold">Details</CardTitle>
             </CardHeader>
             <CardContent className="p-2 pt-1">
-              <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)] gap-x-3 gap-y-1">
+              <div className="grid w-fit grid-cols-[280px_280px] gap-x-2 gap-y-1">
                 <div className="flex min-w-0 w-full flex-col gap-0.5">
                   <Label htmlFor="so-number" className="text-sm">Number</Label>
                   <div id="so-number" className="flex h-8 items-center text-sm text-muted-foreground">
@@ -649,14 +649,14 @@ export function SalesOrderPage() {
                       setForm((f) => ({ ...f, customerId: e.target.value }))
                     }
                     className={cn(
-                      "flex h-8 w-full rounded border border-input bg-background px-2 py-1 text-sm text-foreground",
+                      "flex h-8 w-full rounded border border-input bg-background pl-2 pr-7 py-1 text-sm text-foreground",
                       "focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50",
                     )}
                   >
                     <option value="">Select customer</option>
                     {activeCustomers.map((c) => (
                       <option key={c.id} value={c.id}>
-                        {c.name} ({c.code})
+                        {c.code} - {c.name}
                       </option>
                     ))}
                   </select>
@@ -672,14 +672,14 @@ export function SalesOrderPage() {
                       setForm((f) => ({ ...f, warehouseId: e.target.value }))
                     }
                     className={cn(
-                      "flex h-8 w-full rounded border border-input bg-background px-2 py-1 text-sm text-foreground",
+                      "flex h-8 w-full rounded border border-input bg-background pl-2 pr-7 py-1 text-sm text-foreground",
                       "focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50",
                     )}
                   >
                     <option value="">Select warehouse</option>
                     {activeWarehouses.map((w) => (
                       <option key={w.id} value={w.id}>
-                        {w.name} ({w.code})
+                        {w.code} - {w.name}
                       </option>
                     ))}
                   </select>
