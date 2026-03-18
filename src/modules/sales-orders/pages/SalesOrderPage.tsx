@@ -7,6 +7,8 @@ import { confirm, cancelDocument, createShipment, saveDraft } from "../service";
 import { customerRepository } from "../../customers/repository";
 import { warehouseRepository } from "../../warehouses/repository";
 import { itemRepository } from "../../items/repository";
+import { brandRepository } from "../../brands/repository";
+import { categoryRepository } from "../../categories/repository";
 import type { SalesOrderLine } from "../model";
 import { DocumentPageLayout } from "../../../shared/ui/object/DocumentPageLayout";
 import { BackButton } from "../../../shared/ui/list/BackButton";
@@ -24,7 +26,6 @@ import { getSalesOrderHealth } from "../../../shared/documentHealth";
 import { getErrorAndWarningMessages, actionIssue, combineIssues, hasErrors, issueListContainsMessage, type Issue } from "../../../shared/issues";
 import { DocumentIssueStrip } from "../../../shared/ui/feedback/DocumentIssueStrip";
 import { SearchableItemPicker, type SearchableItemPickerRef } from "../../../shared/ui/item-picker/SearchableItemPicker";
-import { X } from "lucide-react";
 
 type LineWithItem = SalesOrderLine & { itemName: string };
 
@@ -48,57 +49,87 @@ function defaultForm(): FormState {
   };
 }
 
-function soLinesDisplayColumnDefs(
-  linesLength: number,
-  onRemove: (lineId: number) => void,
-  lineHealth: Map<number, "error" | "warning" | null>,
-): ColDef<LineFormRow>[] {
+function soLinesDisplayColumnDefs(): ColDef<LineFormRow>[] {
   return [
     {
-      headerName: "",
-      width: 40,
+      headerName: "№",
+      valueGetter: (params) =>
+        params.node?.rowIndex != null ? String(params.node.rowIndex + 1) : "",
+      width: 52,
+      minWidth: 48,
+      maxWidth: 56,
       sortable: false,
-      cellRenderer: (params: { data?: LineFormRow }) => {
-        if (!params.data) return null;
-        const h = lineHealth.get(params.data._lineId) ?? null;
-        const title =
-          h === "error"
-            ? "Missing item or invalid quantity"
-            : h === "warning"
-              ? "Zero unit price or zero line amount"
-              : "OK";
-        const mod = h === "error" ? "error" : h === "warning" ? "warning" : "ok";
-        return (
-          <span
-            className={cn("doc-lines__status", `doc-lines__status--${mod}`)}
-            title={title}
-            aria-label={title}
-          />
-        );
+      resizable: true,
+    },
+    {
+      headerName: "Item Code",
+      width: 130,
+      minWidth: 120,
+      maxWidth: 140,
+      editable: false,
+      valueGetter: (p) => {
+        const itemId = p.data?.itemId;
+        if (!itemId) return "";
+        const item = itemRepository.getById(itemId);
+        return item?.code ?? itemId;
       },
     },
     {
       field: "itemId",
-      headerName: "Item",
+      headerName: "Item Name",
       flex: 1,
       minWidth: 180,
       editable: false,
       valueFormatter: (p) => {
         if (!p.value) return "";
         const item = itemRepository.getById(p.value);
-        return item ? `${item.code} - ${item.name}` : p.value;
+        return item?.name ?? p.value;
+      },
+    },
+    {
+      headerName: "Brand",
+      width: 130,
+      minWidth: 120,
+      maxWidth: 140,
+      editable: false,
+      valueGetter: (p) => {
+        const itemId = p.data?.itemId;
+        if (!itemId) return "";
+        const item = itemRepository.getById(itemId);
+        if (!item?.brandId) return "";
+        const brand = brandRepository.getById(item.brandId);
+        return brand?.code ?? "";
+      },
+    },
+    {
+      headerName: "Category",
+      width: 130,
+      minWidth: 120,
+      maxWidth: 140,
+      editable: false,
+      valueGetter: (p) => {
+        const itemId = p.data?.itemId;
+        if (!itemId) return "";
+        const item = itemRepository.getById(itemId);
+        if (!item?.categoryId) return "";
+        const category = categoryRepository.getById(item.categoryId);
+        return category?.code ?? "";
       },
     },
     {
       field: "qty",
       headerName: "Qty",
       width: 80,
+      minWidth: 70,
+      maxWidth: 90,
       editable: false,
     },
     {
       field: "unitPrice",
       headerName: "Unit price",
-      width: 100,
+      width: 110,
+      minWidth: 100,
+      maxWidth: 120,
       editable: false,
       valueFormatter: (p) =>
         typeof p.value === "number" && !Number.isNaN(p.value)
@@ -107,7 +138,9 @@ function soLinesDisplayColumnDefs(
     },
     {
       headerName: "Line amount",
-      width: 110,
+      width: 120,
+      minWidth: 110,
+      maxWidth: 130,
       editable: false,
       valueGetter: (p) => {
         const qty = p.data?.qty;
@@ -117,40 +150,69 @@ function soLinesDisplayColumnDefs(
         return Number.isNaN(amount) ? "0.00" : amount.toFixed(2);
       },
     },
-    {
-      headerName: "",
-      width: 90,
-      sortable: false,
-      cellClass: "doc-lines__cell-remove",
-      cellRenderer: (params: { data?: LineFormRow }) => {
-        if (!params.data) return null;
-        const lineId = params.data._lineId;
-        return (
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon"
-            className="h-8 w-8 shrink-0 doc-lines__row-remove-btn text-foreground/80 hover:text-foreground"
-            disabled={linesLength <= 1}
-            onClick={() => onRemove(lineId)}
-            aria-label="Remove line"
-          >
-            <X className="h-4 w-4" aria-hidden />
-          </Button>
-        );
-      },
-    },
   ];
 }
 
 function soLinesReadOnlyColumnDefs(): ColDef<LineWithItem>[] {
   return [
-    { field: "itemName", headerName: "Item", flex: 1, minWidth: 120 },
-    { field: "qty", headerName: "Qty", width: 80 },
+    {
+      headerName: "№",
+      valueGetter: (params) =>
+        params.node?.rowIndex != null ? String(params.node.rowIndex + 1) : "",
+      width: 52,
+      minWidth: 48,
+      maxWidth: 56,
+      sortable: false,
+      resizable: true,
+    },
+    {
+      headerName: "Item Code",
+      width: 130,
+      minWidth: 120,
+      maxWidth: 140,
+      valueGetter: (p) => {
+        const itemId = p.data?.itemId;
+        if (!itemId) return "";
+        const item = itemRepository.getById(itemId);
+        return item?.code ?? itemId;
+      },
+    },
+    { field: "itemName", headerName: "Item Name", flex: 1, minWidth: 180 },
+    {
+      headerName: "Brand",
+      width: 130,
+      minWidth: 120,
+      maxWidth: 140,
+      valueGetter: (p) => {
+        const itemId = p.data?.itemId;
+        if (!itemId) return "";
+        const item = itemRepository.getById(itemId);
+        if (!item?.brandId) return "";
+        const brand = brandRepository.getById(item.brandId);
+        return brand?.code ?? "";
+      },
+    },
+    {
+      headerName: "Category",
+      width: 130,
+      minWidth: 120,
+      maxWidth: 140,
+      valueGetter: (p) => {
+        const itemId = p.data?.itemId;
+        if (!itemId) return "";
+        const item = itemRepository.getById(itemId);
+        if (!item?.categoryId) return "";
+        const category = categoryRepository.getById(item.categoryId);
+        return category?.code ?? "";
+      },
+    },
+    { field: "qty", headerName: "Qty", width: 80, minWidth: 70, maxWidth: 90 },
     {
       field: "unitPrice",
       headerName: "Unit price",
-      width: 100,
+      width: 110,
+      minWidth: 100,
+      maxWidth: 120,
       valueFormatter: (p) =>
         typeof p.value === "number" && !Number.isNaN(p.value)
           ? p.value.toFixed(2)
@@ -158,7 +220,9 @@ function soLinesReadOnlyColumnDefs(): ColDef<LineWithItem>[] {
     },
     {
       headerName: "Line amount",
-      width: 110,
+      width: 120,
+      minWidth: 110,
+      maxWidth: 130,
       valueGetter: (p) => {
         const qty = p.data?.qty;
         const unitPrice = p.data?.unitPrice;
@@ -534,8 +598,8 @@ export function SalesOrderPage() {
   );
 
   const linesColumnDefs = useMemo(
-    () => soLinesDisplayColumnDefs(form.lines.length, removeLineByLineId, health.lineHealth),
-    [form.lines.length, removeLineByLineId, health.lineHealth],
+    () => soLinesDisplayColumnDefs(),
+    [],
   );
 
   if (!id) {
@@ -788,6 +852,21 @@ export function SalesOrderPage() {
                             variant="outline"
                             size="sm"
                             className="h-8"
+                            disabled={form.lines.length <= 1}
+                            onClick={() => {
+                              if (editingLineId !== null) {
+                                removeLineByLineId(editingLineId);
+                                cancelEdit();
+                              }
+                            }}
+                          >
+                            Remove
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            className="h-8"
                             onClick={cancelEdit}
                           >
                             Cancel edit
@@ -910,6 +989,8 @@ export function SalesOrderPage() {
                       columnDefs={soLinesReadOnlyColumnDefs()}
                       defaultColDef={agGridDefaultColDef}
                       getRowId={(p) => p.data.id}
+                      rowSelection={{ mode: "multiRow", checkboxes: true, headerCheckbox: true, enableClickSelection: true }}
+                      selectionColumnDef={agGridSelectionColumnDef}
                     />
                   </AgGridContainer>
                 </div>

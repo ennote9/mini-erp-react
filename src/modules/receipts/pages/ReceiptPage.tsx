@@ -7,6 +7,8 @@ import { post, cancelDocument } from "../service";
 import { purchaseOrderRepository } from "../../purchase-orders/repository";
 import { warehouseRepository } from "../../warehouses/repository";
 import { itemRepository } from "../../items/repository";
+import { brandRepository } from "../../brands/repository";
+import { categoryRepository } from "../../categories/repository";
 import type { ReceiptLine } from "../model";
 import { DocumentPageLayout } from "../../../shared/ui/object/DocumentPageLayout";
 import { BackButton } from "../../../shared/ui/list/BackButton";
@@ -16,13 +18,63 @@ import { actionIssue, type Issue } from "../../../shared/issues";
 import { AgGridContainer } from "../../../shared/ui/ag-grid/AgGridContainer";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { agGridDefaultColDef } from "../../../shared/ui/ag-grid/agGridDefaults";
+import { agGridDefaultColDef, agGridSelectionColumnDef } from "../../../shared/ui/ag-grid/agGridDefaults";
 
 type LineWithItem = ReceiptLine & { itemName: string; uom: string };
 
 function receiptLinesColumnDefs(): ColDef<LineWithItem>[] {
   return [
-    { field: "itemName", headerName: "Item", flex: 1, minWidth: 120 },
+    {
+      headerName: "№",
+      valueGetter: (params) =>
+        params.node?.rowIndex != null ? String(params.node.rowIndex + 1) : "",
+      width: 52,
+      minWidth: 48,
+      maxWidth: 56,
+      sortable: false,
+      resizable: true,
+    },
+    {
+      headerName: "Item Code",
+      width: 130,
+      minWidth: 120,
+      maxWidth: 140,
+      valueGetter: (p) => {
+        const itemId = p.data?.itemId;
+        if (!itemId) return "";
+        const item = itemRepository.getById(itemId);
+        return item?.code ?? itemId;
+      },
+    },
+    { field: "itemName", headerName: "Item Name", flex: 1, minWidth: 180 },
+    {
+      headerName: "Brand",
+      width: 130,
+      minWidth: 120,
+      maxWidth: 140,
+      valueGetter: (p) => {
+        const itemId = p.data?.itemId;
+        if (!itemId) return "";
+        const item = itemRepository.getById(itemId);
+        if (!item?.brandId) return "";
+        const brand = brandRepository.getById(item.brandId);
+        return brand?.code ?? "";
+      },
+    },
+    {
+      headerName: "Category",
+      width: 130,
+      minWidth: 120,
+      maxWidth: 140,
+      valueGetter: (p) => {
+        const itemId = p.data?.itemId;
+        if (!itemId) return "";
+        const item = itemRepository.getById(itemId);
+        if (!item?.categoryId) return "";
+        const category = categoryRepository.getById(item.categoryId);
+        return category?.code ?? "";
+      },
+    },
     { field: "qty", headerName: "Qty", width: 100 },
     { field: "uom", headerName: "UOM", width: 80 },
   ];
@@ -170,6 +222,8 @@ export function ReceiptPage() {
                 columnDefs={receiptLinesColumnDefs()}
                 defaultColDef={agGridDefaultColDef}
                 getRowId={(p) => p.data.id}
+                rowSelection={{ mode: "multiRow", checkboxes: true, headerCheckbox: true, enableClickSelection: true }}
+                selectionColumnDef={agGridSelectionColumnDef}
               />
             </AgGridContainer>
           </div>

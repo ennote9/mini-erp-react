@@ -87,6 +87,11 @@ export function actionIssue(message: string): Issue {
   return { severity: "error", scope: "action", message };
 }
 
+/** Create an action-scope warning issue (e.g. post validation warning). */
+export function actionWarning(message: string): Issue {
+  return { severity: "warning", scope: "action", message };
+}
+
 /** Create a field-scope issue (e.g. required header field or form field). */
 export function fieldIssue(
   severity: IssueSeverity,

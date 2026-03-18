@@ -985,6 +985,23 @@ body,
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
   z-index: 50;
 }
+
+/* Doc page: expand issues panel to the right edge of the content (align with AG Grid table) */
+.doc-page .doc-header__right {
+  position: relative;
+  align-items: flex-end;
+}
+.doc-page .doc-health-strip-wrap {
+  position: static;
+}
+.doc-page .doc-health-strip-panel {
+  left: 0;
+  right: 0;
+  margin-top: 0.5rem;
+  min-width: 12rem;
+  max-width: none;
+  width: auto;
+}
 .doc-health-strip-panel__section {
   margin-bottom: 0.375rem;
 }
@@ -1007,7 +1024,7 @@ body,
 .doc-health-strip-panel__item {
   font-size: 0.7rem;
   line-height: 1.35;
-  padding: 0.2rem 0;
+  padding: 0.05rem 0;
   color: #d4d4d4;
 }
 .doc-health-strip-panel__item--error {
@@ -1194,19 +1211,6 @@ body,
 }
 .doc-page .ag-theme-quartz-dark .ag-row.ag-row-selected.doc-lines__row--editing:hover .ag-cell {
   background-color: #15151a !important;
-}
-
-/* Lines grid: unify Remove button height with entry/slot buttons */
-.doc-page .doc-lines__grid .ag-theme-quartz-dark .doc-lines__cell-remove {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.doc-page .doc-lines__grid .ag-theme-quartz-dark .doc-lines__cell-remove .doc-lines__row-remove-btn,
-.doc-page .doc-lines__grid .ag-theme-quartz-dark .doc-lines__cell-remove button {
-  height: 2rem !important;
-  min-height: 2rem !important;
 }
 
 /* Doc-page grid: checkboxes — white when checked, no blue outline/ring */

@@ -7,22 +7,74 @@ import { post, cancelDocument } from "../service";
 import { salesOrderRepository } from "../../sales-orders/repository";
 import { warehouseRepository } from "../../warehouses/repository";
 import { itemRepository } from "../../items/repository";
+import { brandRepository } from "../../brands/repository";
+import { categoryRepository } from "../../categories/repository";
 import type { ShipmentLine } from "../model";
 import { DocumentPageLayout } from "../../../shared/ui/object/DocumentPageLayout";
 import { BackButton } from "../../../shared/ui/list/BackButton";
 import { StatusBadge } from "../../../shared/ui/feedback/StatusBadge";
-import { IssueBlock } from "../../../shared/ui/feedback/IssueBlock";
-import { actionIssue, type Issue } from "../../../shared/issues";
+import { DocumentIssueStrip } from "../../../shared/ui/feedback/DocumentIssueStrip";
+import { actionIssue, getErrorAndWarningMessages, type Issue } from "../../../shared/issues";
 import { AgGridContainer } from "../../../shared/ui/ag-grid/AgGridContainer";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { agGridDefaultColDef } from "../../../shared/ui/ag-grid/agGridDefaults";
+import { agGridDefaultColDef, agGridSelectionColumnDef } from "../../../shared/ui/ag-grid/agGridDefaults";
 
 type LineWithItem = ShipmentLine & { itemName: string; uom: string };
 
 function shipmentLinesColumnDefs(): ColDef<LineWithItem>[] {
   return [
-    { field: "itemName", headerName: "Item", flex: 1, minWidth: 120 },
+    {
+      headerName: "№",
+      valueGetter: (params) =>
+        params.node?.rowIndex != null ? String(params.node.rowIndex + 1) : "",
+      width: 52,
+      minWidth: 48,
+      maxWidth: 56,
+      sortable: false,
+      resizable: true,
+    },
+    {
+      headerName: "Item Code",
+      width: 130,
+      minWidth: 120,
+      maxWidth: 140,
+      valueGetter: (p) => {
+        const itemId = p.data?.itemId;
+        if (!itemId) return "";
+        const item = itemRepository.getById(itemId);
+        return item?.code ?? itemId;
+      },
+    },
+    { field: "itemName", headerName: "Item Name", flex: 1, minWidth: 180 },
+    {
+      headerName: "Brand",
+      width: 130,
+      minWidth: 120,
+      maxWidth: 140,
+      valueGetter: (p) => {
+        const itemId = p.data?.itemId;
+        if (!itemId) return "";
+        const item = itemRepository.getById(itemId);
+        if (!item?.brandId) return "";
+        const brand = brandRepository.getById(item.brandId);
+        return brand?.code ?? "";
+      },
+    },
+    {
+      headerName: "Category",
+      width: 130,
+      minWidth: 120,
+      maxWidth: 140,
+      valueGetter: (p) => {
+        const itemId = p.data?.itemId;
+        if (!itemId) return "";
+        const item = itemRepository.getById(itemId);
+        if (!item?.categoryId) return "";
+        const category = categoryRepository.getById(item.categoryId);
+        return category?.code ?? "";
+      },
+    },
     { field: "qty", headerName: "Qty", width: 100 },
     { field: "uom", headerName: "UOM", width: 80 },
   ];
@@ -73,7 +125,7 @@ export function ShipmentPage() {
     setActionIssues([]);
     const result = post(id);
     if (result.success) setRefresh((r) => r + 1);
-    else setActionIssues([actionIssue(result.error)]);
+    else setActionIssues(result.issues);
   };
   const handleCancelDocument = () => {
     if (!id) return;
@@ -97,6 +149,10 @@ export function ShipmentPage() {
     { label: doc.number },
   ];
 
+  const { errors: actionErrors, warnings: actionWarnings } =
+    getErrorAndWarningMessages(actionIssues);
+  const hasActionIssues = actionErrors.length > 0 || actionWarnings.length > 0;
+
   return (
     <DocumentPageLayout
       breadcrumbItems={breadcrumbItems}
@@ -107,26 +163,30 @@ export function ShipmentPage() {
             <h2 className="doc-header__title">Shipment {doc.number}</h2>
             <StatusBadge status={doc.status} />
           </div>
-          <div className="doc-header__actions">
-            <Button type="button" disabled>
-              Save
-            </Button>
-            {isDraft && (
-              <Button type="button" onClick={handlePost}>
-                Post
-              </Button>
+          <div className="doc-header__right">
+            {hasActionIssues && (
+              <DocumentIssueStrip errors={actionErrors} warnings={actionWarnings} />
             )}
-            {isDraft && (
-              <Button type="button" variant="outline" onClick={handleCancelDocument}>
-                Cancel document
+            <div className="doc-header__actions">
+              <Button type="button" disabled>
+                Save
               </Button>
-            )}
+              {isDraft && (
+                <Button type="button" onClick={handlePost}>
+                  Post
+                </Button>
+              )}
+              {isDraft && (
+                <Button type="button" variant="outline" onClick={handleCancelDocument}>
+                  Cancel document
+                </Button>
+              )}
+            </div>
           </div>
         </div>
       }
       summary={null}
     >
-      <IssueBlock issues={actionIssues} />
       <Card className="max-w-2xl border-0 shadow-none">
         <CardHeader className="p-4 pb-1">
           <CardTitle className="text-[0.9rem] font-semibold">Details</CardTitle>
@@ -170,6 +230,8 @@ export function ShipmentPage() {
                 columnDefs={shipmentLinesColumnDefs()}
                 defaultColDef={agGridDefaultColDef}
                 getRowId={(p) => p.data.id}
+                rowSelection={{ mode: "multiRow", checkboxes: true, headerCheckbox: true, enableClickSelection: true }}
+                selectionColumnDef={agGridSelectionColumnDef}
               />
             </AgGridContainer>
           </div>
