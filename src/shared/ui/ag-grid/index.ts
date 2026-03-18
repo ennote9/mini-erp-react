@@ -2,5 +2,5 @@ export { AgGridContainer } from "./AgGridContainer";
 export {
   agGridDefaultColDef,
   agGridRowNumberColDef,
-  agGridCheckboxSelectionColDef,
+  agGridSelectionColumnDef,
 } from "./agGridDefaults";

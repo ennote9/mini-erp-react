@@ -170,7 +170,6 @@ export function ShipmentPage() {
                 columnDefs={shipmentLinesColumnDefs()}
                 defaultColDef={agGridDefaultColDef}
                 getRowId={(p) => p.data.id}
-                suppressRowClickSelection
               />
             </AgGridContainer>
           </div>

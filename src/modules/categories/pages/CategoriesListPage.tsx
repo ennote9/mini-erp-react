@@ -10,7 +10,7 @@ import {
   AgGridContainer,
   agGridDefaultColDef,
   agGridRowNumberColDef,
-  agGridCheckboxSelectionColDef,
+  agGridSelectionColumnDef,
 } from "../../../shared/ui/ag-grid";
 import { BackButton } from "../../../shared/ui/list/BackButton";
 import { ListPageSearch } from "../../../shared/ui/list/ListPageSearch";
@@ -64,7 +64,6 @@ export function CategoriesListPage() {
   const columnDefs = useMemo<ColDef<Category>[]>(
     () => [
       agGridRowNumberColDef,
-      agGridCheckboxSelectionColDef,
       {
         field: "code",
         headerName: "Code",
@@ -131,7 +130,7 @@ export function CategoriesListPage() {
             className="rounded-md bg-white text-black hover:bg-gray-200"
             onClick={() => navigate("/categories/new")}
           >
-            Create
+            <span className="create-btn__plus">+</span> Create
           </Button>
         </>
       }
@@ -144,7 +143,8 @@ export function CategoriesListPage() {
             rowData={filteredRows}
             columnDefs={columnDefs}
             defaultColDef={agGridDefaultColDef}
-            rowSelection="multiple"
+            rowSelection={{ mode: "multiRow", checkboxes: true, headerCheckbox: true, enableClickSelection: true }}
+            selectionColumnDef={agGridSelectionColumnDef}
             getRowId={(params) => params.data.id}
             onRowClicked={(e) => e.data && navigate(`/categories/${e.data.id}`)}
           />

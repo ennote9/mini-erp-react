@@ -62,7 +62,7 @@ export const ItemSelectCellEditor = forwardRef<
       <option value="">Select item</option>
       {items.map((i) => (
         <option key={i.id} value={i.id}>
-          {i.name} ({i.code})
+          {i.code} - {i.name}
         </option>
       ))}
     </select>

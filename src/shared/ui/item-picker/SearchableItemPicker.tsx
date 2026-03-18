@@ -7,7 +7,7 @@ import { cn } from "@/lib/utils";
 const MAX_OPTIONS = 50;
 
 function getItemLabel(item: Item): string {
-  return `${item.name} (${item.code})`;
+  return `${item.code} - ${item.name}`;
 }
 
 export type SearchableItemPickerRef = { focus: () => void };

@@ -18,7 +18,7 @@ import {
   AgGridContainer,
   agGridDefaultColDef,
   agGridRowNumberColDef,
-  agGridCheckboxSelectionColDef,
+  agGridSelectionColumnDef,
 } from "../../../shared/ui/ag-grid";
 import { BackButton } from "../../../shared/ui/list/BackButton";
 import { ListPageSearch } from "../../../shared/ui/list/ListPageSearch";
@@ -152,7 +152,6 @@ export function StockMovementsListPage() {
   const columnDefs = useMemo<ColDef<RowData>[]>(
     () => [
       agGridRowNumberColDef,
-      agGridCheckboxSelectionColDef,
       {
         field: "datetime",
         headerName: "Date/Time",
@@ -226,7 +225,8 @@ export function StockMovementsListPage() {
             rowData={filteredRows}
             columnDefs={columnDefs}
             defaultColDef={agGridDefaultColDef}
-            rowSelection="multiple"
+            rowSelection={{ mode: "multiRow", checkboxes: true, headerCheckbox: true, enableClickSelection: true }}
+            selectionColumnDef={agGridSelectionColumnDef}
             getRowId={(params) => params.data.id}
           />
         </AgGridContainer>

@@ -18,7 +18,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
-import { agGridDefaultColDef } from "../../../shared/ui/ag-grid/agGridDefaults";
+import { agGridDefaultColDef, agGridSelectionColumnDef } from "../../../shared/ui/ag-grid/agGridDefaults";
 import { todayYYYYMMDD, normalizeDateForPO } from "../dateUtils";
 import { getPurchaseOrderHealth } from "../../../shared/documentHealth";
 import { getErrorAndWarningMessages, actionIssue, combineIssues, hasErrors, issueListContainsMessage, type Issue } from "../../../shared/issues";
@@ -77,15 +77,6 @@ function poLinesDisplayColumnDefs(
       },
     },
     {
-      checkboxSelection: true,
-      headerCheckboxSelection: true,
-      width: 44,
-      minWidth: 44,
-      maxWidth: 44,
-      sortable: false,
-      resizable: false,
-    },
-    {
       field: "itemId",
       headerName: "Item",
       flex: 1,
@@ -94,7 +85,7 @@ function poLinesDisplayColumnDefs(
       valueFormatter: (p) => {
         if (!p.value) return "";
         const item = itemRepository.getById(p.value);
-        return item ? `${item.name} (${item.code})` : p.value;
+        return item ? `${item.code} - ${item.name}` : p.value;
       },
     },
     {
@@ -603,7 +594,7 @@ export function PurchaseOrderPage() {
               )}
               {!isNew && isConfirmed && (
                 <Button type="button" onClick={handleCreateReceipt}>
-                  Create Receipt
+                  <span className="create-btn__plus">+</span> Create Receipt
                 </Button>
               )}
               {!isNew && (isDraft || isConfirmed) && (
@@ -629,14 +620,14 @@ export function PurchaseOrderPage() {
               <CardTitle className="text-[0.9rem] font-semibold">Details</CardTitle>
             </CardHeader>
             <CardContent className="p-2 pt-1">
-              <div className="grid grid-cols-2 gap-x-3 gap-y-1">
-                <div className="flex flex-col gap-0.5">
+              <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)] gap-x-3 gap-y-1">
+                <div className="flex min-w-0 w-full flex-col gap-0.5">
                   <Label htmlFor="po-number" className="text-sm">Number</Label>
                   <div id="po-number" className="flex h-8 items-center text-sm text-muted-foreground">
                     {displayNumber}
                   </div>
                 </div>
-                <div className="flex flex-col gap-0.5">
+                <div className="flex min-w-0 w-full flex-col gap-0.5">
                   <Label htmlFor="po-date" className="text-sm">
                     Date <span className="text-destructive">*</span>
                   </Label>
@@ -644,10 +635,10 @@ export function PurchaseOrderPage() {
                     id="po-date"
                     value={form.date}
                     onChange={(v) => setForm((f) => ({ ...f, date: v }))}
-                    className="h-8 [&_input]:text-sm"
+                    className="h-8 w-full min-w-0 [&_input]:text-sm"
                   />
                 </div>
-                <div className="flex flex-col gap-0.5">
+                <div className="flex min-w-0 w-full flex-col gap-0.5">
                   <Label htmlFor="po-supplier" className="text-sm">
                     Supplier <span className="text-destructive">*</span>
                   </Label>
@@ -670,7 +661,7 @@ export function PurchaseOrderPage() {
                     ))}
                   </select>
                 </div>
-                <div className="flex flex-col gap-0.5">
+                <div className="flex min-w-0 w-full flex-col gap-0.5">
                   <Label htmlFor="po-warehouse" className="text-sm">
                     Warehouse <span className="text-destructive">*</span>
                   </Label>
@@ -728,6 +719,7 @@ export function PurchaseOrderPage() {
                         onChange={handleLineEntryItemChange}
                         items={itemRepository.list()}
                         placeholder="Search by code, barcode or name…"
+                        className="w-[240px]"
                       />
                     </div>
                     <div className="flex flex-col gap-0.5">
@@ -749,7 +741,7 @@ export function PurchaseOrderPage() {
                             addLineFromEntry();
                           }
                         }}
-                        className="h-8 text-sm"
+                        className="h-8 w-[80px] text-sm text-right align-middle [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                       />
                     </div>
                     <div className="flex flex-col gap-0.5">
@@ -763,7 +755,7 @@ export function PurchaseOrderPage() {
                         onChange={(e) =>
                           setLineEntryUnitPrice(Number(e.target.value) >= 0 ? Number(e.target.value) : 0)
                         }
-                        className="h-8 text-sm"
+                        className="h-8 w-[80px] text-sm text-right align-middle [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                       />
                     </div>
                     <div className="flex gap-1.5 flex-shrink-0 items-center">
@@ -850,9 +842,9 @@ export function PurchaseOrderPage() {
                   defaultColDef={agGridDefaultColDef}
                   getRowId={(p) => String(p.data._lineId)}
                   getRowClass={getRowClass}
-                  rowSelection={isEditable ? "multiple" : undefined}
+                  rowSelection={isEditable ? { mode: "multiRow", checkboxes: true, headerCheckbox: true, enableClickSelection: true } : undefined}
+                  selectionColumnDef={isEditable ? agGridSelectionColumnDef : undefined}
                   onSelectionChanged={isEditable ? onLinesSelectionChanged : undefined}
-                  suppressRowClickSelection={false}
                 />
               </AgGridContainer>
             </div>
@@ -910,7 +902,6 @@ export function PurchaseOrderPage() {
                       columnDefs={poLinesReadOnlyColumnDefs()}
                       defaultColDef={agGridDefaultColDef}
                       getRowId={(p) => p.data.id}
-                      suppressRowClickSelection
                     />
                   </AgGridContainer>
                 </div>

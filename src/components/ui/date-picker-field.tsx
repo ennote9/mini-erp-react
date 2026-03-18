@@ -115,7 +115,7 @@ export function DatePickerField({
   return (
     <div
       className={cn(
-        "flex h-10 w-full rounded-md border border-input bg-background overflow-hidden focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2 focus-within:ring-offset-background",
+        "flex h-10 w-full min-w-0 max-w-full rounded-md border border-input bg-background overflow-hidden focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2 focus-within:ring-offset-background",
         className
       )}
     >

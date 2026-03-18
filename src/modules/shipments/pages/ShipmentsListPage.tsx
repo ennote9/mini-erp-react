@@ -14,7 +14,7 @@ import {
   AgGridContainer,
   agGridDefaultColDef,
   agGridRowNumberColDef,
-  agGridCheckboxSelectionColDef,
+  agGridSelectionColumnDef,
 } from "../../../shared/ui/ag-grid";
 import { BackButton } from "../../../shared/ui/list/BackButton";
 import { ListPageSearch } from "../../../shared/ui/list/ListPageSearch";
@@ -95,7 +95,6 @@ export function ShipmentsListPage() {
   const columnDefs = useMemo<ColDef<RowData>[]>(
     () => [
       agGridRowNumberColDef,
-      agGridCheckboxSelectionColDef,
       {
         field: "number",
         headerName: "Number",
@@ -165,7 +164,8 @@ export function ShipmentsListPage() {
             rowData={filteredRows}
             columnDefs={columnDefs}
             defaultColDef={agGridDefaultColDef}
-            rowSelection="multiple"
+            rowSelection={{ mode: "multiRow", checkboxes: true, headerCheckbox: true, enableClickSelection: true }}
+            selectionColumnDef={agGridSelectionColumnDef}
             getRowId={(params) => params.data.id}
             onRowClicked={(e) => e.data && navigate(`/shipments/${e.data.id}`)}
           />

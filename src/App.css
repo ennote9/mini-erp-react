@@ -180,6 +180,13 @@ body,
   cursor: not-allowed;
 }
 
+/* + Create buttons: larger plus sign */
+.create-btn__plus {
+  font-size: 1.35em;
+  font-weight: 700;
+  line-height: 1;
+}
+
 /* Controls zone: search and filters — one height, one radius, aligned as a single block */
 .list-page__controls {
   display: flex;

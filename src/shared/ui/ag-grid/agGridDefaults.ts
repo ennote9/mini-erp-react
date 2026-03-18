@@ -23,10 +23,8 @@ export const agGridRowNumberColDef: ColDef = {
   resizable: false,
 };
 
-/** Column with row selection checkbox. Always second. */
-export const agGridCheckboxSelectionColDef: ColDef = {
-  checkboxSelection: true,
-  headerCheckboxSelection: true,
+/** Selection column (checkboxes) - use as selectionColumnDef when rowSelection is set. AG Grid 32.2+ */
+export const agGridSelectionColumnDef: ColDef = {
   width: 52,
   minWidth: 52,
   maxWidth: 52,
