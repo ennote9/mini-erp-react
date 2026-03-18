@@ -144,7 +144,7 @@ export function DatePickerField({
           </Button>
         </PopoverTrigger>
         <PopoverContent
-          className="w-auto p-0 min-w-[240px] rounded-lg border border-border bg-popover shadow-lg overflow-hidden"
+          className="w-[176px] p-0 rounded-lg border border-border bg-popover shadow-lg overflow-hidden"
           align="start"
           sideOffset={2}
         >
@@ -154,7 +154,7 @@ export function DatePickerField({
             onSelect={handleSelect}
             defaultMonth={date}
           />
-          <div className="flex justify-end px-2 py-1">
+          <div className="flex justify-end py-0.5 ml-1.5 w-[168px]">
             <Button
               type="button"
               variant="ghost"

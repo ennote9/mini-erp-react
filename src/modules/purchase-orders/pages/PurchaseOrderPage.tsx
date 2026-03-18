@@ -791,9 +791,9 @@ export function PurchaseOrderPage() {
                         </>
                       )}
                     </div>
-                    <div className="doc-lines__contextual-slot min-h-9 flex items-center">
+                    <div className="doc-lines__contextual-slot min-h-9 flex items-end">
                       {duplicateChoicePending && editingLineId === null ? (
-                        <div className="flex flex-col gap-1 py-0.5">
+                        <div className="flex flex-col gap-1">
                           <span className="text-muted-foreground text-xs leading-tight">Item already exists</span>
                           <div className="flex items-center gap-1.5">
                             <Button
@@ -817,7 +817,7 @@ export function PurchaseOrderPage() {
                           </div>
                         </div>
                       ) : selectedLineIds.length >= 2 ? (
-                        <div className="flex flex-col gap-1 py-0.5">
+                        <div className="flex flex-col gap-1">
                           <span className="text-muted-foreground text-xs leading-tight">
                             {selectedLineIds.length} lines selected
                           </span>

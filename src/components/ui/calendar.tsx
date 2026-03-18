@@ -41,7 +41,7 @@ function MonthWithHeaderBar(props: MonthProps) {
     <div className={cn("flex flex-col gap-0", className)} {...rest}>
       {headerChildren.length > 0 && (
         <div
-          className="rdp-calendar-header flex items-center gap-1 h-8 py-0 w-full rounded-t-md"
+          className="rdp-calendar-header flex items-center justify-between gap-0 h-6 py-0 w-[168px] rounded-t-md"
           role="presentation"
         >
           <div className="shrink-0">{prev}</div>
@@ -144,33 +144,33 @@ function Calendar({
       endMonth={endMonthProp ?? endMonth}
       navLayout="around"
       className={cn(
-        "rdp-root px-2 py-1.5 text-[15px]",
-        "[--rdp-day-height:28px][--rdp-day-width:28px]",
-        "[--rdp-day_button-height:26px][--rdp-day_button-width:26px]",
-        "[--rdp-nav_button-height:2rem][--rdp-nav_button-width:2rem]",
-        "[--rdp-nav-height:2rem]",
+        "rdp-root pl-1.5 pr-0 py-0.5 text-[13px]",
+        "[--rdp-day-height:24px][--rdp-day-width:24px]",
+        "[--rdp-day_button-height:20px][--rdp-day_button-width:20px]",
+        "[--rdp-nav_button-height:1.5rem][--rdp-nav_button-width:1.5rem]",
+        "[--rdp-nav-height:1.5rem]",
         "[--rdp-today-color:var(--destructive)]",
         className
       )}
       classNames={{
         months: "flex flex-col gap-0",
         month: "flex flex-col gap-0",
-        month_caption: "flex justify-center items-center relative h-8 py-0",
-        dropdown_root: "flex items-center gap-1.5 h-8",
-        dropdown: "h-8 min-h-8 rounded-sm border-0 bg-transparent px-1.5 py-0 text-xs leading-none min-w-0 flex items-center text-foreground focus:ring-0 focus:ring-offset-0",
-        nav: "flex items-center gap-0.5",
-        button_previous: "h-8 w-8 shrink-0 rounded-sm border-0 bg-transparent text-foreground flex items-center justify-center hover:bg-white/10 focus:ring-0 focus:ring-offset-0",
-        button_next: "h-8 w-8 shrink-0 rounded-sm border-0 bg-transparent text-foreground flex items-center justify-center hover:bg-white/10 focus:ring-0 focus:ring-offset-0",
-        month_grid: "w-full border-collapse",
+        month_caption: "flex justify-center items-center relative h-6 py-0",
+        dropdown_root: "flex items-center gap-1 h-6",
+        dropdown: "h-6 min-h-6 rounded-sm border-0 bg-transparent px-1 py-0 text-xs leading-none min-w-0 flex items-center text-foreground focus:ring-0 focus:ring-offset-0",
+        nav: "flex items-center gap-0",
+        button_previous: "h-6 w-6 shrink-0 rounded-sm border-0 bg-transparent text-foreground flex items-center justify-center hover:bg-white/10 focus:ring-0 focus:ring-offset-0",
+        button_next: "h-6 w-6 shrink-0 rounded-sm border-0 bg-transparent text-foreground flex items-center justify-center hover:bg-white/10 focus:ring-0 focus:ring-offset-0",
+        month_grid: "w-[168px] border-collapse",
         weekdays: "flex gap-0",
         weekday:
-          "text-muted-foreground rounded w-[28px] min-w-[28px] font-normal text-[0.75em] leading-none text-center py-1",
+          "text-muted-foreground rounded w-[24px] min-w-[24px] font-normal text-[0.65em] leading-none text-center py-0",
         week: "flex w-full gap-0 mt-0 mb-0",
-        day: "relative p-0 text-center leading-none w-[28px] min-w-[28px] focus-within:relative [&:has([data-selected])]:bg-zinc-600 [&:has([data-selected].day-outside)]:bg-zinc-600/70 [&:has([data-selected].day-range-end)]:rounded-r [&:has(.today)]:!bg-transparent",
+        day: "relative p-0 text-center leading-none w-[24px] min-w-[24px] border-2 border-transparent focus-within:relative [&:has([data-selected])]:bg-zinc-600 [&:has([data-selected].day-outside)]:bg-zinc-600/70 [&:has([data-selected].day-range-end)]:rounded-r [&:has(.today)]:!bg-transparent",
         day_button: cn(
-          "min-w-[26px] p-0 font-normal aria-selected:opacity-100 rounded-md leading-none border-2 border-transparent aria-selected:border-white hover:bg-accent/40",
+          "p-0 font-normal aria-selected:opacity-100 rounded-sm leading-none border-2 border-transparent aria-selected:border-white hover:bg-accent/40",
           buttonVariants({ variant: "ghost", size: "icon" }),
-          "h-[26px] w-[39px] min-w-[39px]"
+          "h-[20px] w-[20px] min-w-[20px]"
         ),
         range_start: "day-range-start rounded-s-md",
         range_end: "day-range-end rounded-e-md",
@@ -188,6 +188,7 @@ function Calendar({
       formatters={{
         formatWeekdayName: (weekday, _options, dateLib) =>
           dateLib ? dateLib.format(weekday, "EEE").slice(0, 2) : "",
+        formatDay: (date) => String(date.getDate()).padStart(2, "0"),
       }}
       components={{
         Month: MonthWithHeaderBar,
