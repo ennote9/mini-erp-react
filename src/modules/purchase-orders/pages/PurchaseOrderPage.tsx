@@ -27,13 +27,16 @@ import { DocumentIssueStrip } from "../../../shared/ui/feedback/DocumentIssueStr
 import { SearchableItemPicker, type SearchableItemPickerRef } from "../../../shared/ui/item-picker/SearchableItemPicker";
 import { SelectField } from "@/components/ui/select-field";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { ChevronDown } from "lucide-react";
+import { ChevronDown, FileSpreadsheet } from "lucide-react";
 import {
-  exportLinesToXlsx,
-  exportDocumentToXlsx,
+  buildLinesXlsxBuffer,
+  buildDocumentXlsxBuffer,
   type PoExportLineRow,
   type PoDocumentSummary,
 } from "../poExport";
+import { save } from "@tauri-apps/plugin-dialog";
+import { invoke } from "@tauri-apps/api/core";
+import { openPath, revealItemInDir } from "@tauri-apps/plugin-opener";
 
 type LineWithItem = PurchaseOrderLine & { itemName: string };
 
@@ -318,6 +321,7 @@ export function PurchaseOrderPage() {
   const [actionIssues, setActionIssues] = useState<Issue[]>([]);
   const [selectedLineIds, setSelectedLineIds] = useState<number[]>([]);
   const [exportOpen, setExportOpen] = useState(false);
+  const [exportSuccess, setExportSuccess] = useState<{ path: string; filename: string } | null>(null);
   const linesGridRef = useRef<AgGridReact<LineFormRow> | null>(null);
   const lineEntryItemPickerRef = useRef<SearchableItemPickerRef | null>(null);
   const lineEntryQtyInputRef = useRef<HTMLInputElement | null>(null);
@@ -638,28 +642,45 @@ export function PurchaseOrderPage() {
     return buildExportRowsFromFormLines(filtered);
   }, [isEditable, selectedLineIds, form.lines]);
 
+  const runExportWithSaveAs = useCallback(
+    async (defaultFilename: string, buildBuffer: () => Promise<ArrayBuffer>) => {
+      const buffer = await buildBuffer();
+      const hasTauri = typeof (window as unknown as { __TAURI__?: unknown }).__TAURI__ !== "undefined";
+      if (hasTauri) {
+        try {
+          const path = await save({
+            defaultPath: defaultFilename,
+            filters: [{ name: "Excel", extensions: ["xlsx"] }],
+          });
+          if (path == null) return;
+          const bytes = new Uint8Array(buffer);
+          let binary = "";
+          for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
+          const contentsBase64 = btoa(binary);
+          await invoke("write_export_file", { path, contentsBase64 });
+          const filename = path.replace(/^.*[/\\]/, "") || defaultFilename;
+          setExportSuccess({ path, filename });
+        } catch (err) {
+          console.error("Export failed", err);
+        }
+      } else {
+        const blob = new Blob([buffer], {
+          type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = defaultFilename;
+        a.click();
+        URL.revokeObjectURL(url);
+      }
+    },
+    [],
+  );
+
   const handleExportMain = useCallback(() => {
-    if (isEditable && selectedLineIds.length > 0) {
-      const rows = getExportRowsSelected();
-      if (rows.length > 0) exportLinesToXlsx(rows, `${poNumberForFile}_selected-lines.xlsx`);
-    } else {
-      const rows = getExportRowsAll();
-      if (rows.length > 0) exportLinesToXlsx(rows, `${poNumberForFile}_all-lines.xlsx`);
-    }
-  }, [isEditable, selectedLineIds.length, getExportRowsSelected, getExportRowsAll, poNumberForFile]);
-
-  const handleExportSelected = useCallback(() => {
-    const rows = getExportRowsSelected();
-    if (rows.length > 0) exportLinesToXlsx(rows, `${poNumberForFile}_selected-lines.xlsx`);
-  }, [getExportRowsSelected, poNumberForFile]);
-
-  const handleExportAll = useCallback(() => {
     const rows = getExportRowsAll();
-    if (rows.length > 0) exportLinesToXlsx(rows, `${poNumberForFile}_all-lines.xlsx`);
-  }, [getExportRowsAll, poNumberForFile]);
-
-  const handleExportDocument = useCallback(() => {
-    const rows = getExportRowsAll();
+    if (rows.length === 0) return;
     const summary: PoDocumentSummary = {
       number: displayNumber,
       date: normalizeDateForPO(isEditable ? form.date : doc?.date ?? ""),
@@ -670,7 +691,9 @@ export function PurchaseOrderPage() {
       totalQty: isEditable ? totals.totalQty : readonlyTotals.totalQty,
       totalAmount: isEditable ? totals.totalAmount : readonlyTotals.totalAmount,
     };
-    exportDocumentToXlsx(summary, rows, `${poNumberForFile}_document.xlsx`);
+    runExportWithSaveAs(`${poNumberForFile}_document.xlsx`, () =>
+      buildDocumentXlsxBuffer(summary, rows),
+    );
   }, [
     getExportRowsAll,
     displayNumber,
@@ -687,7 +710,22 @@ export function PurchaseOrderPage() {
     readonlyTotals.totalQty,
     readonlyTotals.totalAmount,
     poNumberForFile,
+    runExportWithSaveAs,
   ]);
+
+  const handleExportSelected = useCallback(() => {
+    const rows = getExportRowsSelected();
+    if (rows.length === 0) return;
+    runExportWithSaveAs(`${poNumberForFile}_selected-lines.xlsx`, () =>
+      buildLinesXlsxBuffer(rows),
+    );
+  }, [getExportRowsSelected, poNumberForFile, runExportWithSaveAs]);
+
+  const handleExportAll = useCallback(() => {
+    const rows = getExportRowsAll();
+    if (rows.length === 0) return;
+    runExportWithSaveAs(`${poNumberForFile}_all-lines.xlsx`, () => buildLinesXlsxBuffer(rows));
+  }, [getExportRowsAll, poNumberForFile, runExportWithSaveAs]);
 
   const exportSelectedDisabled = !isEditable || selectedLineIds.length === 0;
 
@@ -1033,9 +1071,10 @@ export function PurchaseOrderPage() {
                     type="button"
                     variant="outline"
                     size="sm"
-                    className="h-8 rounded-r-none border-0 border-r border-input"
+                    className="h-8 rounded-r-none border-0 border-r border-input gap-1.5"
                     onClick={handleExportMain}
                   >
+                    <FileSpreadsheet className="h-4 w-4 shrink-0" />
                     Export
                   </Button>
                   <Popover open={exportOpen} onOpenChange={setExportOpen}>
@@ -1066,23 +1105,13 @@ export function PurchaseOrderPage() {
                         </button>
                         <button
                           type="button"
-className="w-full rounded-sm px-1.5 py-1 text-left text-sm hover:bg-accent"
-                        onClick={() => {
-                          setExportOpen(false);
-                          handleExportAll();
-                        }}
+                          className="w-full rounded-sm px-1.5 py-1 text-left text-sm hover:bg-accent"
+                          onClick={() => {
+                            setExportOpen(false);
+                            handleExportAll();
+                          }}
                         >
                           Export all lines
-                        </button>
-                        <button
-                          type="button"
-className="w-full rounded-sm px-1.5 py-1 text-left text-sm hover:bg-accent"
-                        onClick={() => {
-                          setExportOpen(false);
-                          handleExportDocument();
-                        }}
-                        >
-                          Export document
                         </button>
                       </div>
                     </PopoverContent>
@@ -1097,9 +1126,10 @@ className="w-full rounded-sm px-1.5 py-1 text-left text-sm hover:bg-accent"
                     type="button"
                     variant="outline"
                     size="sm"
-                    className="h-8 rounded-r-none border-0 border-r border-input"
+                    className="h-8 rounded-r-none border-0 border-r border-input gap-1.5"
                     onClick={handleExportMain}
                   >
+                    <FileSpreadsheet className="h-4 w-4 shrink-0" />
                     Export
                   </Button>
                   <Popover open={exportOpen} onOpenChange={setExportOpen}>
@@ -1130,28 +1160,61 @@ className="w-full rounded-sm px-1.5 py-1 text-left text-sm hover:bg-accent"
                         </button>
                         <button
                           type="button"
-className="w-full rounded-sm px-1.5 py-1 text-left text-sm hover:bg-accent"
-                        onClick={() => {
-                          setExportOpen(false);
-                          handleExportAll();
-                        }}
+                          className="w-full rounded-sm px-1.5 py-1 text-left text-sm hover:bg-accent"
+                          onClick={() => {
+                            setExportOpen(false);
+                            handleExportAll();
+                          }}
                         >
                           Export all lines
-                        </button>
-                        <button
-                          type="button"
-className="w-full rounded-sm px-1.5 py-1 text-left text-sm hover:bg-accent"
-                        onClick={() => {
-                          setExportOpen(false);
-                          handleExportDocument();
-                        }}
-                        >
-                          Export document
                         </button>
                       </div>
                     </PopoverContent>
                   </Popover>
                 </div>
+              </div>
+            )}
+            {exportSuccess && (
+              <div className="mb-1.5 flex items-center gap-2 rounded-md border border-input bg-muted/30 px-2 py-1.5 text-sm">
+                <span className="text-muted-foreground">Export completed:</span>
+                <span className="font-medium">{exportSuccess.filename}</span>
+                {typeof (window as unknown as { __TAURI__?: unknown }).__TAURI__ !== "undefined" && (
+                  <>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="h-7 gap-1 text-xs"
+                      onClick={() => {
+                        openPath(exportSuccess.path);
+                        setExportSuccess(null);
+                      }}
+                    >
+                      Open file
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="h-7 gap-1 text-xs"
+                      onClick={() => {
+                        revealItemInDir(exportSuccess.path);
+                        setExportSuccess(null);
+                      }}
+                    >
+                      Open folder
+                    </Button>
+                  </>
+                )}
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="ml-auto h-7 text-xs"
+                  onClick={() => setExportSuccess(null)}
+                >
+                  Dismiss
+                </Button>
               </div>
             )}
             <div className="doc-lines__grid">

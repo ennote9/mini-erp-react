@@ -32,34 +32,19 @@ function addLinesSheet(workbook: Workbook, rows: PoExportLineRow[], sheetName: s
   }
 }
 
-function triggerDownload(blob: Blob, filename: string): void {
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = filename;
-  a.click();
-  URL.revokeObjectURL(url);
-}
-
-export async function exportLinesToXlsx(rows: PoExportLineRow[], filename: string): Promise<void> {
+export async function buildLinesXlsxBuffer(rows: PoExportLineRow[]): Promise<ArrayBuffer> {
   const ExcelJS = await import("exceljs");
   const workbook = new ExcelJS.Workbook();
   addLinesSheet(workbook, rows, "Lines");
-  const buffer = await workbook.xlsx.writeBuffer();
-  const blob = new Blob([buffer], {
-    type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-  });
-  triggerDownload(blob, filename);
+  return workbook.xlsx.writeBuffer();
 }
 
-export async function exportDocumentToXlsx(
+export async function buildDocumentXlsxBuffer(
   summary: PoDocumentSummary,
   lineRows: PoExportLineRow[],
-  filename: string,
-): Promise<void> {
+): Promise<ArrayBuffer> {
   const ExcelJS = await import("exceljs");
   const workbook = new ExcelJS.Workbook();
-
   const docSheet = workbook.addWorksheet("Document");
   docSheet.addRow(["Number", summary.number]);
   docSheet.addRow(["Date", summary.date]);
@@ -69,12 +54,6 @@ export async function exportDocumentToXlsx(
   docSheet.addRow(["Comment", summary.comment]);
   docSheet.addRow(["Total Qty", summary.totalQty]);
   docSheet.addRow(["Total Amount", summary.totalAmount]);
-
   addLinesSheet(workbook, lineRows, "Lines");
-
-  const buffer = await workbook.xlsx.writeBuffer();
-  const blob = new Blob([buffer], {
-    type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-  });
-  triggerDownload(blob, filename);
+  return workbook.xlsx.writeBuffer();
 }
