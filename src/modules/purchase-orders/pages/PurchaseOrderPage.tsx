@@ -24,6 +24,8 @@ import { getPurchaseOrderHealth } from "../../../shared/documentHealth";
 import { getErrorAndWarningMessages, actionIssue, combineIssues, hasErrors, issueListContainsMessage, type Issue } from "../../../shared/issues";
 import { DocumentIssueStrip } from "../../../shared/ui/feedback/DocumentIssueStrip";
 import { SearchableItemPicker, type SearchableItemPickerRef } from "../../../shared/ui/item-picker/SearchableItemPicker";
+import { SelectField } from "@/components/ui/select-field";
+import { X } from "lucide-react";
 
 type LineWithItem = PurchaseOrderLine & { itemName: string };
 
@@ -127,14 +129,14 @@ function poLinesDisplayColumnDefs(
         return (
           <Button
             type="button"
-            variant="outline"
-            size="sm"
-            className="h-8 doc-lines__row-remove-btn"
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8 shrink-0 doc-lines__row-remove-btn text-foreground/80 hover:text-foreground"
             disabled={linesLength <= 1}
             onClick={() => onRemove(lineId)}
             aria-label="Remove line"
           >
-            Remove
+            <X className="h-4 w-4" aria-hidden />
           </Button>
         );
       },
@@ -642,47 +644,37 @@ export function PurchaseOrderPage() {
                   <Label htmlFor="po-supplier" className="text-sm">
                     Supplier <span className="text-destructive">*</span>
                   </Label>
-                  <select
+                  <SelectField
                     id="po-supplier"
                     value={form.supplierId}
-                    onChange={(e) =>
-                      setForm((f) => ({ ...f, supplierId: e.target.value }))
+                    onChange={(v) =>
+                      setForm((f) => ({ ...f, supplierId: v }))
                     }
-                    className={cn(
-                      "flex h-8 w-[280px] rounded border border-input bg-background pl-2 pr-7 py-1 text-sm text-foreground",
-                      "focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50",
-                    )}
-                  >
-                    <option value="">Select supplier</option>
-                    {activeSuppliers.map((s) => (
-                      <option key={s.id} value={s.id}>
-                        {s.code} - {s.name}
-                      </option>
-                    ))}
-                  </select>
+                    options={activeSuppliers.map((s) => ({
+                      value: s.id,
+                      label: `${s.code} - ${s.name}`,
+                    }))}
+                    placeholder="Select supplier"
+                    aria-label="Supplier"
+                  />
                 </div>
                 <div className="flex min-w-0 w-full flex-col gap-0.5">
                   <Label htmlFor="po-warehouse" className="text-sm">
                     Warehouse <span className="text-destructive">*</span>
                   </Label>
-                  <select
+                  <SelectField
                     id="po-warehouse"
                     value={form.warehouseId}
-                    onChange={(e) =>
-                      setForm((f) => ({ ...f, warehouseId: e.target.value }))
+                    onChange={(v) =>
+                      setForm((f) => ({ ...f, warehouseId: v }))
                     }
-                    className={cn(
-                      "flex h-8 w-[280px] rounded border border-input bg-background pl-2 pr-7 py-1 text-sm text-foreground",
-                      "focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50",
-                    )}
-                  >
-                    <option value="">Select warehouse</option>
-                    {activeWarehouses.map((w) => (
-                      <option key={w.id} value={w.id}>
-                        {w.code} - {w.name}
-                      </option>
-                    ))}
-                  </select>
+                    options={activeWarehouses.map((w) => ({
+                      value: w.id,
+                      label: `${w.code} - ${w.name}`,
+                    }))}
+                    placeholder="Select warehouse"
+                    aria-label="Warehouse"
+                  />
                 </div>
                 <div className="col-span-2 flex flex-col gap-0.5">
                   <Label htmlFor="po-comment" className="text-sm">Comment</Label>

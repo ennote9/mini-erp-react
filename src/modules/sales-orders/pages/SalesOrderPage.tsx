@@ -24,6 +24,7 @@ import { getSalesOrderHealth } from "../../../shared/documentHealth";
 import { getErrorAndWarningMessages, actionIssue, combineIssues, hasErrors, issueListContainsMessage, type Issue } from "../../../shared/issues";
 import { DocumentIssueStrip } from "../../../shared/ui/feedback/DocumentIssueStrip";
 import { SearchableItemPicker, type SearchableItemPickerRef } from "../../../shared/ui/item-picker/SearchableItemPicker";
+import { X } from "lucide-react";
 
 type LineWithItem = SalesOrderLine & { itemName: string };
 
@@ -127,14 +128,14 @@ function soLinesDisplayColumnDefs(
         return (
           <Button
             type="button"
-            variant="outline"
-            size="sm"
-            className="h-8 doc-lines__row-remove-btn"
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8 shrink-0 doc-lines__row-remove-btn text-foreground/80 hover:text-foreground"
             disabled={linesLength <= 1}
             onClick={() => onRemove(lineId)}
             aria-label="Remove line"
           >
-            Remove
+            <X className="h-4 w-4" aria-hidden />
           </Button>
         );
       },
