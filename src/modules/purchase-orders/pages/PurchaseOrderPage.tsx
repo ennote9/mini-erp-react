@@ -19,7 +19,6 @@ import { DatePickerField } from "@/components/ui/date-picker-field";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { cn } from "@/lib/utils";
 import { agGridDefaultColDef, agGridSelectionColumnDef } from "../../../shared/ui/ag-grid/agGridDefaults";
 import { todayYYYYMMDD, normalizeDateForPO } from "../dateUtils";
 import { getPurchaseOrderHealth } from "../../../shared/documentHealth";
@@ -392,6 +391,7 @@ export function PurchaseOrderPage() {
   const isDraft = doc?.status === "draft";
   const isConfirmed = doc?.status === "confirmed";
   const isEditable = isNew || isDraft;
+  const displayNumber = !doc ? "—" : isNew ? "—" : doc.number;
 
   const activeSuppliers = useMemo(
     () => supplierRepository.list().filter((s) => s.isActive),
@@ -454,73 +454,6 @@ export function PurchaseOrderPage() {
   const handleCancel = () => {
     navigate("/purchase-orders");
   };
-
-  const poNumberForFile = doc?.number ?? "new";
-
-  const getExportRowsAll = useCallback((): PoExportLineRow[] => {
-    if (isEditable) return buildExportRowsFromFormLines(form.lines);
-    return buildExportRowsFromLinesWithItem(linesWithItem);
-  }, [isEditable, form.lines, linesWithItem]);
-
-  const getExportRowsSelected = useCallback((): PoExportLineRow[] => {
-    if (isEditable && selectedLineIds.length > 0) {
-      const set = new Set(selectedLineIds);
-      const filtered = form.lines.filter((l) => set.has(l._lineId));
-      return buildExportRowsFromFormLines(filtered);
-    }
-    return getExportRowsAll();
-  }, [isEditable, selectedLineIds, form.lines, getExportRowsAll]);
-
-  const handleExportMain = useCallback(() => {
-    if (selectedLineIds.length > 0) {
-      const rows = getExportRowsSelected();
-      if (rows.length > 0) exportLinesToXlsx(rows, `${poNumberForFile}_selected-lines.xlsx`);
-    } else {
-      const rows = getExportRowsAll();
-      if (rows.length > 0) exportLinesToXlsx(rows, `${poNumberForFile}_all-lines.xlsx`);
-    }
-  }, [selectedLineIds.length, getExportRowsSelected, getExportRowsAll, poNumberForFile]);
-
-  const handleExportSelected = useCallback(() => {
-    const rows = getExportRowsSelected();
-    if (rows.length > 0) exportLinesToXlsx(rows, `${poNumberForFile}_selected-lines.xlsx`);
-  }, [getExportRowsSelected, poNumberForFile]);
-
-  const handleExportAll = useCallback(() => {
-    const rows = getExportRowsAll();
-    if (rows.length > 0) exportLinesToXlsx(rows, `${poNumberForFile}_all-lines.xlsx`);
-  }, [getExportRowsAll, poNumberForFile]);
-
-  const handleExportDocument = useCallback(() => {
-    const rows = getExportRowsAll();
-    const summary: PoDocumentSummary = {
-      number: displayNumber,
-      date: normalizeDateForPO(isEditable ? form.date : doc?.date ?? ""),
-      status: doc?.status ?? "draft",
-      supplier: supplierName,
-      warehouse: warehouseName,
-      comment: isEditable ? form.comment : doc?.comment ?? "",
-      totalQty: isEditable ? totals.totalQty : readonlyTotals.totalQty,
-      totalAmount: isEditable ? totals.totalAmount : readonlyTotals.totalAmount,
-    };
-    exportDocumentToXlsx(summary, rows, `${poNumberForFile}_document.xlsx`);
-  }, [
-    getExportRowsAll,
-    displayNumber,
-    isEditable,
-    form.date,
-    form.comment,
-    doc?.date,
-    doc?.status,
-    doc?.comment,
-    supplierName,
-    warehouseName,
-    totals.totalQty,
-    totals.totalAmount,
-    readonlyTotals.totalQty,
-    readonlyTotals.totalAmount,
-    poNumberForFile,
-  ]);
 
   const removeLineByLineId = useCallback((lineId: number) => {
     setDuplicateChoicePending(null);
@@ -690,6 +623,74 @@ export function PurchaseOrderPage() {
     return { totalQty, totalAmount };
   }, [lines]);
 
+  const poNumberForFile = doc?.number ?? "new";
+
+  const getExportRowsAll = useCallback((): PoExportLineRow[] => {
+    if (isEditable) return buildExportRowsFromFormLines(form.lines);
+    return buildExportRowsFromLinesWithItem(linesWithItem);
+  }, [isEditable, form.lines, linesWithItem]);
+
+  const getExportRowsSelected = useCallback((): PoExportLineRow[] => {
+    if (!isEditable) return [];
+    if (selectedLineIds.length === 0) return [];
+    const set = new Set(selectedLineIds);
+    const filtered = form.lines.filter((l) => set.has(l._lineId));
+    return buildExportRowsFromFormLines(filtered);
+  }, [isEditable, selectedLineIds, form.lines]);
+
+  const handleExportMain = useCallback(() => {
+    if (isEditable && selectedLineIds.length > 0) {
+      const rows = getExportRowsSelected();
+      if (rows.length > 0) exportLinesToXlsx(rows, `${poNumberForFile}_selected-lines.xlsx`);
+    } else {
+      const rows = getExportRowsAll();
+      if (rows.length > 0) exportLinesToXlsx(rows, `${poNumberForFile}_all-lines.xlsx`);
+    }
+  }, [isEditable, selectedLineIds.length, getExportRowsSelected, getExportRowsAll, poNumberForFile]);
+
+  const handleExportSelected = useCallback(() => {
+    const rows = getExportRowsSelected();
+    if (rows.length > 0) exportLinesToXlsx(rows, `${poNumberForFile}_selected-lines.xlsx`);
+  }, [getExportRowsSelected, poNumberForFile]);
+
+  const handleExportAll = useCallback(() => {
+    const rows = getExportRowsAll();
+    if (rows.length > 0) exportLinesToXlsx(rows, `${poNumberForFile}_all-lines.xlsx`);
+  }, [getExportRowsAll, poNumberForFile]);
+
+  const handleExportDocument = useCallback(() => {
+    const rows = getExportRowsAll();
+    const summary: PoDocumentSummary = {
+      number: displayNumber,
+      date: normalizeDateForPO(isEditable ? form.date : doc?.date ?? ""),
+      status: doc?.status ?? "draft",
+      supplier: supplierName,
+      warehouse: warehouseName,
+      comment: isEditable ? form.comment : doc?.comment ?? "",
+      totalQty: isEditable ? totals.totalQty : readonlyTotals.totalQty,
+      totalAmount: isEditable ? totals.totalAmount : readonlyTotals.totalAmount,
+    };
+    exportDocumentToXlsx(summary, rows, `${poNumberForFile}_document.xlsx`);
+  }, [
+    getExportRowsAll,
+    displayNumber,
+    isEditable,
+    form.date,
+    form.comment,
+    doc?.date,
+    doc?.status,
+    doc?.comment,
+    supplierName,
+    warehouseName,
+    totals.totalQty,
+    totals.totalAmount,
+    readonlyTotals.totalQty,
+    readonlyTotals.totalAmount,
+    poNumberForFile,
+  ]);
+
+  const exportSelectedDisabled = !isEditable || selectedLineIds.length === 0;
+
   const health = useMemo(
     () =>
       getPurchaseOrderHealth({
@@ -750,7 +751,6 @@ export function PurchaseOrderPage() {
   ];
 
   const displayTitle = isNew ? "New Purchase Order" : `Purchase Order ${doc!.number}`;
-  const displayNumber = isNew ? "—" : doc!.number;
 
   return (
     <DocumentPageLayout
@@ -792,62 +792,6 @@ export function PurchaseOrderPage() {
                   Cancel document
                 </Button>
               )}
-              <div className="flex items-stretch rounded-md border border-input">
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  className="h-8 rounded-r-none border-0 border-r border-input"
-                  onClick={handleExportMain}
-                >
-                  Export
-                </Button>
-                <Popover open={exportOpen} onOpenChange={setExportOpen}>
-                  <PopoverTrigger asChild>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="icon"
-                      className="h-8 w-8 shrink-0 rounded-l-none"
-                      aria-label="Export options"
-                    >
-                      <ChevronDown className="h-4 w-4" />
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-48 p-1" align="end">
-                    <button
-                      type="button"
-                      className="w-full rounded-sm px-2 py-1.5 text-left text-sm hover:bg-accent"
-                      onClick={() => {
-                        setExportOpen(false);
-                        handleExportSelected();
-                      }}
-                    >
-                      Export selected lines
-                    </button>
-                    <button
-                      type="button"
-                      className="w-full rounded-sm px-2 py-1.5 text-left text-sm hover:bg-accent"
-                      onClick={() => {
-                        setExportOpen(false);
-                        handleExportAll();
-                      }}
-                    >
-                      Export all lines
-                    </button>
-                    <button
-                      type="button"
-                      className="w-full rounded-sm px-2 py-1.5 text-left text-sm hover:bg-accent"
-                      onClick={() => {
-                        setExportOpen(false);
-                        handleExportDocument();
-                      }}
-                    >
-                      Export document
-                    </button>
-                  </PopoverContent>
-                </Popover>
-              </div>
               {isEditable && (
                 <Button type="button" variant="outline" onClick={handleCancel}>
                   Cancel
@@ -941,9 +885,10 @@ export function PurchaseOrderPage() {
               <h3 className="doc-lines__title">Lines</h3>
             </div>
             {isEditable && (
-              <Card className="max-w-2xl border-0 shadow-none mb-1.5">
-                <CardContent className="p-2">
-                  <div className="grid grid-cols-2 md:grid-cols-[1fr_1fr_1fr_auto_260px] gap-x-2 gap-y-0 items-end">
+              <div className="flex items-end justify-between gap-2 w-full mb-1.5">
+                <Card className="max-w-2xl border-0 shadow-none flex-1 min-w-0">
+                  <CardContent className="p-2 pb-0">
+                    <div className="grid grid-cols-2 md:grid-cols-[1fr_1fr_1fr_auto_260px] gap-x-2 gap-y-0 items-end">
                     <div className="flex flex-col gap-0.5">
                       <Label htmlFor="line-entry-item" className="text-sm">
                         Item <span className="text-destructive">*</span>
@@ -1083,6 +1028,131 @@ export function PurchaseOrderPage() {
                   </div>
                 </CardContent>
               </Card>
+                <div className="flex items-stretch rounded-md border border-input shrink-0">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="h-8 rounded-r-none border-0 border-r border-input"
+                    onClick={handleExportMain}
+                  >
+                    Export
+                  </Button>
+                  <Popover open={exportOpen} onOpenChange={setExportOpen}>
+                    <PopoverTrigger asChild>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="icon"
+                        className="h-8 w-8 shrink-0 rounded-l-none border-0 shadow-none"
+                        aria-label="Export options"
+                      >
+                        <ChevronDown className="h-4 w-4" />
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="!w-max min-w-0 p-1.5" align="end" side="top">
+                      <div className="flex flex-col gap-0.5">
+                        <button
+                          type="button"
+                          disabled={exportSelectedDisabled}
+                          className="w-full rounded-sm px-1.5 py-1 text-left text-sm hover:bg-accent disabled:cursor-not-allowed disabled:opacity-50"
+                          title={exportSelectedDisabled ? (!isEditable ? "Selection is available in edit mode only." : "Select one or more lines in the grid first.") : undefined}
+                          onClick={() => {
+                            setExportOpen(false);
+                            if (!exportSelectedDisabled) handleExportSelected();
+                          }}
+                        >
+                          Export selected lines
+                        </button>
+                        <button
+                          type="button"
+className="w-full rounded-sm px-1.5 py-1 text-left text-sm hover:bg-accent"
+                        onClick={() => {
+                          setExportOpen(false);
+                          handleExportAll();
+                        }}
+                        >
+                          Export all lines
+                        </button>
+                        <button
+                          type="button"
+className="w-full rounded-sm px-1.5 py-1 text-left text-sm hover:bg-accent"
+                        onClick={() => {
+                          setExportOpen(false);
+                          handleExportDocument();
+                        }}
+                        >
+                          Export document
+                        </button>
+                      </div>
+                    </PopoverContent>
+                  </Popover>
+                </div>
+              </div>
+            )}
+            {!isEditable && (
+              <div className="flex justify-end w-full mb-1.5">
+                <div className="flex items-stretch rounded-md border border-input shrink-0">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="h-8 rounded-r-none border-0 border-r border-input"
+                    onClick={handleExportMain}
+                  >
+                    Export
+                  </Button>
+                  <Popover open={exportOpen} onOpenChange={setExportOpen}>
+                    <PopoverTrigger asChild>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="icon"
+                        className="h-8 w-8 shrink-0 rounded-l-none border-0 shadow-none"
+                        aria-label="Export options"
+                      >
+                        <ChevronDown className="h-4 w-4" />
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="!w-max min-w-0 p-1.5" align="end" side="top">
+                      <div className="flex flex-col gap-0.5">
+                        <button
+                          type="button"
+                          disabled={exportSelectedDisabled}
+                          className="w-full rounded-sm px-1.5 py-1 text-left text-sm hover:bg-accent disabled:cursor-not-allowed disabled:opacity-50"
+                          title={exportSelectedDisabled ? (!isEditable ? "Selection is available in edit mode only." : "Select one or more lines in the grid first.") : undefined}
+                          onClick={() => {
+                            setExportOpen(false);
+                            if (!exportSelectedDisabled) handleExportSelected();
+                          }}
+                        >
+                          Export selected lines
+                        </button>
+                        <button
+                          type="button"
+className="w-full rounded-sm px-1.5 py-1 text-left text-sm hover:bg-accent"
+                        onClick={() => {
+                          setExportOpen(false);
+                          handleExportAll();
+                        }}
+                        >
+                          Export all lines
+                        </button>
+                        <button
+                          type="button"
+className="w-full rounded-sm px-1.5 py-1 text-left text-sm hover:bg-accent"
+                        onClick={() => {
+                          setExportOpen(false);
+                          handleExportDocument();
+                        }}
+                        >
+                          Export document
+                        </button>
+                      </div>
+                    </PopoverContent>
+                  </Popover>
+                </div>
+              </div>
             )}
             <div className="doc-lines__grid">
               <AgGridContainer themeClass="doc-lines-grid">

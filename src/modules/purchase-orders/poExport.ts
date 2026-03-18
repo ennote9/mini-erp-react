@@ -1,3 +1,5 @@
+import type { Workbook } from "exceljs";
+
 export type PoExportLineRow = {
   no: number;
   itemCode: string;
