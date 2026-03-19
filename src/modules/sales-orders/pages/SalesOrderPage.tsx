@@ -922,15 +922,15 @@ export function SalesOrderPage() {
               </div>
             </CardContent>
           </Card>
-          <div className="doc-lines mt-2">
+          <div className="doc-lines mt-[calc(0.5rem+1cm)]">
             <div className="doc-lines__header mb-1.5 max-w-2xl">
               <h3 className="doc-lines__title">Lines</h3>
             </div>
             {isEditable && (
               <div className="flex items-end gap-2 w-full mb-1.5">
                 <Card className="border-0 shadow-none flex-1 min-w-0">
-                  <CardContent className="p-2">
-                    <div className="grid grid-cols-2 md:grid-cols-[1fr_1fr_1fr_auto_260px] gap-x-2 gap-y-0 items-end">
+                  <CardContent className="p-2 pb-0">
+                    <div className="grid grid-cols-2 md:grid-cols-[minmax(200px,240px)_auto_auto_auto_260px] gap-x-2 gap-y-0 items-end w-max max-w-full">
                     <div className="flex flex-col gap-0.5">
                       <Label htmlFor="line-entry-item" className="text-sm">
                         Item <span className="text-destructive">*</span>
@@ -1238,7 +1238,7 @@ export function SalesOrderPage() {
               </dl>
             </CardContent>
           </Card>
-          <div className="doc-lines mt-2">
+          <div className="doc-lines mt-[calc(0.5rem+1cm)]">
             <h3 className="doc-lines__title">Lines</h3>
             <div className="flex flex-row items-center justify-end gap-2 w-full mb-1.5">
               {exportSuccess && (

@@ -919,7 +919,7 @@ export function PurchaseOrderPage() {
               </div>
             </CardContent>
           </Card>
-          <div className="doc-lines mt-2">
+          <div className="doc-lines mt-[calc(0.5rem+1cm)]">
             <div className="doc-lines__header mb-1.5 max-w-2xl">
               <h3 className="doc-lines__title">Lines</h3>
             </div>
@@ -1339,7 +1339,7 @@ export function PurchaseOrderPage() {
               </dl>
             </CardContent>
           </Card>
-          <div className="doc-lines mt-2">
+          <div className="doc-lines mt-[calc(0.5rem+1cm)]">
             <h3 className="doc-lines__title">Lines</h3>
             {linesWithItem.length === 0 ? (
               <p className="doc-lines__empty">No lines.</p>
