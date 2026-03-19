@@ -9,6 +9,7 @@ import type { Issue } from "./issues";
 import { fieldIssue } from "./issues";
 import { normalizeTrim } from "./validation";
 import { parseDocumentLineQty } from "./documentValidation";
+import { itemRepository } from "../modules/items/repository";
 
 export type DocumentHealth = {
   /** Document-level issues; use getErrorAndWarningMessages(issues) for message lists. */
@@ -50,6 +51,7 @@ export function getPurchaseOrderHealth(input: PurchaseOrderHealthInput): Documen
   let validLineCount = 0;
   let linesWithZeroPrice = 0;
   let linesWithZeroAmount = 0;
+  let hasAnyInactiveItem = false;
 
   for (const line of lines) {
     const itemIdTrimmed = normalizeTrim(line.itemId);
@@ -58,18 +60,26 @@ export function getPurchaseOrderHealth(input: PurchaseOrderHealthInput): Documen
 
     if (hasStructuralError) {
       lineHealth.set(line._lineId, "error");
+      continue;
+    }
+
+    const item = itemRepository.getById(itemIdTrimmed);
+    if (!item || !item.isActive) {
+      lineHealth.set(line._lineId, "error");
+      if (item && !item.isActive) hasAnyInactiveItem = true;
+      continue;
+    }
+
+    validLineCount += 1;
+    const up = typeof line.unitPrice === "number" && !Number.isNaN(line.unitPrice) ? line.unitPrice : 0;
+    const amount = lineAmount(line);
+    const hasWarning = up <= 0 || amount <= 0;
+    if (hasWarning) {
+      lineHealth.set(line._lineId, "warning");
+      if (up <= 0) linesWithZeroPrice += 1;
+      if (amount <= 0) linesWithZeroAmount += 1;
     } else {
-      validLineCount += 1;
-      const up = typeof line.unitPrice === "number" && !Number.isNaN(line.unitPrice) ? line.unitPrice : 0;
-      const amount = lineAmount(line);
-      const hasWarning = up <= 0 || amount <= 0;
-      if (hasWarning) {
-        lineHealth.set(line._lineId, "warning");
-        if (up <= 0) linesWithZeroPrice += 1;
-        if (amount <= 0) linesWithZeroAmount += 1;
-      } else {
-        lineHealth.set(line._lineId, null);
-      }
+      lineHealth.set(line._lineId, null);
     }
   }
 
@@ -78,6 +88,9 @@ export function getPurchaseOrderHealth(input: PurchaseOrderHealthInput): Documen
   } else {
     if (validLineCount === 0) {
       issues.push(docIssue("error", "At least one valid line is required (item and quantity)."));
+    }
+    if (hasAnyInactiveItem) {
+      issues.push(docIssue("error", "Inactive items cannot be used in this document."));
     }
     const hasAnyEmptyItem = lines.some((l) => normalizeTrim(l.itemId) === "");
     if (hasAnyEmptyItem) {
@@ -134,6 +147,7 @@ export function getSalesOrderHealth(input: SalesOrderHealthInput): DocumentHealt
   let validLineCount = 0;
   let linesWithZeroPrice = 0;
   let linesWithZeroAmount = 0;
+  let hasAnyInactiveItem = false;
 
   for (const line of lines) {
     const itemIdTrimmed = normalizeTrim(line.itemId);
@@ -142,18 +156,26 @@ export function getSalesOrderHealth(input: SalesOrderHealthInput): DocumentHealt
 
     if (hasStructuralError) {
       lineHealth.set(line._lineId, "error");
+      continue;
+    }
+
+    const item = itemRepository.getById(itemIdTrimmed);
+    if (!item || !item.isActive) {
+      lineHealth.set(line._lineId, "error");
+      if (item && !item.isActive) hasAnyInactiveItem = true;
+      continue;
+    }
+
+    validLineCount += 1;
+    const up = typeof line.unitPrice === "number" && !Number.isNaN(line.unitPrice) ? line.unitPrice : 0;
+    const amount = lineAmount(line);
+    const hasWarning = up <= 0 || amount <= 0;
+    if (hasWarning) {
+      lineHealth.set(line._lineId, "warning");
+      if (up <= 0) linesWithZeroPrice += 1;
+      if (amount <= 0) linesWithZeroAmount += 1;
     } else {
-      validLineCount += 1;
-      const up = typeof line.unitPrice === "number" && !Number.isNaN(line.unitPrice) ? line.unitPrice : 0;
-      const amount = lineAmount(line);
-      const hasWarning = up <= 0 || amount <= 0;
-      if (hasWarning) {
-        lineHealth.set(line._lineId, "warning");
-        if (up <= 0) linesWithZeroPrice += 1;
-        if (amount <= 0) linesWithZeroAmount += 1;
-      } else {
-        lineHealth.set(line._lineId, null);
-      }
+      lineHealth.set(line._lineId, null);
     }
   }
 
@@ -162,6 +184,9 @@ export function getSalesOrderHealth(input: SalesOrderHealthInput): DocumentHealt
   } else {
     if (validLineCount === 0) {
       issues.push(docIssue("error", "At least one valid line is required (item and quantity)."));
+    }
+    if (hasAnyInactiveItem) {
+      issues.push(docIssue("error", "Inactive items cannot be used in this document."));
     }
     const hasAnyEmptyItem = lines.some((l) => normalizeTrim(l.itemId) === "");
     if (hasAnyEmptyItem) {

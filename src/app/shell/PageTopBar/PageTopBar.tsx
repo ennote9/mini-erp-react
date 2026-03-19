@@ -1,5 +1,20 @@
+import type { ComponentType } from "react";
 import { useLocation } from "react-router-dom";
-import { SidebarTrigger } from "@/components/ui/sidebar";
+import {
+  ArrowLeftRight,
+  FolderOpen,
+  LayoutDashboard,
+  Package,
+  PackageCheck,
+  Receipt,
+  Scale,
+  ShoppingBag,
+  ShoppingCart,
+  Tag,
+  Truck,
+  Users,
+  Warehouse,
+} from "lucide-react";
 
 const PAGE_TITLES: Record<string, string> = {
   "/": "Dashboard",
@@ -31,15 +46,46 @@ function getPageTitle(pathname: string): string {
   return PAGE_TITLES[pathname] ?? "Mini ERP";
 }
 
+function getPageIcon(
+  pathname: string
+): ComponentType<{ className?: string }> | null {
+  if (pathname === "/") return LayoutDashboard;
+  if (pathname === "/items" || pathname.match(/^\/items\/[^/]+$/)) return Package;
+  if (pathname === "/brands" || pathname.match(/^\/brands\/[^/]+$/)) return Tag;
+  if (pathname === "/categories" || pathname.match(/^\/categories\/[^/]+$/))
+    return FolderOpen;
+  if (pathname === "/suppliers" || pathname.match(/^\/suppliers\/[^/]+$/))
+    return Truck;
+  if (pathname === "/customers" || pathname.match(/^\/customers\/[^/]+$/))
+    return Users;
+  if (pathname === "/warehouses" || pathname.match(/^\/warehouses\/[^/]+$/))
+    return Warehouse;
+  if (
+    pathname === "/purchase-orders" ||
+    pathname.match(/^\/purchase-orders\/[^/]+$/)
+  )
+    return ShoppingCart;
+  if (pathname === "/receipts" || pathname.match(/^\/receipts\/[^/]+$/))
+    return Receipt;
+  if (pathname === "/sales-orders" || pathname.match(/^\/sales-orders\/[^/]+$/))
+    return ShoppingBag;
+  if (pathname === "/shipments" || pathname.match(/^\/shipments\/[^/]+$/))
+    return PackageCheck;
+  if (pathname === "/stock-balances") return Scale;
+  if (pathname === "/stock-movements") return ArrowLeftRight;
+  return null;
+}
+
 /**
  * Page top bar: page title. Breadcrumb and actions added later.
  */
 export function PageTopBar() {
   const location = useLocation();
   const title = getPageTitle(location.pathname);
+  const Icon = getPageIcon(location.pathname);
   return (
     <header className="app-topbar flex items-center gap-2">
-      <SidebarTrigger className="-ml-1 shrink-0" />
+      {Icon && <Icon className="h-4 w-4 shrink-0" aria-hidden />}
       <h1 className="app-topbar__title min-w-0 flex-1 truncate">{title}</h1>
     </header>
   );

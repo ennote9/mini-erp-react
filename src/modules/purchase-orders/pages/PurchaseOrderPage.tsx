@@ -26,7 +26,19 @@ import { getErrorAndWarningMessages, actionIssue, combineIssues, hasErrors, issu
 import { DocumentIssueStrip } from "../../../shared/ui/feedback/DocumentIssueStrip";
 import { SelectField } from "@/components/ui/select-field";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { ChevronDown, FileSpreadsheet, File, FolderOpen, X } from "lucide-react";
+import {
+  Check,
+  ChevronDown,
+  CircleCheck,
+  File,
+  FileSpreadsheet,
+  FileX,
+  FolderOpen,
+  Plus,
+  Save,
+  Trash2,
+  X,
+} from "lucide-react";
 import { PurchaseOrderItemAutocomplete, type PurchaseOrderItemAutocompleteRef } from "../components/PurchaseOrderItemAutocomplete";
 import {
   buildLinesXlsxBuffer,
@@ -479,6 +491,17 @@ export function PurchaseOrderPage() {
     const itemId = lineEntryItemId.trim();
     const qty = Number(lineEntryQty);
     if (!itemId || !Number.isFinite(qty) || qty <= 0) return;
+
+    const item = itemRepository.getById(itemId);
+    if (!item) {
+      setActionIssues([actionIssue("Selected item is invalid and cannot be added.")]);
+      return;
+    }
+    if (!item.isActive) {
+      setActionIssues([actionIssue("Inactive items cannot be added.")]);
+      return;
+    }
+
     const rawPrice = Number(lineEntryUnitPrice);
     const unitPrice = Number.isFinite(rawPrice) && rawPrice >= 0 ? rawPrice : 0;
     const isDuplicate = form.lines.some((l) => l.itemId === itemId);
@@ -809,6 +832,7 @@ export function PurchaseOrderPage() {
             <div className="doc-header__actions">
               {isEditable && (
                 <Button type="button" onClick={handleSave}>
+                  <Save aria-hidden />
                   Save
                 </Button>
               )}
@@ -819,6 +843,7 @@ export function PurchaseOrderPage() {
                   disabled={hasErrors(health.issues)}
                   title={hasErrors(health.issues) ? "Fix errors before confirming." : undefined}
                 >
+                  <CircleCheck aria-hidden />
                   Confirm
                 </Button>
               )}
@@ -829,11 +854,13 @@ export function PurchaseOrderPage() {
               )}
               {!isNew && (isDraft || isConfirmed) && (
                 <Button type="button" variant="outline" onClick={handleCancelDocument}>
+                  <FileX aria-hidden />
                   Cancel document
                 </Button>
               )}
               {isEditable && (
                 <Button type="button" variant="outline" onClick={handleCancel}>
+                  <X aria-hidden />
                   Cancel
                 </Button>
               )}
@@ -989,9 +1016,10 @@ export function PurchaseOrderPage() {
                           type="button"
                           variant="outline"
                           size="sm"
-                          className="h-8"
+                          className="h-8 gap-1.5"
                           onClick={addLineFromEntry}
                         >
+                          <Plus className="h-4 w-4 shrink-0" aria-hidden />
                           Add line
                         </Button>
                       ) : (
@@ -999,16 +1027,17 @@ export function PurchaseOrderPage() {
                           <Button
                             type="button"
                             size="sm"
-                            className="h-8"
+                            className="h-8 gap-1.5"
                             onClick={updateLineFromEntry}
                           >
+                            <Check className="h-4 w-4 shrink-0" aria-hidden />
                             Update line
                           </Button>
                           <Button
                             type="button"
                             variant="outline"
                             size="sm"
-                            className="h-8"
+                            className="h-8 gap-1.5"
                             disabled={form.lines.length <= 1}
                             onClick={() => {
                               if (editingLineId !== null) {
@@ -1017,15 +1046,17 @@ export function PurchaseOrderPage() {
                               }
                             }}
                           >
+                            <Trash2 className="h-4 w-4 shrink-0" aria-hidden />
                             Remove
                           </Button>
                           <Button
                             type="button"
                             variant="outline"
                             size="sm"
-                            className="h-8"
+                            className="h-8 gap-1.5"
                             onClick={cancelEdit}
                           >
+                            <X className="h-4 w-4 shrink-0" aria-hidden />
                             Cancel edit
                           </Button>
                         </>

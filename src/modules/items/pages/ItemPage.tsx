@@ -23,6 +23,7 @@ import { actionIssue, combineIssues, getErrorAndWarningMessages, issueListContai
 import { getItemFormHealth } from "../../../shared/masterDataHealth";
 import { DocumentIssueStrip } from "../../../shared/ui/feedback/DocumentIssueStrip";
 import { ItemImagesCard } from "../components/ItemImagesCard";
+import { Save, X } from "lucide-react";
 
 type FormState = {
   code: string;
@@ -211,9 +212,11 @@ export function ItemPage() {
             )}
             <div className="doc-header__actions">
               <Button type="button" onClick={handleSave}>
+                <Save aria-hidden />
                 Save
               </Button>
               <Button type="button" variant="outline" onClick={handleCancel}>
+                <X aria-hidden />
                 Cancel
               </Button>
             </div>

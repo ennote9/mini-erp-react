@@ -127,6 +127,8 @@ export const PurchaseOrderItemAutocomplete = forwardRef<
     left: number;
     width: number;
   } | null>(null);
+  const [blockedMessage, setBlockedMessage] = useState<string | null>(null);
+  const blockedTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const inputRef = useRef<HTMLInputElement | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -141,6 +143,12 @@ export const PurchaseOrderItemAutocomplete = forwardRef<
     }),
     [],
   );
+
+  useEffect(() => {
+    return () => {
+      if (blockedTimerRef.current) clearTimeout(blockedTimerRef.current);
+    };
+  }, []);
 
   const displayText = value
     ? selectedItem
@@ -230,6 +238,16 @@ export const PurchaseOrderItemAutocomplete = forwardRef<
   };
 
   const selectItem = (item: Item) => {
+    if (!item.isActive) {
+      setBlockedMessage("Inactive items cannot be added.");
+      if (blockedTimerRef.current) clearTimeout(blockedTimerRef.current);
+      blockedTimerRef.current = setTimeout(
+        () => setBlockedMessage(null),
+        1600,
+      );
+      return;
+    }
+    setBlockedMessage(null);
     onChange(item.id);
     setInputValue(getItemLabel(item));
     setIsOpen(false);
@@ -357,9 +375,16 @@ export const PurchaseOrderItemAutocomplete = forwardRef<
                     id={id ? `${id}-option-${item.id}` : undefined}
                     role="option"
                     aria-selected={highlighted}
+                    aria-disabled={inactive}
                     className={cn(
                       "px-2 py-1.5 text-sm",
-                      highlighted ? "bg-accent text-accent-foreground" : "hover:bg-accent/60",
+                      inactive
+                        ? highlighted
+                          ? "cursor-not-allowed bg-muted/60 text-muted-foreground/90"
+                          : "cursor-not-allowed opacity-60"
+                        : highlighted
+                          ? "bg-accent text-accent-foreground"
+                          : "cursor-pointer hover:bg-accent/60",
                     )}
                     onMouseEnter={() => setHighlightedIndex(idx)}
                     onMouseDown={(e) => {
@@ -387,6 +412,11 @@ export const PurchaseOrderItemAutocomplete = forwardRef<
                   </li>
                 );
               })
+            )}
+            {blockedMessage && (
+              <li className="px-2 py-1.5 text-xs text-muted-foreground">
+                {blockedMessage}
+              </li>
             )}
           </ul>,
           document.body,

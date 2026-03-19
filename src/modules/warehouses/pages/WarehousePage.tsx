@@ -19,6 +19,7 @@ import {
 import { actionIssue, combineIssues, getErrorAndWarningMessages, issueListContainsMessage, type Issue } from "../../../shared/issues";
 import { getWarehouseFormHealth } from "../../../shared/masterDataHealth";
 import { DocumentIssueStrip } from "../../../shared/ui/feedback/DocumentIssueStrip";
+import { Save, X } from "lucide-react";
 
 type FormState = {
   code: string;
@@ -173,9 +174,11 @@ export function WarehousePage() {
             )}
             <div className="doc-header__actions">
               <Button type="button" onClick={handleSave}>
+                <Save aria-hidden />
                 Save
               </Button>
               <Button type="button" variant="outline" onClick={handleCancel}>
+                <X aria-hidden />
                 Cancel
               </Button>
             </div>
