@@ -4,6 +4,7 @@ import {
   loadMasterDataPersisted,
   writeMasterDataPayload,
 } from "@/shared/masterDataPersistence";
+import { registerPersistenceFlush } from "@/shared/persistenceCoordinator";
 
 export type CreateBrandInput = Omit<Brand, "id">;
 export type UpdateBrandPatch = Partial<Omit<Brand, "id">>;
@@ -11,6 +12,8 @@ export type UpdateBrandPatch = Partial<Omit<Brand, "id">>;
 const store: Brand[] = [];
 let nextId = 1;
 let persistChain: Promise<void> = Promise.resolve();
+let persistDepth = 0;
+let lastWriteError: string | null = null;
 
 const PERSIST_PATH = getMasterDataFilePath("brands.json");
 
@@ -43,15 +46,31 @@ function buildSeedBrands(): Brand[] {
 }
 
 function schedulePersist(): void {
-  persistChain = persistChain.then(async () => {
-    try {
-      await writeMasterDataPayload(PERSIST_PATH, [...store]);
-    } catch (e) {
-      if (import.meta.env.DEV) {
-        console.error("[brandRepository] persist failed:", e);
+  persistDepth++;
+  persistChain = persistChain
+    .then(async () => {
+      try {
+        await writeMasterDataPayload(PERSIST_PATH, [...store]);
+        lastWriteError = null;
+      } catch (e) {
+        lastWriteError = e instanceof Error ? e.message : String(e);
+        if (import.meta.env.DEV) {
+          console.error("[brandRepository] persist failed:", e);
+        }
       }
-    }
-  });
+    })
+    .finally(() => {
+      persistDepth--;
+    });
+}
+
+export function getBrandPersistBusy(): boolean {
+  return persistDepth > 0;
+}
+
+export async function flushPendingBrandPersist(): Promise<void> {
+  await persistChain;
+  if (lastWriteError) throw new Error(lastWriteError);
 }
 
 function nextIdStr(): string {
@@ -120,3 +139,8 @@ const seed: CreateBrandInput[] = [
 ];
 
 await bootstrapFromDisk();
+registerPersistenceFlush({
+  id: "brands",
+  flush: flushPendingBrandPersist,
+  isBusy: getBrandPersistBusy,
+});

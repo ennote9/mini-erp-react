@@ -5,6 +5,7 @@ import {
   writeItemsPayload,
   getItemsPersistenceDiagnostics,
 } from "./lib/itemsPersistence";
+import { registerPersistenceFlush } from "../../shared/persistenceCoordinator";
 
 export type CreateItemInput = Omit<Item, "id" | "images"> & { images?: ItemImage[] };
 export type UpdateItemPatch = Partial<Omit<Item, "id">>;
@@ -70,41 +71,12 @@ async function bootstrapFromDisk(): Promise<void> {
   nextId = loadedNext;
 }
 
-let closeHookRegistered = false;
-
-/**
- * Flush pending item JSON writes before the main window closes (Tauri).
- * Uses preventDefault + programmatic close so async flush can finish.
- */
-function registerItemsPersistCloseHook(): void {
-  if (closeHookRegistered) return;
-  closeHookRegistered = true;
-  void (async () => {
-    try {
-      const { getCurrentWindow } = await import("@tauri-apps/api/window");
-      const w = getCurrentWindow();
-      let closingAfterFlush = false;
-      await w.onCloseRequested(async (event) => {
-        if (closingAfterFlush) return;
-        event.preventDefault();
-        try {
-          await flushPendingItemsPersist();
-        } catch (e) {
-          if (import.meta.env.DEV) {
-            console.error("[itemRepository] flush on window close failed:", e);
-          }
-        }
-        closingAfterFlush = true;
-        await w.close();
-      });
-    } catch {
-      /* Not running inside Tauri webview (e.g. plain Vite in browser). */
-    }
-  })();
-}
-
 await bootstrapFromDisk();
-registerItemsPersistCloseHook();
+registerPersistenceFlush({
+  id: "items",
+  flush: flushPendingItemsPersist,
+  isBusy: getItemsPersistBusy,
+});
 
 export { getItemsPersistenceDiagnostics };
 

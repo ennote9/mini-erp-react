@@ -7,6 +7,7 @@ import {
   loadDocumentsPersisted,
   writeDocumentPayload,
 } from "../../shared/documentPersistence";
+import { registerPersistenceFlush } from "../../shared/persistenceCoordinator";
 
 export type CreateSalesOrderHeaderInput = Omit<
   SalesOrder,
@@ -203,35 +204,6 @@ async function bootstrapFromDisk(): Promise<void> {
   numberCounter = computeNextSONumberCounter(headerStore);
 }
 
-let closeHookRegistered = false;
-
-function registerSalesOrderPersistCloseHook(): void {
-  if (closeHookRegistered) return;
-  closeHookRegistered = true;
-  void (async () => {
-    try {
-      const { getCurrentWindow } = await import("@tauri-apps/api/window");
-      const w = getCurrentWindow();
-      let closingAfterFlush = false;
-      await w.onCloseRequested(async (event) => {
-        if (closingAfterFlush) return;
-        event.preventDefault();
-        try {
-          await flushPendingSalesOrderPersist();
-        } catch (e) {
-          if (import.meta.env.DEV) {
-            console.error("[salesOrderRepository] flush on window close failed:", e);
-          }
-        }
-        closingAfterFlush = true;
-        await w.close();
-      });
-    } catch {
-      // Not running in Tauri.
-    }
-  })();
-}
-
 export const salesOrderRepository = {
   list(): SalesOrder[] {
     return [...headerStore];
@@ -305,4 +277,8 @@ export const salesOrderRepository = {
 };
 
 await bootstrapFromDisk();
-registerSalesOrderPersistCloseHook();
+registerPersistenceFlush({
+  id: "sales-orders",
+  flush: flushPendingSalesOrderPersist,
+  isBusy: getSalesOrderPersistBusy,
+});

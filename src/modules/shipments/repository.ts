@@ -5,6 +5,7 @@ import {
   loadDocumentsPersisted,
   writeDocumentPayload,
 } from "../../shared/documentPersistence";
+import { registerPersistenceFlush } from "../../shared/persistenceCoordinator";
 
 export type CreateShipmentHeaderInput = Omit<Shipment, "id" | "number">;
 export type ShipmentLineInput = { itemId: string; qty: number };
@@ -173,35 +174,6 @@ async function bootstrapFromDisk(): Promise<void> {
   numberCounter = computeNextShipmentNumberCounter(headerStore);
 }
 
-let closeHookRegistered = false;
-
-function registerShipmentPersistCloseHook(): void {
-  if (closeHookRegistered) return;
-  closeHookRegistered = true;
-  void (async () => {
-    try {
-      const { getCurrentWindow } = await import("@tauri-apps/api/window");
-      const w = getCurrentWindow();
-      let closingAfterFlush = false;
-      await w.onCloseRequested(async (event) => {
-        if (closingAfterFlush) return;
-        event.preventDefault();
-        try {
-          await flushPendingShipmentPersist();
-        } catch (e) {
-          if (import.meta.env.DEV) {
-            console.error("[shipmentRepository] flush on window close failed:", e);
-          }
-        }
-        closingAfterFlush = true;
-        await w.close();
-      });
-    } catch {
-      // Not running in Tauri.
-    }
-  })();
-}
-
 export const shipmentRepository = {
   list(): Shipment[] {
     return [...headerStore];
@@ -272,4 +244,8 @@ export const shipmentRepository = {
 };
 
 await bootstrapFromDisk();
-registerShipmentPersistCloseHook();
+registerPersistenceFlush({
+  id: "shipments",
+  flush: flushPendingShipmentPersist,
+  isBusy: getShipmentPersistBusy,
+});

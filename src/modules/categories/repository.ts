@@ -4,6 +4,7 @@ import {
   loadMasterDataPersisted,
   writeMasterDataPayload,
 } from "@/shared/masterDataPersistence";
+import { registerPersistenceFlush } from "@/shared/persistenceCoordinator";
 
 export type CreateCategoryInput = Omit<Category, "id">;
 export type UpdateCategoryPatch = Partial<Omit<Category, "id">>;
@@ -11,6 +12,8 @@ export type UpdateCategoryPatch = Partial<Omit<Category, "id">>;
 const store: Category[] = [];
 let nextId = 1;
 let persistChain: Promise<void> = Promise.resolve();
+let persistDepth = 0;
+let lastWriteError: string | null = null;
 
 const PERSIST_PATH = getMasterDataFilePath("categories.json");
 
@@ -43,15 +46,31 @@ function buildSeedCategories(): Category[] {
 }
 
 function schedulePersist(): void {
-  persistChain = persistChain.then(async () => {
-    try {
-      await writeMasterDataPayload(PERSIST_PATH, [...store]);
-    } catch (e) {
-      if (import.meta.env.DEV) {
-        console.error("[categoryRepository] persist failed:", e);
+  persistDepth++;
+  persistChain = persistChain
+    .then(async () => {
+      try {
+        await writeMasterDataPayload(PERSIST_PATH, [...store]);
+        lastWriteError = null;
+      } catch (e) {
+        lastWriteError = e instanceof Error ? e.message : String(e);
+        if (import.meta.env.DEV) {
+          console.error("[categoryRepository] persist failed:", e);
+        }
       }
-    }
-  });
+    })
+    .finally(() => {
+      persistDepth--;
+    });
+}
+
+export function getCategoryPersistBusy(): boolean {
+  return persistDepth > 0;
+}
+
+export async function flushPendingCategoryPersist(): Promise<void> {
+  await persistChain;
+  if (lastWriteError) throw new Error(lastWriteError);
 }
 
 function nextIdStr(): string {
@@ -122,3 +141,8 @@ const seed: CreateCategoryInput[] = [
 ];
 
 await bootstrapFromDisk();
+registerPersistenceFlush({
+  id: "categories",
+  flush: flushPendingCategoryPersist,
+  isBusy: getCategoryPersistBusy,
+});

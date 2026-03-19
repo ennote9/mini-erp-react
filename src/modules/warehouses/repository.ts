@@ -4,6 +4,7 @@ import {
   loadMasterDataPersisted,
   writeMasterDataPayload,
 } from "@/shared/masterDataPersistence";
+import { registerPersistenceFlush } from "@/shared/persistenceCoordinator";
 
 export type CreateWarehouseInput = Omit<Warehouse, "id">;
 export type UpdateWarehousePatch = Partial<Omit<Warehouse, "id">>;
@@ -11,6 +12,8 @@ export type UpdateWarehousePatch = Partial<Omit<Warehouse, "id">>;
 const store: Warehouse[] = [];
 let nextId = 1;
 let persistChain: Promise<void> = Promise.resolve();
+let persistDepth = 0;
+let lastWriteError: string | null = null;
 
 const PERSIST_PATH = getMasterDataFilePath("warehouses.json");
 
@@ -49,15 +52,31 @@ function buildSeedWarehouses(): Warehouse[] {
 }
 
 function schedulePersist(): void {
-  persistChain = persistChain.then(async () => {
-    try {
-      await writeMasterDataPayload(PERSIST_PATH, [...store]);
-    } catch (e) {
-      if (import.meta.env.DEV) {
-        console.error("[warehouseRepository] persist failed:", e);
+  persistDepth++;
+  persistChain = persistChain
+    .then(async () => {
+      try {
+        await writeMasterDataPayload(PERSIST_PATH, [...store]);
+        lastWriteError = null;
+      } catch (e) {
+        lastWriteError = e instanceof Error ? e.message : String(e);
+        if (import.meta.env.DEV) {
+          console.error("[warehouseRepository] persist failed:", e);
+        }
       }
-    }
-  });
+    })
+    .finally(() => {
+      persistDepth--;
+    });
+}
+
+export function getWarehousePersistBusy(): boolean {
+  return persistDepth > 0;
+}
+
+export async function flushPendingWarehousePersist(): Promise<void> {
+  await persistChain;
+  if (lastWriteError) throw new Error(lastWriteError);
 }
 
 function nextIdStr(): string {
@@ -141,3 +160,8 @@ const seed: CreateWarehouseInput[] = [
 ];
 
 await bootstrapFromDisk();
+registerPersistenceFlush({
+  id: "warehouses",
+  flush: flushPendingWarehousePersist,
+  isBusy: getWarehousePersistBusy,
+});

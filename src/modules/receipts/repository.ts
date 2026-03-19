@@ -5,6 +5,7 @@ import {
   loadDocumentsPersisted,
   writeDocumentPayload,
 } from "../../shared/documentPersistence";
+import { registerPersistenceFlush } from "../../shared/persistenceCoordinator";
 
 export type CreateReceiptHeaderInput = Omit<Receipt, "id" | "number">;
 export type ReceiptLineInput = { itemId: string; qty: number };
@@ -173,35 +174,6 @@ async function bootstrapFromDisk(): Promise<void> {
   numberCounter = computeNextReceiptNumberCounter(headerStore);
 }
 
-let closeHookRegistered = false;
-
-function registerReceiptPersistCloseHook(): void {
-  if (closeHookRegistered) return;
-  closeHookRegistered = true;
-  void (async () => {
-    try {
-      const { getCurrentWindow } = await import("@tauri-apps/api/window");
-      const w = getCurrentWindow();
-      let closingAfterFlush = false;
-      await w.onCloseRequested(async (event) => {
-        if (closingAfterFlush) return;
-        event.preventDefault();
-        try {
-          await flushPendingReceiptPersist();
-        } catch (e) {
-          if (import.meta.env.DEV) {
-            console.error("[receiptRepository] flush on window close failed:", e);
-          }
-        }
-        closingAfterFlush = true;
-        await w.close();
-      });
-    } catch {
-      // Not running in Tauri.
-    }
-  })();
-}
-
 export const receiptRepository = {
   list(): Receipt[] {
     return [...headerStore];
@@ -272,4 +244,8 @@ export const receiptRepository = {
 };
 
 await bootstrapFromDisk();
-registerReceiptPersistCloseHook();
+registerPersistenceFlush({
+  id: "receipts",
+  flush: flushPendingReceiptPersist,
+  isBusy: getReceiptPersistBusy,
+});

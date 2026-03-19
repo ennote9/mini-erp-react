@@ -4,6 +4,7 @@ import {
   loadInventoryPersisted,
   writeInventoryPayload,
 } from "../../shared/inventoryPersistence";
+import { registerPersistenceFlush } from "../../shared/persistenceCoordinator";
 
 export type UpsertStockBalanceInput = Omit<StockBalance, "id">;
 
@@ -102,35 +103,6 @@ async function bootstrapFromDisk(): Promise<void> {
   nextId = computeNextNumericId(store);
 }
 
-let closeHookRegistered = false;
-
-function registerStockBalancePersistCloseHook(): void {
-  if (closeHookRegistered) return;
-  closeHookRegistered = true;
-  void (async () => {
-    try {
-      const { getCurrentWindow } = await import("@tauri-apps/api/window");
-      const w = getCurrentWindow();
-      let closingAfterFlush = false;
-      await w.onCloseRequested(async (event) => {
-        if (closingAfterFlush) return;
-        event.preventDefault();
-        try {
-          await flushPendingStockBalancePersist();
-        } catch (e) {
-          if (import.meta.env.DEV) {
-            console.error("[stockBalanceRepository] flush on window close failed:", e);
-          }
-        }
-        closingAfterFlush = true;
-        await w.close();
-      });
-    } catch {
-      // Not running in Tauri.
-    }
-  })();
-}
-
 export const stockBalanceRepository = {
   list(): StockBalance[] {
     return [...store];
@@ -163,4 +135,8 @@ export const stockBalanceRepository = {
 };
 
 await bootstrapFromDisk();
-registerStockBalancePersistCloseHook();
+registerPersistenceFlush({
+  id: "stock-balances",
+  flush: flushPendingStockBalancePersist,
+  isBusy: getStockBalancePersistBusy,
+});

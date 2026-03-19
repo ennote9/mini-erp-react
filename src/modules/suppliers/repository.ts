@@ -4,6 +4,7 @@ import {
   loadMasterDataPersisted,
   writeMasterDataPayload,
 } from "@/shared/masterDataPersistence";
+import { registerPersistenceFlush } from "@/shared/persistenceCoordinator";
 
 export type CreateSupplierInput = Omit<Supplier, "id">;
 export type UpdateSupplierPatch = Partial<Omit<Supplier, "id">>;
@@ -11,6 +12,8 @@ export type UpdateSupplierPatch = Partial<Omit<Supplier, "id">>;
 const store: Supplier[] = [];
 let nextId = 1;
 let persistChain: Promise<void> = Promise.resolve();
+let persistDepth = 0;
+let lastWriteError: string | null = null;
 
 const PERSIST_PATH = getMasterDataFilePath("suppliers.json");
 
@@ -55,15 +58,31 @@ function buildSeedSuppliers(): Supplier[] {
 }
 
 function schedulePersist(): void {
-  persistChain = persistChain.then(async () => {
-    try {
-      await writeMasterDataPayload(PERSIST_PATH, [...store]);
-    } catch (e) {
-      if (import.meta.env.DEV) {
-        console.error("[supplierRepository] persist failed:", e);
+  persistDepth++;
+  persistChain = persistChain
+    .then(async () => {
+      try {
+        await writeMasterDataPayload(PERSIST_PATH, [...store]);
+        lastWriteError = null;
+      } catch (e) {
+        lastWriteError = e instanceof Error ? e.message : String(e);
+        if (import.meta.env.DEV) {
+          console.error("[supplierRepository] persist failed:", e);
+        }
       }
-    }
-  });
+    })
+    .finally(() => {
+      persistDepth--;
+    });
+}
+
+export function getSupplierPersistBusy(): boolean {
+  return persistDepth > 0;
+}
+
+export async function flushPendingSupplierPersist(): Promise<void> {
+  await persistChain;
+  if (lastWriteError) throw new Error(lastWriteError);
 }
 
 function nextIdStr(): string {
@@ -147,3 +166,8 @@ const seed: CreateSupplierInput[] = [
 ];
 
 await bootstrapFromDisk();
+registerPersistenceFlush({
+  id: "suppliers",
+  flush: flushPendingSupplierPersist,
+  isBusy: getSupplierPersistBusy,
+});
