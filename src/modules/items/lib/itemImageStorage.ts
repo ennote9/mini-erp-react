@@ -34,10 +34,26 @@ export async function resolveAbsoluteImagePath(relativePath: string): Promise<st
   return join(base, ...parts);
 }
 
-/** URL for <img src> in Tauri webview. */
+/**
+ * Resolve app-local relative path to an absolute filesystem path and a webview-loadable asset URL.
+ * Uses forward slashes for `convertFileSrc` (Windows paths from `join` may contain backslashes).
+ */
+export async function getItemImagePreviewSources(
+  relativePath: string,
+): Promise<{ absolutePath: string; previewUrl: string }> {
+  const absolutePath = await resolveAbsoluteImagePath(relativePath);
+  const normalized = absolutePath.replace(/\\/g, "/");
+  const previewUrl = convertFileSrc(normalized);
+  if (import.meta.env.DEV) {
+    console.debug("[itemImageStorage] preview sources", { relativePath, absolutePath, normalized, previewUrl });
+  }
+  return { absolutePath, previewUrl };
+}
+
+/** @deprecated Prefer {@link getItemImagePreviewSources} for diagnostics; same URL behavior. */
 export async function getItemImageAssetUrl(relativePath: string): Promise<string> {
-  const abs = await resolveAbsoluteImagePath(relativePath);
-  return convertFileSrc(abs);
+  const { previewUrl } = await getItemImagePreviewSources(relativePath);
+  return previewUrl;
 }
 
 async function readDimensions(file: File): Promise<{ width?: number; height?: number }> {

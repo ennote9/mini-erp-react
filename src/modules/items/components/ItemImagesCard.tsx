@@ -3,7 +3,7 @@ import type { ItemImage } from "../model";
 import { itemRepository } from "../repository";
 import {
   deleteStoredImageFile,
-  getItemImageAssetUrl,
+  getItemImagePreviewSources,
   resolveAbsoluteImagePath,
   saveItemImageFromFile,
 } from "../lib/itemImageStorage";
@@ -35,6 +35,8 @@ type Props = {
 export function ItemImagesCard({ isNew, itemId, images, onImagesChanged }: Props) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [previewAbsolutePath, setPreviewAbsolutePath] = useState<string | null>(null);
+  const [previewLoadState, setPreviewLoadState] = useState<"idle" | "loading" | "ready" | "error">("idle");
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
 
@@ -44,15 +46,26 @@ export function ItemImagesCard({ isNew, itemId, images, onImagesChanged }: Props
     let cancelled = false;
     if (!img) {
       setPreviewUrl(null);
+      setPreviewAbsolutePath(null);
+      setPreviewLoadState("idle");
       return;
     }
-    getItemImageAssetUrl(img.relativePath)
-      .then((url) => {
-        if (!cancelled) setPreviewUrl(url);
+    setPreviewLoadState("loading");
+    setPreviewUrl(null);
+    setPreviewAbsolutePath(null);
+    getItemImagePreviewSources(img.relativePath)
+      .then(({ absolutePath, previewUrl: url }) => {
+        if (!cancelled) {
+          setPreviewAbsolutePath(absolutePath);
+          setPreviewUrl(url);
+          setPreviewLoadState("ready");
+        }
       })
       .catch(() => {
         if (!cancelled) {
           setPreviewUrl(null);
+          setPreviewAbsolutePath(null);
+          setPreviewLoadState("error");
           setMessage("Could not load image preview.");
         }
       });
@@ -149,17 +162,17 @@ export function ItemImagesCard({ isNew, itemId, images, onImagesChanged }: Props
             onUploadClick={triggerPick}
             disabled={busy}
           />
-        ) : previewUrl ? (
+        ) : (
           <ItemImagePreview
+            loadState={previewLoadState}
             previewUrl={previewUrl}
+            absolutePath={previewAbsolutePath}
             image={img}
             onReplace={triggerPick}
             onRemove={() => void handleRemove()}
             onOpenFullSize={() => void handleOpenFullSize()}
             busy={busy}
           />
-        ) : (
-          <p className="text-xs text-muted-foreground">Loading preview…</p>
         )}
       </CardContent>
     </Card>
