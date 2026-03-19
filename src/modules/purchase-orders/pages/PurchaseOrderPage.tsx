@@ -32,15 +32,14 @@ import {
   type ResolvedImportLine,
 } from "../../../shared/ui/object/DocumentLineImportModal";
 import {
+  ClipboardPaste,
   Check,
   ChevronDown,
   CircleCheck,
-  FileUp,
   File,
   FileSpreadsheet,
   FileX,
   FolderOpen,
-  ClipboardPaste,
   Plus,
   Save,
   Trash2,
@@ -1081,20 +1080,7 @@ export function PurchaseOrderPage() {
                             }}
                           >
                             <ClipboardPaste className="h-4 w-4 shrink-0" aria-hidden />
-                            Paste items
-                          </Button>
-                          <Button
-                            type="button"
-                            variant="outline"
-                            size="sm"
-                            className="h-8 gap-1.5"
-                            onClick={() => {
-                              setLineImportInitialTab("excel");
-                              setIsLineImportModalOpen(true);
-                            }}
-                          >
-                            <FileUp className="h-4 w-4 shrink-0" aria-hidden />
-                            Import from Excel
+                            Add lines
                           </Button>
                         </>
                       ) : (

@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { Check, ClipboardPaste, Eye, FileSpreadsheet, FolderOpen, X } from "lucide-react";
 import type { Item } from "../../../modules/items/model";
 import {
   resolveBatchPastedItems,
@@ -177,9 +178,6 @@ export function DocumentLineImportModal(props: Props) {
               Paste item codes/barcodes or import an Excel file. Review the preview before adding lines.
             </p>
           </div>
-          <Button type="button" variant="ghost" size="sm" onClick={close}>
-            Close
-          </Button>
         </div>
 
         <div className="space-y-3 px-4 py-3">
@@ -190,6 +188,7 @@ export function DocumentLineImportModal(props: Props) {
               variant={activeTab === "paste" ? "default" : "outline"}
               onClick={() => setActiveTab("paste")}
             >
+              <ClipboardPaste className="h-4 w-4 shrink-0" aria-hidden />
               Paste
             </Button>
             <Button
@@ -198,6 +197,7 @@ export function DocumentLineImportModal(props: Props) {
               variant={activeTab === "excel" ? "default" : "outline"}
               onClick={() => setActiveTab("excel")}
             >
+              <FileSpreadsheet className="h-4 w-4 shrink-0" aria-hidden />
               Excel
             </Button>
           </div>
@@ -215,6 +215,7 @@ export function DocumentLineImportModal(props: Props) {
                 className="min-h-[120px] font-mono text-xs"
               />
               <Button type="button" size="sm" variant="outline" onClick={handlePreviewPaste}>
+                <Eye className="h-4 w-4 shrink-0" aria-hidden />
                 Preview
               </Button>
             </div>
@@ -231,6 +232,7 @@ export function DocumentLineImportModal(props: Props) {
                   onClick={handleChooseExcel}
                   disabled={isImportingExcel}
                 >
+                  <FolderOpen className="h-4 w-4 shrink-0" aria-hidden />
                   {isImportingExcel ? "Parsing..." : "Choose .xlsx file"}
                 </Button>
                 {importFileName ? (
@@ -334,6 +336,7 @@ export function DocumentLineImportModal(props: Props) {
 
         <div className="flex items-center justify-end gap-1.5 border-t border-border px-4 py-3">
           <Button type="button" variant="outline" onClick={close}>
+            <X className="h-4 w-4 shrink-0" aria-hidden />
             Cancel
           </Button>
           <Button
@@ -341,6 +344,7 @@ export function DocumentLineImportModal(props: Props) {
             onClick={handleAddAllValid}
             disabled={currentValidLineCount <= 0}
           >
+            <Check className="h-4 w-4 shrink-0" aria-hidden />
             Add all valid lines
           </Button>
         </div>
