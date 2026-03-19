@@ -1472,6 +1472,7 @@ export function PurchaseOrderPage() {
             ? item.purchasePrice
             : 0
         }
+        templateFileName="purchase-order-lines-template.xlsx"
         onOpenChange={setIsLineImportModalOpen}
         onApply={handleApplyImportedLines}
       />

@@ -1470,6 +1470,7 @@ export function SalesOrderPage() {
             ? item.salePrice
             : 0
         }
+        templateFileName="sales-order-lines-template.xlsx"
         onOpenChange={setIsLineImportModalOpen}
         onApply={handleApplyImportedLines}
       />

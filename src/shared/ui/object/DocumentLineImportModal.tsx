@@ -2,13 +2,27 @@ import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Check, ClipboardPaste, Eye, FileSpreadsheet, FolderOpen, X } from "lucide-react";
+import { invoke } from "@tauri-apps/api/core";
+import { save } from "@tauri-apps/plugin-dialog";
+import { revealItemInDir } from "@tauri-apps/plugin-opener";
+import {
+  Check,
+  CircleCheck,
+  ClipboardPaste,
+  Download,
+  Eye,
+  File,
+  FileSpreadsheet,
+  FolderOpen,
+  X,
+} from "lucide-react";
 import type { Item } from "../../../modules/items/model";
 import {
   resolveBatchPastedItems,
   type BatchPastePreview,
 } from "../../batchPasteItems";
 import {
+  buildLineImportTemplateXlsxBuffer,
   parseExcelLineImport,
   type ExcelImportPreview,
 } from "../../excelLineImport";
@@ -21,6 +35,13 @@ export type ResolvedImportLine = {
   unitPrice: number;
 };
 
+type PreviewFilter = "all" | "errors" | "valid";
+
+type TemplateDownloadResult = {
+  filename: string;
+  path: string | null;
+};
+
 type ApplyPayload = {
   lines: ResolvedImportLine[];
   skippedRows: number;
@@ -31,6 +52,7 @@ type Props = {
   initialTab: LineImportTab;
   items: Item[];
   getDefaultUnitPrice: (item: Item) => number;
+  templateFileName?: string;
   onOpenChange: (open: boolean) => void;
   onApply: (payload: ApplyPayload) => void;
 };
@@ -65,6 +87,7 @@ export function DocumentLineImportModal(props: Props) {
     initialTab,
     items,
     getDefaultUnitPrice,
+    templateFileName = "line-import-template.xlsx",
     onOpenChange,
     onApply,
   } = props;
@@ -76,6 +99,10 @@ export function DocumentLineImportModal(props: Props) {
   const [importFileName, setImportFileName] = useState<string | null>(null);
   const [isImportingExcel, setIsImportingExcel] = useState(false);
   const [fileErrorMessage, setFileErrorMessage] = useState<string | null>(null);
+  const [templateDownloadResult, setTemplateDownloadResult] =
+    useState<TemplateDownloadResult | null>(null);
+  const [pastePreviewFilter, setPastePreviewFilter] = useState<PreviewFilter>("all");
+  const [excelPreviewFilter, setExcelPreviewFilter] = useState<PreviewFilter>("all");
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
@@ -96,10 +123,62 @@ export function DocumentLineImportModal(props: Props) {
   const handlePreviewPaste = () => {
     setFileErrorMessage(null);
     setPastePreview(resolveBatchPastedItems(pasteInput, items));
+    setPastePreviewFilter("all");
   };
 
   const handleChooseExcel = () => {
     fileInputRef.current?.click();
+  };
+
+  const handleDownloadTemplate = async () => {
+    const defaultFilename = templateFileName;
+    try {
+      const path = await save({
+        defaultPath: defaultFilename,
+        filters: [{ name: "Excel", extensions: ["xlsx"] }],
+      });
+      if (path == null) return;
+
+      const buffer = await buildLineImportTemplateXlsxBuffer();
+      const bytes = new Uint8Array(buffer);
+      let binary = "";
+      for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
+      const contentsBase64 = btoa(binary);
+      await invoke("write_export_file", { path, contentsBase64 });
+      const filename = path.replace(/^.*[/\\]/, "") || defaultFilename;
+      setTemplateDownloadResult({ filename, path });
+      return;
+    } catch {
+      const buffer = await buildLineImportTemplateXlsxBuffer();
+      const blob = new Blob([buffer], {
+        type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = defaultFilename;
+      a.click();
+      URL.revokeObjectURL(url);
+      setTemplateDownloadResult({ filename: defaultFilename, path: null });
+    }
+  };
+
+  const handleOpenTemplateFile = async () => {
+    const path = templateDownloadResult?.path;
+    if (!path) return;
+    try {
+      await invoke("open_export_file", { path });
+    } catch (err) {
+      console.error("Open template file failed", err);
+    }
+  };
+
+  const handleOpenTemplateFolder = () => {
+    const path = templateDownloadResult?.path;
+    if (!path) return;
+    revealItemInDir(path).catch((err) => {
+      console.error("Reveal template file failed", err);
+    });
   };
 
   const handleExcelFileSelected = async (file: File | null) => {
@@ -114,6 +193,7 @@ export function DocumentLineImportModal(props: Props) {
         getDefaultUnitPrice,
       });
       setExcelPreview(preview);
+      setExcelPreviewFilter("all");
     } catch (e) {
       setFileErrorMessage(e instanceof Error ? e.message : "Failed to parse Excel file.");
     } finally {
@@ -167,6 +247,35 @@ export function DocumentLineImportModal(props: Props) {
     setFileErrorMessage(null);
     close();
   };
+
+  const isPasteRowValid = (status: string): boolean => status === "valid";
+  const isExcelRowValid = (status: string): boolean => status === "valid";
+
+  const filteredPasteRows = pastePreview
+    ? pastePreview.rows
+        .map((row, idx) => ({ row, rowNumber: idx + 1 }))
+        .filter(({ row }) => {
+          if (pastePreviewFilter === "all") return true;
+          if (pastePreviewFilter === "valid") return isPasteRowValid(row.status);
+          return !isPasteRowValid(row.status);
+        })
+    : [];
+  const pasteValidCount = pastePreview
+    ? pastePreview.rows.filter((row) => isPasteRowValid(row.status)).length
+    : 0;
+  const pasteErrorCount = pastePreview ? pastePreview.rows.length - pasteValidCount : 0;
+
+  const filteredExcelRows = excelPreview
+    ? excelPreview.rows.filter((row) => {
+        if (excelPreviewFilter === "all") return true;
+        if (excelPreviewFilter === "valid") return isExcelRowValid(row.status);
+        return !isExcelRowValid(row.status);
+      })
+    : [];
+  const excelValidCount = excelPreview
+    ? excelPreview.rows.filter((row) => isExcelRowValid(row.status)).length
+    : 0;
+  const excelErrorCount = excelPreview ? excelPreview.rows.length - excelValidCount : 0;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
@@ -235,12 +344,71 @@ export function DocumentLineImportModal(props: Props) {
                   <FolderOpen className="h-4 w-4 shrink-0" aria-hidden />
                   {isImportingExcel ? "Parsing..." : "Choose .xlsx file"}
                 </Button>
+                <Button type="button" size="sm" variant="outline" onClick={handleDownloadTemplate}>
+                  <Download className="h-4 w-4 shrink-0" aria-hidden />
+                  Download template
+                </Button>
                 {importFileName ? (
                   <span className="max-w-[420px] truncate text-xs text-muted-foreground">
                     {importFileName}
                   </span>
                 ) : null}
               </div>
+              {templateDownloadResult ? (
+                <div className="rounded border border-emerald-500/30 bg-emerald-500/10 px-2 py-1.5 text-xs">
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-1.5 text-emerald-300">
+                        <CircleCheck className="h-3.5 w-3.5 shrink-0" aria-hidden />
+                        <span className="font-medium">Template downloaded</span>
+                      </div>
+                      <div
+                        className="truncate text-muted-foreground"
+                        title={templateDownloadResult.filename}
+                      >
+                        {templateDownloadResult.filename}
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      {templateDownloadResult.path ? (
+                        <>
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="outline"
+                            className="h-7 px-2 text-xs"
+                            onClick={() => {
+                              void handleOpenTemplateFile();
+                            }}
+                          >
+                            <File className="h-3.5 w-3.5 shrink-0" aria-hidden />
+                            Open file
+                          </Button>
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="outline"
+                            className="h-7 px-2 text-xs"
+                            onClick={handleOpenTemplateFolder}
+                          >
+                            <FolderOpen className="h-3.5 w-3.5 shrink-0" aria-hidden />
+                            Open folder
+                          </Button>
+                        </>
+                      ) : null}
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="ghost"
+                        className="h-7 px-2 text-xs"
+                        onClick={() => setTemplateDownloadResult(null)}
+                      >
+                        Dismiss
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              ) : null}
               <input
                 ref={fileInputRef}
                 type="file"
@@ -263,33 +431,68 @@ export function DocumentLineImportModal(props: Props) {
           {activeTab === "paste" && pastePreview ? (
             <div className="space-y-1.5 text-xs text-muted-foreground">
               <PasteSummary preview={pastePreview} />
+              <div className="flex items-center gap-1.5">
+                <Button
+                  type="button"
+                  size="sm"
+                  variant={pastePreviewFilter === "all" ? "default" : "outline"}
+                  className="h-7 px-2 text-xs"
+                  onClick={() => setPastePreviewFilter("all")}
+                >
+                  All ({pastePreview.rows.length})
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant={pastePreviewFilter === "errors" ? "default" : "outline"}
+                  className="h-7 px-2 text-xs"
+                  onClick={() => setPastePreviewFilter("errors")}
+                >
+                  Errors ({pasteErrorCount})
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant={pastePreviewFilter === "valid" ? "default" : "outline"}
+                  className="h-7 px-2 text-xs"
+                  onClick={() => setPastePreviewFilter("valid")}
+                >
+                  Valid ({pasteValidCount})
+                </Button>
+              </div>
               <div className="max-h-64 overflow-auto rounded border border-border/50">
-                <table className="w-full text-xs">
-                  <thead className="sticky top-0 bg-card/95">
-                    <tr className="border-b border-border/50 text-left">
-                      <th className="px-2 py-1">Row</th>
-                      <th className="px-2 py-1">Input</th>
-                      <th className="px-2 py-1">Resolved item</th>
-                      <th className="px-2 py-1">Qty</th>
-                      <th className="px-2 py-1">Status</th>
-                      <th className="px-2 py-1">Reason</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {pastePreview.rows.map((row, idx) => (
-                      <tr key={`${row.token}-${idx}`} className="border-b border-border/30">
-                        <td className="px-2 py-1">{idx + 1}</td>
-                        <td className="px-2 py-1 font-mono">{row.token}</td>
-                        <td className="px-2 py-1">
-                          {row.itemCode ? `${row.itemCode} - ${row.itemName ?? ""}` : "—"}
-                        </td>
-                        <td className="px-2 py-1">{row.qty ?? "—"}</td>
-                        <td className="px-2 py-1">{row.status}</td>
-                        <td className="px-2 py-1">{row.note ?? "—"}</td>
+                {filteredPasteRows.length === 0 ? (
+                  <div className="px-2 py-3 text-xs text-muted-foreground">
+                    {pastePreviewFilter === "errors" ? "No error rows." : "No valid rows."}
+                  </div>
+                ) : (
+                  <table className="w-full text-xs">
+                    <thead className="sticky top-0 bg-card/95">
+                      <tr className="border-b border-border/50 text-left">
+                        <th className="px-2 py-1">Row</th>
+                        <th className="px-2 py-1">Input</th>
+                        <th className="px-2 py-1">Resolved item</th>
+                        <th className="px-2 py-1">Qty</th>
+                        <th className="px-2 py-1">Status</th>
+                        <th className="px-2 py-1">Reason</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
+                    </thead>
+                    <tbody>
+                      {filteredPasteRows.map(({ row, rowNumber }, idx) => (
+                        <tr key={`${row.token}-${idx}`} className="border-b border-border/30">
+                          <td className="px-2 py-1">{rowNumber}</td>
+                          <td className="px-2 py-1 font-mono">{row.token}</td>
+                          <td className="px-2 py-1">
+                            {row.itemCode ? `${row.itemCode} - ${row.itemName ?? ""}` : "—"}
+                          </td>
+                          <td className="px-2 py-1">{row.qty ?? "—"}</td>
+                          <td className="px-2 py-1">{row.status}</td>
+                          <td className="px-2 py-1">{row.note ?? "—"}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                )}
               </div>
             </div>
           ) : null}
@@ -297,38 +500,73 @@ export function DocumentLineImportModal(props: Props) {
           {activeTab === "excel" && excelPreview ? (
             <div className="space-y-1.5 text-xs text-muted-foreground">
               <ExcelSummary preview={excelPreview} />
+              <div className="flex items-center gap-1.5">
+                <Button
+                  type="button"
+                  size="sm"
+                  variant={excelPreviewFilter === "all" ? "default" : "outline"}
+                  className="h-7 px-2 text-xs"
+                  onClick={() => setExcelPreviewFilter("all")}
+                >
+                  All ({excelPreview.rows.length})
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant={excelPreviewFilter === "errors" ? "default" : "outline"}
+                  className="h-7 px-2 text-xs"
+                  onClick={() => setExcelPreviewFilter("errors")}
+                >
+                  Errors ({excelErrorCount})
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant={excelPreviewFilter === "valid" ? "default" : "outline"}
+                  className="h-7 px-2 text-xs"
+                  onClick={() => setExcelPreviewFilter("valid")}
+                >
+                  Valid ({excelValidCount})
+                </Button>
+              </div>
               <div className="max-h-64 overflow-auto rounded border border-border/50">
-                <table className="w-full text-xs">
-                  <thead className="sticky top-0 bg-card/95">
-                    <tr className="border-b border-border/50 text-left">
-                      <th className="px-2 py-1">Row</th>
-                      <th className="px-2 py-1">Input</th>
-                      <th className="px-2 py-1">Resolved item</th>
-                      <th className="px-2 py-1">Qty</th>
-                      <th className="px-2 py-1">Unit price</th>
-                      <th className="px-2 py-1">Status</th>
-                      <th className="px-2 py-1">Reason</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {excelPreview.rows.map((row) => (
-                      <tr
-                        key={`excel-row-${row.rowNumber}-${row.sourceValue}`}
-                        className="border-b border-border/30"
-                      >
-                        <td className="px-2 py-1">{row.rowNumber}</td>
-                        <td className="px-2 py-1 font-mono">{row.sourceValue || "—"}</td>
-                        <td className="px-2 py-1">
-                          {row.itemCode ? `${row.itemCode} - ${row.itemName ?? ""}` : "—"}
-                        </td>
-                        <td className="px-2 py-1">{row.qty ?? "—"}</td>
-                        <td className="px-2 py-1">{row.unitPrice ?? "—"}</td>
-                        <td className="px-2 py-1">{row.status}</td>
-                        <td className="px-2 py-1">{row.reason ?? "—"}</td>
+                {filteredExcelRows.length === 0 ? (
+                  <div className="px-2 py-3 text-xs text-muted-foreground">
+                    {excelPreviewFilter === "errors" ? "No error rows." : "No valid rows."}
+                  </div>
+                ) : (
+                  <table className="w-full text-xs">
+                    <thead className="sticky top-0 bg-card/95">
+                      <tr className="border-b border-border/50 text-left">
+                        <th className="px-2 py-1">Row</th>
+                        <th className="px-2 py-1">Input</th>
+                        <th className="px-2 py-1">Resolved item</th>
+                        <th className="px-2 py-1">Qty</th>
+                        <th className="px-2 py-1">Unit price</th>
+                        <th className="px-2 py-1">Status</th>
+                        <th className="px-2 py-1">Reason</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
+                    </thead>
+                    <tbody>
+                      {filteredExcelRows.map((row) => (
+                        <tr
+                          key={`excel-row-${row.rowNumber}-${row.sourceValue}`}
+                          className="border-b border-border/30"
+                        >
+                          <td className="px-2 py-1">{row.rowNumber}</td>
+                          <td className="px-2 py-1 font-mono">{row.sourceValue || "—"}</td>
+                          <td className="px-2 py-1">
+                            {row.itemCode ? `${row.itemCode} - ${row.itemName ?? ""}` : "—"}
+                          </td>
+                          <td className="px-2 py-1">{row.qty ?? "—"}</td>
+                          <td className="px-2 py-1">{row.unitPrice ?? "—"}</td>
+                          <td className="px-2 py-1">{row.status}</td>
+                          <td className="px-2 py-1">{row.reason ?? "—"}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                )}
               </div>
             </div>
           ) : null}

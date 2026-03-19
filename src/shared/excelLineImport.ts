@@ -51,6 +51,42 @@ type ParseOptions = {
   getDefaultUnitPrice: (item: Item) => number;
 };
 
+export async function buildLineImportTemplateXlsxBuffer(): Promise<ArrayBuffer> {
+  const { default: ExcelJS } = await import("exceljs");
+  const workbook = new ExcelJS.Workbook();
+
+  const sheet = workbook.addWorksheet("Lines Import");
+  sheet.columns = [
+    { header: "Item Code", key: "itemCode", width: 24 },
+    { header: "Qty", key: "qty", width: 10 },
+    { header: "Unit Price", key: "unitPrice", width: 14 },
+  ];
+
+  const headerRow = sheet.getRow(1);
+  headerRow.font = { bold: true };
+
+  sheet.addRow({ itemCode: "ITEM-001", qty: 5, unitPrice: 7.99 });
+  sheet.addRow({ itemCode: "ITEM-002", qty: 2, unitPrice: 9.5 });
+  sheet.addRow({ itemCode: "ITEM-003", qty: 1, unitPrice: 12.0 });
+
+  for (let rowIndex = 2; rowIndex <= 4; rowIndex++) {
+    const row = sheet.getRow(rowIndex);
+    row.font = { color: { argb: "FF6B7280" }, italic: true };
+  }
+
+  const instructions = workbook.addWorksheet("Instructions");
+  instructions.getCell("A1").value = "How to use this template";
+  instructions.getCell("A1").font = { bold: true };
+  instructions.getCell("A3").value = "1) Fill rows on the first worksheet: Lines Import.";
+  instructions.getCell("A4").value = "2) Use Item Code values that exist in your catalog.";
+  instructions.getCell("A5").value = "3) Qty is required and must be greater than 0.";
+  instructions.getCell("A6").value = "4) Unit Price is optional (defaults are applied when empty).";
+  instructions.getCell("A7").value = "5) Example rows are demos. Replace them with real data before import.";
+  instructions.columns = [{ width: 90 }];
+
+  return workbook.xlsx.writeBuffer();
+}
+
 type HeaderValidationKind = "missing_qty" | "missing_identifier";
 
 function normalizeHeader(value: string): string {
