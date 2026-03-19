@@ -18,14 +18,14 @@ import { Button } from "@/components/ui/button";
 import { DatePickerField } from "@/components/ui/date-picker-field";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { SelectField } from "@/components/ui/select-field";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { cn } from "@/lib/utils";
 import { agGridDefaultColDef, agGridSelectionColumnDef } from "../../../shared/ui/ag-grid/agGridDefaults";
 import { todayYYYYMMDD, normalizeDateForSO } from "../dateUtils";
 import { getSalesOrderHealth } from "../../../shared/documentHealth";
 import { getErrorAndWarningMessages, actionIssue, combineIssues, hasErrors, issueListContainsMessage, type Issue } from "../../../shared/issues";
 import { DocumentIssueStrip } from "../../../shared/ui/feedback/DocumentIssueStrip";
-import { SearchableItemPicker, type SearchableItemPickerRef } from "../../../shared/ui/item-picker/SearchableItemPicker";
+import { SalesOrderItemAutocomplete, type SalesOrderItemAutocompleteRef } from "../components/SalesOrderItemAutocomplete";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { ChevronDown, FileSpreadsheet, File, FolderOpen, X } from "lucide-react";
 import { buildLinesXlsxBuffer, buildDocumentXlsxBuffer, type SoExportLineRow, type SoDocumentSummary } from "../soExport";
@@ -318,8 +318,9 @@ export function SalesOrderPage() {
   const [exportSuccess, setExportSuccess] = useState<{ path: string; filename: string } | null>(null);
   const [exportOpen, setExportOpen] = useState(false);
   const linesGridRef = useRef<AgGridReact<LineFormRow> | null>(null);
-  const lineEntryItemPickerRef = useRef<SearchableItemPickerRef | null>(null);
+  const lineEntryItemPickerRef = useRef<SalesOrderItemAutocompleteRef | null>(null);
   const lineEntryQtyInputRef = useRef<HTMLInputElement | null>(null);
+  const lineEntryDropdownRightEdgeRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     setActionIssues([]);
@@ -864,47 +865,37 @@ export function SalesOrderPage() {
                   <Label htmlFor="so-customer" className="text-sm">
                     Customer <span className="text-destructive">*</span>
                   </Label>
-                  <select
+                  <SelectField
                     id="so-customer"
                     value={form.customerId}
-                    onChange={(e) =>
-                      setForm((f) => ({ ...f, customerId: e.target.value }))
+                    onChange={(customerId) =>
+                      setForm((f) => ({ ...f, customerId }))
                     }
-                    className={cn(
-                      "flex h-8 w-full rounded border border-input bg-background pl-2 pr-7 py-1 text-sm text-foreground",
-                      "focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50",
-                    )}
-                  >
-                    <option value="">Select customer</option>
-                    {activeCustomers.map((c) => (
-                      <option key={c.id} value={c.id}>
-                        {c.code} - {c.name}
-                      </option>
-                    ))}
-                  </select>
+                    options={activeCustomers.map((c) => ({
+                      value: c.id,
+                      label: `${c.code} - ${c.name}`,
+                    }))}
+                    placeholder="Select customer"
+                    className="w-full min-w-0"
+                  />
                 </div>
                 <div className="flex min-w-0 w-full flex-col gap-0.5">
                   <Label htmlFor="so-warehouse" className="text-sm">
                     Warehouse <span className="text-destructive">*</span>
                   </Label>
-                  <select
+                  <SelectField
                     id="so-warehouse"
                     value={form.warehouseId}
-                    onChange={(e) =>
-                      setForm((f) => ({ ...f, warehouseId: e.target.value }))
+                    onChange={(warehouseId) =>
+                      setForm((f) => ({ ...f, warehouseId }))
                     }
-                    className={cn(
-                      "flex h-8 w-full rounded border border-input bg-background pl-2 pr-7 py-1 text-sm text-foreground",
-                      "focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50",
-                    )}
-                  >
-                    <option value="">Select warehouse</option>
-                    {activeWarehouses.map((w) => (
-                      <option key={w.id} value={w.id}>
-                        {w.code} - {w.name}
-                      </option>
-                    ))}
-                  </select>
+                    options={activeWarehouses.map((w) => ({
+                      value: w.id,
+                      label: `${w.code} - ${w.name}`,
+                    }))}
+                    placeholder="Select warehouse"
+                    className="w-full min-w-0"
+                  />
                 </div>
                 <div className="col-span-2 flex flex-col gap-0.5">
                   <Label htmlFor="so-comment" className="text-sm">Comment</Label>
@@ -935,7 +926,7 @@ export function SalesOrderPage() {
                       <Label htmlFor="line-entry-item" className="text-sm">
                         Item <span className="text-destructive">*</span>
                       </Label>
-                      <SearchableItemPicker
+                      <SalesOrderItemAutocomplete
                         ref={lineEntryItemPickerRef}
                         id="line-entry-item"
                         value={lineEntryItemId}
@@ -943,6 +934,7 @@ export function SalesOrderPage() {
                         items={itemRepository.list()}
                         placeholder="Search by code, barcode or name…"
                         className="w-[240px]"
+                        dropdownRightEdgeRef={lineEntryDropdownRightEdgeRef}
                       />
                     </div>
                     <div className="flex flex-col gap-0.5">
@@ -984,7 +976,10 @@ export function SalesOrderPage() {
                         className="h-8 w-[80px] text-sm text-right align-middle [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                       />
                     </div>
-                    <div className="flex gap-1.5 flex-shrink-0 items-center">
+                    <div
+                      ref={lineEntryDropdownRightEdgeRef}
+                      className="flex gap-1.5 flex-shrink-0 items-center"
+                    >
                       {editingLineId === null ? (
                         <Button
                           type="button"

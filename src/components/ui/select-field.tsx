@@ -69,7 +69,7 @@ export function SelectField({
       >
         <ul
           role="listbox"
-          className="overflow-y-auto py-0.5"
+          className="erp-dark-scrollbar overflow-y-auto py-0.5"
           style={{ maxHeight: LIST_MAX_HEIGHT_PX }}
         >
           <li role="option">

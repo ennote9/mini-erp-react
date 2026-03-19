@@ -24,10 +24,10 @@ import { todayYYYYMMDD, normalizeDateForPO } from "../dateUtils";
 import { getPurchaseOrderHealth } from "../../../shared/documentHealth";
 import { getErrorAndWarningMessages, actionIssue, combineIssues, hasErrors, issueListContainsMessage, type Issue } from "../../../shared/issues";
 import { DocumentIssueStrip } from "../../../shared/ui/feedback/DocumentIssueStrip";
-import { SearchableItemPicker, type SearchableItemPickerRef } from "../../../shared/ui/item-picker/SearchableItemPicker";
 import { SelectField } from "@/components/ui/select-field";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { ChevronDown, FileSpreadsheet, File, FolderOpen, X } from "lucide-react";
+import { PurchaseOrderItemAutocomplete, type PurchaseOrderItemAutocompleteRef } from "../components/PurchaseOrderItemAutocomplete";
 import {
   buildLinesXlsxBuffer,
   buildDocumentXlsxBuffer,
@@ -323,8 +323,9 @@ export function PurchaseOrderPage() {
   const [exportOpen, setExportOpen] = useState(false);
   const [exportSuccess, setExportSuccess] = useState<{ path: string; filename: string } | null>(null);
   const linesGridRef = useRef<AgGridReact<LineFormRow> | null>(null);
-  const lineEntryItemPickerRef = useRef<SearchableItemPickerRef | null>(null);
+  const lineEntryItemPickerRef = useRef<PurchaseOrderItemAutocompleteRef | null>(null);
   const lineEntryQtyInputRef = useRef<HTMLInputElement | null>(null);
+  const lineEntryDropdownRightEdgeRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     setActionIssues([]);
@@ -932,7 +933,7 @@ export function PurchaseOrderPage() {
                       <Label htmlFor="line-entry-item" className="text-sm">
                         Item <span className="text-destructive">*</span>
                       </Label>
-                      <SearchableItemPicker
+                      <PurchaseOrderItemAutocomplete
                         ref={lineEntryItemPickerRef}
                         id="line-entry-item"
                         value={lineEntryItemId}
@@ -940,6 +941,7 @@ export function PurchaseOrderPage() {
                         items={itemRepository.list()}
                         placeholder="Search by code, barcode or name…"
                         className="w-[240px]"
+                        dropdownRightEdgeRef={lineEntryDropdownRightEdgeRef}
                       />
                     </div>
                     <div className="flex flex-col gap-0.5">
@@ -978,7 +980,10 @@ export function PurchaseOrderPage() {
                         className="h-8 w-[80px] text-sm text-right align-middle [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                       />
                     </div>
-                    <div className="flex gap-1.5 flex-shrink-0 items-center">
+                    <div
+                      ref={lineEntryDropdownRightEdgeRef}
+                      className="flex gap-1.5 flex-shrink-0 items-center"
+                    >
                       {editingLineId === null ? (
                         <Button
                           type="button"
