@@ -9,11 +9,15 @@ import {
 } from "../lib/itemImageStorage";
 import {
   getPrimaryImage,
-  moveImageInOrder,
   normalizeItemImages,
+  reorderItemImagesByIdOrder,
   setPrimaryImage,
 } from "../lib/itemImagesNormalize";
-import { validateItemImageSlotAvailable, ITEM_IMAGE_MAX_COUNT } from "../lib/itemImageValidation";
+import {
+  validateItemImageFile,
+  validateItemImageSlotAvailable,
+  ITEM_IMAGE_MAX_COUNT,
+} from "../lib/itemImageValidation";
 import { ItemImageEmptyState } from "./ItemImageEmptyState";
 import { ItemImagePreview } from "./ItemImagePreview";
 import { ItemImageThumbnails } from "./ItemImageThumbnails";
@@ -41,10 +45,11 @@ export function ItemImagesCard({ isNew, itemId, images, onImagesChanged }: Props
   const fileInputRef = useRef<HTMLInputElement>(null);
   const uploadIntentRef = useRef<UploadIntent>("add");
 
-  const sorted = useMemo(() => normalizeItemImages(images), [images]);
+  /** Order: sortOrder only. Primary does not affect ordering. */
+  const orderedImages = useMemo(() => normalizeItemImages(images), [images]);
   const imagesFingerprint = useMemo(
-    () => sorted.map((i) => `${i.id}:${i.relativePath}:${i.sortOrder}:${i.isPrimary}`).join("|"),
-    [sorted],
+    () => orderedImages.map((i) => `${i.id}:${i.relativePath}:${i.sortOrder}:${i.isPrimary}`).join("|"),
+    [orderedImages],
   );
 
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -53,30 +58,31 @@ export function ItemImagesCard({ isNew, itemId, images, onImagesChanged }: Props
   const [previewLoadState, setPreviewLoadState] = useState<"idle" | "loading" | "ready" | "error">("idle");
   const [thumbUrls, setThumbUrls] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState(false);
-  const [message, setMessage] = useState<string | null>(null);
+  const [cardMessage, setCardMessage] = useState<{ text: string; variant: "error" | "info" } | null>(null);
 
   useEffect(() => {
-    if (sorted.length === 0) {
+    if (orderedImages.length === 0) {
       setSelectedId(null);
       return;
     }
     setSelectedId((prev) => {
-      if (prev && sorted.some((i) => i.id === prev)) return prev;
-      const primary = sorted.find((x) => x.isPrimary) ?? sorted[0];
-      return primary.id;
+      if (prev && orderedImages.some((i) => i.id === prev)) return prev;
+      return orderedImages[0]!.id;
     });
-  }, [imagesFingerprint, sorted]);
+  }, [imagesFingerprint, orderedImages]);
 
+  /** Preview follows selection (sort-order first item only as fallback while syncing). */
   const displayImage = useMemo(() => {
-    if (sorted.length === 0) return undefined;
+    if (orderedImages.length === 0) return undefined;
     if (selectedId) {
-      const hit = sorted.find((i) => i.id === selectedId);
+      const hit = orderedImages.find((i) => i.id === selectedId);
       if (hit) return hit;
     }
-    return getPrimaryImage(sorted) ?? sorted[0];
-  }, [sorted, selectedId]);
+    return orderedImages[0];
+  }, [orderedImages, selectedId]);
 
-  const displayIndex = displayImage ? sorted.findIndex((i) => i.id === displayImage.id) : -1;
+  const selectedIndex =
+    selectedId != null ? orderedImages.findIndex((i) => i.id === selectedId) : -1;
 
   useEffect(() => {
     let cancelled = false;
@@ -102,7 +108,7 @@ export function ItemImagesCard({ isNew, itemId, images, onImagesChanged }: Props
           setPreviewUrl(null);
           setPreviewAbsolutePath(null);
           setPreviewLoadState("error");
-          setMessage("Could not load image preview.");
+          setCardMessage({ text: "Could not load image preview.", variant: "error" });
         }
       });
     return () => {
@@ -112,13 +118,13 @@ export function ItemImagesCard({ isNew, itemId, images, onImagesChanged }: Props
 
   useEffect(() => {
     let cancelled = false;
-    if (sorted.length === 0) {
+    if (orderedImages.length === 0) {
       setThumbUrls({});
       return;
     }
     void (async () => {
       const entries = await Promise.all(
-        sorted.map(async (img) => {
+        orderedImages.map(async (img) => {
           try {
             const { previewUrl: url } = await getItemImagePreviewSources(img.relativePath);
             return [img.id, url] as const;
@@ -134,7 +140,7 @@ export function ItemImagesCard({ isNew, itemId, images, onImagesChanged }: Props
     return () => {
       cancelled = true;
     };
-  }, [imagesFingerprint, sorted]);
+  }, [imagesFingerprint, orderedImages]);
 
   const persistImages = useCallback(
     async (next: ItemImage[]) => {
@@ -144,7 +150,10 @@ export function ItemImagesCard({ isNew, itemId, images, onImagesChanged }: Props
       try {
         await flushPendingItemsPersist();
       } catch (pe) {
-        setMessage(pe instanceof Error ? pe.message : "Could not save item metadata to disk.");
+        setCardMessage({
+          text: pe instanceof Error ? pe.message : "Could not save item metadata to disk.",
+          variant: "error",
+        });
         onImagesChanged();
         throw pe;
       }
@@ -154,110 +163,208 @@ export function ItemImagesCard({ isNew, itemId, images, onImagesChanged }: Props
   );
 
   const triggerPickAdd = useCallback(() => {
-    setMessage(null);
-    const slotErr = validateItemImageSlotAvailable(sorted.length);
+    setCardMessage(null);
+    const slotErr = validateItemImageSlotAvailable(orderedImages.length);
     if (slotErr) {
-      setMessage(slotErr);
+      setCardMessage({ text: slotErr, variant: "error" });
       return;
     }
     uploadIntentRef.current = "add";
     fileInputRef.current?.click();
-  }, [sorted.length]);
+  }, [orderedImages.length]);
 
   const triggerPickReplace = useCallback(() => {
-    setMessage(null);
+    setCardMessage(null);
     uploadIntentRef.current = "replace";
     fileInputRef.current?.click();
   }, []);
 
-  const applyFile = useCallback(
+  const applyReplaceFile = useCallback(
     async (file: File | null) => {
       if (!file || !itemId) return;
       setBusy(true);
-      setMessage(null);
-      const intent = uploadIntentRef.current;
+      setCardMessage(null);
       try {
-        if (intent === "add") {
-          const slotErr = validateItemImageSlotAvailable(sorted.length);
-          if (slotErr) {
-            setMessage(slotErr);
-            return;
-          }
-          const placement = {
-            sortOrder: sorted.length,
-            isPrimary: sorted.length === 0,
-          };
-          const result = await saveItemImageFromFile(itemId, file, placement);
-          if ("error" in result) {
-            setMessage(result.error);
-            return;
-          }
-          try {
-            await persistImages([...sorted, result.image]);
-            setSelectedId(result.image.id);
-          } catch {
-            await deleteStoredImageFile(result.image.relativePath);
-            itemRepository.update(itemId, { images: normalizeItemImages(sorted) });
-            onImagesChanged();
-          }
-        } else {
-          const target =
-            sorted.find((x) => x.id === selectedId) ?? getPrimaryImage(sorted) ?? sorted[0];
-          if (!target) {
-            setMessage("No image to replace.");
-            return;
-          }
-          const previous = normalizeItemImages(sorted);
-          const result = await saveItemImageFromFile(itemId, file, {
-            sortOrder: target.sortOrder,
-            isPrimary: target.isPrimary,
-          });
-          if ("error" in result) {
-            setMessage(result.error);
-            return;
-          }
-          const oldPath = target.relativePath;
-          const merged = normalizeItemImages(
-            sorted.map((img) => (img.id === target.id ? result.image : img)),
-          );
-          itemRepository.update(itemId, { images: merged });
-          try {
-            await flushPendingItemsPersist();
-          } catch (pe) {
-            setMessage(pe instanceof Error ? pe.message : "Could not save item metadata to disk.");
-            await deleteStoredImageFile(result.image.relativePath);
-            itemRepository.update(itemId, { images: previous });
-            onImagesChanged();
-            return;
-          }
-          await deleteStoredImageFile(oldPath);
-          onImagesChanged();
-          setSelectedId(result.image.id);
+        const target =
+          orderedImages.find((x) => x.id === selectedId) ??
+          getPrimaryImage(orderedImages) ??
+          orderedImages[0];
+        if (!target) {
+          setCardMessage({ text: "No image to replace.", variant: "error" });
+          return;
         }
+        const previous = normalizeItemImages(orderedImages);
+        const result = await saveItemImageFromFile(itemId, file, {
+          sortOrder: target.sortOrder,
+          isPrimary: target.isPrimary,
+        });
+        if ("error" in result) {
+          setCardMessage({ text: result.error, variant: "error" });
+          return;
+        }
+        const oldPath = target.relativePath;
+        const merged = normalizeItemImages(
+          orderedImages.map((img) => (img.id === target.id ? result.image : img)),
+        );
+        itemRepository.update(itemId, { images: merged });
+        try {
+          await flushPendingItemsPersist();
+        } catch (pe) {
+          setCardMessage({
+            text: pe instanceof Error ? pe.message : "Could not save item metadata to disk.",
+            variant: "error",
+          });
+          await deleteStoredImageFile(result.image.relativePath);
+          itemRepository.update(itemId, { images: previous });
+          onImagesChanged();
+          return;
+        }
+        await deleteStoredImageFile(oldPath);
+        onImagesChanged();
+        setSelectedId(result.image.id);
       } catch (e) {
-        setMessage(e instanceof Error ? e.message : "Could not save image. Use the desktop app.");
+        setCardMessage({
+          text: e instanceof Error ? e.message : "Could not save image. Use the desktop app.",
+          variant: "error",
+        });
       } finally {
         setBusy(false);
         if (fileInputRef.current) fileInputRef.current.value = "";
       }
     },
-    [itemId, persistImages, selectedId, sorted],
+    [itemId, onImagesChanged, orderedImages, selectedId],
+  );
+
+  const applyAddFiles = useCallback(
+    async (files: File[]) => {
+      if (!itemId || files.length === 0) return;
+      const fileArr = files;
+
+      const slotErr = validateItemImageSlotAvailable(orderedImages.length);
+      if (slotErr) {
+        setCardMessage({ text: slotErr, variant: "error" });
+        if (fileInputRef.current) fileInputRef.current.value = "";
+        return;
+      }
+
+      setBusy(true);
+      setCardMessage(null);
+
+      const hadImagesBefore = orderedImages.length > 0;
+
+      let slotsRemaining = ITEM_IMAGE_MAX_COUNT - orderedImages.length;
+      const skipped: string[] = [];
+      let droppedDueToCap = 0;
+
+      let working = [...orderedImages];
+      const newFilesWritten: ItemImage[] = [];
+
+      for (const file of fileArr) {
+        if (slotsRemaining <= 0) {
+          droppedDueToCap++;
+          continue;
+        }
+        const val = validateItemImageFile(file);
+        if (val) {
+          skipped.push(`${file.name}: ${val}`);
+          continue;
+        }
+        const placement = {
+          sortOrder: working.length,
+          isPrimary: working.length === 0,
+        };
+        const result = await saveItemImageFromFile(itemId, file, placement);
+        if ("error" in result) {
+          skipped.push(`${file.name}: ${result.error}`);
+          continue;
+        }
+        newFilesWritten.push(result.image);
+        working = [...working, result.image];
+        slotsRemaining--;
+      }
+
+      if (newFilesWritten.length === 0) {
+        const parts: string[] = [];
+        if (skipped.length) parts.push(`Skipped: ${skipped.join("; ")}`);
+        if (droppedDueToCap > 0) {
+          parts.push(`Only 0 images were added. Maximum per item is ${ITEM_IMAGE_MAX_COUNT}.`);
+        }
+        setCardMessage({
+          text: parts.join(" ") || "No images could be added.",
+          variant: "error",
+        });
+        setBusy(false);
+        if (fileInputRef.current) fileInputRef.current.value = "";
+        return;
+      }
+
+      try {
+        await persistImages(working);
+        const added = newFilesWritten.length;
+        const summary: string[] = [];
+        if (droppedDueToCap > 0) {
+          summary.push(
+            `Only ${added} image${added === 1 ? "" : "s"} were added. Maximum per item is ${ITEM_IMAGE_MAX_COUNT}.`,
+          );
+        } else {
+          summary.push(`Added ${added} image${added === 1 ? "" : "s"}.`);
+        }
+        if (skipped.length > 0) {
+          const maxShow = 4;
+          const shown = skipped.slice(0, maxShow).join("; ");
+          summary.push(`Skipped: ${shown}${skipped.length > maxShow ? " …" : ""}`);
+        }
+        setCardMessage({ text: summary.join(" "), variant: "info" });
+        if (!hadImagesBefore) {
+          setSelectedId(newFilesWritten[0]!.id);
+        }
+      } catch {
+        for (const img of newFilesWritten) {
+          await deleteStoredImageFile(img.relativePath);
+        }
+        itemRepository.update(itemId, { images: normalizeItemImages(orderedImages) });
+        onImagesChanged();
+        setCardMessage({ text: "Could not save images to disk.", variant: "error" });
+      } finally {
+        setBusy(false);
+        if (fileInputRef.current) fileInputRef.current.value = "";
+      }
+    },
+    [itemId, onImagesChanged, orderedImages, persistImages],
+  );
+
+  const applyFileInputChange = useCallback(
+    (files: File[]) => {
+      if (!files.length) return;
+      if (uploadIntentRef.current === "replace") {
+        void applyReplaceFile(files[0] ?? null);
+      } else {
+        void applyAddFiles(files);
+      }
+    },
+    [applyAddFiles, applyReplaceFile],
   );
 
   const handleRemove = useCallback(async () => {
-    if (!itemId || !displayImage) return;
+    if (!itemId || selectedId == null) return;
+    const toRemove = orderedImages.find((x) => x.id === selectedId);
+    if (!toRemove) return;
+
     setBusy(true);
-    setMessage(null);
-    const previous = normalizeItemImages(sorted);
-    const filtered = sorted.filter((x) => x.id !== displayImage.id);
+    setCardMessage(null);
+    const previous = normalizeItemImages(orderedImages);
+    const filtered = orderedImages.filter((x) => x.id !== toRemove.id);
     const next = normalizeItemImages(filtered);
-    const pathToDelete = displayImage.relativePath;
+    const pathToDelete = toRemove.relativePath;
     try {
       itemRepository.update(itemId, { images: next });
       try {
         await flushPendingItemsPersist();
       } catch (pe) {
-        setMessage(pe instanceof Error ? pe.message : "Could not save item metadata to disk.");
+        setCardMessage({
+          text: pe instanceof Error ? pe.message : "Could not save item metadata to disk.",
+          variant: "error",
+        });
         itemRepository.update(itemId, { images: previous });
         onImagesChanged();
         return;
@@ -265,15 +372,18 @@ export function ItemImagesCard({ isNew, itemId, images, onImagesChanged }: Props
       await deleteStoredImageFile(pathToDelete);
       onImagesChanged();
     } catch (e) {
-      setMessage(e instanceof Error ? e.message : "Could not remove image.");
+      setCardMessage({
+        text: e instanceof Error ? e.message : "Could not remove image.",
+        variant: "error",
+      });
     } finally {
       setBusy(false);
     }
-  }, [displayImage, itemId, onImagesChanged, sorted]);
+  }, [itemId, onImagesChanged, orderedImages, selectedId]);
 
   const handleOpenFullSize = useCallback(async () => {
     if (!displayImage) return;
-    setMessage(null);
+    setCardMessage(null);
     let absolutePathForOpen: string | undefined;
     try {
       absolutePathForOpen = await resolveAbsoluteImagePath(displayImage.relativePath);
@@ -292,77 +402,92 @@ export function ItemImagesCard({ isNew, itemId, images, onImagesChanged }: Props
         import.meta.env.DEV && absolutePathForOpen
           ? `${base} — path: ${absolutePathForOpen}`
           : base;
-      setMessage(withPath);
+      setCardMessage({ text: withPath, variant: "error" });
     }
   }, [displayImage]);
 
   const handleSetPrimary = useCallback(async () => {
-    if (!itemId || !displayImage) return;
+    if (!itemId || selectedId == null) return;
     setBusy(true);
-    setMessage(null);
+    setCardMessage(null);
     try {
-      await persistImages(setPrimaryImage(sorted, displayImage.id));
+      await persistImages(setPrimaryImage(orderedImages, selectedId));
     } catch {
       /* message set in persistImages */
     } finally {
       setBusy(false);
     }
-  }, [displayImage, itemId, persistImages, sorted]);
+  }, [itemId, orderedImages, persistImages, selectedId]);
 
-  const handleMoveLeft = useCallback(async () => {
-    if (!itemId || !displayImage) return;
-    setBusy(true);
-    setMessage(null);
-    try {
-      await persistImages(moveImageInOrder(sorted, displayImage.id, -1));
-    } catch {
-      /* persistImages surfaced message */
-    } finally {
-      setBusy(false);
-    }
-  }, [displayImage, itemId, persistImages, sorted]);
+  const handleSelectPrevious = useCallback(() => {
+    if (selectedIndex <= 0) return;
+    setSelectedId(orderedImages[selectedIndex - 1]!.id);
+  }, [orderedImages, selectedIndex]);
 
-  const handleMoveRight = useCallback(async () => {
-    if (!itemId || !displayImage) return;
-    setBusy(true);
-    setMessage(null);
-    try {
-      await persistImages(moveImageInOrder(sorted, displayImage.id, 1));
-    } catch {
-      /* persistImages surfaced message */
-    } finally {
-      setBusy(false);
-    }
-  }, [displayImage, itemId, persistImages, sorted]);
+  const handleSelectNext = useCallback(() => {
+    if (selectedIndex < 0 || selectedIndex >= orderedImages.length - 1) return;
+    setSelectedId(orderedImages[selectedIndex + 1]!.id);
+  }, [orderedImages, selectedIndex]);
 
-  const canAddMore = sorted.length < ITEM_IMAGE_MAX_COUNT;
+  const handleReorderIds = useCallback(
+    async (newOrderIds: string[]) => {
+      if (!itemId) return;
+      setBusy(true);
+      setCardMessage(null);
+      try {
+        const next = reorderItemImagesByIdOrder(orderedImages, newOrderIds);
+        await persistImages(next);
+      } catch {
+        /* persistImages */
+      } finally {
+        setBusy(false);
+      }
+    },
+    [itemId, orderedImages, persistImages],
+  );
+
+  const canAddMore = orderedImages.length < ITEM_IMAGE_MAX_COUNT;
 
   return (
     <Card className="border-0 shadow-none xl:sticky xl:top-2">
       <CardHeader className="p-2 pb-0.5">
         <CardTitle className="text-[0.9rem] font-semibold">Images</CardTitle>
         <CardDescription className="text-xs">
-          Up to {ITEM_IMAGE_MAX_COUNT} images per item (JPG, PNG, WebP, 10 MB each). Stored locally.
+          Up to {ITEM_IMAGE_MAX_COUNT} images (JPG, PNG, WebP, 10 MB each). Upload accepts multiple files.
+          Arrows change selection; drag thumbnails to reorder. Stored locally.
         </CardDescription>
       </CardHeader>
       <CardContent className="p-2 pt-1">
         <input
           ref={fileInputRef}
           type="file"
+          multiple
           accept="image/jpeg,image/jpg,image/png,image/webp,.jpg,.jpeg,.png,.webp"
           className="sr-only"
           aria-hidden
           tabIndex={-1}
-          onChange={(e) => void applyFile(e.target.files?.[0] ?? null)}
+          onChange={(e) => {
+            const list = e.target.files;
+            const picked = list ? Array.from(list) : [];
+            e.target.value = "";
+            applyFileInputChange(picked);
+          }}
         />
-        {message && (
-          <p className="mb-2 text-xs text-destructive" role="alert">
-            {message}
+        {cardMessage && (
+          <p
+            className={
+              cardMessage.variant === "error"
+                ? "mb-2 text-xs text-destructive"
+                : "mb-2 text-xs text-muted-foreground"
+            }
+            role={cardMessage.variant === "error" ? "alert" : "status"}
+          >
+            {cardMessage.text}
           </p>
         )}
         {isNew || !itemId ? (
           <ItemImageEmptyState variant="unsaved" />
-        ) : sorted.length === 0 ? (
+        ) : orderedImages.length === 0 ? (
           <ItemImageEmptyState variant="ready" onUploadClick={triggerPickAdd} disabled={busy} />
         ) : (
           <div className="flex flex-col gap-2">
@@ -376,18 +501,20 @@ export function ItemImagesCard({ isNew, itemId, images, onImagesChanged }: Props
                 onRemove={() => void handleRemove()}
                 onOpenFullSize={() => void handleOpenFullSize()}
                 onSetPrimary={handleSetPrimary}
-                onMoveLeft={handleMoveLeft}
-                onMoveRight={handleMoveRight}
-                canMoveLeft={displayIndex > 0}
-                canMoveRight={displayIndex >= 0 && displayIndex < sorted.length - 1}
+                canSetPrimary={selectedId != null}
+                onSelectPrevious={handleSelectPrevious}
+                onSelectNext={handleSelectNext}
+                canSelectPrevious={selectedIndex > 0}
+                canSelectNext={selectedIndex >= 0 && selectedIndex < orderedImages.length - 1}
                 busy={busy}
               />
             )}
             <ItemImageThumbnails
-              images={sorted}
+              images={orderedImages}
               selectedId={selectedId}
               thumbUrls={thumbUrls}
               onSelect={setSelectedId}
+              onReorderIds={(ids) => void handleReorderIds(ids)}
               disabled={busy}
             />
             {canAddMore ? (

@@ -14,10 +14,12 @@ type Props = {
   onRemove: () => void;
   onOpenFullSize: () => void;
   onSetPrimary?: () => void;
-  onMoveLeft?: () => void;
-  onMoveRight?: () => void;
-  canMoveLeft?: boolean;
-  canMoveRight?: boolean;
+  /** When false, Primary is disabled (e.g. no explicit selection). */
+  canSetPrimary?: boolean;
+  onSelectPrevious: () => void;
+  onSelectNext: () => void;
+  canSelectPrevious: boolean;
+  canSelectNext: boolean;
   busy?: boolean;
 };
 
@@ -36,10 +38,11 @@ export function ItemImagePreview({
   onRemove,
   onOpenFullSize,
   onSetPrimary,
-  onMoveLeft,
-  onMoveRight,
-  canMoveLeft,
-  canMoveRight,
+  canSetPrimary = true,
+  onSelectPrevious,
+  onSelectNext,
+  canSelectPrevious,
+  canSelectNext,
   busy,
 }: Props) {
   const [imgDecodeFailed, setImgDecodeFailed] = useState(false);
@@ -52,6 +55,9 @@ export function ItemImagePreview({
     image.width != null && image.height != null ? `${image.width} × ${image.height}` : null;
 
   const showDevDecodeHint = import.meta.env.DEV && imgDecodeFailed && previewUrl && absolutePath;
+
+  const primaryDisabled =
+    busy || image.isPrimary || !onSetPrimary || !canSetPrimary;
 
   return (
     <div className="flex flex-col gap-2">
@@ -144,11 +150,13 @@ export function ItemImagePreview({
           size="sm"
           className="h-8 gap-1"
           onClick={() => onSetPrimary?.()}
-          disabled={busy || image.isPrimary || !onSetPrimary}
+          disabled={primaryDisabled}
           title={
-            image.isPrimary
-              ? "Selected image is already primary"
-              : "Set as primary image"
+            !canSetPrimary
+              ? "Select an image first"
+              : image.isPrimary
+                ? "Selected image is already primary"
+                : "Set as primary image"
           }
           aria-label={
             image.isPrimary
@@ -159,34 +167,30 @@ export function ItemImagePreview({
           <Star className="h-3.5 w-3.5" />
           Primary
         </Button>
-        {onMoveLeft && (
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            className="h-8 w-8 p-0"
-            onClick={onMoveLeft}
-            disabled={busy || !canMoveLeft}
-            title="Move left"
-            aria-label="Move image left"
-          >
-            <ChevronLeft className="h-4 w-4" />
-          </Button>
-        )}
-        {onMoveRight && (
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            className="h-8 w-8 p-0"
-            onClick={onMoveRight}
-            disabled={busy || !canMoveRight}
-            title="Move right"
-            aria-label="Move image right"
-          >
-            <ChevronRight className="h-4 w-4" />
-          </Button>
-        )}
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          className="h-8 w-8 p-0"
+          onClick={onSelectPrevious}
+          disabled={busy || !canSelectPrevious}
+          title="Previous image"
+          aria-label="Previous image"
+        >
+          <ChevronLeft className="h-4 w-4" />
+        </Button>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          className="h-8 w-8 p-0"
+          onClick={onSelectNext}
+          disabled={busy || !canSelectNext}
+          title="Next image"
+          aria-label="Next image"
+        >
+          <ChevronRight className="h-4 w-4" />
+        </Button>
       </div>
     </div>
   );
