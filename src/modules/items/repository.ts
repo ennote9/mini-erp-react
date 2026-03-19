@@ -1,8 +1,8 @@
-import type { Item } from "./model";
+import type { Item, ItemImage } from "./model";
 import { brandRepository } from "../brands/repository";
 import { categoryRepository } from "../categories/repository";
 
-export type CreateItemInput = Omit<Item, "id">;
+export type CreateItemInput = Omit<Item, "id" | "images"> & { images?: ItemImage[] };
 export type UpdateItemPatch = Partial<Omit<Item, "id">>;
 
 const store: Item[] = [];
@@ -22,7 +22,11 @@ export const itemRepository = {
   },
 
   create(input: CreateItemInput): Item {
-    const item: Item = { ...input, id: nextIdStr() };
+    const item: Item = {
+      ...input,
+      id: nextIdStr(),
+      images: input.images ?? [],
+    };
     store.push(item);
     return item;
   },

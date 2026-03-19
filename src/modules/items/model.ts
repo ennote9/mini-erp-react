@@ -2,6 +2,22 @@
  * Item entity per docs/01_product_core/02_Domain_Model.md.
  * Master data: sellable/receivable product.
  */
+
+/** Image metadata; binary lives in app-local storage (see relativePath). Phase 1 UI supports one image; model stays array for future multi-image. */
+export interface ItemImage {
+  id: string;
+  fileName: string;
+  /** Path relative to app local data dir (Tauri), e.g. `items/{id}/images/file.webp`. */
+  relativePath: string;
+  mimeType: string;
+  sizeBytes: number;
+  width?: number;
+  height?: number;
+  sortOrder: number;
+  isPrimary: boolean;
+  createdAt: string;
+}
+
 export interface Item {
   id: string;
   code: string;
@@ -14,4 +30,5 @@ export interface Item {
   barcode?: string;
   purchasePrice?: number;
   salePrice?: number;
+  images: ItemImage[];
 }

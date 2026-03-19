@@ -22,6 +22,7 @@ import {
 import { actionIssue, combineIssues, getErrorAndWarningMessages, issueListContainsMessage, type Issue } from "../../../shared/issues";
 import { getItemFormHealth } from "../../../shared/masterDataHealth";
 import { DocumentIssueStrip } from "../../../shared/ui/feedback/DocumentIssueStrip";
+import { ItemImagesCard } from "../components/ItemImagesCard";
 
 type FormState = {
   code: string;
@@ -55,9 +56,10 @@ export function ItemPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const isNew = id === "new";
+  const [imagesRevision, setImagesRevision] = useState(0);
   const item = useMemo(
     () => (id && !isNew ? itemRepository.getById(id) : undefined),
-    [id, isNew],
+    [id, isNew, imagesRevision],
   );
 
   const [form, setForm] = useState<FormState>(defaultForm);
@@ -216,7 +218,8 @@ export function ItemPage() {
           </div>
         </div>
       </div>
-      <Card className="mt-4 max-w-2xl border-0 shadow-none">
+      <div className="mt-4 grid gap-4 xl:grid-cols-[minmax(0,42rem)_minmax(260px,1fr)] xl:items-start">
+      <Card className="max-w-2xl w-full border-0 shadow-none">
         <CardHeader className="p-2 pb-0.5">
           <CardTitle className="text-[0.9rem] font-semibold">Details</CardTitle>
           <CardDescription className="text-xs">
@@ -370,6 +373,13 @@ export function ItemPage() {
           </div>
         </CardContent>
       </Card>
+      <ItemImagesCard
+        isNew={isNew}
+        itemId={isNew ? undefined : id}
+        images={item?.images ?? []}
+        onImagesChanged={() => setImagesRevision((n) => n + 1)}
+      />
+      </div>
     </div>
   );
 }
