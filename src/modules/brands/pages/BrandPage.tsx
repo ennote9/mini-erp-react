@@ -2,6 +2,9 @@ import { useParams, useNavigate } from "react-router-dom";
 import { useMemo, useState, useEffect } from "react";
 import { brandRepository } from "../repository";
 import { saveBrand } from "../service";
+import { itemRepository } from "../../items/repository";
+import { categoryRepository } from "../../categories/repository";
+import type { Item } from "../../items/model";
 import { Breadcrumb } from "../../../shared/ui/object/Breadcrumb";
 import { BackButton } from "../../../shared/ui/list/BackButton";
 import { Button } from "@/components/ui/button";
@@ -36,6 +39,18 @@ function defaultForm(): FormState {
   };
 }
 
+function itemImageCount(item: Item): number {
+  return Array.isArray(item.images) ? item.images.length : 0;
+}
+
+function RelatedItemsImagesCell({ item }: { item: Item }) {
+  const n = itemImageCount(item);
+  if (n === 0) {
+    return <span className="text-muted-foreground tabular-nums">—</span>;
+  }
+  return <span className="tabular-nums text-foreground/90">{n}</span>;
+}
+
 export function BrandPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -44,6 +59,21 @@ export function BrandPage() {
     () => (id && !isNew ? brandRepository.getById(id) : undefined),
     [id, isNew],
   );
+
+  const relatedItems = useMemo(() => {
+    if (!brand?.id) return [];
+    return itemRepository
+      .list()
+      .filter((item) => item.brandId === brand.id)
+      .slice()
+      .sort((a, b) => a.code.localeCompare(b.code, undefined, { sensitivity: "base" }));
+  }, [brand?.id]);
+
+  const relatedSummary = useMemo(() => {
+    const total = relatedItems.length;
+    const active = relatedItems.filter((x) => x.isActive).length;
+    return { total, active, inactive: total - active };
+  }, [relatedItems]);
 
   const [form, setForm] = useState<FormState>(defaultForm);
   const [actionIssues, setActionIssues] = useState<Issue[]>([]);
@@ -223,6 +253,114 @@ export function BrandPage() {
           </div>
         </CardContent>
       </Card>
+
+      {!isNew && brand ? (
+        <Card className="mt-4 w-full max-w-4xl min-w-0 border-0 shadow-none">
+          <CardHeader className="p-2 pb-0.5 space-y-0">
+            <div className="flex flex-wrap items-start justify-between gap-2 gap-y-1.5">
+              <div className="min-w-0 space-y-0.5 flex-1">
+                <CardTitle className="text-[0.9rem] font-semibold tracking-tight">
+                  Related Items
+                </CardTitle>
+                <CardDescription className="text-xs leading-snug">
+                  Linked inventory records. Read-only; open a row for detail.
+                </CardDescription>
+              </div>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="h-7 shrink-0 px-2.5 text-xs"
+                onClick={() =>
+                  navigate(`/items?brandId=${encodeURIComponent(brand.id)}`)
+                }
+              >
+                Open all items
+              </Button>
+            </div>
+          </CardHeader>
+          <CardContent className="p-2 pt-1 space-y-2">
+            <div
+              className="flex flex-wrap gap-1.5"
+              aria-label="Related items summary"
+            >
+              <span className="inline-flex items-baseline gap-1 rounded border border-border/50 bg-muted/25 px-2 py-0.5 text-[11px] tabular-nums leading-none">
+                <span className="text-muted-foreground">Items</span>
+                <span className="font-medium text-foreground/90">{relatedSummary.total}</span>
+              </span>
+              <span className="inline-flex items-baseline gap-1 rounded border border-border/50 bg-muted/25 px-2 py-0.5 text-[11px] tabular-nums leading-none">
+                <span className="text-muted-foreground">Active</span>
+                <span className="font-medium text-foreground/90">{relatedSummary.active}</span>
+              </span>
+              <span className="inline-flex items-baseline gap-1 rounded border border-border/50 bg-muted/25 px-2 py-0.5 text-[11px] tabular-nums leading-none">
+                <span className="text-muted-foreground">Inactive</span>
+                <span className="font-medium text-foreground/90">{relatedSummary.inactive}</span>
+              </span>
+            </div>
+            {relatedItems.length === 0 ? (
+              <p className="text-sm text-muted-foreground py-3 m-0">
+                No items linked to this brand yet.
+              </p>
+            ) : (
+              <div className="min-w-0 overflow-x-auto rounded-md border border-border/60">
+                <table className="list-table text-sm">
+                  <thead>
+                    <tr>
+                      <th className="list-table__cell--code">Code</th>
+                      <th className="list-table__cell--name">Name</th>
+                      <th className="min-w-[100px]">Category</th>
+                      <th className="w-16 text-right whitespace-nowrap">Images</th>
+                      <th className="list-table__cell--active">Active</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {relatedItems.map((item) => {
+                      const catName =
+                        item.categoryId != null && item.categoryId !== ""
+                          ? categoryRepository.getById(item.categoryId)?.name ?? "—"
+                          : "—";
+                      return (
+                        <tr
+                          key={item.id}
+                          className="list-table__row list-table__row--clickable"
+                          onClick={() => navigate(`/items/${item.id}`)}
+                          role="button"
+                          tabIndex={0}
+                          aria-label={`Open item ${item.code}`}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter" || e.key === " ") {
+                              e.preventDefault();
+                              navigate(`/items/${item.id}`);
+                            }
+                          }}
+                        >
+                          <td className="list-table__cell--code font-mono text-xs">{item.code}</td>
+                          <td className="list-table__cell--name">{item.name}</td>
+                          <td className="text-muted-foreground">{catName}</td>
+                          <td className="text-right">
+                            <RelatedItemsImagesCell item={item} />
+                          </td>
+                          <td className="list-table__cell--active">
+                            <span
+                              className={
+                                item.isActive
+                                  ? "status-plain-text status-plain-text--active"
+                                  : "status-plain-text status-plain-text--inactive"
+                              }
+                            >
+                              {item.isActive ? "Active" : "Inactive"}
+                            </span>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      ) : null}
     </div>
   );
 }

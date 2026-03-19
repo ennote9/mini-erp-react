@@ -3,7 +3,7 @@
  * Preserves search, All/Active/Inactive filters, New button, row navigation, empty state.
  */
 import React, { useMemo, useState, useRef, useCallback } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { AgGridReact } from "ag-grid-react";
 import type { ColDef, ICellRendererParams, SelectionChangedEvent } from "ag-grid-community";
 import { itemRepository } from "../repository";
@@ -43,6 +43,16 @@ function applyActiveFilter(
   return items;
 }
 
+function applyBrandIdFilter(items: Item[], brandId: string | null): Item[] {
+  if (brandId == null || brandId === "") return items;
+  return items.filter((x) => x.brandId === brandId);
+}
+
+function applyCategoryIdFilter(items: Item[], categoryId: string | null): Item[] {
+  if (categoryId == null || categoryId === "") return items;
+  return items.filter((x) => x.categoryId === categoryId);
+}
+
 function ActiveStatusCellRenderer(params: ICellRendererParams<Item>) {
   const isActive = params.value as boolean;
   const label = isActive ? "Active" : "Inactive";
@@ -51,6 +61,15 @@ function ActiveStatusCellRenderer(params: ICellRendererParams<Item>) {
       {label}
     </span>
   );
+}
+
+/** Image count only — no thumbnails (Items list). */
+function ImagesCountCellRenderer(params: ICellRendererParams<Item, number>) {
+  const n = typeof params.value === "number" ? params.value : 0;
+  if (n === 0) {
+    return <span className="text-muted-foreground tabular-nums">—</span>;
+  }
+  return <span className="tabular-nums text-foreground/90">{n}</span>;
 }
 
 function buildExportRowsFromItems(items: Item[]): ItemsExportRow[] {
@@ -81,6 +100,21 @@ function buildExportRowsFromItems(items: Item[]): ItemsExportRow[] {
 
 export function ItemsListPage() {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const brandFilterId = useMemo(() => {
+    const raw = searchParams.get("brandId");
+    if (raw == null || raw === "") return null;
+    const t = raw.trim();
+    return t === "" ? null : t;
+  }, [searchParams]);
+
+  const categoryFilterId = useMemo(() => {
+    const raw = searchParams.get("categoryId");
+    if (raw == null || raw === "") return null;
+    const t = raw.trim();
+    return t === "" ? null : t;
+  }, [searchParams]);
+
   const [searchQuery, setSearchQuery] = useState("");
   const [activeFilter, setActiveFilter] = useState<ActiveFilter>("all");
   const [exportSuccess, setExportSuccess] = useState<{ path: string; filename: string } | null>(null);
@@ -94,11 +128,43 @@ export function ItemsListPage() {
 
   const filteredItems = useMemo(() => {
     const searched = itemRepository.search(searchQuery);
-    return applyActiveFilter(searched, activeFilter);
-  }, [searchQuery, activeFilter]);
+    const statusFiltered = applyActiveFilter(searched, activeFilter);
+    const brandFiltered = applyBrandIdFilter(statusFiltered, brandFilterId);
+    return applyCategoryIdFilter(brandFiltered, categoryFilterId);
+  }, [searchQuery, activeFilter, brandFilterId, categoryFilterId]);
 
   const isEmpty = filteredItems.length === 0;
-  const hasActiveFilter = activeFilter !== "all" || searchQuery.trim() !== "";
+  const hasActiveFilter =
+    activeFilter !== "all" ||
+    searchQuery.trim() !== "" ||
+    brandFilterId != null ||
+    categoryFilterId != null;
+
+  const brandFilterLabel = useMemo((): string => {
+    if (brandFilterId == null) return "";
+    const b = brandRepository.getById(brandFilterId);
+    if (b) return b.name || b.code || brandFilterId;
+    return brandFilterId;
+  }, [brandFilterId]);
+
+  const clearBrandFilter = useCallback(() => {
+    const next = new URLSearchParams(searchParams);
+    next.delete("brandId");
+    setSearchParams(next, { replace: true });
+  }, [searchParams, setSearchParams]);
+
+  const categoryFilterLabel = useMemo((): string => {
+    if (categoryFilterId == null) return "";
+    const c = categoryRepository.getById(categoryFilterId);
+    if (c) return c.name || c.code || categoryFilterId;
+    return categoryFilterId;
+  }, [categoryFilterId]);
+
+  const clearCategoryFilter = useCallback(() => {
+    const next = new URLSearchParams(searchParams);
+    next.delete("categoryId");
+    setSearchParams(next, { replace: true });
+  }, [searchParams, setSearchParams]);
 
   const getExportRowsCurrentView = useCallback((): ItemsExportRow[] => {
     const api = gridRef.current?.api;
@@ -167,9 +233,21 @@ export function ItemsListPage() {
   const emptyTitle = hasActiveFilter
     ? "No items match current search or filters"
     : "No items yet";
-  const emptyHint = hasActiveFilter
-    ? "Try changing the search or filter."
-    : "Create your first item to start working with inventory.";
+  const emptyHint = useMemo(() => {
+    if (!hasActiveFilter) {
+      return "Create your first item to start working with inventory.";
+    }
+    if (brandFilterId != null && categoryFilterId != null) {
+      return "Try clearing the brand or category filter or adjusting search.";
+    }
+    if (brandFilterId != null) {
+      return "Try clearing the brand filter or adjusting search.";
+    }
+    if (categoryFilterId != null) {
+      return "Try clearing the category filter or adjusting search.";
+    }
+    return "Try changing the search or filter.";
+  }, [hasActiveFilter, brandFilterId, categoryFilterId]);
 
   const columnDefs = useMemo<ColDef<Item>[]>(
     () => [
@@ -184,6 +262,15 @@ export function ItemsListPage() {
         headerName: "Name",
         minWidth: 160,
         flex: 1,
+      },
+      {
+        colId: "imageCount",
+        headerName: "Images",
+        width: 76,
+        maxWidth: 88,
+        valueGetter: (params) =>
+          Array.isArray(params.data?.images) ? params.data!.images.length : 0,
+        cellRenderer: ImagesCountCellRenderer,
       },
       {
         headerName: "Brand",
@@ -271,6 +358,48 @@ export function ItemsListPage() {
             resultCount={filteredItems.length}
           />
           <div className="flex flex-row items-center gap-2 shrink-0 ml-auto">
+            {brandFilterId != null && (
+              <div
+                className="flex h-8 max-w-[min(100%,18rem)] items-center gap-1.5 rounded-md border border-input bg-background px-2 text-xs shrink-0"
+                role="status"
+                aria-label="Brand filter active"
+              >
+                <span className="text-muted-foreground whitespace-nowrap shrink-0">Brand</span>
+                <span className="truncate font-medium text-foreground/90 min-w-0" title={brandFilterLabel}>
+                  {brandFilterLabel}
+                </span>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="h-7 px-1.5 text-xs shrink-0 text-muted-foreground hover:text-foreground"
+                  onClick={clearBrandFilter}
+                >
+                  Clear
+                </Button>
+              </div>
+            )}
+            {categoryFilterId != null && (
+              <div
+                className="flex h-8 max-w-[min(100%,18rem)] items-center gap-1.5 rounded-md border border-input bg-background px-2 text-xs shrink-0"
+                role="status"
+                aria-label="Category filter active"
+              >
+                <span className="text-muted-foreground whitespace-nowrap shrink-0">Category</span>
+                <span className="truncate font-medium text-foreground/90 min-w-0" title={categoryFilterLabel}>
+                  {categoryFilterLabel}
+                </span>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="h-7 px-1.5 text-xs shrink-0 text-muted-foreground hover:text-foreground"
+                  onClick={clearCategoryFilter}
+                >
+                  Clear
+                </Button>
+              </div>
+            )}
             {exportSuccess && (
               <div className="h-8 w-max flex items-center gap-1.5 rounded-md border border-input bg-background px-2 text-sm shrink-0">
                 <span className="text-muted-foreground text-xs">Export completed:</span>
