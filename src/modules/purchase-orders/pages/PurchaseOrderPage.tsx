@@ -22,18 +22,25 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { agGridDefaultColDef, agGridSelectionColumnDef } from "../../../shared/ui/ag-grid/agGridDefaults";
 import { todayYYYYMMDD, normalizeDateForPO } from "../dateUtils";
 import { getPurchaseOrderHealth } from "../../../shared/documentHealth";
-import { getErrorAndWarningMessages, actionIssue, combineIssues, hasErrors, issueListContainsMessage, type Issue } from "../../../shared/issues";
+import { getErrorAndWarningMessages, actionIssue, actionWarning, combineIssues, hasErrors, issueListContainsMessage, type Issue } from "../../../shared/issues";
 import { DocumentIssueStrip } from "../../../shared/ui/feedback/DocumentIssueStrip";
 import { SelectField } from "@/components/ui/select-field";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
+  DocumentLineImportModal,
+  type LineImportTab,
+  type ResolvedImportLine,
+} from "../../../shared/ui/object/DocumentLineImportModal";
+import {
   Check,
   ChevronDown,
   CircleCheck,
+  FileUp,
   File,
   FileSpreadsheet,
   FileX,
   FolderOpen,
+  ClipboardPaste,
   Plus,
   Save,
   Trash2,
@@ -332,6 +339,8 @@ export function PurchaseOrderPage() {
   } | null>(null);
   const [actionIssues, setActionIssues] = useState<Issue[]>([]);
   const [selectedLineIds, setSelectedLineIds] = useState<number[]>([]);
+  const [isLineImportModalOpen, setIsLineImportModalOpen] = useState(false);
+  const [lineImportInitialTab, setLineImportInitialTab] = useState<LineImportTab>("paste");
   const [exportOpen, setExportOpen] = useState(false);
   const [exportSuccess, setExportSuccess] = useState<{ path: string; filename: string } | null>(null);
   const linesGridRef = useRef<AgGridReact<LineFormRow> | null>(null);
@@ -625,6 +634,44 @@ export function PurchaseOrderPage() {
         lineEntryQtyInputRef.current?.select();
       }, 0);
     }
+  };
+
+  const handleApplyImportedLines = ({ lines, skippedRows }: { lines: ResolvedImportLine[]; skippedRows: number }) => {
+    if (lines.length === 0) return;
+    setForm((f) => {
+      const nextLines = [...f.lines];
+      const lineIndexByItemId = new Map(
+        nextLines.map((line, idx) => [line.itemId, idx]),
+      );
+
+      for (const grouped of lines) {
+        const idx = lineIndexByItemId.get(grouped.itemId);
+        if (idx != null) {
+          nextLines[idx] = { ...nextLines[idx], qty: nextLines[idx].qty + grouped.qty };
+          continue;
+        }
+        nextLines.push({
+          _lineId: nextLineIdRef.current++,
+          itemId: grouped.itemId,
+          qty: grouped.qty,
+          unitPrice: grouped.unitPrice,
+        });
+        lineIndexByItemId.set(grouped.itemId, nextLines.length - 1);
+      }
+      return { ...f, lines: nextLines };
+    });
+
+    if (skippedRows > 0) {
+      setActionIssues([
+        actionWarning(
+          `Added ${lines.length} items. Skipped ${skippedRows} rows.`,
+        ),
+      ]);
+    } else {
+      setActionIssues([]);
+    }
+    setDuplicateChoicePending(null);
+    setTimeout(() => lineEntryItemPickerRef.current?.focus(), 0);
   };
 
   const totals = useMemo(() => {
@@ -1012,16 +1059,44 @@ export function PurchaseOrderPage() {
                       className="flex gap-1.5 flex-shrink-0 items-center"
                     >
                       {editingLineId === null ? (
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          className="h-8 gap-1.5"
-                          onClick={addLineFromEntry}
-                        >
-                          <Plus className="h-4 w-4 shrink-0" aria-hidden />
-                          Add line
-                        </Button>
+                        <>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            className="h-8 gap-1.5"
+                            onClick={addLineFromEntry}
+                          >
+                            <Plus className="h-4 w-4 shrink-0" aria-hidden />
+                            Add line
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            className="h-8 gap-1.5"
+                            onClick={() => {
+                              setLineImportInitialTab("paste");
+                              setIsLineImportModalOpen(true);
+                            }}
+                          >
+                            <ClipboardPaste className="h-4 w-4 shrink-0" aria-hidden />
+                            Paste items
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            className="h-8 gap-1.5"
+                            onClick={() => {
+                              setLineImportInitialTab("excel");
+                              setIsLineImportModalOpen(true);
+                            }}
+                          >
+                            <FileUp className="h-4 w-4 shrink-0" aria-hidden />
+                            Import from Excel
+                          </Button>
+                        </>
                       ) : (
                         <>
                           <Button
@@ -1400,6 +1475,20 @@ export function PurchaseOrderPage() {
           </div>
         </>
       )}
+      <DocumentLineImportModal
+        open={isLineImportModalOpen}
+        initialTab={lineImportInitialTab}
+        items={itemRepository.list()}
+        getDefaultUnitPrice={(item) =>
+          typeof item.purchasePrice === "number" &&
+          Number.isFinite(item.purchasePrice) &&
+          item.purchasePrice >= 0
+            ? item.purchasePrice
+            : 0
+        }
+        onOpenChange={setIsLineImportModalOpen}
+        onApply={handleApplyImportedLines}
+      />
     </DocumentPageLayout>
   );
 }
