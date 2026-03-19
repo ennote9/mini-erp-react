@@ -1,13 +1,81 @@
 import type { Warehouse } from "./model";
+import {
+  getMasterDataFilePath,
+  loadMasterDataPersisted,
+  writeMasterDataPayload,
+} from "@/shared/masterDataPersistence";
 
 export type CreateWarehouseInput = Omit<Warehouse, "id">;
 export type UpdateWarehousePatch = Partial<Omit<Warehouse, "id">>;
 
 const store: Warehouse[] = [];
 let nextId = 1;
+let persistChain: Promise<void> = Promise.resolve();
+
+const PERSIST_PATH = getMasterDataFilePath("warehouses.json");
+
+function asOptionalString(v: unknown): string | undefined {
+  return typeof v === "string" ? v : undefined;
+}
+
+function normalizeWarehouse(raw: unknown): Warehouse | null {
+  if (!raw || typeof raw !== "object") return null;
+  const rec = raw as Record<string, unknown>;
+  if (
+    typeof rec.id !== "string" ||
+    typeof rec.code !== "string" ||
+    typeof rec.name !== "string" ||
+    typeof rec.isActive !== "boolean"
+  ) {
+    return null;
+  }
+  return {
+    id: rec.id,
+    code: rec.code,
+    name: rec.name,
+    isActive: rec.isActive,
+    comment: asOptionalString(rec.comment),
+    warehouseType: asOptionalString(rec.warehouseType),
+    address: asOptionalString(rec.address),
+    city: asOptionalString(rec.city),
+    country: asOptionalString(rec.country),
+    contactPerson: asOptionalString(rec.contactPerson),
+    phone: asOptionalString(rec.phone),
+  };
+}
+
+function buildSeedWarehouses(): Warehouse[] {
+  return seed.map((s, i) => ({ ...s, id: String(i + 1) }));
+}
+
+function schedulePersist(): void {
+  persistChain = persistChain.then(async () => {
+    try {
+      await writeMasterDataPayload(PERSIST_PATH, [...store]);
+    } catch (e) {
+      if (import.meta.env.DEV) {
+        console.error("[warehouseRepository] persist failed:", e);
+      }
+    }
+  });
+}
 
 function nextIdStr(): string {
   return String(nextId++);
+}
+
+async function bootstrapFromDisk(): Promise<void> {
+  const loaded = await loadMasterDataPersisted({
+    relativePath: PERSIST_PATH,
+    buildSeedRecords: buildSeedWarehouses,
+    normalizeRecord: normalizeWarehouse,
+    diagnosticsTag: "warehouseRepository",
+  });
+  if (loaded.diagnostics && import.meta.env.DEV) {
+    console.warn(loaded.diagnostics);
+  }
+  store.splice(0, store.length, ...loaded.records);
+  nextId = loaded.nextId;
 }
 
 export const warehouseRepository = {
@@ -22,6 +90,7 @@ export const warehouseRepository = {
   create(input: CreateWarehouseInput): Warehouse {
     const entity: Warehouse = { ...input, id: nextIdStr() };
     store.push(entity);
+    schedulePersist();
     return entity;
   },
 
@@ -29,6 +98,7 @@ export const warehouseRepository = {
     const i = store.findIndex((x) => x.id === id);
     if (i === -1) return undefined;
     store[i] = { ...store[i], ...patch };
+    schedulePersist();
     return store[i];
   },
 
@@ -69,4 +139,5 @@ const seed: CreateWarehouseInput[] = [
   { code: "WH-024", name: "Decommissioned Site", isActive: false, warehouseType: "Decommissioned", address: "1600 Closed Ln", city: "Pittsburgh", country: "USA", contactPerson: "", phone: "" },
   { code: "WH-025", name: "Cross-Dock Terminal", isActive: true, warehouseType: "Cross-dock", address: "400 Harbor Rd", city: "Newark", country: "USA", contactPerson: "Alice Brown", phone: "+1 973 555 0401" },
 ];
-seed.forEach((s) => warehouseRepository.create(s));
+
+await bootstrapFromDisk();

@@ -1,13 +1,87 @@
 import type { Supplier } from "./model";
+import {
+  getMasterDataFilePath,
+  loadMasterDataPersisted,
+  writeMasterDataPayload,
+} from "@/shared/masterDataPersistence";
 
 export type CreateSupplierInput = Omit<Supplier, "id">;
 export type UpdateSupplierPatch = Partial<Omit<Supplier, "id">>;
 
 const store: Supplier[] = [];
 let nextId = 1;
+let persistChain: Promise<void> = Promise.resolve();
+
+const PERSIST_PATH = getMasterDataFilePath("suppliers.json");
+
+function asOptionalString(v: unknown): string | undefined {
+  return typeof v === "string" ? v : undefined;
+}
+
+function asOptionalNumber(v: unknown): number | undefined {
+  return typeof v === "number" && Number.isFinite(v) ? v : undefined;
+}
+
+function normalizeSupplier(raw: unknown): Supplier | null {
+  if (!raw || typeof raw !== "object") return null;
+  const rec = raw as Record<string, unknown>;
+  if (
+    typeof rec.id !== "string" ||
+    typeof rec.code !== "string" ||
+    typeof rec.name !== "string" ||
+    typeof rec.isActive !== "boolean"
+  ) {
+    return null;
+  }
+  return {
+    id: rec.id,
+    code: rec.code,
+    name: rec.name,
+    isActive: rec.isActive,
+    phone: asOptionalString(rec.phone),
+    email: asOptionalString(rec.email),
+    comment: asOptionalString(rec.comment),
+    contactPerson: asOptionalString(rec.contactPerson),
+    taxId: asOptionalString(rec.taxId),
+    address: asOptionalString(rec.address),
+    city: asOptionalString(rec.city),
+    country: asOptionalString(rec.country),
+    paymentTermsDays: asOptionalNumber(rec.paymentTermsDays),
+  };
+}
+
+function buildSeedSuppliers(): Supplier[] {
+  return seed.map((s, i) => ({ ...s, id: String(i + 1) }));
+}
+
+function schedulePersist(): void {
+  persistChain = persistChain.then(async () => {
+    try {
+      await writeMasterDataPayload(PERSIST_PATH, [...store]);
+    } catch (e) {
+      if (import.meta.env.DEV) {
+        console.error("[supplierRepository] persist failed:", e);
+      }
+    }
+  });
+}
 
 function nextIdStr(): string {
   return String(nextId++);
+}
+
+async function bootstrapFromDisk(): Promise<void> {
+  const loaded = await loadMasterDataPersisted({
+    relativePath: PERSIST_PATH,
+    buildSeedRecords: buildSeedSuppliers,
+    normalizeRecord: normalizeSupplier,
+    diagnosticsTag: "supplierRepository",
+  });
+  if (loaded.diagnostics && import.meta.env.DEV) {
+    console.warn(loaded.diagnostics);
+  }
+  store.splice(0, store.length, ...loaded.records);
+  nextId = loaded.nextId;
 }
 
 export const supplierRepository = {
@@ -22,6 +96,7 @@ export const supplierRepository = {
   create(input: CreateSupplierInput): Supplier {
     const entity: Supplier = { ...input, id: nextIdStr() };
     store.push(entity);
+    schedulePersist();
     return entity;
   },
 
@@ -29,6 +104,7 @@ export const supplierRepository = {
     const i = store.findIndex((x) => x.id === id);
     if (i === -1) return undefined;
     store[i] = { ...store[i], ...patch };
+    schedulePersist();
     return store[i];
   },
 
@@ -69,4 +145,5 @@ const seed: CreateSupplierInput[] = [
   { code: "SUP-0024", name: "Inactive Vendor Ltd", isActive: false, city: "Boston", country: "USA" },
   { code: "SUP-0025", name: "Prime MRO Supply", isActive: true, phone: "+1 555 225 1025", email: "orders@primemro.com", contactPerson: "Stephanie Nelson", taxId: "05-5065072", address: "2500 MRO Ave", city: "Charlotte", country: "USA", paymentTermsDays: 30 },
 ];
-seed.forEach((s) => supplierRepository.create(s));
+
+await bootstrapFromDisk();

@@ -1,13 +1,75 @@
 import type { Category } from "./model";
+import {
+  getMasterDataFilePath,
+  loadMasterDataPersisted,
+  writeMasterDataPayload,
+} from "@/shared/masterDataPersistence";
 
 export type CreateCategoryInput = Omit<Category, "id">;
 export type UpdateCategoryPatch = Partial<Omit<Category, "id">>;
 
 const store: Category[] = [];
 let nextId = 1;
+let persistChain: Promise<void> = Promise.resolve();
+
+const PERSIST_PATH = getMasterDataFilePath("categories.json");
+
+function asOptionalString(v: unknown): string | undefined {
+  return typeof v === "string" ? v : undefined;
+}
+
+function normalizeCategory(raw: unknown): Category | null {
+  if (!raw || typeof raw !== "object") return null;
+  const rec = raw as Record<string, unknown>;
+  if (
+    typeof rec.id !== "string" ||
+    typeof rec.code !== "string" ||
+    typeof rec.name !== "string" ||
+    typeof rec.isActive !== "boolean"
+  ) {
+    return null;
+  }
+  return {
+    id: rec.id,
+    code: rec.code,
+    name: rec.name,
+    isActive: rec.isActive,
+    comment: asOptionalString(rec.comment),
+  };
+}
+
+function buildSeedCategories(): Category[] {
+  return seed.map((s, i) => ({ ...s, id: String(i + 1) }));
+}
+
+function schedulePersist(): void {
+  persistChain = persistChain.then(async () => {
+    try {
+      await writeMasterDataPayload(PERSIST_PATH, [...store]);
+    } catch (e) {
+      if (import.meta.env.DEV) {
+        console.error("[categoryRepository] persist failed:", e);
+      }
+    }
+  });
+}
 
 function nextIdStr(): string {
   return String(nextId++);
+}
+
+async function bootstrapFromDisk(): Promise<void> {
+  const loaded = await loadMasterDataPersisted({
+    relativePath: PERSIST_PATH,
+    buildSeedRecords: buildSeedCategories,
+    normalizeRecord: normalizeCategory,
+    diagnosticsTag: "categoryRepository",
+  });
+  if (loaded.diagnostics && import.meta.env.DEV) {
+    console.warn(loaded.diagnostics);
+  }
+  store.splice(0, store.length, ...loaded.records);
+  nextId = loaded.nextId;
 }
 
 export const categoryRepository = {
@@ -22,6 +84,7 @@ export const categoryRepository = {
   create(input: CreateCategoryInput): Category {
     const entity: Category = { ...input, id: nextIdStr() };
     store.push(entity);
+    schedulePersist();
     return entity;
   },
 
@@ -29,6 +92,7 @@ export const categoryRepository = {
     const i = store.findIndex((x) => x.id === id);
     if (i === -1) return undefined;
     store[i] = { ...store[i], ...patch };
+    schedulePersist();
     return store[i];
   },
 
@@ -56,4 +120,5 @@ const seed: CreateCategoryInput[] = [
   { code: "SENSORS", name: "Sensors", isActive: true },
   { code: "CABLES", name: "Cables", isActive: true },
 ];
-seed.forEach((s) => categoryRepository.create(s));
+
+await bootstrapFromDisk();

@@ -1,13 +1,88 @@
 import type { Customer } from "./model";
+import {
+  getMasterDataFilePath,
+  loadMasterDataPersisted,
+  writeMasterDataPayload,
+} from "@/shared/masterDataPersistence";
 
 export type CreateCustomerInput = Omit<Customer, "id">;
 export type UpdateCustomerPatch = Partial<Omit<Customer, "id">>;
 
 const store: Customer[] = [];
 let nextId = 1;
+let persistChain: Promise<void> = Promise.resolve();
+
+const PERSIST_PATH = getMasterDataFilePath("customers.json");
+
+function asOptionalString(v: unknown): string | undefined {
+  return typeof v === "string" ? v : undefined;
+}
+
+function asOptionalNumber(v: unknown): number | undefined {
+  return typeof v === "number" && Number.isFinite(v) ? v : undefined;
+}
+
+function normalizeCustomer(raw: unknown): Customer | null {
+  if (!raw || typeof raw !== "object") return null;
+  const rec = raw as Record<string, unknown>;
+  if (
+    typeof rec.id !== "string" ||
+    typeof rec.code !== "string" ||
+    typeof rec.name !== "string" ||
+    typeof rec.isActive !== "boolean"
+  ) {
+    return null;
+  }
+  return {
+    id: rec.id,
+    code: rec.code,
+    name: rec.name,
+    isActive: rec.isActive,
+    phone: asOptionalString(rec.phone),
+    email: asOptionalString(rec.email),
+    comment: asOptionalString(rec.comment),
+    contactPerson: asOptionalString(rec.contactPerson),
+    taxId: asOptionalString(rec.taxId),
+    billingAddress: asOptionalString(rec.billingAddress),
+    shippingAddress: asOptionalString(rec.shippingAddress),
+    city: asOptionalString(rec.city),
+    country: asOptionalString(rec.country),
+    paymentTermsDays: asOptionalNumber(rec.paymentTermsDays),
+  };
+}
+
+function buildSeedCustomers(): Customer[] {
+  return seed.map((s, i) => ({ ...s, id: String(i + 1) }));
+}
+
+function schedulePersist(): void {
+  persistChain = persistChain.then(async () => {
+    try {
+      await writeMasterDataPayload(PERSIST_PATH, [...store]);
+    } catch (e) {
+      if (import.meta.env.DEV) {
+        console.error("[customerRepository] persist failed:", e);
+      }
+    }
+  });
+}
 
 function nextIdStr(): string {
   return String(nextId++);
+}
+
+async function bootstrapFromDisk(): Promise<void> {
+  const loaded = await loadMasterDataPersisted({
+    relativePath: PERSIST_PATH,
+    buildSeedRecords: buildSeedCustomers,
+    normalizeRecord: normalizeCustomer,
+    diagnosticsTag: "customerRepository",
+  });
+  if (loaded.diagnostics && import.meta.env.DEV) {
+    console.warn(loaded.diagnostics);
+  }
+  store.splice(0, store.length, ...loaded.records);
+  nextId = loaded.nextId;
 }
 
 export const customerRepository = {
@@ -22,6 +97,7 @@ export const customerRepository = {
   create(input: CreateCustomerInput): Customer {
     const entity: Customer = { ...input, id: nextIdStr() };
     store.push(entity);
+    schedulePersist();
     return entity;
   },
 
@@ -29,6 +105,7 @@ export const customerRepository = {
     const i = store.findIndex((x) => x.id === id);
     if (i === -1) return undefined;
     store[i] = { ...store[i], ...patch };
+    schedulePersist();
     return store[i];
   },
 
@@ -69,4 +146,5 @@ const seed: CreateCustomerInput[] = [
   { code: "CUS-0024", name: "Inactive Customer Ltd", isActive: false, city: "Boston", country: "USA" },
   { code: "CUS-0025", name: "United Industrial Buyers", isActive: true, phone: "+1 555 325 2025", email: "orders@unitedindustrial.com", contactPerson: "Brian Wright", taxId: "05-5065072", billingAddress: "2500 United Ave", shippingAddress: "2500 United Ave", city: "Charlotte", country: "USA", paymentTermsDays: 30 },
 ];
-seed.forEach((s) => customerRepository.create(s));
+
+await bootstrapFromDisk();

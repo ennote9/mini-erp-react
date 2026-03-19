@@ -15,7 +15,13 @@
       "identifier": "fs:scope",
       "allow": [
         { "path": "$APPLOCALDATA/items" },
-        { "path": "$APPLOCALDATA/items/**" }
+        { "path": "$APPLOCALDATA/items/**" },
+        { "path": "$APPLOCALDATA/master-data" },
+        { "path": "$APPLOCALDATA/master-data/**" },
+        { "path": "$APPLOCALDATA/documents" },
+        { "path": "$APPLOCALDATA/documents/**" },
+        { "path": "$APPLOCALDATA/inventory" },
+        { "path": "$APPLOCALDATA/inventory/**" }
       ]
     },
     "fs:allow-exists",
