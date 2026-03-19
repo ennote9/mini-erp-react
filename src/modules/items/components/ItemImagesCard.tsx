@@ -1,14 +1,22 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ItemImage } from "../model";
-import { itemRepository } from "../repository";
+import { itemRepository, flushPendingItemsPersist } from "../repository";
 import {
   deleteStoredImageFile,
   getItemImagePreviewSources,
   resolveAbsoluteImagePath,
   saveItemImageFromFile,
 } from "../lib/itemImageStorage";
+import {
+  getPrimaryImage,
+  moveImageInOrder,
+  normalizeItemImages,
+  setPrimaryImage,
+} from "../lib/itemImagesNormalize";
+import { validateItemImageSlotAvailable, ITEM_IMAGE_MAX_COUNT } from "../lib/itemImageValidation";
 import { ItemImageEmptyState } from "./ItemImageEmptyState";
 import { ItemImagePreview } from "./ItemImagePreview";
+import { ItemImageThumbnails } from "./ItemImageThumbnails";
 import {
   Card,
   CardContent,
@@ -16,14 +24,9 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import { openPath } from "@tauri-apps/plugin-opener";
-
-function primaryImage(images: ItemImage[]): ItemImage | undefined {
-  if (images.length === 0) return undefined;
-  const marked = images.find((i) => i.isPrimary);
-  if (marked) return marked;
-  return [...images].sort((a, b) => a.sortOrder - b.sortOrder || a.createdAt.localeCompare(b.createdAt))[0];
-}
+import { Upload } from "lucide-react";
 
 type Props = {
   isNew: boolean;
@@ -32,19 +35,52 @@ type Props = {
   onImagesChanged: () => void;
 };
 
+type UploadIntent = "add" | "replace";
+
 export function ItemImagesCard({ isNew, itemId, images, onImagesChanged }: Props) {
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const uploadIntentRef = useRef<UploadIntent>("add");
+
+  const sorted = useMemo(() => normalizeItemImages(images), [images]);
+  const imagesFingerprint = useMemo(
+    () => sorted.map((i) => `${i.id}:${i.relativePath}:${i.sortOrder}:${i.isPrimary}`).join("|"),
+    [sorted],
+  );
+
+  const [selectedId, setSelectedId] = useState<string | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [previewAbsolutePath, setPreviewAbsolutePath] = useState<string | null>(null);
   const [previewLoadState, setPreviewLoadState] = useState<"idle" | "loading" | "ready" | "error">("idle");
+  const [thumbUrls, setThumbUrls] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
 
-  const img = primaryImage(images);
+  useEffect(() => {
+    if (sorted.length === 0) {
+      setSelectedId(null);
+      return;
+    }
+    setSelectedId((prev) => {
+      if (prev && sorted.some((i) => i.id === prev)) return prev;
+      const primary = sorted.find((x) => x.isPrimary) ?? sorted[0];
+      return primary.id;
+    });
+  }, [imagesFingerprint, sorted]);
+
+  const displayImage = useMemo(() => {
+    if (sorted.length === 0) return undefined;
+    if (selectedId) {
+      const hit = sorted.find((i) => i.id === selectedId);
+      if (hit) return hit;
+    }
+    return getPrimaryImage(sorted) ?? sorted[0];
+  }, [sorted, selectedId]);
+
+  const displayIndex = displayImage ? sorted.findIndex((i) => i.id === displayImage.id) : -1;
 
   useEffect(() => {
     let cancelled = false;
-    if (!img) {
+    if (!displayImage) {
       setPreviewUrl(null);
       setPreviewAbsolutePath(null);
       setPreviewLoadState("idle");
@@ -53,7 +89,7 @@ export function ItemImagesCard({ isNew, itemId, images, onImagesChanged }: Props
     setPreviewLoadState("loading");
     setPreviewUrl(null);
     setPreviewAbsolutePath(null);
-    getItemImagePreviewSources(img.relativePath)
+    getItemImagePreviewSources(displayImage.relativePath)
       .then(({ absolutePath, previewUrl: url }) => {
         if (!cancelled) {
           setPreviewAbsolutePath(absolutePath);
@@ -72,10 +108,65 @@ export function ItemImagesCard({ isNew, itemId, images, onImagesChanged }: Props
     return () => {
       cancelled = true;
     };
-  }, [img?.id, img?.relativePath]);
+  }, [displayImage?.id, displayImage?.relativePath]);
 
-  const triggerPick = useCallback(() => {
+  useEffect(() => {
+    let cancelled = false;
+    if (sorted.length === 0) {
+      setThumbUrls({});
+      return;
+    }
+    void (async () => {
+      const entries = await Promise.all(
+        sorted.map(async (img) => {
+          try {
+            const { previewUrl: url } = await getItemImagePreviewSources(img.relativePath);
+            return [img.id, url] as const;
+          } catch {
+            return [img.id, ""] as const;
+          }
+        }),
+      );
+      if (!cancelled) {
+        setThumbUrls(Object.fromEntries(entries));
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [imagesFingerprint, sorted]);
+
+  const persistImages = useCallback(
+    async (next: ItemImage[]) => {
+      if (!itemId) return;
+      const normalized = normalizeItemImages(next);
+      itemRepository.update(itemId, { images: normalized });
+      try {
+        await flushPendingItemsPersist();
+      } catch (pe) {
+        setMessage(pe instanceof Error ? pe.message : "Could not save item metadata to disk.");
+        onImagesChanged();
+        throw pe;
+      }
+      onImagesChanged();
+    },
+    [itemId, onImagesChanged],
+  );
+
+  const triggerPickAdd = useCallback(() => {
     setMessage(null);
+    const slotErr = validateItemImageSlotAvailable(sorted.length);
+    if (slotErr) {
+      setMessage(slotErr);
+      return;
+    }
+    uploadIntentRef.current = "add";
+    fileInputRef.current?.click();
+  }, [sorted.length]);
+
+  const triggerPickReplace = useCallback(() => {
+    setMessage(null);
+    uploadIntentRef.current = "replace";
     fileInputRef.current?.click();
   }, []);
 
@@ -84,18 +175,65 @@ export function ItemImagesCard({ isNew, itemId, images, onImagesChanged }: Props
       if (!file || !itemId) return;
       setBusy(true);
       setMessage(null);
+      const intent = uploadIntentRef.current;
       try {
-        const current = primaryImage(itemRepository.getById(itemId)?.images ?? []);
-        if (current) {
-          await deleteStoredImageFile(current.relativePath);
+        if (intent === "add") {
+          const slotErr = validateItemImageSlotAvailable(sorted.length);
+          if (slotErr) {
+            setMessage(slotErr);
+            return;
+          }
+          const placement = {
+            sortOrder: sorted.length,
+            isPrimary: sorted.length === 0,
+          };
+          const result = await saveItemImageFromFile(itemId, file, placement);
+          if ("error" in result) {
+            setMessage(result.error);
+            return;
+          }
+          try {
+            await persistImages([...sorted, result.image]);
+            setSelectedId(result.image.id);
+          } catch {
+            await deleteStoredImageFile(result.image.relativePath);
+            itemRepository.update(itemId, { images: normalizeItemImages(sorted) });
+            onImagesChanged();
+          }
+        } else {
+          const target =
+            sorted.find((x) => x.id === selectedId) ?? getPrimaryImage(sorted) ?? sorted[0];
+          if (!target) {
+            setMessage("No image to replace.");
+            return;
+          }
+          const previous = normalizeItemImages(sorted);
+          const result = await saveItemImageFromFile(itemId, file, {
+            sortOrder: target.sortOrder,
+            isPrimary: target.isPrimary,
+          });
+          if ("error" in result) {
+            setMessage(result.error);
+            return;
+          }
+          const oldPath = target.relativePath;
+          const merged = normalizeItemImages(
+            sorted.map((img) => (img.id === target.id ? result.image : img)),
+          );
+          itemRepository.update(itemId, { images: merged });
+          try {
+            await flushPendingItemsPersist();
+          } catch (pe) {
+            setMessage(pe instanceof Error ? pe.message : "Could not save item metadata to disk.");
+            await deleteStoredImageFile(result.image.relativePath);
+            itemRepository.update(itemId, { images: previous });
+            onImagesChanged();
+            return;
+          }
+          await deleteStoredImageFile(oldPath);
+          onImagesChanged();
+          setSelectedId(result.image.id);
         }
-        const result = await saveItemImageFromFile(itemId, file);
-        if ("error" in result) {
-          setMessage(result.error);
-          return;
-        }
-        itemRepository.update(itemId, { images: [result.image] });
-        onImagesChanged();
       } catch (e) {
         setMessage(e instanceof Error ? e.message : "Could not save image. Use the desktop app.");
       } finally {
@@ -103,40 +241,108 @@ export function ItemImagesCard({ isNew, itemId, images, onImagesChanged }: Props
         if (fileInputRef.current) fileInputRef.current.value = "";
       }
     },
-    [itemId, onImagesChanged],
+    [itemId, persistImages, selectedId, sorted],
   );
 
   const handleRemove = useCallback(async () => {
-    if (!itemId || !img) return;
+    if (!itemId || !displayImage) return;
     setBusy(true);
     setMessage(null);
+    const previous = normalizeItemImages(sorted);
+    const filtered = sorted.filter((x) => x.id !== displayImage.id);
+    const next = normalizeItemImages(filtered);
+    const pathToDelete = displayImage.relativePath;
     try {
-      await deleteStoredImageFile(img.relativePath);
-      itemRepository.update(itemId, { images: [] });
+      itemRepository.update(itemId, { images: next });
+      try {
+        await flushPendingItemsPersist();
+      } catch (pe) {
+        setMessage(pe instanceof Error ? pe.message : "Could not save item metadata to disk.");
+        itemRepository.update(itemId, { images: previous });
+        onImagesChanged();
+        return;
+      }
+      await deleteStoredImageFile(pathToDelete);
       onImagesChanged();
     } catch (e) {
       setMessage(e instanceof Error ? e.message : "Could not remove image.");
     } finally {
       setBusy(false);
     }
-  }, [itemId, img, onImagesChanged]);
+  }, [displayImage, itemId, onImagesChanged, sorted]);
 
   const handleOpenFullSize = useCallback(async () => {
-    if (!img) return;
+    if (!displayImage) return;
+    setMessage(null);
+    let absolutePathForOpen: string | undefined;
     try {
-      const abs = await resolveAbsoluteImagePath(img.relativePath);
-      await openPath(abs);
+      absolutePathForOpen = await resolveAbsoluteImagePath(displayImage.relativePath);
+      await openPath(absolutePathForOpen);
     } catch (e) {
-      setMessage(e instanceof Error ? e.message : "Could not open image.");
+      const base =
+        e instanceof Error ? e.message : typeof e === "string" ? e : "Could not open image.";
+      if (import.meta.env.DEV) {
+        console.error("[ItemImagesCard] Open full size failed", {
+          relativePath: displayImage.relativePath,
+          absolutePath: absolutePathForOpen,
+          error: e,
+        });
+      }
+      const withPath =
+        import.meta.env.DEV && absolutePathForOpen
+          ? `${base} — path: ${absolutePathForOpen}`
+          : base;
+      setMessage(withPath);
     }
-  }, [img]);
+  }, [displayImage]);
+
+  const handleSetPrimary = useCallback(async () => {
+    if (!itemId || !displayImage) return;
+    setBusy(true);
+    setMessage(null);
+    try {
+      await persistImages(setPrimaryImage(sorted, displayImage.id));
+    } catch {
+      /* message set in persistImages */
+    } finally {
+      setBusy(false);
+    }
+  }, [displayImage, itemId, persistImages, sorted]);
+
+  const handleMoveLeft = useCallback(async () => {
+    if (!itemId || !displayImage) return;
+    setBusy(true);
+    setMessage(null);
+    try {
+      await persistImages(moveImageInOrder(sorted, displayImage.id, -1));
+    } catch {
+      /* persistImages surfaced message */
+    } finally {
+      setBusy(false);
+    }
+  }, [displayImage, itemId, persistImages, sorted]);
+
+  const handleMoveRight = useCallback(async () => {
+    if (!itemId || !displayImage) return;
+    setBusy(true);
+    setMessage(null);
+    try {
+      await persistImages(moveImageInOrder(sorted, displayImage.id, 1));
+    } catch {
+      /* persistImages surfaced message */
+    } finally {
+      setBusy(false);
+    }
+  }, [displayImage, itemId, persistImages, sorted]);
+
+  const canAddMore = sorted.length < ITEM_IMAGE_MAX_COUNT;
 
   return (
     <Card className="border-0 shadow-none xl:sticky xl:top-2">
       <CardHeader className="p-2 pb-0.5">
         <CardTitle className="text-[0.9rem] font-semibold">Images</CardTitle>
         <CardDescription className="text-xs">
-          One product image (stored locally). JPG, PNG, or WebP, up to 10 MB.
+          Up to {ITEM_IMAGE_MAX_COUNT} images per item (JPG, PNG, WebP, 10 MB each). Stored locally.
         </CardDescription>
       </CardHeader>
       <CardContent className="p-2 pt-1">
@@ -156,23 +362,50 @@ export function ItemImagesCard({ isNew, itemId, images, onImagesChanged }: Props
         )}
         {isNew || !itemId ? (
           <ItemImageEmptyState variant="unsaved" />
-        ) : !img ? (
-          <ItemImageEmptyState
-            variant="ready"
-            onUploadClick={triggerPick}
-            disabled={busy}
-          />
+        ) : sorted.length === 0 ? (
+          <ItemImageEmptyState variant="ready" onUploadClick={triggerPickAdd} disabled={busy} />
         ) : (
-          <ItemImagePreview
-            loadState={previewLoadState}
-            previewUrl={previewUrl}
-            absolutePath={previewAbsolutePath}
-            image={img}
-            onReplace={triggerPick}
-            onRemove={() => void handleRemove()}
-            onOpenFullSize={() => void handleOpenFullSize()}
-            busy={busy}
-          />
+          <div className="flex flex-col gap-2">
+            {displayImage && (
+              <ItemImagePreview
+                loadState={previewLoadState}
+                previewUrl={previewUrl}
+                absolutePath={previewAbsolutePath}
+                image={displayImage}
+                onReplace={triggerPickReplace}
+                onRemove={() => void handleRemove()}
+                onOpenFullSize={() => void handleOpenFullSize()}
+                onSetPrimary={handleSetPrimary}
+                onMoveLeft={handleMoveLeft}
+                onMoveRight={handleMoveRight}
+                canMoveLeft={displayIndex > 0}
+                canMoveRight={displayIndex >= 0 && displayIndex < sorted.length - 1}
+                busy={busy}
+              />
+            )}
+            <ItemImageThumbnails
+              images={sorted}
+              selectedId={selectedId}
+              thumbUrls={thumbUrls}
+              onSelect={setSelectedId}
+              disabled={busy}
+            />
+            {canAddMore ? (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="h-8 w-full gap-1.5"
+                onClick={triggerPickAdd}
+                disabled={busy}
+              >
+                <Upload className="h-3.5 w-3.5" />
+                Upload image
+              </Button>
+            ) : (
+              <p className="text-[11px] text-muted-foreground">Maximum {ITEM_IMAGE_MAX_COUNT} images reached.</p>
+            )}
+          </div>
         )}
       </CardContent>
     </Card>

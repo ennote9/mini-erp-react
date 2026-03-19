@@ -3,7 +3,7 @@ import { useMemo, useState, useEffect } from "react";
 import { itemRepository } from "../repository";
 import { brandRepository } from "../../brands/repository";
 import { categoryRepository } from "../../categories/repository";
-import { saveItem } from "../service";
+import { saveItemAwaitPersist } from "../service";
 import { Breadcrumb } from "../../../shared/ui/object/Breadcrumb";
 import { BackButton } from "../../../shared/ui/list/BackButton";
 import { Button } from "@/components/ui/button";
@@ -142,26 +142,28 @@ export function ItemPage() {
 
   const handleSave = () => {
     setActionIssues([]);
-    const result = saveItem(
-      {
-        code: form.code,
-        name: form.name,
-        uom: form.uom,
-        isActive: form.isActive,
-        description: form.description || undefined,
-        brandId: form.brandId || undefined,
-        categoryId: form.categoryId || undefined,
-        barcode: form.barcode || undefined,
-        purchasePrice: parsePrice(form.purchasePrice),
-        salePrice: parsePrice(form.salePrice),
-      },
-      isNew ? undefined : id ?? undefined,
-    );
-    if (result.success) {
-      navigate("/items");
-    } else if (!issueListContainsMessage(health.issues, result.error)) {
-      setActionIssues([actionIssue(result.error)]);
-    }
+    void (async () => {
+      const result = await saveItemAwaitPersist(
+        {
+          code: form.code,
+          name: form.name,
+          uom: form.uom,
+          isActive: form.isActive,
+          description: form.description || undefined,
+          brandId: form.brandId || undefined,
+          categoryId: form.categoryId || undefined,
+          barcode: form.barcode || undefined,
+          purchasePrice: parsePrice(form.purchasePrice),
+          salePrice: parsePrice(form.salePrice),
+        },
+        isNew ? undefined : id ?? undefined,
+      );
+      if (result.success) {
+        navigate("/items");
+      } else if (!issueListContainsMessage(health.issues, result.error)) {
+        setActionIssues([actionIssue(result.error)]);
+      }
+    })();
   };
 
   const handleCancel = () => {

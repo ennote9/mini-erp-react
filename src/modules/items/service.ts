@@ -1,4 +1,4 @@
-import { itemRepository } from "./repository";
+import { itemRepository, flushPendingItemsPersist } from "./repository";
 import { brandRepository } from "../brands/repository";
 import { categoryRepository } from "../categories/repository";
 import {
@@ -110,6 +110,26 @@ export function saveItem(
   return { success: true, id: created.id };
 }
 
+/**
+ * Validates and saves like {@link saveItem}, then waits until items.json persistence completes.
+ * Use from Item save flow so navigation does not outrun disk write.
+ */
+export async function saveItemAwaitPersist(
+  data: SaveItemInput,
+  existingId?: string,
+): Promise<SaveItemResult> {
+  const r = saveItem(data, existingId);
+  if (!r.success) return r;
+  try {
+    await flushPendingItemsPersist();
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    return { success: false, error: msg || "Could not save items to disk." };
+  }
+  return r;
+}
+
 export const itemService = {
   saveItem,
+  saveItemAwaitPersist,
 };

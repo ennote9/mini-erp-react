@@ -3,7 +3,7 @@
  * Master data: sellable/receivable product.
  */
 
-/** Image metadata; binary lives in app-local storage (see relativePath). Phase 1 UI supports one image; model stays array for future multi-image. */
+/** Image metadata; binary lives in app-local storage (see relativePath). Multiple images per item; at most one {@link ItemImage.isPrimary}. */
 export interface ItemImage {
   id: string;
   fileName: string;

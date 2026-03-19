@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import type { ItemImage } from "../model";
 import { Button } from "@/components/ui/button";
-import { ExternalLink, Trash2, Upload } from "lucide-react";
+import { ChevronLeft, ChevronRight, ExternalLink, Star, Trash2, Upload } from "lucide-react";
 
 type LoadState = "idle" | "loading" | "ready" | "error";
 
@@ -13,6 +13,11 @@ type Props = {
   onReplace: () => void;
   onRemove: () => void;
   onOpenFullSize: () => void;
+  onSetPrimary?: () => void;
+  onMoveLeft?: () => void;
+  onMoveRight?: () => void;
+  canMoveLeft?: boolean;
+  canMoveRight?: boolean;
   busy?: boolean;
 };
 
@@ -30,6 +35,11 @@ export function ItemImagePreview({
   onReplace,
   onRemove,
   onOpenFullSize,
+  onSetPrimary,
+  onMoveLeft,
+  onMoveRight,
+  canMoveLeft,
+  canMoveRight,
   busy,
 }: Props) {
   const [imgDecodeFailed, setImgDecodeFailed] = useState(false);
@@ -46,6 +56,11 @@ export function ItemImagePreview({
   return (
     <div className="flex flex-col gap-2">
       <div className="relative overflow-hidden rounded-md border border-input bg-background aspect-[4/3] max-h-[220px] flex items-center justify-center">
+        {image.isPrimary && (
+          <span className="absolute left-1.5 top-1.5 z-[1] rounded bg-primary/90 px-1.5 py-0.5 text-[10px] font-medium text-primary-foreground">
+            Primary
+          </span>
+        )}
         {(loadState === "loading" || loadState === "idle") && (
           <p className="text-xs text-muted-foreground px-2 text-center">Loading preview…</p>
         )}
@@ -91,8 +106,8 @@ export function ItemImagePreview({
           className="h-8 gap-1"
           onClick={onReplace}
           disabled={busy}
-          title="Replace image"
-          aria-label="Replace image"
+          title="Replace selected image"
+          aria-label="Replace selected image"
         >
           <Upload className="h-3.5 w-3.5" />
           Replace
@@ -117,12 +132,61 @@ export function ItemImagePreview({
           className="h-8 gap-1 text-destructive hover:text-destructive"
           onClick={onRemove}
           disabled={busy}
-          title="Remove image"
-          aria-label="Remove image"
+          title="Remove selected image"
+          aria-label="Remove selected image"
         >
           <Trash2 className="h-3.5 w-3.5" />
           Remove
         </Button>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          className="h-8 gap-1"
+          onClick={() => onSetPrimary?.()}
+          disabled={busy || image.isPrimary || !onSetPrimary}
+          title={
+            image.isPrimary
+              ? "Selected image is already primary"
+              : "Set as primary image"
+          }
+          aria-label={
+            image.isPrimary
+              ? "Primary (selected image is already primary)"
+              : "Set as primary image"
+          }
+        >
+          <Star className="h-3.5 w-3.5" />
+          Primary
+        </Button>
+        {onMoveLeft && (
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="h-8 w-8 p-0"
+            onClick={onMoveLeft}
+            disabled={busy || !canMoveLeft}
+            title="Move left"
+            aria-label="Move image left"
+          >
+            <ChevronLeft className="h-4 w-4" />
+          </Button>
+        )}
+        {onMoveRight && (
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="h-8 w-8 p-0"
+            onClick={onMoveRight}
+            disabled={busy || !canMoveRight}
+            title="Move right"
+            aria-label="Move image right"
+          >
+            <ChevronRight className="h-4 w-4" />
+          </Button>
+        )}
       </div>
     </div>
   );

@@ -1,6 +1,9 @@
-/** Phase 1 image upload rules for Items. */
+/** Image upload rules for Items (multi-image). */
 
 export const ITEM_IMAGE_MAX_BYTES = 10 * 1024 * 1024;
+
+/** Max images per item (phase 1). */
+export const ITEM_IMAGE_MAX_COUNT = 5;
 
 export const ITEM_IMAGE_ALLOWED_EXT = new Set(["jpg", "jpeg", "png", "webp"]);
 
@@ -17,6 +20,14 @@ export function validateItemImageFile(file: File): string | null {
   const ext = extensionFromFileName(file.name);
   if (!ext || !ITEM_IMAGE_ALLOWED_EXT.has(ext)) {
     return "Allowed types: JPG, JPEG, PNG, WebP.";
+  }
+  return null;
+}
+
+/** When adding (not replacing), enforce max count. */
+export function validateItemImageSlotAvailable(currentCount: number): string | null {
+  if (currentCount >= ITEM_IMAGE_MAX_COUNT) {
+    return `You can add up to ${ITEM_IMAGE_MAX_COUNT} images per item. Remove one to add another.`;
   }
   return null;
 }

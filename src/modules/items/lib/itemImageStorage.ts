@@ -68,9 +68,16 @@ async function readDimensions(file: File): Promise<{ width?: number; height?: nu
   }
 }
 
+/** Placement in the item's ordered image list (caller normalizes full array after merge). */
+export type ItemImagePlacement = {
+  sortOrder: number;
+  isPrimary: boolean;
+};
+
 export async function saveItemImageFromFile(
   itemId: string,
   file: File,
+  placement: ItemImagePlacement,
 ): Promise<{ image: ItemImage } | { error: string }> {
   const v = validateItemImageFile(file);
   if (v) return { error: v };
@@ -93,8 +100,8 @@ export async function saveItemImageFromFile(
     sizeBytes: file.size,
     width,
     height,
-    sortOrder: 0,
-    isPrimary: true,
+    sortOrder: placement.sortOrder,
+    isPrimary: placement.isPrimary,
     createdAt: new Date().toISOString(),
   };
   return { image };

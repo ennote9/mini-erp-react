@@ -7,15 +7,22 @@
     "core:default",
     "dialog:default",
     "opener:default",
-    "opener:allow-open-path",
+    {
+      "identifier": "opener:allow-open-path",
+      "allow": [{ "path": "$APPLOCALDATA/items/**" }]
+    },
     {
       "identifier": "fs:scope",
-      "allow": [{ "path": "$APPLOCALDATA/items/**" }]
+      "allow": [
+        { "path": "$APPLOCALDATA/items" },
+        { "path": "$APPLOCALDATA/items/**" }
+      ]
     },
     "fs:allow-exists",
     "fs:allow-mkdir",
     "fs:allow-read-file",
     "fs:allow-remove",
+    "fs:allow-rename",
     "fs:allow-stat",
     "fs:allow-write-file"
   ]
