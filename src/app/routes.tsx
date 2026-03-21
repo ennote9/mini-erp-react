@@ -19,6 +19,7 @@ import {
 import { ShipmentsListPage, ShipmentPage } from "../modules/shipments";
 import { StockBalancesListPage } from "../modules/stock-balances";
 import { StockMovementsListPage } from "../modules/stock-movements";
+import { SettingsPage } from "../modules/settings";
 
 /**
  * Route tree: shell layout with nested page routes.
@@ -51,6 +52,7 @@ export function AppRoutes() {
         <Route path="shipments/:id" element={<ShipmentPage />} />
         <Route path="stock-balances" element={<StockBalancesListPage />} />
         <Route path="stock-movements" element={<StockMovementsListPage />} />
+        <Route path="settings" element={<SettingsPage />} />
       </Route>
     </Routes>
   );

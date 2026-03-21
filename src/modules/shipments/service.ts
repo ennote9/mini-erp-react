@@ -10,15 +10,12 @@ import { stockBalanceRepository } from "../stock-balances/repository";
 import { parseDocumentLineQty } from "../../shared/documentValidation";
 import { normalizeTrim } from "../../shared/validation";
 import {
-  normalizeCancelReasonComment,
-  validateCancelDocumentReasonForm,
-  normalizeReversalReasonComment,
-  validateReversalDocumentReasonForm,
-  type CancelDocumentReasonCode,
+  resolveCancelDocumentReasonForService,
+  resolveReversalDocumentReasonForService,
   type CancelDocumentReasonInput,
-  type ReversalDocumentReasonCode,
   type ReversalDocumentReasonInput,
 } from "../../shared/reasonCodes";
+import { getAppSettings } from "../../shared/settings/store";
 import { appendAuditEvent } from "../../shared/audit/eventLogRepository";
 import { AUDIT_ACTOR_LOCAL_USER } from "../../shared/audit/eventLogTypes";
 import {
@@ -275,11 +272,16 @@ export function post(shipmentId: string): PostResult {
   const prevStatus = shipment.status;
   shipmentRepository.update(shipmentId, { status: "posted" });
   const soFulfillment = computeSalesOrderFulfillment(shipment.salesOrderId);
-  const nextSoStatus = soFulfillment.state === "complete" ? "closed" : "confirmed";
+  const autoClose = getAppSettings().documents.autoClosePlanningOnFullFulfillment;
+  const nextSoStatus =
+    autoClose && soFulfillment.state === "complete" ? "closed" : "confirmed";
   salesOrderRepository.update(shipment.salesOrderId, {
     status: nextSoStatus,
   });
-  if (nextSoStatus === "closed") {
+  if (
+    nextSoStatus === "closed" &&
+    getAppSettings().inventory.releaseReservationsOnSalesOrderClose
+  ) {
     reconcileSalesOrderReservations(shipment.salesOrderId, { reason: "sales_order_closed" });
   }
   appendAuditEvent({
@@ -301,14 +303,17 @@ export function cancelDocument(
   shipmentId: string,
   input: CancelDocumentReasonInput,
 ): CancelDocumentResult {
-  const reasonErr = validateCancelDocumentReasonForm(input.cancelReasonCode);
-  if (reasonErr) return { success: false, error: reasonErr };
+  const resolved = resolveCancelDocumentReasonForService(
+    input,
+    getAppSettings().documents.requireCancelReason,
+  );
+  if (!resolved.ok) return { success: false, error: resolved.error };
   const shipment = shipmentRepository.getById(shipmentId);
   if (!shipment) return { success: false, error: "Shipment not found." };
   if (shipment.status !== "draft")
     return { success: false, error: "Only draft shipments can be cancelled." };
-  const code = input.cancelReasonCode as CancelDocumentReasonCode;
-  const comment = normalizeCancelReasonComment(input.cancelReasonComment);
+  const code = resolved.code;
+  const comment = resolved.comment;
   const prevStatus = shipment.status;
   shipmentRepository.update(shipmentId, {
     status: "cancelled",
@@ -339,8 +344,11 @@ export function reverseDocument(
   shipmentId: string,
   input: ReversalDocumentReasonInput,
 ): ReverseDocumentResult {
-  const reasonErr = validateReversalDocumentReasonForm(input.reversalReasonCode);
-  if (reasonErr) return { success: false, error: reasonErr };
+  const resolved = resolveReversalDocumentReasonForService(
+    input,
+    getAppSettings().documents.requireReversalReason,
+  );
+  if (!resolved.ok) return { success: false, error: resolved.error };
 
   const shipment = shipmentRepository.getById(shipmentId);
   if (!shipment) return { success: false, error: "Shipment not found." };
@@ -364,8 +372,8 @@ export function reverseDocument(
   }
 
   const now = new Date().toISOString();
-  const code = input.reversalReasonCode as ReversalDocumentReasonCode;
-  const revComment = normalizeReversalReasonComment(input.reversalReasonComment);
+  const reasonCode = resolved.code;
+  const revComment = resolved.comment;
 
   for (const line of lines) {
     const qty = parseDocumentLineQty(line.qty)!;
@@ -394,7 +402,7 @@ export function reverseDocument(
   const prevStatus = shipment.status;
   shipmentRepository.update(shipmentId, {
     status: "reversed",
-    reversalReasonCode: code,
+    reversalReasonCode: reasonCode,
     ...(revComment !== undefined ? { reversalReasonComment: revComment } : {}),
   });
 
@@ -411,7 +419,7 @@ export function reverseDocument(
       documentNumber: shipment.number,
       previousStatus: prevStatus,
       newStatus: "reversed" as const,
-      reversalReasonCode: code,
+      reversalReasonCode: reasonCode,
       reversalReasonComment: revComment ?? null,
       movementLineCount: lines.length,
       salesOrderId: shipment.salesOrderId,

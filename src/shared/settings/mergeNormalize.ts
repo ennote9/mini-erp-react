@@ -1,0 +1,156 @@
+import { DEFAULT_APP_SETTINGS } from "./defaults";
+import type {
+  AllocationModeId,
+  AppSettings,
+  DateFormatId,
+  NumberFormatId,
+  PartnerTermsOverwriteId,
+  ThemePreference,
+} from "./types";
+
+export type DeepPartialAppSettings = {
+  general?: Partial<AppSettings["general"]>;
+  documents?: Partial<AppSettings["documents"]>;
+  inventory?: Partial<AppSettings["inventory"]>;
+  commercial?: Partial<AppSettings["commercial"]>;
+  dataAudit?: Partial<AppSettings["dataAudit"]>;
+};
+
+function isRecord(v: unknown): v is Record<string, unknown> {
+  return typeof v === "object" && v !== null && !Array.isArray(v);
+}
+
+function asThemePreference(v: unknown): ThemePreference | undefined {
+  return v === "dark" || v === "system" ? v : undefined;
+}
+
+function asDateFormatId(v: unknown): DateFormatId | undefined {
+  return v === "iso" || v === "eu" || v === "us" ? v : undefined;
+}
+
+function asNumberFormatId(v: unknown): NumberFormatId | undefined {
+  return v === "spaceComma" || v === "commaDot" || v === "dotComma" ? v : undefined;
+}
+
+function asAllocationModeId(v: unknown): AllocationModeId | undefined {
+  return v === "manual" ? v : undefined;
+}
+
+function asPartnerTermsOverwriteId(v: unknown): PartnerTermsOverwriteId | undefined {
+  return v === "document_wins" || v === "master_wins" ? v : undefined;
+}
+
+function asBool(v: unknown): boolean | undefined {
+  return typeof v === "boolean" ? v : undefined;
+}
+
+function asFiniteNumber(v: unknown): number | undefined {
+  if (typeof v !== "number" || !Number.isFinite(v)) return undefined;
+  return v;
+}
+
+/**
+ * Merge persisted blob into defaults; unknown keys ignored; corrupt shapes fall back per-field.
+ */
+export function normalizeAppSettingsFromUnknown(raw: unknown): AppSettings {
+  const base = DEFAULT_APP_SETTINGS;
+  if (!isRecord(raw)) return structuredClone(base);
+
+  const g = isRecord(raw.general) ? raw.general : {};
+  const d = isRecord(raw.documents) ? raw.documents : {};
+  const i = isRecord(raw.inventory) ? raw.inventory : {};
+  const c = isRecord(raw.commercial) ? raw.commercial : {};
+  const a = isRecord(raw.dataAudit) ? raw.dataAudit : {};
+
+  const legacySingleDraft = asBool(
+    (d as Record<string, unknown>).singleDraftFactualPerSource,
+  );
+
+  return {
+    general: {
+      theme: asThemePreference(g.theme) ?? base.general.theme,
+      dateFormat: asDateFormatId(g.dateFormat) ?? base.general.dateFormat,
+      numberFormat: asNumberFormatId(g.numberFormat) ?? base.general.numberFormat,
+      hotkeysEnabled: asBool(g.hotkeysEnabled) ?? base.general.hotkeysEnabled,
+    },
+    documents: {
+      blockConfirmWhenPlanningHasBlockingErrors:
+        asBool(d.blockConfirmWhenPlanningHasBlockingErrors) ??
+        base.documents.blockConfirmWhenPlanningHasBlockingErrors,
+      blockPostWhenFactualHasBlockingErrors:
+        asBool(d.blockPostWhenFactualHasBlockingErrors) ??
+        base.documents.blockPostWhenFactualHasBlockingErrors,
+      showDocumentEventLog: asBool(d.showDocumentEventLog) ?? base.documents.showDocumentEventLog,
+      requireCancelReason: asBool(d.requireCancelReason) ?? base.documents.requireCancelReason,
+      requireReversalReason: asBool(d.requireReversalReason) ?? base.documents.requireReversalReason,
+      autoClosePlanningOnFullFulfillment:
+        asBool(d.autoClosePlanningOnFullFulfillment) ??
+        base.documents.autoClosePlanningOnFullFulfillment,
+      singleDraftReceiptPerPurchaseOrder:
+        asBool(d.singleDraftReceiptPerPurchaseOrder) ??
+        legacySingleDraft ??
+        base.documents.singleDraftReceiptPerPurchaseOrder,
+      singleDraftShipmentPerSalesOrder:
+        asBool(d.singleDraftShipmentPerSalesOrder) ??
+        legacySingleDraft ??
+        base.documents.singleDraftShipmentPerSalesOrder,
+    },
+    inventory: {
+      reservationsEnabled: asBool(i.reservationsEnabled) ?? base.inventory.reservationsEnabled,
+      requireReservationBeforeShipment:
+        asBool(i.requireReservationBeforeShipment) ?? base.inventory.requireReservationBeforeShipment,
+      allocationMode: asAllocationModeId(i.allocationMode) ?? base.inventory.allocationMode,
+      releaseReservationsOnSalesOrderCancel:
+        asBool(i.releaseReservationsOnSalesOrderCancel) ??
+        base.inventory.releaseReservationsOnSalesOrderCancel,
+      releaseReservationsOnSalesOrderClose:
+        asBool(i.releaseReservationsOnSalesOrderClose) ??
+        base.inventory.releaseReservationsOnSalesOrderClose,
+      reconcileReservationsOnSalesOrderSaveConfirm:
+        asBool(i.reconcileReservationsOnSalesOrderSaveConfirm) ??
+        base.inventory.reconcileReservationsOnSalesOrderSaveConfirm,
+    },
+    commercial: {
+      moneyDecimalPlaces: clampMoneyDecimals(
+        asFiniteNumber(c.moneyDecimalPlaces) ?? base.commercial.moneyDecimalPlaces,
+      ),
+      zeroPriceLinesRequireReason:
+        asBool(c.zeroPriceLinesRequireReason) ?? base.commercial.zeroPriceLinesRequireReason,
+      partnerTermsOverwrite:
+        asPartnerTermsOverwriteId(c.partnerTermsOverwrite) ?? base.commercial.partnerTermsOverwrite,
+    },
+    dataAudit: {
+      auditLogEnabled: asBool(a.auditLogEnabled) ?? base.dataAudit.auditLogEnabled,
+      showAppVersion: asBool(a.showAppVersion) ?? base.dataAudit.showAppVersion,
+    },
+  };
+}
+
+export function clampMoneyDecimals(n: number): number {
+  const r = Math.round(n);
+  return Math.min(4, Math.max(2, r));
+}
+
+export function mergeAppSettingsPatch(
+  current: AppSettings,
+  patch: DeepPartialAppSettings,
+): AppSettings {
+  return {
+    general: { ...current.general, ...patch.general },
+    documents: { ...current.documents, ...patch.documents },
+    inventory: { ...current.inventory, ...patch.inventory },
+    commercial: {
+      ...current.commercial,
+      ...patch.commercial,
+      moneyDecimalPlaces:
+        patch.commercial?.moneyDecimalPlaces !== undefined
+          ? clampMoneyDecimals(patch.commercial.moneyDecimalPlaces)
+          : current.commercial.moneyDecimalPlaces,
+    },
+    dataAudit: { ...current.dataAudit, ...patch.dataAudit },
+  };
+}
+
+export function defaultSettingsClone(): AppSettings {
+  return structuredClone(DEFAULT_APP_SETTINGS);
+}

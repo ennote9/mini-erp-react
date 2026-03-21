@@ -19,12 +19,11 @@ import {
   validatePaymentTermsDaysForm,
 } from "../../shared/planningCommercialDates";
 import {
-  normalizeCancelReasonComment,
-  validateCancelDocumentReasonForm,
+  resolveCancelDocumentReasonForService,
   zeroPriceReasonCodeForStore,
-  type CancelDocumentReasonCode,
   type CancelDocumentReasonInput,
 } from "../../shared/reasonCodes";
+import { getAppSettings } from "../../shared/settings/store";
 import { appendAuditEvent } from "../../shared/audit/eventLogRepository";
 import { AUDIT_ACTOR_LOCAL_USER } from "../../shared/audit/eventLogTypes";
 import { auditShipmentDocumentCreated } from "../../shared/audit/factualDocumentAudit";
@@ -40,6 +39,7 @@ import { stockReservationRepository } from "../stock-reservations/repository";
 import { stockBalanceRepository } from "../stock-balances/repository";
 import { reconcileSalesOrderReservations } from "../../shared/soReservationReconcile";
 import type { SalesOrder } from "./model";
+import { computeSalesOrderAllocationView } from "../../shared/soAllocation";
 
 export { reconcileSalesOrderReservations };
 export type {
@@ -215,7 +215,9 @@ export function saveDraft(
       newLinesFromDb: newLines,
       itemCode: itemCodeForAudit,
     });
-    reconcileSalesOrderReservations(existingId, { reason: "save_draft" });
+    if (getAppSettings().inventory.reconcileReservationsOnSalesOrderSaveConfirm) {
+      reconcileSalesOrderReservations(existingId, { reason: "save_draft" });
+    }
     return { success: true, id: existingId };
   }
   const created = salesOrderRepository.create(header, lines);
@@ -273,7 +275,9 @@ export function confirm(soId: string): ConfirmResult {
   if (err) return { success: false, error: err };
   const so = salesOrderRepository.getById(soId)!;
   salesOrderRepository.update(soId, { status: "confirmed" });
-  reconcileSalesOrderReservations(soId, { reason: "confirm" });
+  if (getAppSettings().inventory.reconcileReservationsOnSalesOrderSaveConfirm) {
+    reconcileSalesOrderReservations(soId, { reason: "confirm" });
+  }
   appendAuditEvent({
     entityType: "sales_order",
     entityId: soId,
@@ -346,8 +350,11 @@ export function cancelDocument(
   soId: string,
   input: CancelDocumentReasonInput,
 ): CancelDocumentResult {
-  const reasonErr = validateCancelDocumentReasonForm(input.cancelReasonCode);
-  if (reasonErr) return { success: false, error: reasonErr };
+  const resolved = resolveCancelDocumentReasonForService(
+    input,
+    getAppSettings().documents.requireCancelReason,
+  );
+  if (!resolved.ok) return { success: false, error: resolved.error };
   const so = salesOrderRepository.getById(soId);
   if (!so) return { success: false, error: "Sales order not found." };
   if (so.status !== "draft" && so.status !== "confirmed")
@@ -355,10 +362,12 @@ export function cancelDocument(
       success: false,
       error: "Only draft or confirmed sales orders can be cancelled.",
     };
-  const code = input.cancelReasonCode as CancelDocumentReasonCode;
-  const comment = normalizeCancelReasonComment(input.cancelReasonComment);
+  const code = resolved.code;
+  const comment = resolved.comment;
   const prevStatus = so.status;
-  const reservationsReleased = stockReservationRepository.releaseAllActiveForSalesOrder(soId);
+  const reservationsReleased = getAppSettings().inventory.releaseReservationsOnSalesOrderCancel
+    ? stockReservationRepository.releaseAllActiveForSalesOrder(soId)
+    : 0;
   salesOrderRepository.update(soId, {
     status: "cancelled",
     cancelReasonCode: code,
@@ -413,11 +422,28 @@ export function createShipment(soId: string): CreateShipmentResult {
       error: "Sales order is already fully shipped (posted shipments).",
     };
   }
-  if (hasDraftShipmentForSo(soId)) {
+  if (
+    getAppSettings().documents.singleDraftShipmentPerSalesOrder &&
+    hasDraftShipmentForSo(soId)
+  ) {
     return {
       success: false,
       error: "A draft shipment already exists for this sales order.",
     };
+  }
+
+  if (getAppSettings().inventory.requireReservationBeforeShipment) {
+    const alloc = computeSalesOrderAllocationView(soId);
+    const unreserved = alloc.lines.some(
+      (l) => l.remainingQty > 0 && l.reservedQty < l.remainingQty,
+    );
+    if (unreserved) {
+      return {
+        success: false,
+        error:
+          "Each open line must be fully reserved before creating a shipment. Use Allocate stock on the sales order.",
+      };
+    }
   }
 
   const fulfillment = computeSalesOrderFulfillment(soId);

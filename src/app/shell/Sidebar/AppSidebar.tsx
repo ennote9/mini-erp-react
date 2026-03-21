@@ -14,6 +14,7 @@ import {
   User,
   Users,
   Warehouse,
+  Settings,
 } from "lucide-react";
 import { NavLink, useLocation } from "react-router-dom";
 import {
@@ -154,6 +155,9 @@ export function AppSidebar() {
       </SidebarContent>
       <SidebarFooter>
         <SidebarMenu>
+          <SidebarMenuItem>
+            <SidebarNavLink to="/settings" label="Settings" icon={Settings} />
+          </SidebarMenuItem>
           <SidebarMenuItem>
             <SidebarMenuButton
               size="lg"

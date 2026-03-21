@@ -21,7 +21,9 @@
         { "path": "$APPLOCALDATA/documents" },
         { "path": "$APPLOCALDATA/documents/**" },
         { "path": "$APPLOCALDATA/inventory" },
-        { "path": "$APPLOCALDATA/inventory/**" }
+        { "path": "$APPLOCALDATA/inventory/**" },
+        { "path": "$APPLOCALDATA/config" },
+        { "path": "$APPLOCALDATA/config/**" }
       ]
     },
     "fs:allow-exists",

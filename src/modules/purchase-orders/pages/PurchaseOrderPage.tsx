@@ -84,6 +84,7 @@ import {
   type PurchaseOrderFulfillment,
   type PoLineFulfillment,
 } from "../../../shared/planningFulfillment";
+import { useSettings } from "../../../shared/settings/SettingsContext";
 
 type LineWithItem = PurchaseOrderLine & { itemName: string };
 
@@ -447,6 +448,7 @@ function poLinesReadOnlyColumnDefs(
 export function PurchaseOrderPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const { settings } = useSettings();
   const [refresh, setRefresh] = useState(0);
   const isNew = id === "new";
   const doc = useMemo(
@@ -1154,8 +1156,16 @@ export function PurchaseOrderPage() {
                 <Button
                   type="button"
                   onClick={handleConfirm}
-                  disabled={hasErrors(health.issues)}
-                  title={hasErrors(health.issues) ? "Fix errors before confirming." : undefined}
+                  disabled={
+                    settings.documents.blockConfirmWhenPlanningHasBlockingErrors &&
+                    hasErrors(health.issues)
+                  }
+                  title={
+                    settings.documents.blockConfirmWhenPlanningHasBlockingErrors &&
+                    hasErrors(health.issues)
+                      ? "Fix errors before confirming."
+                      : undefined
+                  }
                 >
                   <CircleCheck aria-hidden />
                   Confirm
@@ -1886,7 +1896,7 @@ export function PurchaseOrderPage() {
         onOpenChange={setIsLineImportModalOpen}
         onApply={handleApplyImportedLines}
       />
-      {!isNew && id ? (
+      {!isNew && id && settings.documents.showDocumentEventLog ? (
         <DocumentEventLogSection entityType="purchase_order" entityId={id} refresh={refresh} />
       ) : null}
       <CancelDocumentReasonDialog

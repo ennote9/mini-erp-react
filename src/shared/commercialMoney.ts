@@ -1,18 +1,26 @@
 /**
- * Central money rules for planning documents (PO/SO): 2 decimal places, half-up rounding.
- * Line amount = round2(qty * unitPrice); document total = round2(sum of line amounts).
+ * Central money rules for planning documents (PO/SO): configurable decimals (2–4), half-up rounding.
+ * Line amount = round(qty * unitPrice); document total = round(sum of line amounts).
  */
 
+import { clampMoneyDecimals } from "./settings/mergeNormalize";
+import { getAppSettings } from "./settings/store";
+
+/** Default when settings are not involved (docs / tests). */
 export const COMMERCIAL_MONEY_DECIMAL_PLACES = 2;
 
-const FACTOR = 10 ** COMMERCIAL_MONEY_DECIMAL_PLACES;
+export function getCommercialMoneyDecimalPlaces(): number {
+  return clampMoneyDecimals(getAppSettings().commercial.moneyDecimalPlaces);
+}
 
-/** Round to 2 decimals (half away from zero). */
+/** Round to configured commercial decimals (half away from zero). */
 export function roundMoney(value: number): number {
   if (!Number.isFinite(value)) return 0;
-  const scaled = value * FACTOR;
+  const places = getCommercialMoneyDecimalPlaces();
+  const factor = 10 ** places;
+  const scaled = value * factor;
   const rounded = Math.sign(scaled) * Math.round(Math.abs(scaled));
-  return rounded / FACTOR;
+  return rounded / factor;
 }
 
 /** Per-line monetary amount from qty and unit price (each already validated as finite, unit price ≥ 0). */
@@ -34,7 +42,7 @@ export function sumPlanningDocumentLineAmounts(
 }
 
 /**
- * Parse and normalize a unit price for persistence: finite, ≥ 0, rounded to 2 decimals.
+ * Parse and normalize a unit price for persistence: finite, ≥ 0, rounded to commercial decimals.
  * Returns null if invalid (including negative).
  */
 export function parseCommercialUnitPrice(value: unknown): number | null {

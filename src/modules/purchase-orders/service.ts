@@ -19,12 +19,11 @@ import {
   validatePaymentTermsDaysForm,
 } from "../../shared/planningCommercialDates";
 import {
-  normalizeCancelReasonComment,
-  validateCancelDocumentReasonForm,
+  resolveCancelDocumentReasonForService,
   zeroPriceReasonCodeForStore,
-  type CancelDocumentReasonCode,
   type CancelDocumentReasonInput,
 } from "../../shared/reasonCodes";
+import { getAppSettings } from "../../shared/settings/store";
 import { appendAuditEvent } from "../../shared/audit/eventLogRepository";
 import { AUDIT_ACTOR_LOCAL_USER } from "../../shared/audit/eventLogTypes";
 import { auditReceiptDocumentCreated } from "../../shared/audit/factualDocumentAudit";
@@ -275,18 +274,21 @@ export function cancelDocument(
   poId: string,
   input: CancelDocumentReasonInput,
 ): CancelDocumentResult {
-  const reasonErr = validateCancelDocumentReasonForm(input.cancelReasonCode);
-  if (reasonErr) return { success: false, error: reasonErr };
+  const resolved = resolveCancelDocumentReasonForService(
+    input,
+    getAppSettings().documents.requireCancelReason,
+  );
+  if (!resolved.ok) return { success: false, error: resolved.error };
   const po = purchaseOrderRepository.getById(poId);
   if (!po) return { success: false, error: "Purchase order not found." };
   if (po.status !== "draft" && po.status !== "confirmed")
     return { success: false, error: "Only draft or confirmed purchase orders can be cancelled." };
-  const code = input.cancelReasonCode as CancelDocumentReasonCode;
-  const comment = normalizeCancelReasonComment(input.cancelReasonComment);
+  const cancelCode = resolved.code;
+  const comment = resolved.comment;
   const prevStatus = po.status;
   purchaseOrderRepository.update(poId, {
     status: "cancelled",
-    cancelReasonCode: code,
+    cancelReasonCode: cancelCode,
     ...(comment !== undefined ? { cancelReasonComment: comment } : {}),
   });
   appendAuditEvent({
@@ -298,7 +300,7 @@ export function cancelDocument(
       documentNumber: po.number,
       previousStatus: prevStatus,
       newStatus: "cancelled" as const,
-      cancelReasonCode: code,
+      cancelReasonCode: cancelCode,
       cancelReasonComment: comment ?? null,
     },
   });
@@ -322,7 +324,10 @@ export function createReceipt(poId: string): CreateReceiptResult {
       error: "Purchase order is already fully received (posted receipts).",
     };
   }
-  if (hasDraftReceiptForPo(poId)) {
+  if (
+    getAppSettings().documents.singleDraftReceiptPerPurchaseOrder &&
+    hasDraftReceiptForPo(poId)
+  ) {
     return {
       success: false,
       error: "A draft receipt already exists for this purchase order.",

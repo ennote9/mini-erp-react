@@ -76,6 +76,39 @@ export function validateCancelDocumentReasonForm(raw: unknown): string | null {
   return null;
 }
 
+/**
+ * When {@param requireReason} is false, missing/invalid form input falls back to OTHER for audit storage.
+ */
+export function resolveCancelDocumentReasonForService(
+  input: CancelDocumentReasonInput,
+  requireReason: boolean,
+):
+  | { ok: true; code: CancelDocumentReasonCode; comment: string | undefined }
+  | { ok: false; error: string } {
+  if (requireReason) {
+    const err = validateCancelDocumentReasonForm(input.cancelReasonCode);
+    if (err) return { ok: false, error: err };
+    return {
+      ok: true,
+      code: input.cancelReasonCode as CancelDocumentReasonCode,
+      comment: normalizeCancelReasonComment(input.cancelReasonComment),
+    };
+  }
+  const raw = input.cancelReasonCode;
+  if (raw != null && raw !== "" && isCancelDocumentReasonCode(raw)) {
+    return {
+      ok: true,
+      code: raw,
+      comment: normalizeCancelReasonComment(input.cancelReasonComment),
+    };
+  }
+  return {
+    ok: true,
+    code: "OTHER",
+    comment: normalizeCancelReasonComment(input.cancelReasonComment),
+  };
+}
+
 /** Optional note; trim; empty → undefined */
 export function normalizeCancelReasonComment(raw: unknown): string | undefined {
   if (raw == null) return undefined;
@@ -120,6 +153,36 @@ export function validateReversalDocumentReasonForm(raw: unknown): string | null 
   if (raw == null || raw === "") return "A reversal reason is required.";
   if (!isReversalDocumentReasonCode(raw)) return "Select a valid reversal reason.";
   return null;
+}
+
+export function resolveReversalDocumentReasonForService(
+  input: ReversalDocumentReasonInput,
+  requireReason: boolean,
+):
+  | { ok: true; code: ReversalDocumentReasonCode; comment: string | undefined }
+  | { ok: false; error: string } {
+  if (requireReason) {
+    const err = validateReversalDocumentReasonForm(input.reversalReasonCode);
+    if (err) return { ok: false, error: err };
+    return {
+      ok: true,
+      code: input.reversalReasonCode as ReversalDocumentReasonCode,
+      comment: normalizeReversalReasonComment(input.reversalReasonComment),
+    };
+  }
+  const raw = input.reversalReasonCode;
+  if (raw != null && raw !== "" && isReversalDocumentReasonCode(raw)) {
+    return {
+      ok: true,
+      code: raw,
+      comment: normalizeReversalReasonComment(input.reversalReasonComment),
+    };
+  }
+  return {
+    ok: true,
+    code: "OTHER",
+    comment: normalizeReversalReasonComment(input.reversalReasonComment),
+  };
 }
 
 /** Same rules as cancel comment (trim, max length). */

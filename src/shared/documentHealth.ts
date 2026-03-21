@@ -13,6 +13,7 @@ import { itemRepository } from "../modules/items/repository";
 import { lineAmountMoney, roundMoney } from "./commercialMoney";
 import { validatePaymentTermsDaysForm } from "./planningCommercialDates";
 import { isZeroPriceLineReasonCode } from "./reasonCodes";
+import { getAppSettings } from "./settings/store";
 
 export type DocumentHealth = {
   /** Document-level issues; use getErrorAndWarningMessages(issues) for message lists. */
@@ -52,6 +53,7 @@ export type PurchaseOrderHealthInput = {
 export function getPurchaseOrderHealth(input: PurchaseOrderHealthInput): DocumentHealth {
   const issues: Issue[] = [];
   const lineHealth = new Map<number, "error" | "warning" | null>();
+  const zeroPriceReasonRequired = getAppSettings().commercial.zeroPriceLinesRequireReason;
 
   if (normalizeTrim(input.supplierId) === "") {
     issues.push(fieldIssue("error", "supplierId", "Supplier is required."));
@@ -100,8 +102,14 @@ export function getPurchaseOrderHealth(input: PurchaseOrderHealthInput): Documen
     const amount = lineAmount(line);
     const hasZeroPriceReason = isZeroPriceLineReasonCode(line.zeroPriceReasonCode);
     if (up === 0 && !hasZeroPriceReason) {
-      lineHealth.set(line._lineId, "error");
-      linesWithZeroPriceMissingReason += 1;
+      if (zeroPriceReasonRequired) {
+        lineHealth.set(line._lineId, "error");
+        linesWithZeroPriceMissingReason += 1;
+        linesWithZeroPrice += 1;
+        if (amount === 0) linesWithZeroAmount += 1;
+        continue;
+      }
+      lineHealth.set(line._lineId, "warning");
       linesWithZeroPrice += 1;
       if (amount === 0) linesWithZeroAmount += 1;
       continue;
@@ -142,7 +150,7 @@ export function getPurchaseOrderHealth(input: PurchaseOrderHealthInput): Documen
     }
   }
 
-  if (linesWithZeroPriceMissingReason > 0) {
+  if (zeroPriceReasonRequired && linesWithZeroPriceMissingReason > 0) {
     issues.push(
       docIssue(
         "error",
@@ -186,6 +194,7 @@ export type SalesOrderHealthInput = {
 export function getSalesOrderHealth(input: SalesOrderHealthInput): DocumentHealth {
   const issues: Issue[] = [];
   const lineHealth = new Map<number, "error" | "warning" | null>();
+  const zeroPriceReasonRequired = getAppSettings().commercial.zeroPriceLinesRequireReason;
 
   if (normalizeTrim(input.customerId) === "") {
     issues.push(fieldIssue("error", "customerId", "Customer is required."));
@@ -234,8 +243,14 @@ export function getSalesOrderHealth(input: SalesOrderHealthInput): DocumentHealt
     const amount = lineAmount(line);
     const hasZeroPriceReason = isZeroPriceLineReasonCode(line.zeroPriceReasonCode);
     if (up === 0 && !hasZeroPriceReason) {
-      lineHealth.set(line._lineId, "error");
-      linesWithZeroPriceMissingReason += 1;
+      if (zeroPriceReasonRequired) {
+        lineHealth.set(line._lineId, "error");
+        linesWithZeroPriceMissingReason += 1;
+        linesWithZeroPrice += 1;
+        if (amount === 0) linesWithZeroAmount += 1;
+        continue;
+      }
+      lineHealth.set(line._lineId, "warning");
       linesWithZeroPrice += 1;
       if (amount === 0) linesWithZeroAmount += 1;
       continue;
@@ -276,7 +291,7 @@ export function getSalesOrderHealth(input: SalesOrderHealthInput): DocumentHealt
     }
   }
 
-  if (linesWithZeroPriceMissingReason > 0) {
+  if (zeroPriceReasonRequired && linesWithZeroPriceMissingReason > 0) {
     issues.push(
       docIssue(
         "error",

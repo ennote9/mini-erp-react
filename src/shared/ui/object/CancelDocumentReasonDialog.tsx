@@ -8,8 +8,10 @@ import {
   CANCEL_DOCUMENT_REASON_CODES,
   CANCEL_DOCUMENT_REASON_LABELS,
   type CancelDocumentReasonCode,
+  isCancelDocumentReasonCode,
   validateCancelDocumentReasonForm,
 } from "../../reasonCodes";
+import { useSettings } from "../../settings/SettingsContext";
 import { cn } from "@/lib/utils";
 
 export type CancelDocumentReasonPayload = {
@@ -36,6 +38,8 @@ export function CancelDocumentReasonDialog({
   documentKindLabel,
   onConfirm,
 }: Props) {
+  const { settings } = useSettings();
+  const requireReason = settings.documents.requireCancelReason;
   const [reasonCode, setReasonCode] = useState<string>("");
   const [comment, setComment] = useState("");
   const [submitError, setSubmitError] = useState<string | null>(null);
@@ -48,15 +52,22 @@ export function CancelDocumentReasonDialog({
   }, [open]);
 
   const handleConfirm = () => {
-    const err = validateCancelDocumentReasonForm(reasonCode);
-    if (err) {
-      setSubmitError(err);
-      return;
+    let effectiveCode: CancelDocumentReasonCode;
+    if (requireReason) {
+      const err = validateCancelDocumentReasonForm(reasonCode);
+      if (err) {
+        setSubmitError(err);
+        return;
+      }
+      effectiveCode = reasonCode as CancelDocumentReasonCode;
+    } else {
+      effectiveCode =
+        reasonCode !== "" && isCancelDocumentReasonCode(reasonCode) ? reasonCode : "OTHER";
     }
     setSubmitError(null);
     const c = comment.trim();
     onConfirm({
-      cancelReasonCode: reasonCode as CancelDocumentReasonCode,
+      cancelReasonCode: effectiveCode,
       cancelReasonComment: c === "" ? undefined : c.length > 500 ? c.slice(0, 500) : c,
     });
     onOpenChange(false);
@@ -87,14 +98,15 @@ export function CancelDocumentReasonDialog({
             Cancel {documentKindLabel}
           </Dialog.Title>
           <Dialog.Description className="mt-1.5 text-sm text-muted-foreground">
-            This action marks the document as cancelled. Select a reason. Cancellation cannot proceed
-            without a reason code.
+            {requireReason
+              ? "This action marks the document as cancelled. A reason code is required."
+              : "This action marks the document as cancelled. You may leave the reason unset; “Other” will be recorded if empty."}
           </Dialog.Description>
 
           <div className="mt-4 flex flex-col gap-3">
             <div className="flex flex-col gap-1">
               <Label htmlFor="cancel-reason-code" className="text-sm">
-                Reason <span className="text-destructive">*</span>
+                Reason {requireReason ? <span className="text-destructive">*</span> : null}
               </Label>
               <SelectField
                 id="cancel-reason-code"

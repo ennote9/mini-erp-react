@@ -6,6 +6,7 @@
 import { normalizeTrim } from "./validation";
 import { parseCommercialUnitPrice, roundMoney } from "./commercialMoney";
 import { isZeroPriceLineReasonCode } from "./reasonCodes";
+import { getAppSettings } from "./settings/store";
 
 export type DocumentLineInput = { itemId: string; qty: number };
 
@@ -78,6 +79,7 @@ export function validatePlanningLineUnitPrices(
 export function validatePlanningLinesZeroPriceReasons(
   lines: ReadonlyArray<{ unitPrice?: unknown; zeroPriceReasonCode?: unknown }>,
 ): string | null {
+  if (!getAppSettings().commercial.zeroPriceLinesRequireReason) return null;
   if (!lines || lines.length === 0) return null;
   for (const line of lines) {
     const up = parseCommercialUnitPrice(line.unitPrice);

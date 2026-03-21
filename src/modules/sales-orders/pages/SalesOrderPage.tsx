@@ -66,6 +66,7 @@ import {
   type CancelDocumentReasonPayload,
 } from "../../../shared/ui/object/CancelDocumentReasonDialog";
 import { DocumentEventLogSection } from "../../../shared/ui/object/DocumentEventLogSection";
+import { useSettings } from "../../../shared/settings/SettingsContext";
 import {
   CANCEL_DOCUMENT_REASON_LABELS,
   ZERO_PRICE_LINE_REASON_CODES,
@@ -508,6 +509,7 @@ function buildExportRowsFromLinesWithItem(lines: LineWithItem[]): SoExportLineRo
 export function SalesOrderPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const { settings } = useSettings();
   const [refresh, setRefresh] = useState(0);
   const isNew = id === "new";
   const doc = useMemo(
@@ -1234,8 +1236,16 @@ export function SalesOrderPage() {
                 <Button
                   type="button"
                   onClick={handleConfirm}
-                  disabled={hasErrors(health.issues)}
-                  title={hasErrors(health.issues) ? "Fix errors before confirming." : undefined}
+                  disabled={
+                    settings.documents.blockConfirmWhenPlanningHasBlockingErrors &&
+                    hasErrors(health.issues)
+                  }
+                  title={
+                    settings.documents.blockConfirmWhenPlanningHasBlockingErrors &&
+                    hasErrors(health.issues)
+                      ? "Fix errors before confirming."
+                      : undefined
+                  }
                 >
                   <CircleCheck aria-hidden />
                   Confirm
@@ -2017,7 +2027,7 @@ export function SalesOrderPage() {
         onOpenChange={setIsLineImportModalOpen}
         onApply={handleApplyImportedLines}
       />
-      {!isNew && id ? (
+      {!isNew && id && settings.documents.showDocumentEventLog ? (
         <DocumentEventLogSection entityType="sales_order" entityId={id} refresh={refresh} />
       ) : null}
       <CancelDocumentReasonDialog

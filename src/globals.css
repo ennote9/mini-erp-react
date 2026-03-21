@@ -91,6 +91,38 @@
   --ring: #525252;
 }
 
+/* System light preference: calm ERP light shell (paired with theme "System"). */
+.light {
+  --sidebar-background: 0 0% 98%;
+  --sidebar-foreground: 240 5.3% 26.1%;
+  --sidebar-primary: 240 5.9% 10%;
+  --sidebar-primary-foreground: 0 0% 98%;
+  --sidebar-accent: 240 4.8% 95.9%;
+  --sidebar-accent-foreground: 240 5.9% 10%;
+  --sidebar-border: 220 13% 91%;
+  --sidebar-ring: 217.2 91.2% 59.8%;
+
+  --background: #f4f4f5;
+  --foreground: #18181b;
+  --card: #fafafa;
+  --card-foreground: #18181b;
+  --popover: #fafafa;
+  --popover-foreground: #18181b;
+  --primary: #18181b;
+  --primary-foreground: #fafafa;
+  --secondary: #e4e4e7;
+  --secondary-foreground: #18181b;
+  --muted: #e4e4e7;
+  --muted-foreground: #71717a;
+  --accent: #e4e4e7;
+  --accent-foreground: #18181b;
+  --destructive: #b91c1c;
+  --destructive-foreground: #fafafa;
+  --border: #d4d4d8;
+  --input: #d4d4d8;
+  --ring: #525252;
+}
+
 @layer base {
   button:not(:disabled),
   [role="button"]:not(:disabled) {

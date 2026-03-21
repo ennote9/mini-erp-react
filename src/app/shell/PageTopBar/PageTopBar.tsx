@@ -8,6 +8,7 @@ import {
   PackageCheck,
   Receipt,
   Scale,
+  Settings,
   ShoppingBag,
   ShoppingCart,
   Tag,
@@ -30,6 +31,7 @@ const PAGE_TITLES: Record<string, string> = {
   "/shipments": "Shipments",
   "/stock-balances": "Stock Balances",
   "/stock-movements": "Stock Movements",
+  "/settings": "Settings",
 };
 
 function getPageTitle(pathname: string): string {
@@ -73,6 +75,7 @@ function getPageIcon(
     return PackageCheck;
   if (pathname === "/stock-balances") return Scale;
   if (pathname === "/stock-movements") return ArrowLeftRight;
+  if (pathname === "/settings") return Settings;
   return null;
 }
 

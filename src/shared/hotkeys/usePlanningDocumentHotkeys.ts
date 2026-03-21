@@ -1,4 +1,5 @@
 import { useEffect, useRef } from "react";
+import { useSettings } from "../settings/SettingsContext";
 import { isErpDialogOpen, isHotkeyFieldBlocked } from "./hotkeyHelpers";
 
 export type PlanningDocumentHotkeyHandlers = {
@@ -18,10 +19,13 @@ export type PlanningDocumentHotkeyHandlers = {
  * Skips when line-import modal is open, any ERP dialog is open, or focus is in an editable field.
  */
 export function usePlanningDocumentHotkeys(handlers: PlanningDocumentHotkeyHandlers): void {
+  const { settings } = useSettings();
+  const enabled = settings.general.hotkeysEnabled;
   const ref = useRef(handlers);
   ref.current = handlers;
 
   useEffect(() => {
+    if (!enabled) return;
     const onKeyDown = (e: KeyboardEvent) => {
       const h = ref.current;
       if (h.isLineImportModalOpen) return;
@@ -60,5 +64,5 @@ export function usePlanningDocumentHotkeys(handlers: PlanningDocumentHotkeyHandl
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, []);
+  }, [enabled]);
 }

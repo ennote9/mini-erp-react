@@ -8,8 +8,10 @@ import {
   REVERSAL_DOCUMENT_REASON_CODES,
   REVERSAL_DOCUMENT_REASON_LABELS,
   type ReversalDocumentReasonCode,
+  isReversalDocumentReasonCode,
   validateReversalDocumentReasonForm,
 } from "../../reasonCodes";
+import { useSettings } from "../../settings/SettingsContext";
 import { cn } from "@/lib/utils";
 
 export type ReverseDocumentReasonPayload = {
@@ -36,6 +38,8 @@ export function ReverseDocumentReasonDialog({
   documentKindLabel,
   onConfirm,
 }: Props) {
+  const { settings } = useSettings();
+  const requireReason = settings.documents.requireReversalReason;
   const [reasonCode, setReasonCode] = useState<string>("");
   const [comment, setComment] = useState("");
   const [submitError, setSubmitError] = useState<string | null>(null);
@@ -48,15 +52,22 @@ export function ReverseDocumentReasonDialog({
   }, [open]);
 
   const handleConfirm = () => {
-    const err = validateReversalDocumentReasonForm(reasonCode);
-    if (err) {
-      setSubmitError(err);
-      return;
+    let effectiveCode: ReversalDocumentReasonCode;
+    if (requireReason) {
+      const err = validateReversalDocumentReasonForm(reasonCode);
+      if (err) {
+        setSubmitError(err);
+        return;
+      }
+      effectiveCode = reasonCode as ReversalDocumentReasonCode;
+    } else {
+      effectiveCode =
+        reasonCode !== "" && isReversalDocumentReasonCode(reasonCode) ? reasonCode : "OTHER";
     }
     setSubmitError(null);
     const c = comment.trim();
     onConfirm({
-      reversalReasonCode: reasonCode as ReversalDocumentReasonCode,
+      reversalReasonCode: effectiveCode,
       reversalReasonComment: c === "" ? undefined : c.length > 500 ? c.slice(0, 500) : c,
     });
     onOpenChange(false);
@@ -87,14 +98,15 @@ export function ReverseDocumentReasonDialog({
             Reverse {documentKindLabel}
           </Dialog.Title>
           <Dialog.Description className="mt-1.5 text-sm text-muted-foreground">
-            This records a full reversal of the posted document: compensating stock movements will be
-            created and the document will be marked Reversed. A reason is required.
+            {requireReason
+              ? "This records a full reversal: compensating stock movements will be created and the document will be marked Reversed. A reason is required."
+              : "This records a full reversal. You may leave the reason unset; “Other” will be recorded if empty."}
           </Dialog.Description>
 
           <div className="mt-4 flex flex-col gap-3">
             <div className="flex flex-col gap-1">
               <Label htmlFor="reversal-reason-code" className="text-sm">
-                Reason <span className="text-destructive">*</span>
+                Reason {requireReason ? <span className="text-destructive">*</span> : null}
               </Label>
               <SelectField
                 id="reversal-reason-code"

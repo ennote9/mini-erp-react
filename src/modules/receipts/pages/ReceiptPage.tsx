@@ -14,7 +14,12 @@ import { DocumentPageLayout } from "../../../shared/ui/object/DocumentPageLayout
 import { BackButton } from "../../../shared/ui/list/BackButton";
 import { StatusBadge } from "../../../shared/ui/feedback/StatusBadge";
 import { DocumentIssueStrip } from "../../../shared/ui/feedback/DocumentIssueStrip";
-import { actionIssue, getErrorAndWarningMessages, type Issue } from "../../../shared/issues";
+import {
+  actionIssue,
+  getErrorAndWarningMessages,
+  hasErrors,
+  type Issue,
+} from "../../../shared/issues";
 import { AgGridContainer } from "../../../shared/ui/ag-grid/AgGridContainer";
 import { Button } from "@/components/ui/button";
 import {
@@ -45,6 +50,7 @@ import {
   type ReverseDocumentReasonPayload,
 } from "../../../shared/ui/object/ReverseDocumentReasonDialog";
 import { DocumentEventLogSection } from "../../../shared/ui/object/DocumentEventLogSection";
+import { useSettings } from "../../../shared/settings/SettingsContext";
 import {
   CANCEL_DOCUMENT_REASON_LABELS,
   REVERSAL_DOCUMENT_REASON_LABELS,
@@ -132,6 +138,7 @@ function buildExportRowsFromLinesWithItem(lines: LineWithItem[]): ReceiptExportL
 
 export function ReceiptPage() {
   const { id } = useParams<{ id: string }>();
+  const { settings } = useSettings();
   const [refresh, setRefresh] = useState(0);
   const [actionIssues, setActionIssues] = useState<Issue[]>([]);
   const [selectedLineIds, setSelectedLineIds] = useState<string[]>([]);
@@ -298,6 +305,20 @@ export function ReceiptPage() {
     }
   };
 
+  const issuesForStrip = useMemo(
+    () => factualDocumentIssuesForStrip(actionIssues, isDraft, id, validateReceiptFull),
+    [actionIssues, isDraft, id, refresh],
+  );
+
+  const { errors: documentErrors, warnings: documentWarnings } =
+    getErrorAndWarningMessages(issuesForStrip);
+  const hasDocumentIssues =
+    documentErrors.length > 0 || documentWarnings.length > 0;
+  const postBlockedByValidation =
+    isDraft &&
+    settings.documents.blockPostWhenFactualHasBlockingErrors &&
+    hasErrors(issuesForStrip);
+
   if (!id || !doc) {
     return (
       <div className="doc-page doc-page--not-found">
@@ -311,16 +332,6 @@ export function ReceiptPage() {
     { label: "Receipts", to: "/receipts" },
     { label: doc.number },
   ];
-
-  const issuesForStrip = useMemo(
-    () => factualDocumentIssuesForStrip(actionIssues, isDraft, id, validateReceiptFull),
-    [actionIssues, isDraft, id, refresh],
-  );
-
-  const { errors: documentErrors, warnings: documentWarnings } =
-    getErrorAndWarningMessages(issuesForStrip);
-  const hasDocumentIssues =
-    documentErrors.length > 0 || documentWarnings.length > 0;
 
   return (
     <DocumentPageLayout
@@ -341,7 +352,16 @@ export function ReceiptPage() {
             )}
             <div className="doc-header__actions">
               {isDraft && (
-                <Button type="button" onClick={handlePost}>
+                <Button
+                  type="button"
+                  onClick={handlePost}
+                  disabled={postBlockedByValidation}
+                  title={
+                    postBlockedByValidation
+                      ? "Resolve blocking errors before posting."
+                      : undefined
+                  }
+                >
                   Post
                 </Button>
               )}
@@ -560,7 +580,9 @@ export function ReceiptPage() {
           </div>
         )}
       </div>
-      {id ? <DocumentEventLogSection entityType="receipt" entityId={id} refresh={refresh} /> : null}
+      {id && settings.documents.showDocumentEventLog ? (
+        <DocumentEventLogSection entityType="receipt" entityId={id} refresh={refresh} />
+      ) : null}
       <CancelDocumentReasonDialog
         open={cancelReasonDialogOpen}
         onOpenChange={setCancelReasonDialogOpen}
