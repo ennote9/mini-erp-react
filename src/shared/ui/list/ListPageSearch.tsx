@@ -1,6 +1,7 @@
 import { useState, type Ref } from "react";
 import { Search, X } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useTranslation } from "@/shared/i18n/context";
 
 type Props = {
   placeholder: string;
@@ -31,6 +32,7 @@ export function ListPageSearch({
   name = "search",
   inputRef,
 }: Props) {
+  const { t } = useTranslation();
   const [focused, setFocused] = useState(false);
   const showLeftOverlay = value === "" && !focused;
   const showClearButton = value !== "";
@@ -55,7 +57,7 @@ export function ListPageSearch({
           type="button"
           className="list-page-search__clear"
           onClick={() => onChange("")}
-          aria-label="Clear search"
+          aria-label={t("doc.list.clearSearchAria")}
         >
           <X className="list-page-search__clear-icon" />
         </button>
@@ -75,7 +77,7 @@ export function ListPageSearch({
       />
       {showResultCount && (
         <div className="list-page-search__right-overlay" aria-hidden>
-          {resultCount} results
+          {t("doc.list.searchResultsCount", { count: resultCount })}
         </div>
       )}
     </div>

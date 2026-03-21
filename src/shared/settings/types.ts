@@ -2,6 +2,10 @@
  * Typed application settings model. Keys are grouped by stable section IDs for UI and growth.
  */
 
+import type { AppLocaleId } from "../i18n/locales";
+
+export type { AppLocaleId };
+
 export type SettingsSectionId =
   | "workspaceProfile"
   | "general"
@@ -47,6 +51,8 @@ export type AppSettings = {
   general: {
     workspaceMode: WorkspaceModeId;
     profileOverrides: ProfileOverridesState;
+    /** UI language (en / ru / kk). */
+    locale: AppLocaleId;
     theme: ThemePreference;
     dateFormat: DateFormatId;
     numberFormat: NumberFormatId;

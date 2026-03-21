@@ -31,6 +31,8 @@ import { buildStockMovementsListXlsxBuffer, type StockMovementsExportRow } from 
 import { save } from "@tauri-apps/plugin-dialog";
 import { invoke } from "@tauri-apps/api/core";
 import { revealItemInDir } from "@tauri-apps/plugin-opener";
+import type { TFunction } from "../../../shared/i18n/resolve";
+import { useTranslation } from "@/shared/i18n/context";
 
 type RowData = StockMovement & {
   itemCode: string;
@@ -38,13 +40,6 @@ type RowData = StockMovement & {
   warehouseName: string;
   sourceDocumentLabel: string;
   sourceDocumentHref: string | null;
-};
-
-const MOVEMENT_TYPE_LABEL: Record<string, string> = {
-  receipt: "Receipt",
-  shipment: "Shipment",
-  receipt_reversal: "Receipt reversal",
-  shipment_reversal: "Shipment reversal",
 };
 
 const DATE_TIME_FORMAT: Intl.DateTimeFormatOptions = {
@@ -62,27 +57,32 @@ function formatDateTime(isoString: string | null | undefined): string {
 }
 
 function MovementTypeCellRenderer(params: ICellRendererParams<RowData>) {
+  const { t } = useTranslation();
   const value = params.value as string | undefined;
   if (value == null) return null;
-  const label = MOVEMENT_TYPE_LABEL[value] ?? value;
-  return label;
+  const key = `ops.stockMovements.types.${value}`;
+  const translated = t(key);
+  return translated === value ? value : translated;
 }
 
 function getSourceDocument(
   sourceDocumentType: SourceDocumentType,
   sourceDocumentId: string,
+  translate: TFunction,
 ): { label: string; href: string | null } {
   if (sourceDocumentType === "receipt") {
     const doc = receiptRepository.getById(sourceDocumentId);
+    const number = doc?.number ?? sourceDocumentId;
     return {
-      label: doc ? `Receipt ${doc.number}` : `Receipt ${sourceDocumentId}`,
+      label: translate("ops.stockMovements.sourceReceipt", { number }),
       href: `/receipts/${sourceDocumentId}`,
     };
   }
   if (sourceDocumentType === "shipment") {
     const doc = shipmentRepository.getById(sourceDocumentId);
+    const number = doc?.number ?? sourceDocumentId;
     return {
-      label: doc ? `Shipment ${doc.number}` : `Shipment ${sourceDocumentId}`,
+      label: translate("ops.stockMovements.sourceShipment", { number }),
       href: `/shipments/${sourceDocumentId}`,
     };
   }
@@ -124,11 +124,14 @@ function filterByWarehouseId(rows: RowData[], warehouseId: string | null): RowDa
   return rows.filter((r) => r.warehouseId === warehouseId);
 }
 
-function buildExportRowsFromMovements(rows: RowData[]): StockMovementsExportRow[] {
+function buildExportRowsFromMovements(
+  rows: RowData[],
+  movementTypeLabel: (code: string) => string,
+): StockMovementsExportRow[] {
   return rows.map((r, idx) => ({
     no: idx + 1,
     dateTime: formatDateTime(r.datetime),
-    movementType: MOVEMENT_TYPE_LABEL[r.movementType] ?? r.movementType,
+    movementType: movementTypeLabel(r.movementType),
     itemCode: r.itemCode,
     itemName: r.itemName,
     warehouse: r.warehouseName,
@@ -143,13 +146,22 @@ function buildExportRowsFromMovements(rows: RowData[]): StockMovementsExportRow[
 }
 
 export function StockMovementsListPage() {
+  const { t, locale } = useTranslation();
   const [searchParams, setSearchParams] = useSearchParams();
   const warehouseFilterId = useMemo(() => {
     const raw = searchParams.get("warehouseId");
     if (raw == null || raw === "") return null;
-    const t = raw.trim();
-    return t === "" ? null : t;
+    const trimmed = raw.trim();
+    return trimmed === "" ? null : trimmed;
   }, [searchParams]);
+
+  const movementTypeLabel = useCallback(
+    (code: string) => {
+      const translated = t(`ops.stockMovements.types.${code}`);
+      return translated === code ? code : translated;
+    },
+    [t],
+  );
 
   const [searchQuery, setSearchQuery] = useState("");
   const [exportSuccess, setExportSuccess] = useState<{ path: string; filename: string } | null>(null);
@@ -169,8 +181,11 @@ export function StockMovementsListPage() {
       .map((m) => {
         const item = itemRepository.getById(m.itemId);
         const warehouse = warehouseRepository.getById(m.warehouseId);
-        const { label: sourceDocumentLabel, href: sourceDocumentHref } =
-          getSourceDocument(m.sourceDocumentType, m.sourceDocumentId);
+        const { label: sourceDocumentLabel, href: sourceDocumentHref } = getSourceDocument(
+          m.sourceDocumentType,
+          m.sourceDocumentId,
+          t,
+        );
         return {
           ...m,
           itemCode: item?.code ?? m.itemId,
@@ -184,7 +199,7 @@ export function StockMovementsListPage() {
         (a, b) =>
           new Date(b.datetime).getTime() - new Date(a.datetime).getTime(),
       );
-  }, []);
+  }, [t, locale]);
 
   const filteredRows = useMemo(() => {
     const bySearch = filterBySearch(rowsWithNames, searchQuery);
@@ -209,26 +224,26 @@ export function StockMovementsListPage() {
 
   const getExportRowsCurrentView = useCallback((): StockMovementsExportRow[] => {
     const api = gridRef.current?.api;
-    if (!api) return buildExportRowsFromMovements(filteredRows);
+    if (!api) return buildExportRowsFromMovements(filteredRows, movementTypeLabel);
     const rows: RowData[] = [];
     api.forEachNodeAfterFilterAndSort((rowNode) => {
       if (rowNode.data) rows.push(rowNode.data);
     });
-    return buildExportRowsFromMovements(rows);
-  }, [filteredRows]);
+    return buildExportRowsFromMovements(rows, movementTypeLabel);
+  }, [filteredRows, movementTypeLabel]);
 
   const getExportRowsSelected = useCallback((): StockMovementsExportRow[] => {
     const api = gridRef.current?.api;
     const rows: RowData[] = api ? (api.getSelectedRows() as RowData[]) : [];
-    return buildExportRowsFromMovements(rows);
-  }, []);
+    return buildExportRowsFromMovements(rows, movementTypeLabel);
+  }, [movementTypeLabel]);
 
   const runExportWithSaveAs = useCallback(
     async (defaultFilename: string, buildBuffer: () => Promise<ArrayBuffer>) => {
       try {
         const path = await save({
           defaultPath: defaultFilename,
-          filters: [{ name: "Excel", extensions: ["xlsx"] }],
+          filters: [{ name: t("ops.importModal.excelFileFilterName"), extensions: ["xlsx"] }],
         });
         if (path == null) return;
 
@@ -255,7 +270,7 @@ export function StockMovementsListPage() {
         URL.revokeObjectURL(url);
       }
     },
-    [],
+    [t],
   );
 
   const handleExportCurrentView = useCallback(() => {
@@ -272,51 +287,51 @@ export function StockMovementsListPage() {
   const exportSelectedDisabled = selectedCount === 0;
 
   const emptyTitle = hasFilter
-    ? "No stock movements match current search or filters"
-    : "No stock movements yet";
+    ? t("ops.stockMovements.empty.titleFiltered")
+    : t("ops.stockMovements.empty.titleDefault");
   const emptyHint = useMemo(() => {
     if (!hasFilter) {
-      return "Movements will appear after posting receipts and shipments.";
+      return t("ops.stockMovements.empty.hintPosted");
     }
     if (warehouseFilterId != null && searchQuery.trim() === "") {
-      return "No stock movements for this warehouse. Try clearing the warehouse filter.";
+      return t("ops.stockMovements.empty.hintWarehouseOnly");
     }
-    return "Try changing the search or warehouse filter.";
-  }, [hasFilter, warehouseFilterId, searchQuery]);
+    return t("ops.stockMovements.empty.hintGeneral");
+  }, [hasFilter, warehouseFilterId, searchQuery, t]);
 
   const columnDefs = useMemo<ColDef<RowData>[]>(
     () => [
       agGridRowNumberColDef,
       {
         field: "datetime",
-        headerName: "Date/Time",
+        headerName: t("doc.columns.dateTime"),
         width: 200,
         valueFormatter: (params) => formatDateTime(params.value),
       },
       {
         field: "movementType",
-        headerName: "Movement Type",
+        headerName: t("doc.columns.movementType"),
         width: 120,
         cellRenderer: MovementTypeCellRenderer,
       },
       {
         field: "itemCode",
-        headerName: "Item Code",
+        headerName: t("doc.columns.itemCode"),
         width: 120,
       },
       {
         field: "itemName",
-        headerName: "Item Name",
+        headerName: t("doc.columns.itemName"),
         minWidth: 160,
       },
       {
         field: "warehouseName",
-        headerName: "Warehouse",
+        headerName: t("doc.columns.warehouse"),
         minWidth: 120,
       },
       {
         field: "qtyDelta",
-        headerName: "Qty Delta",
+        headerName: t("doc.columns.qtyDelta"),
         width: 110,
         valueFormatter: (params) =>
           params.value != null
@@ -326,14 +341,14 @@ export function StockMovementsListPage() {
             : "",
       },
       {
-        headerName: "Source Document",
+        headerName: t("doc.columns.sourceDocument"),
         minWidth: 180,
         width: 180,
         valueGetter: (params) => params.data?.sourceDocumentLabel ?? "",
         cellRenderer: SourceDocumentCellRenderer,
       },
     ],
-    [],
+    [t, locale],
   );
 
   return (
@@ -341,13 +356,13 @@ export function StockMovementsListPage() {
       header={null}
       controls={
         <>
-          <BackButton to="/" aria-label="Back to Dashboard" />
+          <BackButton to="/" aria-label={t("doc.list.backToDashboard")} />
           <ListPageSearch
             inputRef={listSearchInputRef}
-            placeholder="Search"
+            placeholder={t("ops.stockMovements.searchPlaceholder")}
             value={searchQuery}
             onChange={setSearchQuery}
-            aria-label="Search stock movements"
+            aria-label={t("ops.stockMovements.searchAria")}
             resultCount={filteredRows.length}
           />
           <div className="flex flex-row items-center gap-2 shrink-0 ml-auto">
@@ -355,9 +370,11 @@ export function StockMovementsListPage() {
               <div
                 className="flex h-8 max-w-[min(100%,18rem)] items-center gap-1.5 rounded-md border border-input bg-background px-2 text-xs shrink-0"
                 role="status"
-                aria-label="Warehouse filter active"
+                aria-label={t("ops.stockBalances.warehouseFilterAria")}
               >
-                <span className="text-muted-foreground whitespace-nowrap shrink-0">Warehouse</span>
+                <span className="text-muted-foreground whitespace-nowrap shrink-0">
+                  {t("doc.columns.warehouse")}
+                </span>
                 <span
                   className="truncate font-medium text-foreground/90 min-w-0"
                   title={warehouseFilterLabel}
@@ -371,21 +388,21 @@ export function StockMovementsListPage() {
                   className="h-7 px-1.5 text-xs shrink-0 text-muted-foreground hover:text-foreground"
                   onClick={clearWarehouseFilter}
                 >
-                  Clear
+                  {t("doc.list.clear")}
                 </Button>
               </div>
             )}
             {exportSuccess && (
               <div className="h-8 w-max flex items-center gap-1.5 rounded-md border border-input bg-background px-2 text-sm shrink-0">
-                <span className="text-muted-foreground text-xs">Export completed:</span>
+                <span className="text-muted-foreground text-xs">{t("doc.list.exportCompleted")}</span>
                 <span className="font-medium text-xs truncate max-w-[12rem]" title={exportSuccess.filename}>{exportSuccess.filename}</span>
                 <Button
                   type="button"
                   variant="ghost"
                   size="icon"
                   className="h-7 w-7 shrink-0 text-muted-foreground hover:text-foreground"
-                  title="Open file"
-                  aria-label="Open file"
+                  title={t("doc.list.openFile")}
+                  aria-label={t("doc.list.openFile")}
                   onClick={async () => {
                     try {
                       await invoke("open_export_file", { path: exportSuccess.path });
@@ -403,8 +420,8 @@ export function StockMovementsListPage() {
                   variant="ghost"
                   size="icon"
                   className="h-7 w-7 shrink-0 text-muted-foreground hover:text-foreground"
-                  title="Open folder"
-                  aria-label="Open folder"
+                  title={t("doc.list.openFolder")}
+                  aria-label={t("doc.list.openFolder")}
                   onClick={() => {
                     revealItemInDir(exportSuccess.path);
                     setExportSuccess(null);
@@ -417,8 +434,8 @@ export function StockMovementsListPage() {
                   variant="ghost"
                   size="icon"
                   className="h-6 w-6 shrink-0 text-muted-foreground/80 hover:text-muted-foreground"
-                  title="Dismiss"
-                  aria-label="Dismiss"
+                  title={t("doc.list.dismiss")}
+                  aria-label={t("doc.list.dismiss")}
                   onClick={() => setExportSuccess(null)}
                 >
                   <X className="h-3 w-3" />
@@ -434,7 +451,7 @@ export function StockMovementsListPage() {
                 onClick={handleExportCurrentView}
               >
                 <FileSpreadsheet className="h-4 w-4 shrink-0" />
-                Export
+                {t("doc.list.export")}
               </Button>
               <Popover open={exportOpen} onOpenChange={setExportOpen}>
                 <PopoverTrigger asChild>
@@ -443,7 +460,7 @@ export function StockMovementsListPage() {
                     variant="outline"
                     size="icon"
                     className="h-8 w-8 shrink-0 rounded-l-none border-0 shadow-none"
-                    aria-label="Export options"
+                    aria-label={t("doc.list.exportOptionsAria")}
                   >
                     <ChevronDown className="h-4 w-4" />
                   </Button>
@@ -454,13 +471,13 @@ export function StockMovementsListPage() {
                       type="button"
                       disabled={exportSelectedDisabled}
                       className="w-full rounded-sm px-1.5 py-1 text-left text-sm hover:bg-accent disabled:cursor-not-allowed disabled:opacity-50"
-                      title={exportSelectedDisabled ? "Select one or more rows in the grid first." : undefined}
+                      title={exportSelectedDisabled ? t("doc.list.selectRowsForExport") : undefined}
                       onClick={() => {
                         setExportOpen(false);
                         if (!exportSelectedDisabled) handleExportSelected();
                       }}
                     >
-                      Export selected rows
+                      {t("doc.list.exportSelectedRows")}
                     </button>
                   </div>
                 </PopoverContent>

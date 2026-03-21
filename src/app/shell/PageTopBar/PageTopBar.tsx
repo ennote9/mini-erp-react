@@ -16,40 +16,41 @@ import {
   Users,
   Warehouse,
 } from "lucide-react";
+import { useTranslation } from "@/shared/i18n";
 
 const PAGE_TITLES: Record<string, string> = {
-  "/": "Dashboard",
-  "/items": "Items",
-  "/brands": "Brands",
-  "/categories": "Categories",
-  "/suppliers": "Suppliers",
-  "/customers": "Customers",
-  "/warehouses": "Warehouses",
-  "/purchase-orders": "Purchase Orders",
-  "/receipts": "Receipts",
-  "/sales-orders": "Sales Orders",
-  "/shipments": "Shipments",
-  "/stock-balances": "Stock Balances",
-  "/stock-movements": "Stock Movements",
-  "/settings": "Settings",
+  "/": "routes.dashboard",
+  "/items": "routes.items",
+  "/brands": "routes.brands",
+  "/categories": "routes.categories",
+  "/suppliers": "routes.suppliers",
+  "/customers": "routes.customers",
+  "/warehouses": "routes.warehouses",
+  "/purchase-orders": "routes.purchaseOrders",
+  "/receipts": "routes.receipts",
+  "/sales-orders": "routes.salesOrders",
+  "/shipments": "routes.shipments",
+  "/stock-balances": "routes.stockBalances",
+  "/stock-movements": "routes.stockMovements",
+  "/settings": "routes.settings",
 };
 
-function getPageTitle(pathname: string): string {
-  if (pathname.match(/^\/items\/[^/]+$/)) return "Item";
-  if (pathname.match(/^\/brands\/[^/]+$/)) return "Brand";
-  if (pathname.match(/^\/categories\/[^/]+$/)) return "Category";
-  if (pathname.match(/^\/suppliers\/[^/]+$/)) return "Supplier";
-  if (pathname.match(/^\/customers\/[^/]+$/)) return "Customer";
-  if (pathname.match(/^\/warehouses\/[^/]+$/)) return "Warehouse";
-  if (pathname.match(/^\/purchase-orders\/[^/]+$/)) return "Purchase Order";
-  if (pathname.match(/^\/receipts\/[^/]+$/)) return "Receipt";
-  if (pathname.match(/^\/sales-orders\/[^/]+$/)) return "Sales Order";
-  if (pathname.match(/^\/shipments\/[^/]+$/)) return "Shipment";
-  return PAGE_TITLES[pathname] ?? "Mini ERP";
+function getPageTitleKey(pathname: string): string {
+  if (pathname.match(/^\/items\/[^/]+$/)) return "routes.item";
+  if (pathname.match(/^\/brands\/[^/]+$/)) return "routes.brand";
+  if (pathname.match(/^\/categories\/[^/]+$/)) return "routes.category";
+  if (pathname.match(/^\/suppliers\/[^/]+$/)) return "routes.supplier";
+  if (pathname.match(/^\/customers\/[^/]+$/)) return "routes.customer";
+  if (pathname.match(/^\/warehouses\/[^/]+$/)) return "routes.warehouse";
+  if (pathname.match(/^\/purchase-orders\/[^/]+$/)) return "routes.purchaseOrder";
+  if (pathname.match(/^\/receipts\/[^/]+$/)) return "routes.receipt";
+  if (pathname.match(/^\/sales-orders\/[^/]+$/)) return "routes.salesOrder";
+  if (pathname.match(/^\/shipments\/[^/]+$/)) return "routes.shipment";
+  return PAGE_TITLES[pathname] ?? "routes.fallback";
 }
 
 function getPageIcon(
-  pathname: string
+  pathname: string,
 ): ComponentType<{ className?: string }> | null {
   if (pathname === "/") return LayoutDashboard;
   if (pathname === "/items" || pathname.match(/^\/items\/[^/]+$/)) return Package;
@@ -83,8 +84,9 @@ function getPageIcon(
  * Page top bar: page title. Breadcrumb and actions added later.
  */
 export function PageTopBar() {
+  const { t } = useTranslation();
   const location = useLocation();
-  const title = getPageTitle(location.pathname);
+  const title = t(getPageTitleKey(location.pathname));
   const Icon = getPageIcon(location.pathname);
   return (
     <header className="app-topbar flex items-center gap-2">

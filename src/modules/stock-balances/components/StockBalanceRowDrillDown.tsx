@@ -9,10 +9,8 @@ import {
   listOutgoingContributorsForWarehouseItem,
   listIncomingContributorsForWarehouseItem,
 } from "../../../shared/stockBalancesDrillDownContributors";
-import {
-  STOCK_BALANCE_COVERAGE_LABELS,
-  type StockBalanceCoverageStatus,
-} from "../../../shared/stockBalancesOperationalMetrics";
+import { type StockBalanceCoverageStatus } from "../../../shared/stockBalancesOperationalMetrics";
+import { useTranslation } from "@/shared/i18n/context";
 
 export type StockBalanceDrillDownSnapshot = {
   itemId: string;
@@ -73,7 +71,10 @@ function StatTile({ label, value }: { label: string; value: string | number }) {
 }
 
 export function StockBalanceRowDrillDown({ row, onOpenChange }: Props) {
+  const { t } = useTranslation();
   const navigate = useNavigate();
+
+  const coverageLabel = (s: StockBalanceCoverageStatus) => t(`ops.stock.coverage.${s}`);
 
   const reservations = useMemo(
     () => listReservationContributorsForWarehouseItem(row.warehouseId, row.itemId),
@@ -126,16 +127,15 @@ export function StockBalanceRowDrillDown({ row, onOpenChange }: Props) {
           )}
           onOpenAutoFocus={(e) => e.preventDefault()}
         >
-          <Dialog.Title className="sr-only">Stock balance sources for {row.itemCode}</Dialog.Title>
-          <Dialog.Description className="sr-only">
-            Breakdown of reservations, sales order demand, and purchase order supply for this item and
-            warehouse.
-          </Dialog.Description>
+          <Dialog.Title className="sr-only">
+            {t("ops.stock.drilldown.titleSr", { code: row.itemCode })}
+          </Dialog.Title>
+          <Dialog.Description className="sr-only">{t("ops.stock.drilldown.descSr")}</Dialog.Description>
 
           {/* Header — fixed */}
           <header className="shrink-0 border-b border-border bg-background px-4 pt-3 pb-2">
             <p className="text-[0.6rem] font-medium uppercase tracking-widest text-muted-foreground/90">
-              Stock balance sources
+              {t("ops.stock.drilldown.headerKicker")}
             </p>
             <h2 className="mt-1 text-sm font-semibold leading-snug text-foreground">
               <span className="font-mono tracking-tight">{row.itemCode}</span>
@@ -143,19 +143,23 @@ export function StockBalanceRowDrillDown({ row, onOpenChange }: Props) {
               <span>{row.itemName}</span>
             </h2>
             <p className="mt-1 text-xs text-muted-foreground">
-              <span className="text-muted-foreground/80">Warehouse</span>{" "}
+              <span className="text-muted-foreground/80">{t("ops.stock.drilldown.warehouseLabel")}</span>{" "}
               <span className="text-foreground/90">{row.warehouseName}</span>
             </p>
             <div className="mt-2 flex flex-wrap items-center gap-2">
               <div className="flex items-center gap-1.5">
-                <span className="text-[0.6rem] uppercase tracking-wide text-muted-foreground">Coverage</span>
+                <span className="text-[0.6rem] uppercase tracking-wide text-muted-foreground">
+                  {t("doc.columns.coverage")}
+                </span>
                 <Badge variant={coverageBadgeVariant(row.coverageStatus)} className="text-[0.62rem] px-1.5 py-0 h-5">
-                  {STOCK_BALANCE_COVERAGE_LABELS[row.coverageStatus]}
+                  {coverageLabel(row.coverageStatus)}
                 </Badge>
               </div>
               <div className="h-3.5 w-px bg-border/80 hidden sm:block" aria-hidden />
               <div className="flex items-baseline gap-1">
-                <span className="text-[0.6rem] uppercase tracking-wide text-muted-foreground">Net shortage</span>
+                <span className="text-[0.6rem] uppercase tracking-wide text-muted-foreground">
+                  {t("doc.columns.netShortage")}
+                </span>
                 <span className="text-xs font-semibold tabular-nums text-foreground">{row.netShortageQty}</span>
               </div>
             </div>
@@ -166,17 +170,17 @@ export function StockBalanceRowDrillDown({ row, onOpenChange }: Props) {
             {/* Summary — stat tiles */}
             <div>
               <h3 className="text-[0.62rem] font-semibold uppercase tracking-wider text-muted-foreground mb-1.5">
-                Summary
+                {t("ops.stock.drilldown.summarySection")}
               </h3>
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5">
-                <StatTile label="Total quantity" value={row.qtyOnHand} />
-                <StatTile label="Reserved" value={row.reservedQty} />
-                <StatTile label="Available" value={row.availableQty} />
-                <StatTile label="Outgoing" value={row.outgoingQty} />
-                <StatTile label="Incoming" value={row.incomingQty} />
-                <StatTile label="Deficit" value={row.deficitQty} />
-                <StatTile label="Net shortage" value={row.netShortageQty} />
-                <StatTile label="Coverage" value={STOCK_BALANCE_COVERAGE_LABELS[row.coverageStatus]} />
+                <StatTile label={t("doc.columns.totalQuantity")} value={row.qtyOnHand} />
+                <StatTile label={t("doc.columns.reserved")} value={row.reservedQty} />
+                <StatTile label={t("doc.columns.available")} value={row.availableQty} />
+                <StatTile label={t("doc.columns.outgoing")} value={row.outgoingQty} />
+                <StatTile label={t("doc.columns.incoming")} value={row.incomingQty} />
+                <StatTile label={t("doc.columns.deficit")} value={row.deficitQty} />
+                <StatTile label={t("doc.columns.netShortage")} value={row.netShortageQty} />
+                <StatTile label={t("doc.columns.coverage")} value={coverageLabel(row.coverageStatus)} />
               </div>
             </div>
 
@@ -186,21 +190,23 @@ export function StockBalanceRowDrillDown({ row, onOpenChange }: Props) {
                 id="sb-src-res"
                 className="text-[0.62rem] font-semibold uppercase tracking-wider text-foreground/90 mb-1.5 pb-1 border-b border-border/50"
               >
-                Active reservations
+                {t("ops.stock.drilldown.reservationsTitle")}
               </h3>
               {reservations.length === 0 ? (
-                <p className="text-[0.6875rem] text-muted-foreground leading-snug">No active reservations for this row.</p>
+                <p className="text-[0.6875rem] text-muted-foreground leading-snug">
+                  {t("ops.stock.drilldown.reservationsEmpty")}
+                </p>
               ) : (
                 <>
                   <div className="overflow-x-auto -mx-1">
                     <table className="w-full min-w-[480px]">
                       <thead>
                         <tr className="bg-background">
-                          <th className={th}>Sales order</th>
-                          <th className={th}>Status</th>
-                          <th className={th}>Line</th>
-                          <th className={cn(th, "text-right")}>Reserved</th>
-                          <th className={th}>Updated</th>
+                          <th className={th}>{t("doc.columns.salesOrder")}</th>
+                          <th className={th}>{t("doc.columns.status")}</th>
+                          <th className={th}>{t("doc.columns.line")}</th>
+                          <th className={cn(th, "text-right")}>{t("doc.columns.reserved")}</th>
+                          <th className={th}>{t("doc.columns.updated")}</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -232,7 +238,7 @@ export function StockBalanceRowDrillDown({ row, onOpenChange }: Props) {
                       <tfoot>
                         <tr className="bg-background">
                           <td colSpan={3} className={tfootLabel}>
-                            Total
+                            {t("doc.columns.total")}
                           </td>
                           <td className={cn(tfootValue, "text-right")}>{sumRes}</td>
                           <td />
@@ -242,8 +248,7 @@ export function StockBalanceRowDrillDown({ row, onOpenChange }: Props) {
                   </div>
                   {sumRes !== row.reservedQty ? (
                     <p className="mt-1.5 text-[0.6rem] leading-snug text-muted-foreground/85">
-                      Line detail ({sumRes}) differs from grid Reserved ({row.reservedQty}). Check warehouse and
-                      item on each reservation.
+                      {t("ops.stock.drilldown.mismatchReserved", { sum: sumRes, grid: row.reservedQty })}
                     </p>
                   ) : null}
                 </>
@@ -256,23 +261,25 @@ export function StockBalanceRowDrillDown({ row, onOpenChange }: Props) {
                 id="sb-src-out"
                 className="text-[0.62rem] font-semibold uppercase tracking-wider text-foreground/90 mb-1.5 pb-1 border-b border-border/50"
               >
-                Outgoing demand
+                {t("ops.stock.drilldown.outgoingTitle")}
               </h3>
               {outgoing.length === 0 ? (
-                <p className="text-[0.6875rem] text-muted-foreground leading-snug">No remaining demand on confirmed sales orders.</p>
+                <p className="text-[0.6875rem] text-muted-foreground leading-snug">
+                  {t("ops.stock.drilldown.outgoingEmpty")}
+                </p>
               ) : (
                 <>
                   <div className="overflow-x-auto -mx-1">
                     <table className="w-full min-w-[560px]">
                       <thead>
                         <tr className="bg-background">
-                          <th className={th}>Sales order</th>
-                          <th className={th}>Status</th>
-                          <th className={th}>Line</th>
-                          <th className={cn(th, "text-right")}>Ordered</th>
-                          <th className={cn(th, "text-right")}>Shipped</th>
-                          <th className={cn(th, "text-right")}>Remaining</th>
-                          <th className={cn(th, "text-right")}>Reserved</th>
+                          <th className={th}>{t("doc.columns.salesOrder")}</th>
+                          <th className={th}>{t("doc.columns.status")}</th>
+                          <th className={th}>{t("doc.columns.line")}</th>
+                          <th className={cn(th, "text-right")}>{t("doc.columns.ordered")}</th>
+                          <th className={cn(th, "text-right")}>{t("doc.columns.shipped")}</th>
+                          <th className={cn(th, "text-right")}>{t("doc.columns.remaining")}</th>
+                          <th className={cn(th, "text-right")}>{t("doc.columns.reserved")}</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -304,7 +311,7 @@ export function StockBalanceRowDrillDown({ row, onOpenChange }: Props) {
                       <tfoot>
                         <tr className="bg-background">
                           <td colSpan={5} className={tfootLabel}>
-                            Total remaining
+                            {t("doc.columns.totalRemaining")}
                           </td>
                           <td className={cn(tfootValue, "text-right")}>{sumOut}</td>
                           <td />
@@ -314,8 +321,7 @@ export function StockBalanceRowDrillDown({ row, onOpenChange }: Props) {
                   </div>
                   {sumOut !== row.outgoingQty ? (
                     <p className="mt-1.5 text-[0.6rem] leading-snug text-muted-foreground/85">
-                      Line total ({sumOut}) may differ from grid Outgoing ({row.outgoingQty}) when the same item
-                      appears on multiple order lines (posted quantities are shared by item).
+                      {t("ops.stock.drilldown.mismatchOutgoing", { sum: sumOut, grid: row.outgoingQty })}
                     </p>
                   ) : null}
                 </>
@@ -328,22 +334,24 @@ export function StockBalanceRowDrillDown({ row, onOpenChange }: Props) {
                 id="sb-src-in"
                 className="text-[0.62rem] font-semibold uppercase tracking-wider text-foreground/90 mb-1.5 pb-1 border-b border-border/50"
               >
-                Incoming supply
+                {t("ops.stock.drilldown.incomingTitle")}
               </h3>
               {incoming.length === 0 ? (
-                <p className="text-[0.6875rem] text-muted-foreground leading-snug">No expected receipts on confirmed purchase orders.</p>
+                <p className="text-[0.6875rem] text-muted-foreground leading-snug">
+                  {t("ops.stock.drilldown.incomingEmpty")}
+                </p>
               ) : (
                 <>
                   <div className="overflow-x-auto -mx-1">
                     <table className="w-full min-w-[480px]">
                       <thead>
                         <tr className="bg-background">
-                          <th className={th}>Purchase order</th>
-                          <th className={th}>Status</th>
-                          <th className={th}>Line</th>
-                          <th className={cn(th, "text-right")}>Ordered</th>
-                          <th className={cn(th, "text-right")}>Received</th>
-                          <th className={cn(th, "text-right")}>Remaining</th>
+                          <th className={th}>{t("doc.columns.purchaseOrder")}</th>
+                          <th className={th}>{t("doc.columns.status")}</th>
+                          <th className={th}>{t("doc.columns.line")}</th>
+                          <th className={cn(th, "text-right")}>{t("doc.columns.ordered")}</th>
+                          <th className={cn(th, "text-right")}>{t("doc.columns.received")}</th>
+                          <th className={cn(th, "text-right")}>{t("doc.columns.remaining")}</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -374,7 +382,7 @@ export function StockBalanceRowDrillDown({ row, onOpenChange }: Props) {
                       <tfoot>
                         <tr className="bg-background">
                           <td colSpan={5} className={tfootLabel}>
-                            Total remaining
+                            {t("doc.columns.totalRemaining")}
                           </td>
                           <td className={cn(tfootValue, "text-right")}>{sumInc}</td>
                         </tr>
@@ -383,8 +391,7 @@ export function StockBalanceRowDrillDown({ row, onOpenChange }: Props) {
                   </div>
                   {sumInc !== row.incomingQty ? (
                     <p className="mt-1.5 text-[0.6rem] leading-snug text-muted-foreground/85">
-                      Line total ({sumInc}) may differ from grid Incoming ({row.incomingQty}) when the same item
-                      appears on multiple order lines (received quantities are shared by item).
+                      {t("ops.stock.drilldown.mismatchIncoming", { sum: sumInc, grid: row.incomingQty })}
                     </p>
                   ) : null}
                 </>
@@ -403,7 +410,7 @@ export function StockBalanceRowDrillDown({ row, onOpenChange }: Props) {
                   className="h-7 text-[0.6875rem] px-2 text-muted-foreground"
                   onClick={navigateToRelatedSalesOrders}
                 >
-                  Open related sales orders
+                  {t("ops.stock.drilldown.openRelatedSo")}
                 </Button>
               ) : null}
               {hasPurchaseSideContext ? (
@@ -414,12 +421,12 @@ export function StockBalanceRowDrillDown({ row, onOpenChange }: Props) {
                   className="h-7 text-[0.6875rem] px-2 text-muted-foreground"
                   onClick={navigateToRelatedPurchaseOrders}
                 >
-                  Open related purchase orders
+                  {t("ops.stock.drilldown.openRelatedPo")}
                 </Button>
               ) : null}
             </div>
             <Button type="button" variant="outline" size="sm" className="h-7 min-w-[4.5rem] text-[0.6875rem]" onClick={() => onOpenChange(false)}>
-              Close
+              {t("ops.stock.drilldown.close")}
             </Button>
           </footer>
         </Dialog.Content>

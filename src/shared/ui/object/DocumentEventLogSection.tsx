@@ -1,7 +1,8 @@
 import { useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { listAuditEventsForEntity } from "../../audit/eventLogRepository";
-import { auditEventLabel, auditEventSummary } from "../../audit/eventLogLabels";
+import { auditEventLabel } from "../../audit/eventLogLabels";
+import { auditEventSummaryI18n, useTranslation } from "@/shared/i18n";
 import type { AuditEntityType, AuditEventRecord } from "../../audit/eventLogTypes";
 
 type Props = {
@@ -25,6 +26,7 @@ function formatWhen(iso: string): string {
 }
 
 export function DocumentEventLogSection({ entityType, entityId, refresh }: Props) {
+  const { t } = useTranslation();
   const entries = useMemo((): AuditEventRecord[] => {
     if (!entityId) return [];
     return listAuditEventsForEntity(entityType, entityId);
@@ -35,11 +37,11 @@ export function DocumentEventLogSection({ entityType, entityId, refresh }: Props
   return (
     <Card className="max-w-2xl border-0 shadow-none mt-6">
       <CardHeader className="p-2 pb-0.5">
-        <CardTitle className="text-[0.9rem] font-semibold">Event log</CardTitle>
+        <CardTitle className="text-[0.9rem] font-semibold">{t("doc.eventLog.title")}</CardTitle>
       </CardHeader>
       <CardContent className="p-2 pt-1">
         {entries.length === 0 ? (
-          <p className="text-sm text-muted-foreground">No events recorded yet.</p>
+          <p className="text-sm text-muted-foreground">{t("doc.eventLog.empty")}</p>
         ) : (
           <ul className="doc-event-log space-y-1.5 text-sm max-h-64 overflow-y-auto erp-dark-scrollbar">
             {entries.map((e) => (
@@ -48,8 +50,10 @@ export function DocumentEventLogSection({ entityType, entityId, refresh }: Props
                 className="doc-event-log__row flex flex-wrap gap-x-2 gap-y-0.5 border-b border-border/50 pb-1.5 last:border-0"
               >
                 <span className="text-muted-foreground tabular-nums shrink-0">{formatWhen(e.createdAt)}</span>
-                <span className="font-medium text-foreground shrink-0">{auditEventLabel(e.eventType)}</span>
-                <span className="text-foreground/90 min-w-0 break-words">{auditEventSummary(e.payload)}</span>
+                <span className="font-medium text-foreground shrink-0">{auditEventLabel(e.eventType, t)}</span>
+                <span className="text-foreground/90 min-w-0 break-words">
+                  {auditEventSummaryI18n(e.payload, t)}
+                </span>
               </li>
             ))}
           </ul>

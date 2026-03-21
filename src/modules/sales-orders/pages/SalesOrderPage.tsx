@@ -67,23 +67,26 @@ import {
 } from "../../../shared/ui/object/CancelDocumentReasonDialog";
 import { DocumentEventLogSection } from "../../../shared/ui/object/DocumentEventLogSection";
 import { useSettings } from "../../../shared/settings/SettingsContext";
+import { useTranslation } from "@/shared/i18n/context";
+import type { TFunction } from "@/shared/i18n/resolve";
+import { translateZeroPriceReason, translateCancelReason } from "@/shared/i18n/reasonLabels";
+import {
+  translatePlanningFulfillmentState,
+  translateSalesOrderAllocationState,
+} from "@/shared/i18n/fulfillmentLabels";
 import { getEffectiveWorkspaceFeatureEnabled } from "../../../shared/workspace";
 import {
-  CANCEL_DOCUMENT_REASON_LABELS,
   ZERO_PRICE_LINE_REASON_CODES,
-  ZERO_PRICE_LINE_REASON_LABELS,
   type CancelDocumentReasonCode,
   type ZeroPriceLineReasonCode,
 } from "../../../shared/reasonCodes";
 import {
   computeSalesOrderFulfillment,
-  planningFulfillmentStateLabel,
   type SalesOrderFulfillment,
   type SoLineFulfillment,
 } from "../../../shared/planningFulfillment";
 import {
   computeSalesOrderAllocationView,
-  salesOrderAllocationStateLabel,
   type SalesOrderAllocationView,
   type SoLineAllocationRow,
 } from "../../../shared/soAllocation";
@@ -97,11 +100,6 @@ type LineFormRow = {
   zeroPriceReasonCode: string;
   _lineId: number;
 };
-
-const ZERO_PRICE_REASON_SELECT_OPTIONS = ZERO_PRICE_LINE_REASON_CODES.map((code) => ({
-  value: code,
-  label: ZERO_PRICE_LINE_REASON_LABELS[code],
-}));
 
 type FormState = {
   date: string;
@@ -124,14 +122,16 @@ function defaultForm(): FormState {
 }
 
 function soLinesDisplayColumnDefs(
+  t: TFunction,
   fulfillmentByItemId: Map<string, SoLineFulfillment>,
   allocationByItemId: Map<string, SoLineAllocationRow>,
   includeAllocationColumns: boolean,
 ): ColDef<LineFormRow>[] {
+  const dash = t("domain.audit.summary.emDash");
   const allocationCols: ColDef<LineFormRow>[] = includeAllocationColumns
     ? [
         {
-          headerName: "Reserved",
+          headerName: t("doc.columns.reserved"),
           width: 78,
           minWidth: 70,
           maxWidth: 88,
@@ -139,14 +139,14 @@ function soLinesDisplayColumnDefs(
           sortable: false,
           valueGetter: (p) => {
             const itemId = p.data?.itemId;
-            if (!itemId) return "—";
+            if (!itemId) return dash;
             const a = allocationByItemId.get(itemId);
-            if (!a) return "—";
+            if (!a) return dash;
             return String(a.reservedQty);
           },
         },
         {
-          headerName: "Shortage",
+          headerName: t("doc.columns.shortage"),
           width: 78,
           minWidth: 70,
           maxWidth: 88,
@@ -154,9 +154,9 @@ function soLinesDisplayColumnDefs(
           sortable: false,
           valueGetter: (p) => {
             const itemId = p.data?.itemId;
-            if (!itemId) return "—";
+            if (!itemId) return dash;
             const a = allocationByItemId.get(itemId);
-            if (!a) return "—";
+            if (!a) return dash;
             return String(a.shortageQty);
           },
         },
@@ -165,7 +165,7 @@ function soLinesDisplayColumnDefs(
 
   return [
     {
-      headerName: "№",
+      headerName: t("doc.columns.lineNo"),
       valueGetter: (params) =>
         params.node?.rowIndex != null ? String(params.node.rowIndex + 1) : "",
       width: 52,
@@ -175,7 +175,7 @@ function soLinesDisplayColumnDefs(
       resizable: true,
     },
     {
-      headerName: "Item Code",
+      headerName: t("doc.columns.itemCode"),
       width: 130,
       minWidth: 120,
       maxWidth: 140,
@@ -189,7 +189,7 @@ function soLinesDisplayColumnDefs(
     },
     {
       field: "itemId",
-      headerName: "Item Name",
+      headerName: t("doc.columns.itemName"),
       flex: 1,
       minWidth: 180,
       editable: false,
@@ -200,7 +200,7 @@ function soLinesDisplayColumnDefs(
       },
     },
     {
-      headerName: "Brand",
+      headerName: t("doc.columns.brand"),
       width: 130,
       minWidth: 120,
       maxWidth: 140,
@@ -215,7 +215,7 @@ function soLinesDisplayColumnDefs(
       },
     },
     {
-      headerName: "Category",
+      headerName: t("doc.columns.category"),
       width: 130,
       minWidth: 120,
       maxWidth: 140,
@@ -231,14 +231,14 @@ function soLinesDisplayColumnDefs(
     },
     {
       field: "qty",
-      headerName: "Qty",
+      headerName: t("doc.columns.qty"),
       width: 80,
       minWidth: 70,
       maxWidth: 90,
       editable: false,
     },
     {
-      headerName: "Shipped",
+      headerName: t("doc.columns.shipped"),
       width: 86,
       minWidth: 78,
       maxWidth: 96,
@@ -246,14 +246,14 @@ function soLinesDisplayColumnDefs(
       sortable: false,
       valueGetter: (p) => {
         const itemId = p.data?.itemId;
-        if (!itemId) return "—";
+        if (!itemId) return dash;
         const f = fulfillmentByItemId.get(itemId);
-        if (!f) return "—";
+        if (!f) return dash;
         return String(f.shippedQty);
       },
     },
     {
-      headerName: "Remaining",
+      headerName: t("doc.columns.remaining"),
       width: 100,
       minWidth: 88,
       maxWidth: 112,
@@ -261,17 +261,18 @@ function soLinesDisplayColumnDefs(
       sortable: false,
       valueGetter: (p) => {
         const itemId = p.data?.itemId;
-        if (!itemId) return "—";
+        if (!itemId) return dash;
         const f = fulfillmentByItemId.get(itemId);
-        if (!f) return "—";
-        if (f.remainingQty < 0) return `${f.remainingQty} (over)`;
+        if (!f) return dash;
+        if (f.remainingQty < 0)
+          return t("doc.fulfillment.remainingOver", { qty: f.remainingQty });
         return String(f.remainingQty);
       },
     },
     ...allocationCols,
     {
       field: "unitPrice",
-      headerName: "Unit price",
+      headerName: t("doc.columns.unitPrice"),
       width: 110,
       minWidth: 100,
       maxWidth: 120,
@@ -282,7 +283,7 @@ function soLinesDisplayColumnDefs(
           : "0.00",
     },
     {
-      headerName: "Line amount",
+      headerName: t("doc.columns.lineAmount"),
       width: 120,
       minWidth: 110,
       maxWidth: 130,
@@ -296,7 +297,7 @@ function soLinesDisplayColumnDefs(
       },
     },
     {
-      headerName: "Zero-price reason",
+      headerName: t("doc.columns.zeroPriceReason"),
       width: 150,
       minWidth: 130,
       maxWidth: 180,
@@ -306,44 +307,46 @@ function soLinesDisplayColumnDefs(
         if (typeof up !== "number" || roundMoney(up) !== 0) return "";
         const c = p.data?.zeroPriceReasonCode;
         if (typeof c !== "string" || c === "") return "";
-        return ZERO_PRICE_LINE_REASON_LABELS[c as ZeroPriceLineReasonCode] ?? c;
+        return translateZeroPriceReason(t, c as ZeroPriceLineReasonCode);
       },
     },
   ];
 }
 
 function soLinesReadOnlyColumnDefs(
+  t: TFunction,
   fulfillment: SalesOrderFulfillment | null,
   allocation: SalesOrderAllocationView | null,
   includeAllocationColumns: boolean,
 ): ColDef<LineWithItem>[] {
+  const dash = t("domain.audit.summary.emDash");
   const allocationCols: ColDef<LineWithItem>[] = includeAllocationColumns
     ? [
         {
-          headerName: "Reserved",
+          headerName: t("doc.columns.reserved"),
           width: 78,
           minWidth: 70,
           maxWidth: 88,
           sortable: false,
           valueGetter: (p) => {
             const lineId = p.data?.id;
-            if (!lineId || !allocation) return "—";
+            if (!lineId || !allocation) return dash;
             const row = allocation.lines.find((l) => l.lineId === lineId);
-            if (!row) return "—";
+            if (!row) return dash;
             return String(row.reservedQty);
           },
         },
         {
-          headerName: "Shortage",
+          headerName: t("doc.columns.shortage"),
           width: 78,
           minWidth: 70,
           maxWidth: 88,
           sortable: false,
           valueGetter: (p) => {
             const lineId = p.data?.id;
-            if (!lineId || !allocation) return "—";
+            if (!lineId || !allocation) return dash;
             const row = allocation.lines.find((l) => l.lineId === lineId);
-            if (!row) return "—";
+            if (!row) return dash;
             return String(row.shortageQty);
           },
         },
@@ -352,7 +355,7 @@ function soLinesReadOnlyColumnDefs(
 
   return [
     {
-      headerName: "№",
+      headerName: t("doc.columns.lineNo"),
       valueGetter: (params) =>
         params.node?.rowIndex != null ? String(params.node.rowIndex + 1) : "",
       width: 52,
@@ -362,7 +365,7 @@ function soLinesReadOnlyColumnDefs(
       resizable: true,
     },
     {
-      headerName: "Item Code",
+      headerName: t("doc.columns.itemCode"),
       width: 130,
       minWidth: 120,
       maxWidth: 140,
@@ -373,9 +376,9 @@ function soLinesReadOnlyColumnDefs(
         return item?.code ?? itemId;
       },
     },
-    { field: "itemName", headerName: "Item Name", flex: 1, minWidth: 180 },
+    { field: "itemName", headerName: t("doc.columns.itemName"), flex: 1, minWidth: 180 },
     {
-      headerName: "Brand",
+      headerName: t("doc.columns.brand"),
       width: 130,
       minWidth: 120,
       maxWidth: 140,
@@ -389,7 +392,7 @@ function soLinesReadOnlyColumnDefs(
       },
     },
     {
-      headerName: "Category",
+      headerName: t("doc.columns.category"),
       width: 130,
       minWidth: 120,
       maxWidth: 140,
@@ -402,40 +405,41 @@ function soLinesReadOnlyColumnDefs(
         return category?.code ?? "";
       },
     },
-    { field: "qty", headerName: "Qty", width: 80, minWidth: 70, maxWidth: 90 },
+    { field: "qty", headerName: t("doc.columns.qty"), width: 80, minWidth: 70, maxWidth: 90 },
     {
-      headerName: "Shipped",
+      headerName: t("doc.columns.shipped"),
       width: 86,
       minWidth: 78,
       maxWidth: 96,
       sortable: false,
       valueGetter: (p) => {
         const lineId = p.data?.id;
-        if (!lineId || !fulfillment) return "—";
+        if (!lineId || !fulfillment) return dash;
         const row = fulfillment.lines.find((l) => l.lineId === lineId);
-        if (!row) return "—";
+        if (!row) return dash;
         return String(row.shippedQty);
       },
     },
     {
-      headerName: "Remaining",
+      headerName: t("doc.columns.remaining"),
       width: 100,
       minWidth: 88,
       maxWidth: 112,
       sortable: false,
       valueGetter: (p) => {
         const lineId = p.data?.id;
-        if (!lineId || !fulfillment) return "—";
+        if (!lineId || !fulfillment) return dash;
         const row = fulfillment.lines.find((l) => l.lineId === lineId);
-        if (!row) return "—";
-        if (row.remainingQty < 0) return `${row.remainingQty} (over)`;
+        if (!row) return dash;
+        if (row.remainingQty < 0)
+          return t("doc.fulfillment.remainingOver", { qty: row.remainingQty });
         return String(row.remainingQty);
       },
     },
     ...allocationCols,
     {
       field: "unitPrice",
-      headerName: "Unit price",
+      headerName: t("doc.columns.unitPrice"),
       width: 110,
       minWidth: 100,
       maxWidth: 120,
@@ -445,7 +449,7 @@ function soLinesReadOnlyColumnDefs(
           : "0.00",
     },
     {
-      headerName: "Line amount",
+      headerName: t("doc.columns.lineAmount"),
       width: 120,
       minWidth: 110,
       maxWidth: 130,
@@ -458,7 +462,7 @@ function soLinesReadOnlyColumnDefs(
       },
     },
     {
-      headerName: "Zero-price reason",
+      headerName: t("doc.columns.zeroPriceReason"),
       width: 150,
       minWidth: 130,
       maxWidth: 180,
@@ -467,7 +471,7 @@ function soLinesReadOnlyColumnDefs(
         if (typeof up !== "number" || roundMoney(up) !== 0) return "";
         const c = p.data?.zeroPriceReasonCode;
         if (typeof c !== "string" || c === "") return "";
-        return ZERO_PRICE_LINE_REASON_LABELS[c as ZeroPriceLineReasonCode] ?? c;
+        return translateZeroPriceReason(t, c as ZeroPriceLineReasonCode);
       },
     },
   ];
@@ -524,6 +528,7 @@ function buildExportRowsFromLinesWithItem(lines: LineWithItem[]): SoExportLineRo
 export function SalesOrderPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const { t, locale } = useTranslation();
   const { settings } = useSettings();
   const [refresh, setRefresh] = useState(0);
   const isNew = id === "new";
@@ -560,6 +565,15 @@ export function SalesOrderPage() {
   const lineEntryQtyInputRef = useRef<HTMLInputElement | null>(null);
   const lineEntryDropdownRightEdgeRef = useRef<HTMLDivElement | null>(null);
   const prevCustomerIdRef = useRef<string | null>(null);
+
+  const zeroPriceReasonOptions = useMemo(
+    () =>
+      ZERO_PRICE_LINE_REASON_CODES.map((code) => ({
+        value: code,
+        label: translateZeroPriceReason(t, code),
+      })),
+    [t, locale],
+  );
 
   useEffect(() => {
     prevCustomerIdRef.current = null;
@@ -701,8 +715,8 @@ export function SalesOrderPage() {
       normalizeDateForSO(form.date),
       parsePaymentTermsDaysToStore(form.paymentTermsDays),
     );
-    return d ?? "—";
-  }, [form.date, form.paymentTermsDays]);
+    return d ?? t("domain.audit.summary.emDash");
+  }, [form.date, form.paymentTermsDays, t, locale]);
 
   const activeCustomers = useMemo(
     () => customerRepository.list().filter((c) => c.isActive),
@@ -808,11 +822,11 @@ export function SalesOrderPage() {
 
     const item = itemRepository.getById(itemId);
     if (!item) {
-      setActionIssues([actionIssue("Selected item is invalid and cannot be added.")]);
+      setActionIssues([actionIssue(t("doc.so.errors.invalidItem"))]);
       return;
     }
     if (!item.isActive) {
-      setActionIssues([actionIssue("Inactive items cannot be added.")]);
+      setActionIssues([actionIssue(t("doc.so.errors.inactiveItem"))]);
       return;
     }
 
@@ -998,7 +1012,7 @@ export function SalesOrderPage() {
     if (skippedRows > 0) {
       setActionIssues([
         actionWarning(
-          `Added ${lines.length} items. Skipped ${skippedRows} rows.`,
+          t("doc.so.importWarning", { added: lines.length, skipped: skippedRows }),
         ),
       ]);
     } else {
@@ -1101,11 +1115,23 @@ export function SalesOrderPage() {
   const linesColumnDefs = useMemo(
     () =>
       soLinesDisplayColumnDefs(
+        t,
         soFulfillmentByItemId,
         soAllocationByItemId,
         showSalesOrderAllocationUi,
       ),
-    [soFulfillmentByItemId, soAllocationByItemId, showSalesOrderAllocationUi],
+    [t, locale, soFulfillmentByItemId, soAllocationByItemId, showSalesOrderAllocationUi],
+  );
+
+  const readOnlyLinesColumnDefs = useMemo(
+    () =>
+      soLinesReadOnlyColumnDefs(
+        t,
+        soFulfillment,
+        soAllocationView,
+        showSalesOrderAllocationUi,
+      ),
+    [t, locale, soFulfillment, soAllocationView, showSalesOrderAllocationUi],
   );
 
   const soNumberForFile = doc?.number ?? "new";
@@ -1128,7 +1154,7 @@ export function SalesOrderPage() {
       try {
         const path = await save({
           defaultPath: defaultFilename,
-          filters: [{ name: "Excel", extensions: ["xlsx"] }],
+          filters: [{ name: t("doc.page.excelFilterName"), extensions: ["xlsx"] }],
         });
         if (path == null) return;
 
@@ -1155,13 +1181,13 @@ export function SalesOrderPage() {
         URL.revokeObjectURL(url);
       }
     },
-    [],
+    [t],
   );
 
   const handleExportMain = useCallback(() => {
     const rows = getExportRowsAll();
     const summary: SoDocumentSummary = {
-      number: isNew ? "—" : doc!.number,
+      number: isNew ? t("domain.audit.summary.emDash") : doc!.number,
       date: normalizeDateForSO(isEditable ? form.date : doc?.date ?? ""),
       status: doc?.status ?? "draft",
       customer: customerName,
@@ -1191,6 +1217,7 @@ export function SalesOrderPage() {
     readonlyTotals.totalAmount,
     soNumberForFile,
     runExportWithSaveAs,
+    t,
   ]);
 
   const handleExportSelected = useCallback(() => {
@@ -1226,7 +1253,7 @@ export function SalesOrderPage() {
   if (!id) {
     return (
       <div className="doc-page doc-page--not-found">
-        <p>Sales order not found.</p>
+        <p>{t("doc.notFound.salesOrder")}</p>
       </div>
     );
   }
@@ -1234,24 +1261,26 @@ export function SalesOrderPage() {
   if (!isNew && !doc) {
     return (
       <div className="doc-page doc-page--not-found">
-        <p>Sales order not found.</p>
+        <p>{t("doc.notFound.salesOrder")}</p>
       </div>
     );
   }
 
   const breadcrumbItems = [
-    { label: "Sales", to: "/sales-orders" },
-    { label: "Sales Orders", to: "/sales-orders" },
-    { label: isNew ? "New" : doc!.number },
+    { label: t("shell.sales"), to: "/sales-orders" },
+    { label: t("shell.nav.salesOrders"), to: "/sales-orders" },
+    { label: isNew ? t("doc.page.new") : doc!.number },
   ];
 
-  const displayTitle = isNew ? "New Sales Order" : `Sales Order ${doc!.number}`;
-  const displayNumber = isNew ? "—" : doc!.number;
+  const displayTitle = isNew
+    ? t("doc.so.titleNew")
+    : t("doc.so.titleNumbered", { number: doc!.number });
+  const displayNumber = isNew ? t("domain.audit.summary.emDash") : doc!.number;
 
   return (
     <DocumentPageLayout
       breadcrumbItems={breadcrumbItems}
-      breadcrumbPrefix={<BackButton to="/sales-orders" aria-label="Back to Sales Orders" />}
+      breadcrumbPrefix={<BackButton to="/sales-orders" aria-label={t("doc.so.backToListAria")} />}
       header={
         <div className="doc-header">
           <div className="doc-header__title-row">
@@ -1267,10 +1296,10 @@ export function SalesOrderPage() {
                 <Button
                   type="button"
                   onClick={handleSave}
-                  title="Save (Ctrl/Cmd+S)"
+                  title={t("doc.page.saveTitle")}
                 >
                   <Save aria-hidden />
-                  Save
+                  {t("common.save")}
                 </Button>
               )}
               {!isNew && isDraft && (
@@ -1284,12 +1313,12 @@ export function SalesOrderPage() {
                   title={
                     settings.documents.blockConfirmWhenPlanningHasBlockingErrors &&
                     hasErrors(health.issues)
-                      ? "Fix errors before confirming."
+                      ? t("doc.page.fixErrorsBeforeConfirm")
                       : undefined
                   }
                 >
                   <CircleCheck aria-hidden />
-                  Confirm
+                  {t("doc.page.confirm")}
                 </Button>
               )}
               {!isNew && isConfirmed && showSalesOrderAllocationUi && (
@@ -1297,26 +1326,26 @@ export function SalesOrderPage() {
                   type="button"
                   variant="outline"
                   onClick={handleAllocateStock}
-                  title="Allocate stock (Alt+Shift+A)"
+                  title={t("doc.page.allocateStockTitle")}
                 >
-                  Allocate stock
+                  {t("doc.page.allocateStock")}
                 </Button>
               )}
               {!isNew && isConfirmed && (
                 <Button type="button" onClick={handleCreateShipment}>
-                  <span className="create-btn__plus">+</span> Create Shipment
+                  <span className="create-btn__plus">+</span> {t("doc.page.createShipment")}
                 </Button>
               )}
               {!isNew && (isDraft || isConfirmed) && (
                 <Button type="button" variant="outline" onClick={handleCancelDocument}>
                   <FileX aria-hidden />
-                  Cancel document
+                  {t("doc.page.cancelDocument")}
                 </Button>
               )}
               {isEditable && (
                 <Button type="button" variant="outline" onClick={handleCancel}>
                   <X aria-hidden />
-                  Cancel
+                  {t("common.cancel")}
                 </Button>
               )}
             </div>
@@ -1329,19 +1358,19 @@ export function SalesOrderPage() {
         <>
           <Card className="max-w-2xl border-0 shadow-none">
             <CardHeader className="p-2 pb-0.5">
-              <CardTitle className="text-[0.9rem] font-semibold">Details</CardTitle>
+              <CardTitle className="text-[0.9rem] font-semibold">{t("doc.page.details")}</CardTitle>
             </CardHeader>
             <CardContent className="p-2 pt-1">
               <div className="grid w-fit grid-cols-[280px_280px] gap-x-2 gap-y-1">
                 <div className="flex min-w-0 w-full flex-col gap-0.5">
-                  <Label htmlFor="so-number" className="text-sm">Number</Label>
+                  <Label htmlFor="so-number" className="text-sm">{t("doc.columns.number")}</Label>
                   <div id="so-number" className="flex h-8 items-center text-sm text-muted-foreground">
                     {displayNumber}
                   </div>
                 </div>
                 <div className="flex min-w-0 w-full flex-col gap-0.5">
                   <Label htmlFor="so-date" className="text-sm">
-                    Date <span className="text-destructive">*</span>
+                    {t("doc.columns.date")} <span className="text-destructive">*</span>
                   </Label>
                   <DatePickerField
                     id="so-date"
@@ -1352,7 +1381,7 @@ export function SalesOrderPage() {
                 </div>
                 <div className="flex min-w-0 w-full flex-col gap-0.5">
                   <Label htmlFor="so-customer" className="text-sm">
-                    Customer <span className="text-destructive">*</span>
+                    {t("doc.columns.customer")} <span className="text-destructive">*</span>
                   </Label>
                   <SelectField
                     id="so-customer"
@@ -1364,13 +1393,13 @@ export function SalesOrderPage() {
                       value: c.id,
                       label: `${c.code} - ${c.name}`,
                     }))}
-                    placeholder="Select customer"
+                    placeholder={t("doc.page.selectCustomer")}
                     className="w-full min-w-0"
                   />
                 </div>
                 <div className="flex min-w-0 w-full flex-col gap-0.5">
                   <Label htmlFor="so-warehouse" className="text-sm">
-                    Warehouse <span className="text-destructive">*</span>
+                    {t("doc.columns.warehouse")} <span className="text-destructive">*</span>
                   </Label>
                   <SelectField
                     id="so-warehouse"
@@ -1382,13 +1411,13 @@ export function SalesOrderPage() {
                       value: w.id,
                       label: `${w.code} - ${w.name}`,
                     }))}
-                    placeholder="Select warehouse"
+                    placeholder={t("doc.page.selectWarehouse")}
                     className="w-full min-w-0"
                   />
                 </div>
                 <div className="flex min-w-0 w-full flex-col gap-0.5">
                   <Label htmlFor="so-payment-terms" className="text-sm">
-                    Payment terms (days)
+                    {t("doc.page.paymentTermsDaysLabel")}
                   </Label>
                   <Input
                     id="so-payment-terms"
@@ -1397,18 +1426,18 @@ export function SalesOrderPage() {
                     step={1}
                     value={form.paymentTermsDays}
                     onChange={(e) => setForm((f) => ({ ...f, paymentTermsDays: e.target.value }))}
-                    placeholder="From customer or enter"
+                    placeholder={t("doc.page.paymentTermsInputPlaceholderCustomer")}
                     className="h-8 text-sm"
                   />
                 </div>
                 <div className="flex min-w-0 w-full flex-col gap-0.5">
-                  <span className="text-sm text-muted-foreground">Due date</span>
+                  <span className="text-sm text-muted-foreground">{t("doc.page.dueDate")}</span>
                   <div className="flex h-8 items-center text-sm text-foreground/90 tabular-nums">
                     {computedDueDateDisplay}
                   </div>
                 </div>
                 <div className="col-span-2 flex flex-col gap-0.5">
-                  <Label htmlFor="so-comment" className="text-sm">Comment</Label>
+                  <Label htmlFor="so-comment" className="text-sm">{t("doc.columns.comment")}</Label>
                   <Input
                     id="so-comment"
                     type="text"
@@ -1416,7 +1445,7 @@ export function SalesOrderPage() {
                     onChange={(e) =>
                       setForm((f) => ({ ...f, comment: e.target.value }))
                     }
-                    placeholder="Optional"
+                    placeholder={t("common.optional")}
                     className="h-8 text-sm"
                   />
                 </div>
@@ -1425,37 +1454,37 @@ export function SalesOrderPage() {
           </Card>
           <div className="doc-lines mt-[calc(0.5rem+1cm)]">
             <div className="doc-lines__header mb-1.5 max-w-2xl">
-              <h3 className="doc-lines__title">Lines</h3>
+              <h3 className="doc-lines__title">{t("doc.page.lines")}</h3>
             </div>
             {!isNew && soFulfillment ? (
               <div className="mb-2 max-w-4xl text-xs">
                 <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
-                  <span className="font-medium text-foreground">Shipment fulfillment</span>
+                  <span className="font-medium text-foreground">{t("doc.fulfillment.so.sectionTitle")}</span>
                   <span className="tabular-nums text-muted-foreground">
-                    {planningFulfillmentStateLabel(soFulfillment.state)}
+                    {translatePlanningFulfillmentState(t, soFulfillment.state)}
+                  </span>
+                  <span className="text-muted-foreground tabular-nums">
+                    {t("doc.fulfillment.so.shippedOrdered", {
+                      shipped: soFulfillment.totalShipped,
+                      ordered: soFulfillment.totalOrdered,
+                    })}
                   </span>
                   <span className="text-muted-foreground">
-                    Shipped{" "}
-                    <span className="text-foreground tabular-nums">{soFulfillment.totalShipped}</span>
-                    {" / "}
-                    <span className="tabular-nums">{soFulfillment.totalOrdered}</span> ordered
-                  </span>
-                  <span className="text-muted-foreground">
-                    Remaining{" "}
+                    {t("doc.fulfillment.so.remainingLabel")}{" "}
                     <span className="text-foreground tabular-nums">
                       {soFulfillment.totalRemaining < 0
-                        ? `${soFulfillment.totalRemaining} (over)`
+                        ? t("doc.fulfillment.remainingOver", { qty: soFulfillment.totalRemaining })
                         : soFulfillment.totalRemaining}
                     </span>
                   </span>
-                  <span className="text-muted-foreground">
-                    Shipments:{" "}
-                    <span className="text-foreground tabular-nums">{soFulfillment.postedShipmentCount}</span>
-                    {" posted / "}
-                    <span className="tabular-nums">{soFulfillment.relatedShipmentCount}</span> total
+                  <span className="text-muted-foreground tabular-nums">
+                    {t("doc.fulfillment.so.shipmentsPostedTotal", {
+                      posted: soFulfillment.postedShipmentCount,
+                      total: soFulfillment.relatedShipmentCount,
+                    })}
                   </span>
                   {soFulfillment.hasOverFulfillment ? (
-                    <span className="text-destructive font-medium">Over-shipped on line(s)</span>
+                    <span className="text-destructive font-medium">{t("doc.fulfillment.so.overShipped")}</span>
                   ) : null}
                 </div>
               </div>
@@ -1463,18 +1492,18 @@ export function SalesOrderPage() {
             {!isNew && showSalesOrderAllocationUi && soAllocationView ? (
               <div className="mb-2 max-w-4xl text-xs">
                 <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
-                  <span className="font-medium text-foreground">Stock allocation</span>
+                  <span className="font-medium text-foreground">{t("doc.fulfillment.so.allocationSectionTitle")}</span>
                   <span className="tabular-nums text-muted-foreground">
-                    {salesOrderAllocationStateLabel(soAllocationView.state)}
+                    {translateSalesOrderAllocationState(t, soAllocationView.state)}
                   </span>
                   <span className="text-muted-foreground">
-                    Reserved{" "}
+                    {t("doc.columns.reserved")}{" "}
                     <span className="text-foreground tabular-nums">{soAllocationView.totalReserved}</span>
                   </span>
                   <span className="text-muted-foreground">
-                    Shortage{" "}
+                    {t("doc.columns.shortage")}{" "}
                     <span className="text-foreground tabular-nums">{soAllocationView.totalShortage}</span>
-                    <span className="text-muted-foreground/80"> (remaining not reserved)</span>
+                    <span className="text-muted-foreground/80"> {t("doc.fulfillment.so.allocationShortageHint")}</span>
                   </span>
                 </div>
               </div>
@@ -1486,7 +1515,7 @@ export function SalesOrderPage() {
                     <div className="grid grid-cols-2 md:grid-cols-[minmax(200px,240px)_auto_auto_auto_minmax(160px,220px)_minmax(260px,1fr)] gap-x-2 gap-y-1 items-end w-max max-w-full">
                     <div className="flex flex-col gap-0.5">
                       <Label htmlFor="line-entry-item" className="text-sm">
-                        Item <span className="text-destructive">*</span>
+                        {t("doc.page.itemLabel")} <span className="text-destructive">*</span>
                       </Label>
                       <SalesOrderItemAutocomplete
                         ref={lineEntryItemPickerRef}
@@ -1494,14 +1523,14 @@ export function SalesOrderPage() {
                         value={lineEntryItemId}
                         onChange={handleLineEntryItemChange}
                         items={itemRepository.list()}
-                        placeholder="Search by code, barcode or name…"
+                        placeholder={t("doc.page.searchItemPlaceholder")}
                         className="w-[240px]"
                         dropdownRightEdgeRef={lineEntryDropdownRightEdgeRef}
                       />
                     </div>
                     <div className="flex flex-col gap-0.5">
                       <Label htmlFor="line-entry-qty" className="text-sm">
-                        Qty <span className="text-destructive">*</span>
+                        {t("doc.columns.qty")} <span className="text-destructive">*</span>
                       </Label>
                       <Input
                         ref={lineEntryQtyInputRef}
@@ -1523,7 +1552,7 @@ export function SalesOrderPage() {
                     </div>
                     <div className="flex flex-col gap-0.5">
                       <Label htmlFor="line-entry-unit-price" className="text-sm">
-                        Unit price
+                        {t("doc.columns.unitPrice")}
                       </Label>
                       <Input
                         id="line-entry-unit-price"
@@ -1542,7 +1571,7 @@ export function SalesOrderPage() {
                     </div>
                     <div className="flex flex-col gap-0.5 md:col-span-1">
                       <Label htmlFor="so-line-entry-zp-reason" className="text-sm">
-                        Zero-price reason
+                        {t("doc.page.zeroPriceReasonLabel")}
                         {roundMoney(lineEntryUnitPrice) === 0 ? (
                           <span className="text-destructive"> *</span>
                         ) : null}
@@ -1551,8 +1580,12 @@ export function SalesOrderPage() {
                         id="so-line-entry-zp-reason"
                         value={lineEntryZeroPriceReason}
                         onChange={setLineEntryZeroPriceReason}
-                        options={ZERO_PRICE_REASON_SELECT_OPTIONS}
-                        placeholder={roundMoney(lineEntryUnitPrice) === 0 ? "Select reason" : "—"}
+                        options={zeroPriceReasonOptions}
+                        placeholder={
+                          roundMoney(lineEntryUnitPrice) === 0
+                            ? t("doc.cancelDialog.selectPlaceholder")
+                            : t("domain.audit.summary.emDash")
+                        }
                         className="w-[min(100%,220px)] min-w-0"
                         disabled={roundMoney(lineEntryUnitPrice) !== 0}
                       />
@@ -1569,10 +1602,10 @@ export function SalesOrderPage() {
                             size="sm"
                             className="h-8 gap-1.5"
                             onClick={addLineFromEntry}
-                            title="Add line (Alt+A)"
+                            title={t("doc.page.addLineTitle")}
                           >
                             <Plus className="h-4 w-4 shrink-0" aria-hidden />
-                            Add line
+                            {t("doc.page.addLine")}
                           </Button>
                           <Button
                             type="button"
@@ -1583,10 +1616,10 @@ export function SalesOrderPage() {
                               setLineImportInitialTab("paste");
                               setIsLineImportModalOpen(true);
                             }}
-                            title="Add lines — paste / Excel (Alt+L)"
+                            title={t("doc.page.addLinesTitle")}
                           >
                             <ClipboardPaste className="h-4 w-4 shrink-0" aria-hidden />
-                            Add lines
+                            {t("doc.page.addLines")}
                           </Button>
                         </>
                       ) : (
@@ -1598,7 +1631,7 @@ export function SalesOrderPage() {
                             onClick={updateLineFromEntry}
                           >
                             <Check className="h-4 w-4 shrink-0" aria-hidden />
-                            Update line
+                            {t("doc.page.updateLine")}
                           </Button>
                           <Button
                             type="button"
@@ -1614,7 +1647,7 @@ export function SalesOrderPage() {
                             }}
                           >
                             <Trash2 className="h-4 w-4 shrink-0" aria-hidden />
-                            Remove
+                            {t("doc.page.remove")}
                           </Button>
                           <Button
                             type="button"
@@ -1624,7 +1657,7 @@ export function SalesOrderPage() {
                             onClick={cancelEdit}
                           >
                             <X className="h-4 w-4 shrink-0" aria-hidden />
-                            Cancel edit
+                            {t("doc.page.cancelEdit")}
                           </Button>
                         </>
                       )}
@@ -1632,7 +1665,7 @@ export function SalesOrderPage() {
                     <div className="doc-lines__contextual-slot min-h-9 flex items-end">
                       {duplicateChoicePending && editingLineId === null ? (
                         <div className="flex flex-col gap-1">
-                          <span className="text-muted-foreground text-xs leading-tight">Item already exists</span>
+                          <span className="text-muted-foreground text-xs leading-tight">{t("doc.page.itemAlreadyExists")}</span>
                           <div className="flex items-center gap-1.5">
                             <Button
                               type="button"
@@ -1641,7 +1674,7 @@ export function SalesOrderPage() {
                               className="h-8"
                               onClick={handleDuplicateIncreaseQty}
                             >
-                              Increase quantity
+                              {t("doc.page.increaseQuantity")}
                             </Button>
                             <Button
                               type="button"
@@ -1650,18 +1683,18 @@ export function SalesOrderPage() {
                               className="h-8"
                               onClick={handleDuplicateCancel}
                             >
-                              Cancel
+                              {t("common.cancel")}
                             </Button>
                           </div>
                         </div>
                       ) : selectedLineIds.length >= 2 ? (
                         <div className="flex flex-col gap-1">
                           <span className="text-muted-foreground text-xs leading-tight">
-                            {selectedLineIds.length} lines selected
+                            {t("doc.page.linesSelected", { count: selectedLineIds.length })}
                           </span>
                           <div className="flex items-center gap-1.5">
                             <Button type="button" variant="outline" size="sm" className="h-8" onClick={removeSelectedLines}>
-                              Remove selected lines
+                              {t("doc.page.removeSelectedLines")}
                             </Button>
                           </div>
                         </div>
@@ -1673,15 +1706,15 @@ export function SalesOrderPage() {
                 <div className="flex flex-row items-center gap-2 shrink-0">
                   {exportSuccess && (
                     <div className="h-8 w-max flex items-center gap-1.5 rounded-md border border-input bg-background px-2 text-sm shrink-0">
-                      <span className="text-muted-foreground text-xs">Export completed:</span>
+                      <span className="text-muted-foreground text-xs">{t("doc.list.exportCompleted")}</span>
                       <span className="font-medium text-xs truncate max-w-[12rem]" title={exportSuccess.filename}>{exportSuccess.filename}</span>
                       <Button
                         type="button"
                         variant="ghost"
                         size="icon"
                         className="h-7 w-7 shrink-0 text-muted-foreground hover:text-foreground"
-                        title="Open file"
-                        aria-label="Open file"
+                        title={t("doc.list.openFile")}
+                        aria-label={t("doc.list.openFile")}
                         onClick={async () => {
                           try {
                             await invoke("open_export_file", { path: exportSuccess.path });
@@ -1699,8 +1732,8 @@ export function SalesOrderPage() {
                         variant="ghost"
                         size="icon"
                         className="h-7 w-7 shrink-0 text-muted-foreground hover:text-foreground"
-                        title="Open folder"
-                        aria-label="Open folder"
+                        title={t("doc.list.openFolder")}
+                        aria-label={t("doc.list.openFolder")}
                         onClick={() => {
                           revealItemInDir(exportSuccess.path);
                           setExportSuccess(null);
@@ -1713,8 +1746,8 @@ export function SalesOrderPage() {
                         variant="ghost"
                         size="icon"
                         className="h-6 w-6 shrink-0 text-muted-foreground/80 hover:text-muted-foreground"
-                        title="Dismiss"
-                        aria-label="Dismiss"
+                        title={t("doc.list.dismiss")}
+                        aria-label={t("doc.list.dismiss")}
                         onClick={() => setExportSuccess(null)}
                       >
                         <X className="h-3 w-3" />
@@ -1730,7 +1763,7 @@ export function SalesOrderPage() {
                       onClick={handleExportMain}
                     >
                       <FileSpreadsheet className="h-4 w-4 shrink-0" />
-                      Export
+                      {t("doc.page.export")}
                     </Button>
                     <Popover open={exportOpen} onOpenChange={setExportOpen}>
                       <PopoverTrigger asChild>
@@ -1739,7 +1772,7 @@ export function SalesOrderPage() {
                           variant="outline"
                           size="icon"
                           className="h-8 w-8 shrink-0 rounded-l-none border-0 shadow-none"
-                          aria-label="Export options"
+                          aria-label={t("doc.list.exportOptionsAria")}
                         >
                           <ChevronDown className="h-4 w-4" />
                         </Button>
@@ -1750,13 +1783,19 @@ export function SalesOrderPage() {
                             type="button"
                             disabled={exportSelectedDisabled}
                             className="w-full rounded-sm px-1.5 py-1 text-left text-sm hover:bg-accent disabled:cursor-not-allowed disabled:opacity-50"
-                            title={exportSelectedDisabled ? (!isEditable ? "Selection is available in edit mode only." : "Select one or more lines in the grid first.") : undefined}
+                            title={
+                              exportSelectedDisabled
+                                ? !isEditable
+                                  ? t("doc.list.exportSelectionEditModeOnly")
+                                  : t("doc.list.exportSelectLinesFirst")
+                                : undefined
+                            }
                             onClick={() => {
                               setExportOpen(false);
                               if (!exportSelectedDisabled) handleExportSelected();
                             }}
                           >
-                            Export selected lines
+                            {t("doc.list.exportSelectedRows")}
                           </button>
                           <button
                             type="button"
@@ -1766,7 +1805,7 @@ export function SalesOrderPage() {
                               handleExportAll();
                             }}
                           >
-                            Export all lines
+                            {t("doc.list.exportAllLines")}
                           </button>
                         </div>
                       </PopoverContent>
@@ -1793,10 +1832,10 @@ export function SalesOrderPage() {
             {form.lines.length > 0 && (
               <div className="doc-lines__totals mt-1.5 flex gap-6 text-sm">
                 <span>
-                  <strong>Total qty:</strong> {totals.totalQty}
+                  {t("doc.page.totalQty")}: {totals.totalQty}
                 </span>
                 <span>
-                  <strong>Total amount:</strong> {totals.totalAmount.toFixed(2)}
+                  {t("doc.page.totalAmount")}: {totals.totalAmount.toFixed(2)}
                 </span>
               </div>
             )}
@@ -1806,56 +1845,59 @@ export function SalesOrderPage() {
         <>
           <Card className="max-w-2xl border-0 shadow-none">
             <CardHeader className="p-2 pb-0.5">
-              <CardTitle className="text-[0.9rem] font-semibold">Details</CardTitle>
+              <CardTitle className="text-[0.9rem] font-semibold">{t("doc.page.details")}</CardTitle>
             </CardHeader>
             <CardContent className="p-2 pt-1">
               <dl className="doc-summary doc-summary--compact doc-summary--dense">
                 <div className="doc-summary__row">
-                  <dt className="doc-summary__term">Number</dt>
+                  <dt className="doc-summary__term">{t("doc.columns.number")}</dt>
                   <dd className="doc-summary__value">{doc!.number}</dd>
                 </div>
                 <div className="doc-summary__row">
-                  <dt className="doc-summary__term">Date</dt>
+                  <dt className="doc-summary__term">{t("doc.columns.date")}</dt>
                   <dd className="doc-summary__value">{normalizeDateForSO(doc!.date)}</dd>
                 </div>
                 <div className="doc-summary__row">
-                  <dt className="doc-summary__term">Customer</dt>
+                  <dt className="doc-summary__term">{t("doc.columns.customer")}</dt>
                   <dd className="doc-summary__value">{customerName}</dd>
                 </div>
                 <div className="doc-summary__row">
-                  <dt className="doc-summary__term">Warehouse</dt>
+                  <dt className="doc-summary__term">{t("doc.columns.warehouse")}</dt>
                   <dd className="doc-summary__value">{warehouseName}</dd>
                 </div>
                 <div className="doc-summary__row">
-                  <dt className="doc-summary__term">Payment terms (days)</dt>
+                  <dt className="doc-summary__term">{t("doc.summary.paymentTerms")}</dt>
                   <dd className="doc-summary__value">
-                    {doc!.paymentTermsDays !== undefined ? `${doc!.paymentTermsDays} days` : "—"}
+                    {doc!.paymentTermsDays !== undefined
+                      ? t("doc.summary.paymentTermsDays", { days: doc!.paymentTermsDays })
+                      : t("domain.audit.summary.emDash")}
                   </dd>
                 </div>
                 <div className="doc-summary__row">
-                  <dt className="doc-summary__term">Due date</dt>
+                  <dt className="doc-summary__term">{t("doc.page.dueDate")}</dt>
                   <dd className="doc-summary__value">
-                    {doc!.dueDate != null && doc!.dueDate !== "" ? doc!.dueDate : "—"}
+                    {doc!.dueDate != null && doc!.dueDate !== ""
+                      ? doc!.dueDate
+                      : t("domain.audit.summary.emDash")}
                   </dd>
                 </div>
                 {doc!.comment != null && doc!.comment !== "" && (
                   <div className="doc-summary__row">
-                    <dt className="doc-summary__term">Comment</dt>
+                    <dt className="doc-summary__term">{t("doc.columns.comment")}</dt>
                     <dd className="doc-summary__value">{doc!.comment}</dd>
                   </div>
                 )}
                 {doc!.status === "cancelled" && doc!.cancelReasonCode != null && doc!.cancelReasonCode !== "" && (
                   <>
                     <div className="doc-summary__row">
-                      <dt className="doc-summary__term">Cancel reason</dt>
+                      <dt className="doc-summary__term">{t("doc.summary.cancelReason")}</dt>
                       <dd className="doc-summary__value">
-                        {CANCEL_DOCUMENT_REASON_LABELS[doc!.cancelReasonCode as CancelDocumentReasonCode] ??
-                          doc!.cancelReasonCode}
+                        {translateCancelReason(t, doc!.cancelReasonCode as CancelDocumentReasonCode)}
                       </dd>
                     </div>
                     {doc!.cancelReasonComment != null && doc!.cancelReasonComment !== "" && (
                       <div className="doc-summary__row">
-                        <dt className="doc-summary__term">Cancel comment</dt>
+                        <dt className="doc-summary__term">{t("doc.summary.cancelComment")}</dt>
                         <dd className="doc-summary__value">{doc!.cancelReasonComment}</dd>
                       </div>
                     )}
@@ -1865,36 +1907,36 @@ export function SalesOrderPage() {
             </CardContent>
           </Card>
           <div className="doc-lines mt-[calc(0.5rem+1cm)]">
-            <h3 className="doc-lines__title">Lines</h3>
+            <h3 className="doc-lines__title">{t("doc.page.lines")}</h3>
             {soFulfillment ? (
               <div className="mb-2 max-w-4xl text-xs">
                 <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
-                  <span className="font-medium text-foreground">Shipment fulfillment</span>
+                  <span className="font-medium text-foreground">{t("doc.fulfillment.so.sectionTitle")}</span>
                   <span className="tabular-nums text-muted-foreground">
-                    {planningFulfillmentStateLabel(soFulfillment.state)}
+                    {translatePlanningFulfillmentState(t, soFulfillment.state)}
+                  </span>
+                  <span className="text-muted-foreground tabular-nums">
+                    {t("doc.fulfillment.so.shippedOrdered", {
+                      shipped: soFulfillment.totalShipped,
+                      ordered: soFulfillment.totalOrdered,
+                    })}
                   </span>
                   <span className="text-muted-foreground">
-                    Shipped{" "}
-                    <span className="text-foreground tabular-nums">{soFulfillment.totalShipped}</span>
-                    {" / "}
-                    <span className="tabular-nums">{soFulfillment.totalOrdered}</span> ordered
-                  </span>
-                  <span className="text-muted-foreground">
-                    Remaining{" "}
+                    {t("doc.fulfillment.so.remainingLabel")}{" "}
                     <span className="text-foreground tabular-nums">
                       {soFulfillment.totalRemaining < 0
-                        ? `${soFulfillment.totalRemaining} (over)`
+                        ? t("doc.fulfillment.remainingOver", { qty: soFulfillment.totalRemaining })
                         : soFulfillment.totalRemaining}
                     </span>
                   </span>
-                  <span className="text-muted-foreground">
-                    Shipments:{" "}
-                    <span className="text-foreground tabular-nums">{soFulfillment.postedShipmentCount}</span>
-                    {" posted / "}
-                    <span className="tabular-nums">{soFulfillment.relatedShipmentCount}</span> total
+                  <span className="text-muted-foreground tabular-nums">
+                    {t("doc.fulfillment.so.shipmentsPostedTotal", {
+                      posted: soFulfillment.postedShipmentCount,
+                      total: soFulfillment.relatedShipmentCount,
+                    })}
                   </span>
                   {soFulfillment.hasOverFulfillment ? (
-                    <span className="text-destructive font-medium">Over-shipped on line(s)</span>
+                    <span className="text-destructive font-medium">{t("doc.fulfillment.so.overShipped")}</span>
                   ) : null}
                 </div>
               </div>
@@ -1902,18 +1944,18 @@ export function SalesOrderPage() {
             {showSalesOrderAllocationUi && soAllocationView ? (
               <div className="mb-2 max-w-4xl text-xs">
                 <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
-                  <span className="font-medium text-foreground">Stock allocation</span>
+                  <span className="font-medium text-foreground">{t("doc.fulfillment.so.allocationSectionTitle")}</span>
                   <span className="tabular-nums text-muted-foreground">
-                    {salesOrderAllocationStateLabel(soAllocationView.state)}
+                    {translateSalesOrderAllocationState(t, soAllocationView.state)}
                   </span>
                   <span className="text-muted-foreground">
-                    Reserved{" "}
+                    {t("doc.columns.reserved")}{" "}
                     <span className="text-foreground tabular-nums">{soAllocationView.totalReserved}</span>
                   </span>
                   <span className="text-muted-foreground">
-                    Shortage{" "}
+                    {t("doc.columns.shortage")}{" "}
                     <span className="text-foreground tabular-nums">{soAllocationView.totalShortage}</span>
-                    <span className="text-muted-foreground/80"> (remaining not reserved)</span>
+                    <span className="text-muted-foreground/80"> {t("doc.fulfillment.so.allocationShortageHint")}</span>
                   </span>
                 </div>
               </div>
@@ -1921,15 +1963,15 @@ export function SalesOrderPage() {
             <div className="flex flex-row items-center justify-end gap-2 w-full mb-1.5">
               {exportSuccess && (
                 <div className="h-8 w-max flex items-center gap-1.5 rounded-md border border-input bg-background px-2 text-sm shrink-0">
-                  <span className="text-muted-foreground text-xs">Export completed:</span>
+                  <span className="text-muted-foreground text-xs">{t("doc.list.exportCompleted")}</span>
                   <span className="font-medium text-xs truncate max-w-[12rem]" title={exportSuccess.filename}>{exportSuccess.filename}</span>
                   <Button
                     type="button"
                     variant="ghost"
                     size="icon"
                     className="h-7 w-7 shrink-0 text-muted-foreground hover:text-foreground"
-                    title="Open file"
-                    aria-label="Open file"
+                    title={t("doc.list.openFile")}
+                    aria-label={t("doc.list.openFile")}
                     onClick={async () => {
                       try {
                         await invoke("open_export_file", { path: exportSuccess.path });
@@ -1947,8 +1989,8 @@ export function SalesOrderPage() {
                     variant="ghost"
                     size="icon"
                     className="h-7 w-7 shrink-0 text-muted-foreground hover:text-foreground"
-                    title="Open folder"
-                    aria-label="Open folder"
+                    title={t("doc.list.openFolder")}
+                    aria-label={t("doc.list.openFolder")}
                     onClick={() => {
                       revealItemInDir(exportSuccess.path);
                       setExportSuccess(null);
@@ -1961,8 +2003,8 @@ export function SalesOrderPage() {
                     variant="ghost"
                     size="icon"
                     className="h-6 w-6 shrink-0 text-muted-foreground/80 hover:text-muted-foreground"
-                    title="Dismiss"
-                    aria-label="Dismiss"
+                    title={t("doc.list.dismiss")}
+                    aria-label={t("doc.list.dismiss")}
                     onClick={() => setExportSuccess(null)}
                   >
                     <X className="h-3 w-3" />
@@ -1978,7 +2020,7 @@ export function SalesOrderPage() {
                   onClick={handleExportMain}
                 >
                   <FileSpreadsheet className="h-4 w-4 shrink-0" />
-                  Export
+                  {t("doc.page.export")}
                 </Button>
                 <Popover open={exportOpen} onOpenChange={setExportOpen}>
                   <PopoverTrigger asChild>
@@ -1987,7 +2029,7 @@ export function SalesOrderPage() {
                       variant="outline"
                       size="icon"
                       className="h-8 w-8 shrink-0 rounded-l-none border-0 shadow-none"
-                      aria-label="Export options"
+                      aria-label={t("doc.list.exportOptionsAria")}
                     >
                       <ChevronDown className="h-4 w-4" />
                     </Button>
@@ -1998,13 +2040,19 @@ export function SalesOrderPage() {
                         type="button"
                         disabled={exportSelectedDisabled}
                         className="w-full rounded-sm px-1.5 py-1 text-left text-sm hover:bg-accent disabled:cursor-not-allowed disabled:opacity-50"
-                        title={exportSelectedDisabled ? (!isEditable ? "Selection is available in edit mode only." : "Select one or more lines in the grid first.") : undefined}
+                        title={
+                          exportSelectedDisabled
+                            ? !isEditable
+                              ? t("doc.list.exportSelectionEditModeOnly")
+                              : t("doc.list.exportSelectLinesFirst")
+                            : undefined
+                        }
                         onClick={() => {
                           setExportOpen(false);
                           if (!exportSelectedDisabled) handleExportSelected();
                         }}
                       >
-                        Export selected lines
+                        {t("doc.list.exportSelectedRows")}
                       </button>
                       <button
                         type="button"
@@ -2014,7 +2062,7 @@ export function SalesOrderPage() {
                           handleExportAll();
                         }}
                       >
-                        Export all lines
+                        {t("doc.list.exportAllLines")}
                       </button>
                     </div>
                   </PopoverContent>
@@ -2022,7 +2070,7 @@ export function SalesOrderPage() {
               </div>
             </div>
             {linesWithItem.length === 0 ? (
-              <p className="doc-lines__empty">No lines.</p>
+              <p className="doc-lines__empty">{t("doc.page.noLines")}</p>
             ) : (
               <>
                 <div className="doc-lines__grid">
@@ -2030,11 +2078,7 @@ export function SalesOrderPage() {
                     <AgGridReact<LineWithItem>
                       {...agGridDefaultGridOptions}
                       rowData={linesWithItem}
-                      columnDefs={soLinesReadOnlyColumnDefs(
-                        soFulfillment,
-                        soAllocationView,
-                        showSalesOrderAllocationUi,
-                      )}
+                      columnDefs={readOnlyLinesColumnDefs}
                       defaultColDef={agGridDefaultColDef}
                       getRowId={(p) => p.data.id}
                       rowSelection={{ mode: "multiRow", checkboxes: true, headerCheckbox: true, enableClickSelection: true }}
@@ -2044,10 +2088,10 @@ export function SalesOrderPage() {
                 </div>
                 <div className="doc-lines__totals mt-1.5 flex gap-6 text-sm">
                   <span>
-                    <strong>Total qty:</strong> {readonlyTotals.totalQty}
+                    {t("doc.page.totalQty")}: {readonlyTotals.totalQty}
                   </span>
                   <span>
-                    <strong>Total amount:</strong> {readonlyTotals.totalAmount.toFixed(2)}
+                    {t("doc.page.totalAmount")}: {readonlyTotals.totalAmount.toFixed(2)}
                   </span>
                 </div>
               </>
@@ -2069,6 +2113,7 @@ export function SalesOrderPage() {
           )
         }
         templateFileName="sales-order-lines-template.xlsx"
+        templateDisplayLabel={t("doc.so.importTemplateLabel")}
         onOpenChange={setIsLineImportModalOpen}
         onApply={handleApplyImportedLines}
       />
@@ -2078,7 +2123,7 @@ export function SalesOrderPage() {
       <CancelDocumentReasonDialog
         open={cancelReasonDialogOpen}
         onOpenChange={setCancelReasonDialogOpen}
-        documentKindLabel="sales order"
+        documentKindLabel={t("doc.kinds.salesOrder")}
         onConfirm={handleCancelDocumentConfirm}
       />
     </DocumentPageLayout>

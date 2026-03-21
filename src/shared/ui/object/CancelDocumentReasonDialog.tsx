@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Dialog } from "radix-ui";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -6,12 +6,12 @@ import { SelectField } from "@/components/ui/select-field";
 import { Input } from "@/components/ui/input";
 import {
   CANCEL_DOCUMENT_REASON_CODES,
-  CANCEL_DOCUMENT_REASON_LABELS,
   type CancelDocumentReasonCode,
   isCancelDocumentReasonCode,
   validateCancelDocumentReasonForm,
 } from "../../reasonCodes";
 import { useSettings } from "../../settings/SettingsContext";
+import { useTranslation, translateCancelReason } from "@/shared/i18n";
 import { cn } from "@/lib/utils";
 
 export type CancelDocumentReasonPayload = {
@@ -27,19 +27,23 @@ type Props = {
   onConfirm: (payload: CancelDocumentReasonPayload) => void;
 };
 
-const REASON_OPTIONS = CANCEL_DOCUMENT_REASON_CODES.map((code) => ({
-  value: code,
-  label: CANCEL_DOCUMENT_REASON_LABELS[code],
-}));
-
 export function CancelDocumentReasonDialog({
   open,
   onOpenChange,
   documentKindLabel,
   onConfirm,
 }: Props) {
+  const { t } = useTranslation();
   const { settings } = useSettings();
   const requireReason = settings.documents.requireCancelReason;
+  const reasonOptions = useMemo(
+    () =>
+      CANCEL_DOCUMENT_REASON_CODES.map((code) => ({
+        value: code,
+        label: translateCancelReason(t, code),
+      })),
+    [t],
+  );
   const [reasonCode, setReasonCode] = useState<string>("");
   const [comment, setComment] = useState("");
   const [submitError, setSubmitError] = useState<string | null>(null);
@@ -56,7 +60,13 @@ export function CancelDocumentReasonDialog({
     if (requireReason) {
       const err = validateCancelDocumentReasonForm(reasonCode);
       if (err) {
-        setSubmitError(err);
+        setSubmitError(
+          err === "A cancel reason is required."
+            ? t("validation.cancelReasonRequired")
+            : err === "Select a valid cancel reason."
+              ? t("validation.selectValidCancelReason")
+              : err,
+        );
         return;
       }
       effectiveCode = reasonCode as CancelDocumentReasonCode;
@@ -95,37 +105,36 @@ export function CancelDocumentReasonDialog({
           }}
         >
           <Dialog.Title className="text-base font-semibold text-foreground">
-            Cancel {documentKindLabel}
+            {t("doc.cancelDialog.title", { kind: documentKindLabel })}
           </Dialog.Title>
           <Dialog.Description className="mt-1.5 text-sm text-muted-foreground">
-            {requireReason
-              ? "This action marks the document as cancelled. A reason code is required."
-              : "This action marks the document as cancelled. You may leave the reason unset; “Other” will be recorded if empty."}
+            {requireReason ? t("doc.cancelDialog.descriptionRequired") : t("doc.cancelDialog.descriptionOptional")}
           </Dialog.Description>
 
           <div className="mt-4 flex flex-col gap-3">
             <div className="flex flex-col gap-1">
               <Label htmlFor="cancel-reason-code" className="text-sm">
-                Reason {requireReason ? <span className="text-destructive">*</span> : null}
+                {t("doc.cancelDialog.reasonLabel")}{" "}
+                {requireReason ? <span className="text-destructive">*</span> : null}
               </Label>
               <SelectField
                 id="cancel-reason-code"
                 value={reasonCode}
                 onChange={setReasonCode}
-                options={REASON_OPTIONS}
-                placeholder="Select reason"
+                options={reasonOptions}
+                placeholder={t("doc.cancelDialog.selectPlaceholder")}
                 className="w-full"
               />
             </div>
             <div className="flex flex-col gap-1">
               <Label htmlFor="cancel-reason-comment" className="text-sm">
-                Comment (optional)
+                {t("doc.cancelDialog.commentLabel")} ({t("doc.cancelDialog.commentOptional")})
               </Label>
               <Input
                 id="cancel-reason-comment"
                 value={comment}
                 onChange={(e) => setComment(e.target.value)}
-                placeholder="Optional note"
+                placeholder={t("doc.cancelDialog.notePlaceholder")}
                 className="h-8 text-sm"
                 maxLength={500}
               />
@@ -139,15 +148,15 @@ export function CancelDocumentReasonDialog({
 
           <div className="mt-5 flex justify-end gap-2">
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
-              Back
+              {t("doc.cancelDialog.back")}
             </Button>
             <Button
               type="button"
               variant="destructive"
               onClick={handleConfirm}
-              title="Confirm cancellation (Ctrl/Cmd+Enter)"
+              title={t("doc.cancelDialog.confirmTitle")}
             >
-              Confirm cancellation
+              {t("doc.cancelDialog.confirm")}
             </Button>
           </div>
         </Dialog.Content>

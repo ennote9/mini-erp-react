@@ -43,6 +43,19 @@ export const SETTINGS_SECTION_ORDER: SettingsSectionId[] = [
 
 export const SETTINGS_REGISTRY: SettingRegistryEntry[] = [
   {
+    id: "general.locale",
+    section: "general",
+    valueType: "enum",
+    label: "Language",
+    description: "User interface language. Applies immediately across the app.",
+    readiness: "active",
+    options: [
+      { value: "en", label: "English" },
+      { value: "ru", label: "Русский" },
+      { value: "kk", label: "Қазақша" },
+    ],
+  },
+  {
     id: "general.theme",
     section: "general",
     valueType: "enum",

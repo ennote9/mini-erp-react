@@ -1,4 +1,5 @@
 import { DEFAULT_APP_SETTINGS } from "./defaults";
+import { normalizeAppLocale } from "../i18n/locales";
 import type {
   AllocationModeId,
   AppSettings,
@@ -104,6 +105,7 @@ export function normalizeAppSettingsFromUnknown(raw: unknown): AppSettings {
         (g as Record<string, unknown>).profileOverrides,
         base.general.profileOverrides,
       ),
+      locale: normalizeAppLocale((g as Record<string, unknown>).locale),
       theme: asThemePreference(g.theme) ?? base.general.theme,
       dateFormat: asDateFormatId(g.dateFormat) ?? base.general.dateFormat,
       numberFormat: asNumberFormatId(g.numberFormat) ?? base.general.numberFormat,

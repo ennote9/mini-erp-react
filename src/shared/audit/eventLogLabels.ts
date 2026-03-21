@@ -22,7 +22,13 @@ const LABELS: Record<AuditEventType, string> = {
   zero_price_reason_changed: "Zero-price reason changed",
 };
 
-export function auditEventLabel(eventType: AuditEventType): string {
+export function auditEventLabel(
+  eventType: AuditEventType,
+  t?: (key: string) => string,
+): string {
+  if (t) {
+    return t(`domain.audit.events.${eventType}`);
+  }
   return LABELS[eventType] ?? eventType;
 }
 

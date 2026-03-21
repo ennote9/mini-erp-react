@@ -1,5 +1,6 @@
 import { useMemo } from "react";
 import { cn } from "@/lib/utils";
+import { useTranslation } from "@/shared/i18n";
 import { useSettings } from "@/shared/settings";
 import { getEffectiveWorkspaceFeatureEnabled } from "@/shared/workspace";
 import {
@@ -21,6 +22,7 @@ import {
 } from "../components";
 
 export function DashboardPage() {
+  const { t } = useTranslation();
   const { settings } = useSettings();
   const workspaceMode = settings.general.workspaceMode;
   const showStockMovementsCard = getEffectiveWorkspaceFeatureEnabled(
@@ -42,12 +44,9 @@ export function DashboardPage() {
     <div className="dashboard-page mx-auto max-w-[1600px] space-y-6 p-4 md:p-5" data-module="dashboard">
       <header className="space-y-1">
         <h1 className="text-lg font-semibold tracking-tight text-foreground md:text-xl">
-          Dashboard
+          {t("dashboard.title")}
         </h1>
-        <p className="m-0 max-w-2xl text-sm text-muted-foreground">
-          Operational snapshot: document and inventory counts, recent receipts and shipments, and
-          quick navigation.
-        </p>
+        <p className="m-0 max-w-2xl text-sm text-muted-foreground">{t("dashboard.subtitle")}</p>
       </header>
 
       <section className="space-y-2" aria-labelledby="dash-doc-heading">
@@ -55,51 +54,51 @@ export function DashboardPage() {
           id="dash-doc-heading"
           className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground"
         >
-          Documents
+          {t("dashboard.sections.documents")}
         </h2>
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
           <DocumentOverviewCard
-            title="Purchase orders"
+            title={t("dashboard.po.title")}
             listPath="/purchase-orders"
             total={po.total}
             stats={[
-              { key: "draft", label: "Draft", value: po.draft },
-              { key: "confirmed", label: "Confirmed", value: po.confirmed },
-              { key: "closed", label: "Closed", value: po.closed },
-              { key: "cancelled", label: "Cancelled", value: po.cancelled },
+              { key: "draft", label: t("dashboard.stats.draft"), value: po.draft },
+              { key: "confirmed", label: t("dashboard.stats.confirmed"), value: po.confirmed },
+              { key: "closed", label: t("dashboard.stats.closed"), value: po.closed },
+              { key: "cancelled", label: t("dashboard.stats.cancelled"), value: po.cancelled },
             ]}
           />
           <DocumentOverviewCard
-            title="Sales orders"
+            title={t("dashboard.so.title")}
             listPath="/sales-orders"
             total={so.total}
             stats={[
-              { key: "draft", label: "Draft", value: so.draft },
-              { key: "confirmed", label: "Confirmed", value: so.confirmed },
-              { key: "closed", label: "Closed", value: so.closed },
-              { key: "cancelled", label: "Cancelled", value: so.cancelled },
+              { key: "draft", label: t("dashboard.stats.draft"), value: so.draft },
+              { key: "confirmed", label: t("dashboard.stats.confirmed"), value: so.confirmed },
+              { key: "closed", label: t("dashboard.stats.closed"), value: so.closed },
+              { key: "cancelled", label: t("dashboard.stats.cancelled"), value: so.cancelled },
             ]}
           />
           <DocumentOverviewCard
-            title="Receipts"
+            title={t("dashboard.receipts.title")}
             listPath="/receipts"
             total={receipts.total}
             stats={[
-              { key: "draft", label: "Draft", value: receipts.draft },
-              { key: "posted", label: "Posted", value: receipts.posted },
-              { key: "reversed", label: "Reversed", value: receipts.reversed },
-              { key: "cancelled", label: "Cancelled", value: receipts.cancelled },
+              { key: "draft", label: t("dashboard.stats.draft"), value: receipts.draft },
+              { key: "posted", label: t("dashboard.stats.posted"), value: receipts.posted },
+              { key: "reversed", label: t("dashboard.stats.reversed"), value: receipts.reversed },
+              { key: "cancelled", label: t("dashboard.stats.cancelled"), value: receipts.cancelled },
             ]}
           />
           <DocumentOverviewCard
-            title="Shipments"
+            title={t("dashboard.shipments.title")}
             listPath="/shipments"
             total={shipments.total}
             stats={[
-              { key: "draft", label: "Draft", value: shipments.draft },
-              { key: "posted", label: "Posted", value: shipments.posted },
-              { key: "reversed", label: "Reversed", value: shipments.reversed },
-              { key: "cancelled", label: "Cancelled", value: shipments.cancelled },
+              { key: "draft", label: t("dashboard.stats.draft"), value: shipments.draft },
+              { key: "posted", label: t("dashboard.stats.posted"), value: shipments.posted },
+              { key: "reversed", label: t("dashboard.stats.reversed"), value: shipments.reversed },
+              { key: "cancelled", label: t("dashboard.stats.cancelled"), value: shipments.cancelled },
             ]}
           />
         </div>
@@ -110,7 +109,7 @@ export function DashboardPage() {
           id="dash-inv-heading"
           className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground"
         >
-          Inventory
+          {t("dashboard.sections.inventory")}
         </h2>
         <div
           className={cn(
@@ -119,24 +118,28 @@ export function DashboardPage() {
           )}
         >
           <InventoryOverviewCard
-            title="Stock balances"
+            title={t("dashboard.stockBalances.title")}
             listPath="/stock-balances"
-            metrics={[{ key: "rows", label: "Balance rows", value: inventory.balanceRows }]}
+            metrics={[
+              { key: "rows", label: t("dashboard.stockBalances.balanceRows"), value: inventory.balanceRows },
+            ]}
           />
           {showStockMovementsCard ? (
             <InventoryOverviewCard
-              title="Stock movements"
+              title={t("dashboard.stockMovements.title")}
               listPath="/stock-movements"
-              metrics={[{ key: "rows", label: "Movement rows", value: inventory.movementRows }]}
+              metrics={[
+                { key: "rows", label: t("dashboard.stockMovements.movementRows"), value: inventory.movementRows },
+              ]}
             />
           ) : null}
           <InventoryOverviewCard
-            title="Items"
+            title={t("dashboard.items.title")}
             listPath="/items"
             metrics={[
-              { key: "total", label: "Total items", value: inventory.itemsTotal },
-              { key: "active", label: "Active", value: inventory.itemsActive },
-              { key: "images", label: "With images", value: inventory.itemsWithImages },
+              { key: "total", label: t("dashboard.items.total"), value: inventory.itemsTotal },
+              { key: "active", label: t("dashboard.items.active"), value: inventory.itemsActive },
+              { key: "images", label: t("dashboard.items.withImages"), value: inventory.itemsWithImages },
             ]}
           />
         </div>
@@ -147,21 +150,21 @@ export function DashboardPage() {
           id="dash-activity-heading"
           className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground"
         >
-          Recent activity
+          {t("dashboard.sections.recentActivity")}
         </h2>
         <div className="grid grid-cols-1 gap-3 xl:grid-cols-2">
           <RecentActivityPanel
             variant="receipt"
-            title="Recent receipts"
+            title={t("dashboard.recentReceipts.title")}
             listPath="/receipts"
-            emptyMessage="No receipts yet."
+            emptyMessage={t("dashboard.recentReceipts.empty")}
             rows={recentReceipts}
           />
           <RecentActivityPanel
             variant="shipment"
-            title="Recent shipments"
+            title={t("dashboard.recentShipments.title")}
             listPath="/shipments"
-            emptyMessage="No shipments yet."
+            emptyMessage={t("dashboard.recentShipments.empty")}
             rows={recentShipments}
           />
         </div>
@@ -172,7 +175,7 @@ export function DashboardPage() {
           id="dash-nav-heading"
           className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground"
         >
-          Navigation &amp; signals
+          {t("dashboard.sections.navSignals")}
         </h2>
         <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
           <DashboardQuickLinks />

@@ -1,4 +1,5 @@
 import type { ColDef, GridOptions } from "ag-grid-community";
+import type { TFunction } from "@/shared/i18n/resolve";
 
 /**
  * Grid options applied across ERP grids so visible cell values can be selected/copied.
@@ -30,6 +31,14 @@ export const agGridRowNumberColDef: ColDef = {
   sortable: false,
   resizable: false,
 };
+
+/** Localized № header; use inside `useMemo` with `[t, locale]` so headers refresh on language change. */
+export function getAgGridRowNumberColDef(t: TFunction): ColDef {
+  return {
+    ...agGridRowNumberColDef,
+    headerName: t("doc.columns.lineNo"),
+  };
+}
 
 /** Selection column (checkboxes) - use as selectionColumnDef when rowSelection is set. AG Grid 32.2+ */
 export const agGridSelectionColumnDef: ColDef = {

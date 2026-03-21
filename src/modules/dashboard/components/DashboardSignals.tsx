@@ -6,6 +6,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { useTranslation } from "@/shared/i18n";
 import type { DashboardSignals as SignalsData } from "../dashboardStats";
 
 type Props = {
@@ -13,25 +14,26 @@ type Props = {
 };
 
 export function DashboardSignals({ signals }: Props) {
+  const { t } = useTranslation();
   const rows: { label: string; value: number; hint?: string; to?: string }[] = [
     {
-      label: "Inactive items",
+      label: t("dashboard.signals.inactiveItems"),
       value: signals.inactiveItems,
       to: "/items",
-      hint: "Master data",
+      hint: t("dashboard.signals.masterDataHint"),
     },
     {
-      label: "Items without images",
+      label: t("dashboard.signals.itemsWithoutImages"),
       value: signals.itemsWithoutImages,
       to: "/items",
     },
     {
-      label: "Draft receipts",
+      label: t("dashboard.signals.draftReceipts"),
       value: signals.draftReceipts,
       to: "/receipts",
     },
     {
-      label: "Draft shipments",
+      label: t("dashboard.signals.draftShipments"),
       value: signals.draftShipments,
       to: "/shipments",
     },
@@ -40,10 +42,8 @@ export function DashboardSignals({ signals }: Props) {
   return (
     <Card className="min-w-0 border-border/60 bg-card/40 shadow-none">
       <CardHeader className="space-y-0 p-3 pb-1">
-        <CardTitle className="text-sm font-semibold">Signals</CardTitle>
-        <CardDescription className="text-xs">
-          Light operational checks from current data.
-        </CardDescription>
+        <CardTitle className="text-sm font-semibold">{t("dashboard.signals.title")}</CardTitle>
+        <CardDescription className="text-xs">{t("dashboard.signals.subtitle")}</CardDescription>
       </CardHeader>
       <CardContent className="p-3 pt-1">
         <ul className="m-0 list-none space-y-2 p-0 text-sm">

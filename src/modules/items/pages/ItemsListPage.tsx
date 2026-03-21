@@ -34,6 +34,7 @@ import { buildItemsListXlsxBuffer, type ItemsExportRow } from "../itemsListExpor
 import { save } from "@tauri-apps/plugin-dialog";
 import { invoke } from "@tauri-apps/api/core";
 import { revealItemInDir } from "@tauri-apps/plugin-opener";
+import { useTranslation } from "@/shared/i18n/context";
 
 type ActiveFilter = "all" | "active" | "inactive";
 
@@ -57,8 +58,9 @@ function applyCategoryIdFilter(items: Item[], categoryId: string | null): Item[]
 }
 
 function ActiveStatusCellRenderer(params: ICellRendererParams<Item>) {
+  const { t } = useTranslation();
   const isActive = params.value as boolean;
-  const label = isActive ? "Active" : "Inactive";
+  const label = isActive ? t("ops.master.activeCell.active") : t("ops.master.activeCell.inactive");
   return (
     <span className={isActive ? "status-plain-text status-plain-text--active" : "status-plain-text status-plain-text--inactive"}>
       {label}
@@ -75,7 +77,7 @@ function ImagesCountCellRenderer(params: ICellRendererParams<Item, number>) {
   return <span className="tabular-nums text-foreground/90">{n}</span>;
 }
 
-function buildExportRowsFromItems(items: Item[]): ItemsExportRow[] {
+function buildExportRowsFromItems(items: Item[], activeYes: string, activeNo: string): ItemsExportRow[] {
   return items.map((item, idx) => {
     const brand = item.brandId ? brandRepository.getById(item.brandId)?.name ?? "" : "";
     const category = item.categoryId ? categoryRepository.getById(item.categoryId)?.name ?? "" : "";
@@ -96,12 +98,13 @@ function buildExportRowsFromItems(items: Item[]): ItemsExportRow[] {
       uom: item.uom ?? "",
       purchasePrice,
       salePrice,
-      active: item.isActive ? "Active" : "Inactive",
+      active: item.isActive ? activeYes : activeNo,
     };
   });
 }
 
 export function ItemsListPage() {
+  const { t, locale } = useTranslation();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const brandFilterId = useMemo(() => {
@@ -173,19 +176,21 @@ export function ItemsListPage() {
 
   const getExportRowsCurrentView = useCallback((): ItemsExportRow[] => {
     const api = gridRef.current?.api;
-    if (!api) return buildExportRowsFromItems(filteredItems);
+    const y = t("ops.master.exportActiveYes");
+    const n = t("ops.master.exportActiveNo");
+    if (!api) return buildExportRowsFromItems(filteredItems, y, n);
     const rows: Item[] = [];
     api.forEachNodeAfterFilterAndSort((rowNode) => {
       if (rowNode.data) rows.push(rowNode.data);
     });
-    return buildExportRowsFromItems(rows);
-  }, [filteredItems]);
+    return buildExportRowsFromItems(rows, y, n);
+  }, [filteredItems, t]);
 
   const getExportRowsSelected = useCallback((): ItemsExportRow[] => {
     const api = gridRef.current?.api;
     const rows: Item[] = api ? (api.getSelectedRows() as Item[]) : [];
-    return buildExportRowsFromItems(rows);
-  }, []);
+    return buildExportRowsFromItems(rows, t("ops.master.exportActiveYes"), t("ops.master.exportActiveNo"));
+  }, [t]);
 
   const runExportWithSaveAs = useCallback(
     async (defaultFilename: string, buildBuffer: () => Promise<ArrayBuffer>) => {
@@ -236,41 +241,41 @@ export function ItemsListPage() {
   const exportSelectedDisabled = selectedCount === 0;
 
   const emptyTitle = hasActiveFilter
-    ? "No items match current search or filters"
-    : "No items yet";
+    ? t("ops.list.items.emptyFiltered")
+    : t("ops.list.items.emptyDefault");
   const emptyHint = useMemo(() => {
     if (!hasActiveFilter) {
-      return "Create your first item to start working with inventory.";
+      return t("ops.list.items.hintCreateFirst");
     }
     if (brandFilterId != null && categoryFilterId != null) {
-      return "Try clearing the brand or category filter or adjusting search.";
+      return t("ops.list.items.hintBrandCategory");
     }
     if (brandFilterId != null) {
-      return "Try clearing the brand filter or adjusting search.";
+      return t("ops.list.items.hintBrand");
     }
     if (categoryFilterId != null) {
-      return "Try clearing the category filter or adjusting search.";
+      return t("ops.list.items.hintCategory");
     }
-    return "Try changing the search or filter.";
-  }, [hasActiveFilter, brandFilterId, categoryFilterId]);
+    return t("ops.list.master.hintClearFilters");
+  }, [hasActiveFilter, brandFilterId, categoryFilterId, t]);
 
   const columnDefs = useMemo<ColDef<Item>[]>(
     () => [
       agGridRowNumberColDef,
       {
         field: "code",
-        headerName: "Code",
+        headerName: t("doc.columns.code"),
         width: 130,
       },
       {
         field: "name",
-        headerName: "Name",
+        headerName: t("doc.columns.name"),
         minWidth: 160,
         flex: 1,
       },
       {
         colId: "imageCount",
-        headerName: "Images",
+        headerName: t("doc.columns.images"),
         width: 76,
         maxWidth: 88,
         valueGetter: (params) =>
@@ -278,7 +283,7 @@ export function ItemsListPage() {
         cellRenderer: ImagesCountCellRenderer,
       },
       {
-        headerName: "Brand",
+        headerName: t("doc.columns.brand"),
         width: 110,
         valueGetter: (params) => {
           const id = params.data?.brandId;
@@ -288,7 +293,7 @@ export function ItemsListPage() {
         },
       },
       {
-        headerName: "Category",
+        headerName: t("doc.columns.category"),
         width: 120,
         valueGetter: (params) => {
           const id = params.data?.categoryId;
@@ -299,12 +304,12 @@ export function ItemsListPage() {
       },
       {
         field: "uom",
-        headerName: "UOM",
+        headerName: t("doc.columns.uom"),
         width: 90,
       },
       {
         field: "purchasePrice",
-        headerName: "Purchase price",
+        headerName: t("doc.columns.purchasePrice"),
         width: 120,
         valueFormatter: (params) =>
           params.value != null && typeof params.value === "number"
@@ -313,7 +318,7 @@ export function ItemsListPage() {
       },
       {
         field: "salePrice",
-        headerName: "Sale price",
+        headerName: t("doc.columns.salePrice"),
         width: 100,
         valueFormatter: (params) =>
           params.value != null && typeof params.value === "number"
@@ -322,12 +327,12 @@ export function ItemsListPage() {
       },
       {
         field: "isActive",
-        headerName: "Active",
+        headerName: t("doc.columns.active"),
         width: 100,
         cellRenderer: ActiveStatusCellRenderer,
       },
     ],
-    [],
+    [t, locale],
   );
 
   return (
@@ -335,8 +340,8 @@ export function ItemsListPage() {
       header={null}
       controls={
         <>
-          <BackButton to="/" aria-label="Back to Dashboard" />
-          <ButtonGroup className="list-page__filter-group" aria-label="Filter by status">
+          <BackButton to="/" aria-label={t("doc.list.backToDashboard")} />
+          <ButtonGroup className="list-page__filter-group" aria-label={t("ops.list.filterStatusAria")}>
             {(["all", "active", "inactive"] as const).map((value, index) => (
               <React.Fragment key={value}>
                 {index > 0 && <ButtonGroupSeparator />}
@@ -347,20 +352,20 @@ export function ItemsListPage() {
                   onClick={() => setActiveFilter(value)}
                 >
                   {value === "all"
-                    ? "All"
+                    ? t("doc.list.all")
                     : value === "active"
-                      ? "Active"
-                      : "Inactive"}
+                      ? t("ops.master.activeCell.active")
+                      : t("ops.master.activeCell.inactive")}
                 </Button>
               </React.Fragment>
             ))}
           </ButtonGroup>
           <ListPageSearch
             inputRef={listSearchInputRef}
-            placeholder="Search"
+            placeholder={t("ops.list.items.searchPlaceholder")}
             value={searchQuery}
             onChange={setSearchQuery}
-            aria-label="Search items"
+            aria-label={t("ops.list.items.searchAria")}
             resultCount={filteredItems.length}
           />
           <div className="flex flex-row items-center gap-2 shrink-0 ml-auto">
@@ -368,9 +373,11 @@ export function ItemsListPage() {
               <div
                 className="flex h-8 max-w-[min(100%,18rem)] items-center gap-1.5 rounded-md border border-input bg-background px-2 text-xs shrink-0"
                 role="status"
-                aria-label="Brand filter active"
+                aria-label={t("ops.list.filterBrandAria")}
               >
-                <span className="text-muted-foreground whitespace-nowrap shrink-0">Brand</span>
+                <span className="text-muted-foreground whitespace-nowrap shrink-0">
+                  {t("ops.list.filterBrand")}
+                </span>
                 <span className="truncate font-medium text-foreground/90 min-w-0" title={brandFilterLabel}>
                   {brandFilterLabel}
                 </span>
@@ -402,21 +409,21 @@ export function ItemsListPage() {
                   className="h-7 px-1.5 text-xs shrink-0 text-muted-foreground hover:text-foreground"
                   onClick={clearCategoryFilter}
                 >
-                  Clear
+                  {t("doc.list.clear")}
                 </Button>
               </div>
             )}
             {exportSuccess && (
               <div className="h-8 w-max flex items-center gap-1.5 rounded-md border border-input bg-background px-2 text-sm shrink-0">
-                <span className="text-muted-foreground text-xs">Export completed:</span>
+                <span className="text-muted-foreground text-xs">{t("doc.list.exportCompleted")}</span>
                 <span className="font-medium text-xs truncate max-w-[12rem]" title={exportSuccess.filename}>{exportSuccess.filename}</span>
                 <Button
                   type="button"
                   variant="ghost"
                   size="icon"
                   className="h-7 w-7 shrink-0 text-muted-foreground hover:text-foreground"
-                  title="Open file"
-                  aria-label="Open file"
+                  title={t("doc.list.openFile")}
+                  aria-label={t("doc.list.openFile")}
                   onClick={async () => {
                     try {
                       await invoke("open_export_file", { path: exportSuccess.path });
@@ -434,8 +441,8 @@ export function ItemsListPage() {
                   variant="ghost"
                   size="icon"
                   className="h-7 w-7 shrink-0 text-muted-foreground hover:text-foreground"
-                  title="Open folder"
-                  aria-label="Open folder"
+                  title={t("doc.list.openFolder")}
+                  aria-label={t("doc.list.openFolder")}
                   onClick={() => {
                     revealItemInDir(exportSuccess.path);
                     setExportSuccess(null);
@@ -448,8 +455,8 @@ export function ItemsListPage() {
                   variant="ghost"
                   size="icon"
                   className="h-6 w-6 shrink-0 text-muted-foreground/80 hover:text-muted-foreground"
-                  title="Dismiss"
-                  aria-label="Dismiss"
+                  title={t("doc.list.dismiss")}
+                  aria-label={t("doc.list.dismiss")}
                   onClick={() => setExportSuccess(null)}
                 >
                   <X className="h-3 w-3" />
@@ -465,7 +472,7 @@ export function ItemsListPage() {
                 onClick={handleExportCurrentView}
               >
                 <FileSpreadsheet className="h-4 w-4 shrink-0" />
-                Export
+                {t("doc.list.export")}
               </Button>
               <Popover open={exportOpen} onOpenChange={setExportOpen}>
                 <PopoverTrigger asChild>
@@ -474,7 +481,7 @@ export function ItemsListPage() {
                     variant="outline"
                     size="icon"
                     className="h-8 w-8 shrink-0 rounded-l-none border-0 shadow-none"
-                    aria-label="Export options"
+                    aria-label={t("doc.list.exportOptionsAria")}
                   >
                     <ChevronDown className="h-4 w-4" />
                   </Button>
@@ -485,13 +492,13 @@ export function ItemsListPage() {
                       type="button"
                       disabled={exportSelectedDisabled}
                       className="w-full rounded-sm px-1.5 py-1 text-left text-sm hover:bg-accent disabled:cursor-not-allowed disabled:opacity-50"
-                      title={exportSelectedDisabled ? "Select one or more rows in the grid first." : undefined}
+                      title={exportSelectedDisabled ? t("doc.list.selectRowsForExport") : undefined}
                       onClick={() => {
                         setExportOpen(false);
                         if (!exportSelectedDisabled) handleExportSelected();
                       }}
                     >
-                      Export selected rows
+                      {t("doc.list.exportSelectedRows")}
                     </button>
                   </div>
                 </PopoverContent>
@@ -505,7 +512,7 @@ export function ItemsListPage() {
             className="rounded-md bg-white text-black hover:bg-gray-200"
             onClick={() => navigate("/items/new")}
           >
-            <span className="create-btn__plus">+</span> Create
+            <span className="create-btn__plus">+</span> {t("doc.list.create")}
           </Button>
         </>
       }

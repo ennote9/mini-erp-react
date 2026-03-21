@@ -5,6 +5,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { useTranslation } from "@/shared/i18n";
 
 export type InventoryMetric = {
   key: string;
@@ -19,6 +20,7 @@ type Props = {
 };
 
 export function InventoryOverviewCard({ title, listPath, metrics }: Props) {
+  const { t } = useTranslation();
   return (
     <Card className="min-w-0 border-border/60 bg-card/40 shadow-none">
       <CardHeader className="space-y-0 p-3 pb-2">
@@ -28,7 +30,7 @@ export function InventoryOverviewCard({ title, listPath, metrics }: Props) {
             to={listPath}
             className="shrink-0 text-[11px] text-muted-foreground hover:text-foreground"
           >
-            Open →
+            {t("dashboard.openArrow")}
           </Link>
         </div>
       </CardHeader>

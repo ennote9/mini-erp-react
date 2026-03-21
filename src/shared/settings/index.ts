@@ -1,4 +1,5 @@
 export type {
+  AppLocaleId,
   AppSettings,
   ProfileOverridesState,
   SettingReadiness,

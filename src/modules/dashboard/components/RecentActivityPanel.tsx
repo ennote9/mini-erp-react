@@ -6,6 +6,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { useTranslation } from "@/shared/i18n";
 import { StatusBadge } from "../../../shared/ui/feedback/StatusBadge";
 import type { FactualDocumentStatus } from "../../../shared/domain";
 
@@ -46,6 +47,7 @@ type ShipmentProps = {
 type Props = ReceiptProps | ShipmentProps;
 
 export function RecentActivityPanel(props: Props) {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const { title, listPath, emptyMessage, rows } = props;
 
@@ -74,11 +76,11 @@ export function RecentActivityPanel(props: Props) {
             <table className="list-table text-sm">
               <thead>
                 <tr>
-                  <th className="list-table__cell--code">Number</th>
-                  <th className="whitespace-nowrap">Date</th>
-                  <th className="min-w-[88px]">Status</th>
-                  <th className="min-w-[100px]">Source</th>
-                  <th className="min-w-[100px]">Warehouse</th>
+                  <th className="list-table__cell--code">{t("dashboard.recent.columns.number")}</th>
+                  <th className="whitespace-nowrap">{t("dashboard.recent.columns.date")}</th>
+                  <th className="min-w-[88px]">{t("dashboard.recent.columns.status")}</th>
+                  <th className="min-w-[100px]">{t("dashboard.recent.columns.source")}</th>
+                  <th className="min-w-[100px]">{t("dashboard.recent.columns.warehouse")}</th>
                 </tr>
               </thead>
               <tbody>
@@ -90,7 +92,7 @@ export function RecentActivityPanel(props: Props) {
                         onClick={() => navigate(`/receipts/${r.id}`)}
                         role="button"
                         tabIndex={0}
-                        aria-label={`Open receipt ${r.number}`}
+                        aria-label={t("dashboard.recent.openReceiptAria", { number: r.number })}
                         onKeyDown={(e) => {
                           if (e.key === "Enter" || e.key === " ") {
                             e.preventDefault();
@@ -106,7 +108,7 @@ export function RecentActivityPanel(props: Props) {
                           <StatusBadge status={r.status} />
                         </td>
                         <td className="truncate max-w-[10rem]" title={r.purchaseOrderNumber}>
-                          PO {r.purchaseOrderNumber}
+                          {t("dashboard.recent.poPrefix")} {r.purchaseOrderNumber}
                         </td>
                         <td className="truncate max-w-[10rem]" title={r.warehouseName}>
                           {r.warehouseName}
@@ -120,7 +122,7 @@ export function RecentActivityPanel(props: Props) {
                         onClick={() => navigate(`/shipments/${s.id}`)}
                         role="button"
                         tabIndex={0}
-                        aria-label={`Open shipment ${s.number}`}
+                        aria-label={t("dashboard.recent.openShipmentAria", { number: s.number })}
                         onKeyDown={(e) => {
                           if (e.key === "Enter" || e.key === " ") {
                             e.preventDefault();
@@ -136,7 +138,7 @@ export function RecentActivityPanel(props: Props) {
                           <StatusBadge status={s.status} />
                         </td>
                         <td className="truncate max-w-[10rem]" title={s.salesOrderNumber}>
-                          SO {s.salesOrderNumber}
+                          {t("dashboard.recent.soPrefix")} {s.salesOrderNumber}
                         </td>
                         <td className="truncate max-w-[10rem]" title={s.warehouseName}>
                           {s.warehouseName}

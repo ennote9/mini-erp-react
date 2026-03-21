@@ -8,7 +8,6 @@ import { SelectField } from "@/components/ui/select-field";
 import { cn } from "@/lib/utils";
 import {
   registryEntriesForSection,
-  SETTINGS_SECTION_META,
   settingsSectionsVisibleForWorkspace,
   useSettings,
   type AppSettings,
@@ -18,6 +17,7 @@ import {
   type SettingsPersistenceState,
 } from "@/shared/settings";
 import { NULL_PROFILE_OVERRIDES, isWorkspaceFeatureVisible } from "@/shared/workspace";
+import { useTranslation, settingRegistryIdToI18nKey, type TFunction } from "@/shared/i18n";
 import { WorkspaceProfileSettingsCard } from "../components/WorkspaceProfileSettingsCard";
 
 function SettingsPersistenceNote({
@@ -25,47 +25,45 @@ function SettingsPersistenceNote({
   persistenceState,
   corruptRestoredOnLoad,
   technicalDetail,
+  t,
 }: {
   hydrated: boolean;
   persistenceState: SettingsPersistenceState;
   corruptRestoredOnLoad: boolean;
   technicalDetail: string | null;
+  t: TFunction;
 }) {
   if (!hydrated) return null;
 
   return (
     <div className="mt-2 space-y-2">
       {persistenceState === "file_persisted" && (
-        <p className="text-[11px] text-muted-foreground">Saved locally (app data folder).</p>
+        <p className="text-[11px] text-muted-foreground">{t("settings.persistence.filePersisted")}</p>
       )}
 
       {persistenceState === "fallback_persisted" && (
         <div className="rounded-md border border-border/80 bg-muted/30 px-2.5 py-2 text-xs leading-snug text-muted-foreground">
-          <p className="font-medium text-foreground/85">Using browser storage</p>
-          <p className="mt-0.5 text-[11px]">
-            App data file isn’t available; settings are stored in browser storage and still apply for this app.
-          </p>
+          <p className="font-medium text-foreground/85">{t("settings.persistence.fallbackTitle")}</p>
+          <p className="mt-0.5 text-[11px]">{t("settings.persistence.fallbackBody")}</p>
         </div>
       )}
 
       {persistenceState === "defaults_only" && (
         <div className="rounded-md border border-destructive/35 bg-destructive/10 px-2.5 py-2 text-xs leading-snug">
-          <p className="font-medium text-foreground">Settings are not being saved</p>
-          <p className="mt-0.5 text-[11px] text-muted-foreground">
-            Changes may be lost when you close the app. Check storage access or permissions.
-          </p>
+          <p className="font-medium text-foreground">{t("settings.persistence.notSavedTitle")}</p>
+          <p className="mt-0.5 text-[11px] text-muted-foreground">{t("settings.persistence.notSavedBody")}</p>
         </div>
       )}
 
       {corruptRestoredOnLoad && (
-        <p className="text-[11px] text-muted-foreground">
-          The previous settings file was invalid and was replaced with defaults.
-        </p>
+        <p className="text-[11px] text-muted-foreground">{t("settings.persistence.corrupt")}</p>
       )}
 
       {technicalDetail && (
         <details className="text-[11px] text-muted-foreground/80">
-          <summary className="cursor-pointer select-none hover:text-muted-foreground">Technical details</summary>
+          <summary className="cursor-pointer select-none hover:text-muted-foreground">
+            {t("settings.persistence.technicalDetails")}
+          </summary>
           <pre className="mt-1 max-h-24 overflow-auto whitespace-pre-wrap break-words font-mono erp-dark-scrollbar">
             {technicalDetail}
           </pre>
@@ -75,15 +73,15 @@ function SettingsPersistenceNote({
   );
 }
 
-function readinessNote(r: SettingReadiness): string | null {
+function readinessNote(r: SettingReadiness, t: TFunction): string | null {
   if (r === "active") return null;
-  if (r === "partial") return "Partial";
-  if (r === "storedOnly") return "Saved only";
-  return "Info";
+  if (r === "partial") return t("readiness.partial");
+  if (r === "storedOnly") return t("readiness.storedOnly");
+  return t("readiness.informational");
 }
 
-function ReadinessBadge({ readiness }: { readiness: SettingReadiness }) {
-  const note = readinessNote(readiness);
+function ReadinessBadge({ readiness, t }: { readiness: SettingReadiness; t: TFunction }) {
+  const note = readinessNote(readiness, t);
   if (!note) return null;
   return (
     <span
@@ -97,10 +95,10 @@ function ReadinessBadge({ readiness }: { readiness: SettingReadiness }) {
       )}
       title={
         readiness === "partial"
-          ? "Works for some paths; see description for limits."
+          ? t("settings.readinessTitle.partial")
           : readiness === "storedOnly"
-            ? "Value is stored but not read by business logic yet."
-            : "Explains current system behavior; not a live toggle."
+            ? t("settings.readinessTitle.storedOnly")
+            : t("settings.readinessTitle.informational")
       }
     >
       {note}
@@ -108,14 +106,14 @@ function ReadinessBadge({ readiness }: { readiness: SettingReadiness }) {
   );
 }
 
-function persistenceStateSummary(state: SettingsPersistenceState): string {
+function persistenceStateSummary(state: SettingsPersistenceState, t: TFunction): string {
   switch (state) {
     case "file_persisted":
-      return "App data file";
+      return t("settings.persistence.summaryFile");
     case "fallback_persisted":
-      return "Browser storage (fallback)";
+      return t("settings.persistence.summaryBrowser");
     case "defaults_only":
-      return "Not saved (this session only)";
+      return t("settings.persistence.summaryNone");
     default: {
       const _x: never = state;
       return _x;
@@ -125,6 +123,8 @@ function persistenceStateSummary(state: SettingsPersistenceState): string {
 
 function getSettingValue(settings: AppSettings, entry: SettingRegistryEntry): unknown {
   switch (entry.id) {
+    case "general.locale":
+      return settings.general.locale;
     case "general.theme":
       return settings.general.theme;
     case "general.dateFormat":
@@ -177,6 +177,7 @@ function getSettingValue(settings: AppSettings, entry: SettingRegistryEntry): un
 }
 
 export function SettingsPage() {
+  const { t } = useTranslation();
   const {
     settings,
     patch,
@@ -264,6 +265,9 @@ export function SettingsPage() {
   const onEnum = useCallback(
     (entry: SettingRegistryEntry, value: string) => {
       switch (entry.id) {
+        case "general.locale":
+          patch({ general: { locale: value as AppSettings["general"]["locale"] } });
+          break;
         case "general.theme":
           patch({ general: { theme: value as AppSettings["general"]["theme"] } });
           break;
@@ -305,30 +309,27 @@ export function SettingsPage() {
     [activeSection, workspaceMode],
   );
 
-  const meta = SETTINGS_SECTION_META[activeSection];
-
   return (
     <div className="settings-page flex min-h-0 flex-1 flex-col gap-4 p-4">
       <div className="shrink-0">
-        <h2 className="text-lg font-semibold tracking-tight text-foreground">Settings</h2>
-        <p className="mt-1 max-w-3xl text-sm text-muted-foreground">
-          Workspace preferences and system rules. Changes apply immediately when persistence is available.
-        </p>
+        <h2 className="text-lg font-semibold tracking-tight text-foreground">{t("settings.page.title")}</h2>
+        <p className="mt-1 max-w-3xl text-sm text-muted-foreground">{t("settings.page.subtitle")}</p>
         {!hydrated && (
-          <p className="mt-2 text-xs text-muted-foreground">Loading saved settings…</p>
+          <p className="mt-2 text-xs text-muted-foreground">{t("settings.page.loading")}</p>
         )}
         <SettingsPersistenceNote
           hydrated={hydrated}
           persistenceState={persistenceState}
           corruptRestoredOnLoad={corruptRestoredOnLoad}
           technicalDetail={persistenceTechnicalDetail}
+          t={t}
         />
       </div>
 
       <div className="flex min-h-0 flex-1 gap-4">
         <nav
           className="settings-page__nav flex w-44 shrink-0 flex-col gap-0.5 border-r border-border pr-3"
-          aria-label="Settings sections"
+          aria-label={t("settings.page.title")}
         >
           {visibleSettingsSections.map((id) => (
             <button
@@ -342,7 +343,7 @@ export function SettingsPage() {
                   : "text-muted-foreground hover:bg-muted/60 hover:text-foreground",
               )}
             >
-              {SETTINGS_SECTION_META[id].title}
+              {t(`settings.sections.${id}.title`)}
             </button>
           ))}
         </nav>
@@ -368,7 +369,7 @@ export function SettingsPage() {
                   className="h-8 text-xs text-muted-foreground"
                   onClick={() => resetSection("workspaceProfile")}
                 >
-                  Reset this section to defaults
+                  {t("settings.page.resetSection")}
                 </Button>
               </div>
             </>
@@ -376,23 +377,26 @@ export function SettingsPage() {
             <>
           <Card className="border-border/80 bg-card/40">
             <CardHeader className="pb-3">
-              <CardTitle className="text-base">{meta.title}</CardTitle>
-              <CardDescription className="text-xs">{meta.description}</CardDescription>
+              <CardTitle className="text-base">{t(`settings.sections.${activeSection}.title`)}</CardTitle>
+              <CardDescription className="text-xs">{t(`settings.sections.${activeSection}.description`)}</CardDescription>
             </CardHeader>
             <CardContent className="space-y-0 divide-y divide-border/80 pb-4">
               {sectionEntries.map((entry) => {
                 const value = getSettingValue(settings, entry);
                 const boolDisabled = entry.readiness === "informational";
+                const i18nKey = settingRegistryIdToI18nKey(entry.id);
+                const entryLabel = t(`settings.entries.${i18nKey}.label`);
+                const entryDescription = t(`settings.entries.${i18nKey}.description`);
 
                 if (entry.valueType === "readonly") {
                   return (
                     <div key={entry.id} className="flex flex-col gap-1 py-3 first:pt-0 sm:flex-row sm:items-start sm:justify-between">
                       <div className="min-w-0 flex-1 space-y-1 pr-4">
                         <div className="flex flex-wrap items-center gap-2">
-                          <Label className="text-sm font-medium text-foreground">{entry.label}</Label>
-                          <ReadinessBadge readiness={entry.readiness} />
+                          <Label className="text-sm font-medium text-foreground">{entryLabel}</Label>
+                          <ReadinessBadge readiness={entry.readiness} t={t} />
                         </div>
-                        <p className="text-xs text-muted-foreground">{entry.description}</p>
+                        <p className="text-xs text-muted-foreground">{entryDescription}</p>
                       </div>
                       <div className="shrink-0 text-xs text-muted-foreground">—</div>
                     </div>
@@ -407,11 +411,11 @@ export function SettingsPage() {
                     <div className="min-w-0 flex-1 space-y-1 pr-4">
                       <div className="flex flex-wrap items-center gap-2">
                         <Label className="text-sm font-medium text-foreground" htmlFor={entry.id}>
-                          {entry.label}
+                          {entryLabel}
                         </Label>
-                        <ReadinessBadge readiness={entry.readiness} />
+                        <ReadinessBadge readiness={entry.readiness} t={t} />
                       </div>
-                      <p className="text-xs text-muted-foreground">{entry.description}</p>
+                      <p className="text-xs text-muted-foreground">{entryDescription}</p>
                     </div>
                     <div className="flex shrink-0 items-center gap-2 sm:justify-end">
                       {entry.valueType === "boolean" && (
@@ -420,7 +424,7 @@ export function SettingsPage() {
                           checked={Boolean(value)}
                           disabled={boolDisabled}
                           onCheckedChange={(c) => onBoolean(entry, c)}
-                          aria-label={entry.label}
+                          aria-label={entryLabel}
                         />
                       )}
                       {entry.valueType === "enum" && entry.options && (
@@ -428,13 +432,16 @@ export function SettingsPage() {
                           id={entry.id}
                           value={String(value ?? "")}
                           onChange={(v) => onEnum(entry, v)}
-                          options={[...entry.options]}
-                          placeholder="Select"
+                          options={entry.options.map((o) => ({
+                            value: o.value,
+                            label: t(`settings.options.${i18nKey}.${o.value}`),
+                          }))}
+                          placeholder={t("common.select")}
                           disabled={
                             entry.readiness === "informational" ||
                             (entry.id === "inventory.allocationMode" && entry.options.length <= 1)
                           }
-                          aria-label={entry.label}
+                          aria-label={entryLabel}
                           className="w-[min(100%,280px)]"
                         />
                       )}
@@ -462,13 +469,13 @@ export function SettingsPage() {
                 hydrated && (
                 <div className="flex flex-col gap-1 border-t border-border/80 py-3 sm:flex-row sm:items-center sm:justify-between">
                   <div className="min-w-0 space-y-1 pr-4">
-                    <Label className="text-sm font-medium text-foreground">Settings persistence</Label>
-                    <p className="text-xs text-muted-foreground">
-                      Where these preferences are stored on this device (same as the status note at the top of this page).
-                    </p>
+                    <Label className="text-sm font-medium text-foreground">
+                      {t("settings.page.persistenceLabel")}
+                    </Label>
+                    <p className="text-xs text-muted-foreground">{t("settings.page.persistenceWhere")}</p>
                   </div>
                   <div className="shrink-0 text-xs font-medium text-foreground/90">
-                    {persistenceStateSummary(persistenceState)}
+                    {persistenceStateSummary(persistenceState, t)}
                   </div>
                 </div>
               )}
@@ -478,8 +485,8 @@ export function SettingsPage() {
                 settings.dataAudit.showAppVersion && (
                 <div className="flex flex-col gap-1 border-t border-border/80 py-3 sm:flex-row sm:items-center sm:justify-between">
                   <div className="min-w-0 space-y-1 pr-4">
-                    <Label className="text-sm font-medium text-foreground">Application</Label>
-                    <p className="text-xs text-muted-foreground">Build mode for this front-end bundle.</p>
+                    <Label className="text-sm font-medium text-foreground">{t("settings.page.buildInfoLabel")}</Label>
+                    <p className="text-xs text-muted-foreground">{t("settings.page.buildInfoDesc")}</p>
                   </div>
                   <div className="shrink-0 font-mono text-xs text-muted-foreground">
                     {import.meta.env.DEV ? "development" : "production"} · vite
@@ -497,7 +504,7 @@ export function SettingsPage() {
               className="h-8"
               onClick={() => resetSection(activeSection)}
             >
-              Reset this section to defaults
+              {t("settings.page.resetSection")}
             </Button>
           </div>
             </>

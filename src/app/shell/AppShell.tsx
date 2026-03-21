@@ -9,12 +9,14 @@ import {
   listPendingPersistenceModules,
   PersistenceFlushError,
 } from "@/shared/persistenceCoordinator";
+import { useTranslation } from "@/shared/i18n";
 
 /**
  * App shell: shadcn Sidebar (left) + main workspace (right).
  * Desktop-first. Page content renders via Outlet.
  */
 export function AppShell() {
+  const { t } = useTranslation();
   const [showSavingOverlay, setShowSavingOverlay] = useState(false);
   const isFlushingRef = useRef(false);
   const closeAfterFlushRef = useRef(false);
@@ -82,7 +84,7 @@ export function AppShell() {
           {showSavingOverlay ? (
             <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/55">
               <div className="rounded-md border border-white/15 bg-card px-4 py-3 text-sm text-card-foreground shadow-lg">
-                Saving data before exit...
+                {t("app.savingBeforeExit")}
               </div>
             </div>
           ) : null}

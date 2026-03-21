@@ -14,7 +14,7 @@ import {
   AgGridContainer,
   agGridDefaultColDef,
   agGridDefaultGridOptions,
-  agGridRowNumberColDef,
+  getAgGridRowNumberColDef,
   agGridSelectionColumnDef,
   hasMeaningfulTextSelection,
 } from "../../../shared/ui/ag-grid";
@@ -32,6 +32,7 @@ import { buildShipmentsListXlsxBuffer, type ShipmentsExportRow } from "../shipme
 import { save } from "@tauri-apps/plugin-dialog";
 import { invoke } from "@tauri-apps/api/core";
 import { revealItemInDir } from "@tauri-apps/plugin-opener";
+import { useTranslation } from "@/shared/i18n/context";
 
 type StatusFilter = "all" | FactualDocumentStatus;
 
@@ -79,6 +80,7 @@ function buildExportRowsFromShipments(rows: RowData[]): ShipmentsExportRow[] {
 
 export function ShipmentsListPage() {
   const navigate = useNavigate();
+  const { t, locale } = useTranslation();
   const [searchParams, setSearchParams] = useSearchParams();
   const warehouseFilterId = useMemo(() => {
     const raw = searchParams.get("warehouseId");
@@ -159,7 +161,7 @@ export function ShipmentsListPage() {
       try {
         const path = await save({
           defaultPath: defaultFilename,
-          filters: [{ name: "Excel", extensions: ["xlsx"] }],
+          filters: [{ name: t("doc.page.excelFilterName"), extensions: ["xlsx"] }],
         });
         if (path == null) return;
 
@@ -186,7 +188,7 @@ export function ShipmentsListPage() {
         URL.revokeObjectURL(url);
       }
     },
-    [],
+    [t],
   );
 
   const handleExportCurrentView = useCallback(() => {
@@ -203,57 +205,60 @@ export function ShipmentsListPage() {
   const exportSelectedDisabled = selectedCount === 0;
 
   const emptyTitle = hasFilter
-    ? "No shipments match current search or filters"
-    : "No shipments yet";
+    ? t("ops.list.shipments.emptyFiltered")
+    : t("ops.list.shipments.emptyDefault");
   const emptyHint = useMemo(() => {
     if (!hasFilter) {
-      return "Shipments are created from confirmed sales orders.";
+      return t("ops.list.shipments.hintCreate");
     }
     if (warehouseFilterId != null && statusFilter === "all" && searchQuery.trim() === "") {
-      return "No shipments for this warehouse. Try clearing the warehouse filter.";
+      return t("ops.list.shipments.hintWarehouseOnly");
     }
-    return "Try changing the search, status filter, or warehouse filter.";
-  }, [hasFilter, warehouseFilterId, statusFilter, searchQuery]);
+    return t("ops.list.shipments.hintSearchStatusWarehouse");
+  }, [hasFilter, warehouseFilterId, statusFilter, searchQuery, t, locale]);
 
-  const statusOptions: { value: StatusFilter; label: string }[] = [
-    { value: "all", label: "All" },
-    { value: "draft", label: "Draft" },
-    { value: "posted", label: "Posted" },
-    { value: "reversed", label: "Reversed" },
-    { value: "cancelled", label: "Cancelled" },
-  ];
+  const statusOptions = useMemo(
+    (): { value: StatusFilter; label: string }[] => [
+      { value: "all", label: t("doc.list.all") },
+      { value: "draft", label: t("status.factual.draft") },
+      { value: "posted", label: t("status.factual.posted") },
+      { value: "reversed", label: t("status.factual.reversed") },
+      { value: "cancelled", label: t("status.factual.cancelled") },
+    ],
+    [t, locale],
+  );
 
   const columnDefs = useMemo<ColDef<RowData>[]>(
     () => [
-      agGridRowNumberColDef,
+      getAgGridRowNumberColDef(t),
       {
         field: "number",
-        headerName: "Number",
+        headerName: t("doc.columns.number"),
         width: 150,
       },
       {
         field: "date",
-        headerName: "Date",
+        headerName: t("doc.columns.date"),
         width: 140,
       },
       {
         field: "salesOrderNumber",
-        headerName: "Sales Order",
+        headerName: t("doc.columns.salesOrder"),
         minWidth: 180,
       },
       {
         field: "warehouseName",
-        headerName: "Warehouse",
+        headerName: t("doc.columns.warehouse"),
         minWidth: 160,
       },
       {
         field: "status",
-        headerName: "Status",
+        headerName: t("doc.columns.status"),
         width: 130,
         cellRenderer: StatusCellRenderer,
       },
     ],
-    [],
+    [t, locale],
   );
 
   return (
@@ -261,8 +266,8 @@ export function ShipmentsListPage() {
       header={null}
       controls={
         <>
-          <BackButton to="/" aria-label="Back to Dashboard" />
-          <ButtonGroup className="list-page__filter-group" aria-label="Filter by status">
+          <BackButton to="/" aria-label={t("doc.list.backToDashboard")} />
+          <ButtonGroup className="list-page__filter-group" aria-label={t("ops.list.filterStatusAria")}>
             {statusOptions.map(({ value, label }, index) => (
               <React.Fragment key={value}>
                 {index > 0 && <ButtonGroupSeparator />}
@@ -279,10 +284,10 @@ export function ShipmentsListPage() {
           </ButtonGroup>
           <ListPageSearch
             inputRef={listSearchInputRef}
-            placeholder="Search"
+            placeholder={t("ops.list.shipments.searchPlaceholder")}
             value={searchQuery}
             onChange={setSearchQuery}
-            aria-label="Search shipments"
+            aria-label={t("ops.list.shipments.searchAria")}
             resultCount={filteredRows.length}
           />
           <div className="flex flex-row items-center gap-2 shrink-0 ml-auto">
@@ -290,9 +295,9 @@ export function ShipmentsListPage() {
               <div
                 className="flex h-8 max-w-[min(100%,18rem)] items-center gap-1.5 rounded-md border border-input bg-background px-2 text-xs shrink-0"
                 role="status"
-                aria-label="Warehouse filter active"
+                aria-label={t("ops.list.shipments.filterWarehouseAria")}
               >
-                <span className="text-muted-foreground whitespace-nowrap shrink-0">Warehouse</span>
+                <span className="text-muted-foreground whitespace-nowrap shrink-0">{t("doc.columns.warehouse")}</span>
                 <span
                   className="truncate font-medium text-foreground/90 min-w-0"
                   title={warehouseFilterLabel}
@@ -306,21 +311,21 @@ export function ShipmentsListPage() {
                   className="h-7 px-1.5 text-xs shrink-0 text-muted-foreground hover:text-foreground"
                   onClick={clearWarehouseFilter}
                 >
-                  Clear
+                  {t("doc.list.clear")}
                 </Button>
               </div>
             )}
             {exportSuccess && (
               <div className="h-8 w-max flex items-center gap-1.5 rounded-md border border-input bg-background px-2 text-sm shrink-0">
-                <span className="text-muted-foreground text-xs">Export completed:</span>
+                <span className="text-muted-foreground text-xs">{t("doc.list.exportCompleted")}</span>
                 <span className="font-medium text-xs truncate max-w-[12rem]" title={exportSuccess.filename}>{exportSuccess.filename}</span>
                 <Button
                   type="button"
                   variant="ghost"
                   size="icon"
                   className="h-7 w-7 shrink-0 text-muted-foreground hover:text-foreground"
-                  title="Open file"
-                  aria-label="Open file"
+                  title={t("doc.list.openFile")}
+                  aria-label={t("doc.list.openFile")}
                   onClick={async () => {
                     try {
                       await invoke("open_export_file", { path: exportSuccess.path });
@@ -338,8 +343,8 @@ export function ShipmentsListPage() {
                   variant="ghost"
                   size="icon"
                   className="h-7 w-7 shrink-0 text-muted-foreground hover:text-foreground"
-                  title="Open folder"
-                  aria-label="Open folder"
+                  title={t("doc.list.openFolder")}
+                  aria-label={t("doc.list.openFolder")}
                   onClick={() => {
                     revealItemInDir(exportSuccess.path);
                     setExportSuccess(null);
@@ -352,8 +357,8 @@ export function ShipmentsListPage() {
                   variant="ghost"
                   size="icon"
                   className="h-6 w-6 shrink-0 text-muted-foreground/80 hover:text-muted-foreground"
-                  title="Dismiss"
-                  aria-label="Dismiss"
+                  title={t("doc.list.dismiss")}
+                  aria-label={t("doc.list.dismiss")}
                   onClick={() => setExportSuccess(null)}
                 >
                   <X className="h-3 w-3" />
@@ -369,7 +374,7 @@ export function ShipmentsListPage() {
                 onClick={handleExportCurrentView}
               >
                 <FileSpreadsheet className="h-4 w-4 shrink-0" />
-                Export
+                {t("doc.list.export")}
               </Button>
               <Popover open={exportOpen} onOpenChange={setExportOpen}>
                 <PopoverTrigger asChild>
@@ -378,7 +383,7 @@ export function ShipmentsListPage() {
                     variant="outline"
                     size="icon"
                     className="h-8 w-8 shrink-0 rounded-l-none border-0 shadow-none"
-                    aria-label="Export options"
+                    aria-label={t("doc.list.exportOptionsAria")}
                   >
                     <ChevronDown className="h-4 w-4" />
                   </Button>
@@ -389,13 +394,13 @@ export function ShipmentsListPage() {
                       type="button"
                       disabled={exportSelectedDisabled}
                       className="w-full rounded-sm px-1.5 py-1 text-left text-sm hover:bg-accent disabled:cursor-not-allowed disabled:opacity-50"
-                      title={exportSelectedDisabled ? "Select one or more rows in the grid first." : undefined}
+                      title={exportSelectedDisabled ? t("doc.list.selectRowsForExport") : undefined}
                       onClick={() => {
                         setExportOpen(false);
                         if (!exportSelectedDisabled) handleExportSelected();
                       }}
                     >
-                      Export selected rows
+                      {t("doc.list.exportSelectedRows")}
                     </button>
                   </div>
                 </PopoverContent>

@@ -27,6 +27,12 @@ import {
   parseExcelLineImport,
   type ExcelImportPreview,
 } from "../../excelLineImport";
+import { useTranslation } from "@/shared/i18n/context";
+import type { TFunction } from "@/shared/i18n/resolve";
+
+function importRowStatusLabel(t: TFunction, status: string): string {
+  return t(`ops.importModal.rowStatus.${status}`);
+}
 
 export type LineImportTab = "paste" | "excel";
 
@@ -54,30 +60,44 @@ type Props = {
   items: Item[];
   getDefaultUnitPrice: (item: Item) => number;
   templateFileName?: string;
+  /** Localized name shown after download; file on disk remains `templateFileName`. */
+  templateDisplayLabel?: string;
   onOpenChange: (open: boolean) => void;
   onApply: (payload: ApplyPayload) => void;
 };
 
 function PasteSummary({ preview }: { preview: BatchPastePreview }) {
+  const { t } = useTranslation();
   return (
     <div>
-      Rows: {preview.totalLines} | Valid: {preview.validMatchCount} | Inactive:{" "}
-      {preview.inactiveCount} | Not found: {preview.notFoundCount} | Invalid qty:{" "}
-      {preview.invalidQuantityCount} | Invalid format: {preview.invalidFormatCount} |
-      Header skipped: {preview.headerSkippedCount} | Duplicates merged:{" "}
-      {preview.mergedDuplicateCount} | Extra columns ignored:{" "}
-      {preview.extraColumnsIgnoredCount}
+      {t("ops.importModal.summaryPaste", {
+        total: preview.totalLines,
+        valid: preview.validMatchCount,
+        inactive: preview.inactiveCount,
+        notFound: preview.notFoundCount,
+        badQty: preview.invalidQuantityCount,
+        badFmt: preview.invalidFormatCount,
+        headerSkipped: preview.headerSkippedCount,
+        merged: preview.mergedDuplicateCount,
+        extraCols: preview.extraColumnsIgnoredCount,
+      })}
     </div>
   );
 }
 
 function ExcelSummary({ preview }: { preview: ExcelImportPreview }) {
+  const { t } = useTranslation();
   return (
     <div>
-      Rows: {preview.totalRowsRead} | Valid: {preview.validRows} | Inactive:{" "}
-      {preview.inactiveRows} | Not found: {preview.notFoundRows} | Invalid qty:{" "}
-      {preview.invalidQuantityRows} | Invalid format: {preview.invalidFormatRows} |
-      Duplicates merged: {preview.mergedDuplicates}
+      {t("ops.importModal.summaryExcel", {
+        total: preview.totalRowsRead,
+        valid: preview.validRows,
+        inactive: preview.inactiveRows,
+        notFound: preview.notFoundRows,
+        badQty: preview.invalidQuantityRows,
+        badFmt: preview.invalidFormatRows,
+        merged: preview.mergedDuplicates,
+      })}
     </div>
   );
 }
@@ -89,10 +109,13 @@ export function DocumentLineImportModal(props: Props) {
     items,
     getDefaultUnitPrice,
     templateFileName = "line-import-template.xlsx",
+    templateDisplayLabel,
     onOpenChange,
     onApply,
   } = props;
 
+  const { t } = useTranslation();
+  const emDash = t("domain.audit.summary.emDash");
   const [activeTab, setActiveTab] = useState<LineImportTab>(initialTab);
   const [pasteInput, setPasteInput] = useState("");
   const [pastePreview, setPastePreview] = useState<BatchPastePreview | null>(null);
@@ -154,7 +177,7 @@ export function DocumentLineImportModal(props: Props) {
     try {
       const path = await save({
         defaultPath: defaultFilename,
-        filters: [{ name: "Excel", extensions: ["xlsx"] }],
+        filters: [{ name: t("ops.importModal.excelFileFilterName"), extensions: ["xlsx"] }],
       });
       if (path == null) return;
 
@@ -219,7 +242,7 @@ export function DocumentLineImportModal(props: Props) {
       setExcelPreviewFilter("all");
     } catch (e) {
       if (modalSessionRef.current !== sessionAtStart) return;
-      setFileErrorMessage(e instanceof Error ? e.message : "Failed to parse Excel file.");
+      setFileErrorMessage(e instanceof Error ? e.message : t("ops.importModal.parseError"));
     } finally {
       if (modalSessionRef.current === sessionAtStart) {
         setIsImportingExcel(false);
@@ -342,11 +365,9 @@ export function DocumentLineImportModal(props: Props) {
         <div className="flex items-start justify-between border-b border-border px-4 py-3">
           <div>
             <h3 id="line-import-title" className="text-sm font-semibold">
-              Add lines
+              {t("ops.importModal.title")}
             </h3>
-            <p className="text-xs text-muted-foreground">
-              Paste item codes/barcodes or import an Excel file. Review the preview before adding lines.
-            </p>
+            <p className="text-xs text-muted-foreground">{t("ops.importModal.subtitle")}</p>
           </div>
         </div>
 
@@ -359,7 +380,7 @@ export function DocumentLineImportModal(props: Props) {
               onClick={() => setActiveTab("paste")}
             >
               <ClipboardPaste className="h-4 w-4 shrink-0" aria-hidden />
-              Paste
+              {t("ops.importModal.tabPaste")}
             </Button>
             <Button
               type="button"
@@ -368,32 +389,30 @@ export function DocumentLineImportModal(props: Props) {
               onClick={() => setActiveTab("excel")}
             >
               <FileSpreadsheet className="h-4 w-4 shrink-0" aria-hidden />
-              Excel
+              {t("ops.importModal.tabExcel")}
             </Button>
           </div>
 
           {activeTab === "paste" ? (
             <div className="space-y-1.5">
               <Label htmlFor="line-import-paste" className="text-sm">
-                Paste one item code/barcode per line, or code/barcode + qty
+                {t("ops.importModal.pasteLabel")}
               </Label>
               <Textarea
                 id="line-import-paste"
                 value={pasteInput}
                 onChange={(e) => setPasteInput(e.target.value)}
-                placeholder={"ITEM-001\nITEM-002 2\n1234567890123\t3"}
+                placeholder={t("ops.importModal.pastePlaceholder")}
                 className="min-h-[120px] font-mono text-xs"
               />
               <Button type="button" size="sm" variant="outline" onClick={handlePreviewPaste}>
                 <Eye className="h-4 w-4 shrink-0" aria-hidden />
-                Preview
+                {t("ops.importModal.preview")}
               </Button>
             </div>
           ) : (
             <div className="space-y-1.5">
-              <p className="text-xs text-muted-foreground">
-                Expected columns: Item Code or Barcode, Qty, optional Unit Price.
-              </p>
+              <p className="text-xs text-muted-foreground">{t("ops.importModal.excelHint")}</p>
               <div className="flex items-center gap-1.5">
                 <Button
                   type="button"
@@ -403,11 +422,11 @@ export function DocumentLineImportModal(props: Props) {
                   disabled={isImportingExcel}
                 >
                   <FolderOpen className="h-4 w-4 shrink-0" aria-hidden />
-                  {isImportingExcel ? "Parsing..." : "Choose .xlsx file"}
+                  {isImportingExcel ? t("ops.importModal.parsing") : t("ops.importModal.chooseXlsx")}
                 </Button>
                 <Button type="button" size="sm" variant="outline" onClick={handleDownloadTemplate}>
                   <Download className="h-4 w-4 shrink-0" aria-hidden />
-                  Download template
+                  {t("ops.importModal.downloadTemplate")}
                 </Button>
                 {importFileName ? (
                   <span className="max-w-[420px] truncate text-xs text-muted-foreground">
@@ -421,13 +440,13 @@ export function DocumentLineImportModal(props: Props) {
                     <div className="min-w-0">
                       <div className="flex items-center gap-1.5 text-emerald-300">
                         <CircleCheck className="h-3.5 w-3.5 shrink-0" aria-hidden />
-                        <span className="font-medium">Template downloaded</span>
+                        <span className="font-medium">{t("ops.importModal.templateDownloaded")}</span>
                       </div>
                       <div
                         className="truncate text-muted-foreground"
                         title={templateDownloadResult.filename}
                       >
-                        {templateDownloadResult.filename}
+                        {templateDisplayLabel ?? templateDownloadResult.filename}
                       </div>
                     </div>
                     <div className="flex items-center gap-1">
@@ -443,7 +462,7 @@ export function DocumentLineImportModal(props: Props) {
                             }}
                           >
                             <File className="h-3.5 w-3.5 shrink-0" aria-hidden />
-                            Open file
+                            {t("ops.importModal.openFile")}
                           </Button>
                           <Button
                             type="button"
@@ -453,7 +472,7 @@ export function DocumentLineImportModal(props: Props) {
                             onClick={handleOpenTemplateFolder}
                           >
                             <FolderOpen className="h-3.5 w-3.5 shrink-0" aria-hidden />
-                            Open folder
+                            {t("ops.importModal.openFolder")}
                           </Button>
                         </>
                       ) : null}
@@ -464,7 +483,7 @@ export function DocumentLineImportModal(props: Props) {
                         className="h-7 px-2 text-xs"
                         onClick={() => setTemplateDownloadResult(null)}
                       >
-                        Dismiss
+                        {t("ops.importModal.dismiss")}
                       </Button>
                     </div>
                   </div>
@@ -500,7 +519,7 @@ export function DocumentLineImportModal(props: Props) {
                   className="h-7 px-2 text-xs"
                   onClick={() => setPastePreviewFilter("all")}
                 >
-                  All ({pastePreview.rows.length})
+                  {t("ops.importModal.filterAll", { count: pastePreview.rows.length })}
                 </Button>
                 <Button
                   type="button"
@@ -509,7 +528,7 @@ export function DocumentLineImportModal(props: Props) {
                   className="h-7 px-2 text-xs"
                   onClick={() => setPastePreviewFilter("errors")}
                 >
-                  Errors ({pasteErrorCount})
+                  {t("ops.importModal.filterErrors", { count: pasteErrorCount })}
                 </Button>
                 <Button
                   type="button"
@@ -518,24 +537,26 @@ export function DocumentLineImportModal(props: Props) {
                   className="h-7 px-2 text-xs"
                   onClick={() => setPastePreviewFilter("valid")}
                 >
-                  Valid ({pasteValidCount})
+                  {t("ops.importModal.filterValid", { count: pasteValidCount })}
                 </Button>
               </div>
               <div className="max-h-64 overflow-auto rounded border border-border/50">
                 {filteredPasteRows.length === 0 ? (
                   <div className="px-2 py-3 text-xs text-muted-foreground">
-                    {pastePreviewFilter === "errors" ? "No error rows." : "No valid rows."}
+                    {pastePreviewFilter === "errors"
+                      ? t("ops.importModal.noErrorRows")
+                      : t("ops.importModal.noValidRows")}
                   </div>
                 ) : (
                   <table className="w-full text-xs">
                     <thead className="sticky top-0 bg-card/95">
                       <tr className="border-b border-border/50 text-left">
-                        <th className="px-2 py-1">Row</th>
-                        <th className="px-2 py-1">Input</th>
-                        <th className="px-2 py-1">Resolved item</th>
-                        <th className="px-2 py-1">Qty</th>
-                        <th className="px-2 py-1">Status</th>
-                        <th className="px-2 py-1">Reason</th>
+                        <th className="px-2 py-1">{t("doc.columns.row")}</th>
+                        <th className="px-2 py-1">{t("doc.columns.input")}</th>
+                        <th className="px-2 py-1">{t("doc.columns.resolvedItem")}</th>
+                        <th className="px-2 py-1">{t("doc.columns.qty")}</th>
+                        <th className="px-2 py-1">{t("doc.columns.status")}</th>
+                        <th className="px-2 py-1">{t("doc.columns.reason")}</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -544,11 +565,13 @@ export function DocumentLineImportModal(props: Props) {
                           <td className="px-2 py-1">{rowNumber}</td>
                           <td className="px-2 py-1 font-mono">{row.token}</td>
                           <td className="px-2 py-1">
-                            {row.itemCode ? `${row.itemCode} - ${row.itemName ?? ""}` : "—"}
+                            {row.itemCode
+                              ? `${row.itemCode} — ${row.itemName ?? ""}`
+                              : emDash}
                           </td>
-                          <td className="px-2 py-1">{row.qty ?? "—"}</td>
-                          <td className="px-2 py-1">{row.status}</td>
-                          <td className="px-2 py-1">{row.note ?? "—"}</td>
+                          <td className="px-2 py-1">{row.qty ?? emDash}</td>
+                          <td className="px-2 py-1">{importRowStatusLabel(t, row.status)}</td>
+                          <td className="px-2 py-1">{row.note ?? emDash}</td>
                         </tr>
                       ))}
                     </tbody>
@@ -569,7 +592,7 @@ export function DocumentLineImportModal(props: Props) {
                   className="h-7 px-2 text-xs"
                   onClick={() => setExcelPreviewFilter("all")}
                 >
-                  All ({excelPreview.rows.length})
+                  {t("ops.importModal.filterAll", { count: excelPreview.rows.length })}
                 </Button>
                 <Button
                   type="button"
@@ -578,7 +601,7 @@ export function DocumentLineImportModal(props: Props) {
                   className="h-7 px-2 text-xs"
                   onClick={() => setExcelPreviewFilter("errors")}
                 >
-                  Errors ({excelErrorCount})
+                  {t("ops.importModal.filterErrors", { count: excelErrorCount })}
                 </Button>
                 <Button
                   type="button"
@@ -587,25 +610,27 @@ export function DocumentLineImportModal(props: Props) {
                   className="h-7 px-2 text-xs"
                   onClick={() => setExcelPreviewFilter("valid")}
                 >
-                  Valid ({excelValidCount})
+                  {t("ops.importModal.filterValid", { count: excelValidCount })}
                 </Button>
               </div>
               <div className="max-h-64 overflow-auto rounded border border-border/50">
                 {filteredExcelRows.length === 0 ? (
                   <div className="px-2 py-3 text-xs text-muted-foreground">
-                    {excelPreviewFilter === "errors" ? "No error rows." : "No valid rows."}
+                    {excelPreviewFilter === "errors"
+                      ? t("ops.importModal.noErrorRows")
+                      : t("ops.importModal.noValidRows")}
                   </div>
                 ) : (
                   <table className="w-full text-xs">
                     <thead className="sticky top-0 bg-card/95">
                       <tr className="border-b border-border/50 text-left">
-                        <th className="px-2 py-1">Row</th>
-                        <th className="px-2 py-1">Input</th>
-                        <th className="px-2 py-1">Resolved item</th>
-                        <th className="px-2 py-1">Qty</th>
-                        <th className="px-2 py-1">Unit price</th>
-                        <th className="px-2 py-1">Status</th>
-                        <th className="px-2 py-1">Reason</th>
+                        <th className="px-2 py-1">{t("doc.columns.row")}</th>
+                        <th className="px-2 py-1">{t("doc.columns.input")}</th>
+                        <th className="px-2 py-1">{t("doc.columns.resolvedItem")}</th>
+                        <th className="px-2 py-1">{t("doc.columns.qty")}</th>
+                        <th className="px-2 py-1">{t("doc.columns.unitPrice")}</th>
+                        <th className="px-2 py-1">{t("doc.columns.status")}</th>
+                        <th className="px-2 py-1">{t("doc.columns.reason")}</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -615,14 +640,16 @@ export function DocumentLineImportModal(props: Props) {
                           className="border-b border-border/30"
                         >
                           <td className="px-2 py-1">{row.rowNumber}</td>
-                          <td className="px-2 py-1 font-mono">{row.sourceValue || "—"}</td>
+                          <td className="px-2 py-1 font-mono">{row.sourceValue || emDash}</td>
                           <td className="px-2 py-1">
-                            {row.itemCode ? `${row.itemCode} - ${row.itemName ?? ""}` : "—"}
+                            {row.itemCode
+                              ? `${row.itemCode} — ${row.itemName ?? ""}`
+                              : emDash}
                           </td>
-                          <td className="px-2 py-1">{row.qty ?? "—"}</td>
-                          <td className="px-2 py-1">{row.unitPrice ?? "—"}</td>
-                          <td className="px-2 py-1">{row.status}</td>
-                          <td className="px-2 py-1">{row.reason ?? "—"}</td>
+                          <td className="px-2 py-1">{row.qty ?? emDash}</td>
+                          <td className="px-2 py-1">{row.unitPrice ?? emDash}</td>
+                          <td className="px-2 py-1">{importRowStatusLabel(t, row.status)}</td>
+                          <td className="px-2 py-1">{row.reason ?? emDash}</td>
                         </tr>
                       ))}
                     </tbody>
@@ -636,16 +663,16 @@ export function DocumentLineImportModal(props: Props) {
         <div className="flex items-center justify-end gap-1.5 border-t border-border px-4 py-3">
           <Button type="button" variant="outline" onClick={close}>
             <X className="h-4 w-4 shrink-0" aria-hidden />
-            Cancel
+            {t("common.cancel")}
           </Button>
           <Button
             type="button"
             onClick={handleAddAllValid}
             disabled={currentValidLineCount <= 0}
-            title="Add all valid lines (Ctrl/Cmd+Enter)"
+            title={t("ops.importModal.addAllValidTitle")}
           >
             <Check className="h-4 w-4 shrink-0" aria-hidden />
-            Add all valid lines
+            {t("ops.importModal.addAllValid")}
           </Button>
         </div>
       </div>

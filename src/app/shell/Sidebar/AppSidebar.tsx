@@ -30,46 +30,48 @@ import {
   SidebarMenuItem,
 } from "@/components/ui/sidebar";
 import { useSettings } from "@/shared/settings";
-import { getEffectiveWorkspaceFeatureEnabled, WORKSPACE_MODE_OPTIONS } from "@/shared/workspace";
+import { useTranslation } from "@/shared/i18n";
+import { getEffectiveWorkspaceFeatureEnabled } from "@/shared/workspace";
+import type { WorkspaceModeId } from "@/shared/settings";
 
 type NavLinkItem = {
-  label: string;
+  labelKey: string;
   to: string;
   icon: ComponentType<{ className?: string }>;
   feature?: "navBrandsCategories" | "navStockMovements";
 };
 
-const nav: ReadonlyArray<{ label: string; links: readonly NavLinkItem[] }> = [
+const nav: ReadonlyArray<{ groupKey: string; links: readonly NavLinkItem[] }> = [
   {
-    label: "Master Data",
+    groupKey: "shell.masterData",
     links: [
-      { label: "Items", to: "/items", icon: Package },
-      { label: "Brands", to: "/brands", icon: Tag, feature: "navBrandsCategories" as const },
-      { label: "Categories", to: "/categories", icon: FolderOpen, feature: "navBrandsCategories" as const },
-      { label: "Suppliers", to: "/suppliers", icon: Truck },
-      { label: "Customers", to: "/customers", icon: Users },
-      { label: "Warehouses", to: "/warehouses", icon: Warehouse },
+      { labelKey: "shell.nav.items", to: "/items", icon: Package },
+      { labelKey: "shell.nav.brands", to: "/brands", icon: Tag, feature: "navBrandsCategories" as const },
+      { labelKey: "shell.nav.categories", to: "/categories", icon: FolderOpen, feature: "navBrandsCategories" as const },
+      { labelKey: "shell.nav.suppliers", to: "/suppliers", icon: Truck },
+      { labelKey: "shell.nav.customers", to: "/customers", icon: Users },
+      { labelKey: "shell.nav.warehouses", to: "/warehouses", icon: Warehouse },
     ],
   },
   {
-    label: "Purchasing",
+    groupKey: "shell.purchasing",
     links: [
-      { label: "Purchase Orders", to: "/purchase-orders", icon: ShoppingCart },
-      { label: "Receipts", to: "/receipts", icon: Receipt },
+      { labelKey: "shell.nav.purchaseOrders", to: "/purchase-orders", icon: ShoppingCart },
+      { labelKey: "shell.nav.receipts", to: "/receipts", icon: Receipt },
     ],
   },
   {
-    label: "Sales",
+    groupKey: "shell.sales",
     links: [
-      { label: "Sales Orders", to: "/sales-orders", icon: ShoppingBag },
-      { label: "Shipments", to: "/shipments", icon: PackageCheck },
+      { labelKey: "shell.nav.salesOrders", to: "/sales-orders", icon: ShoppingBag },
+      { labelKey: "shell.nav.shipments", to: "/shipments", icon: PackageCheck },
     ],
   },
   {
-    label: "Inventory",
+    groupKey: "shell.inventory",
     links: [
-      { label: "Stock Balances", to: "/stock-balances", icon: Scale },
-      { label: "Stock Movements", to: "/stock-movements", icon: ArrowLeftRight, feature: "navStockMovements" },
+      { labelKey: "shell.nav.stockBalances", to: "/stock-balances", icon: Scale },
+      { labelKey: "shell.nav.stockMovements", to: "/stock-movements", icon: ArrowLeftRight, feature: "navStockMovements" },
     ],
   },
 ];
@@ -105,11 +107,16 @@ function SidebarNavLink({
  * App sidebar using shadcn Sidebar primitives. Refined to match official docs:
  * workspace-style header, nav with icons, footer block, inset-ready shell.
  */
+function workspaceModeLabel(t: (k: string) => string, mode: WorkspaceModeId): string {
+  return t(`workspace.mode.${mode}.label`);
+}
+
 export function AppSidebar() {
+  const { t } = useTranslation();
   const { settings } = useSettings();
   const mode = settings.general.workspaceMode;
   const overrides = settings.general.profileOverrides;
-  const modeLabel = WORKSPACE_MODE_OPTIONS.find((o) => o.value === mode)?.label ?? mode;
+  const modeLabel = workspaceModeLabel(t, mode);
 
   return (
     <Sidebar collapsible="none" variant="inset">
@@ -124,9 +131,14 @@ export function AppSidebar() {
                 <LayoutDashboard className="size-4" />
               </div>
               <div className="grid min-w-0 flex-1 gap-0.5 text-left">
-                <span className="truncate text-sm font-semibold leading-tight text-sidebar-foreground">Mini ERP</span>
-                <span className="truncate text-xs leading-tight text-sidebar-foreground/70" title="Current workspace complexity profile">
-                  {modeLabel} workspace
+                <span className="truncate text-sm font-semibold leading-tight text-sidebar-foreground">
+                  {t("app.name")}
+                </span>
+                <span
+                  className="truncate text-xs leading-tight text-sidebar-foreground/70"
+                  title={t("workspace.mode.advanced.hint")}
+                >
+                  {modeLabel} {t("shell.workspaceSuffix")}
                 </span>
               </div>
             </SidebarMenuButton>
@@ -135,16 +147,16 @@ export function AppSidebar() {
       </SidebarHeader>
       <SidebarContent>
         <SidebarGroup>
-          <SidebarGroupLabel>Dashboard</SidebarGroupLabel>
+          <SidebarGroupLabel>{t("shell.dashboard")}</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
               <SidebarMenuItem>
-                <SidebarNavLink to="/" label="Dashboard" end icon={LayoutDashboard} />
+                <SidebarNavLink to="/" label={t("shell.dashboard")} end icon={LayoutDashboard} />
               </SidebarMenuItem>
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
-        {nav.filter((x) => "links" in x).map((group) => {
+        {nav.map((group) => {
           const links = group.links.filter((link) => {
             if (link.feature === "navBrandsCategories")
               return getEffectiveWorkspaceFeatureEnabled(mode, overrides, "navBrandsCategories");
@@ -154,13 +166,13 @@ export function AppSidebar() {
           });
           if (links.length === 0) return null;
           return (
-            <SidebarGroup key={group.label}>
-              <SidebarGroupLabel>{group.label}</SidebarGroupLabel>
+            <SidebarGroup key={group.groupKey}>
+              <SidebarGroupLabel>{t(group.groupKey)}</SidebarGroupLabel>
               <SidebarGroupContent>
                 <SidebarMenu>
                   {links.map((link) => (
                     <SidebarMenuItem key={link.to}>
-                      <SidebarNavLink to={link.to} label={link.label} icon={link.icon} />
+                      <SidebarNavLink to={link.to} label={t(link.labelKey)} icon={link.icon} />
                     </SidebarMenuItem>
                   ))}
                 </SidebarMenu>
@@ -183,8 +195,12 @@ export function AppSidebar() {
                 <User className="size-4" />
               </div>
               <div className="grid min-w-0 flex-1 gap-0.5 text-left">
-                <span className="truncate text-sm font-medium leading-tight text-sidebar-foreground">Account</span>
-                <span className="truncate text-xs leading-tight text-sidebar-foreground/60">Signed in</span>
+                <span className="truncate text-sm font-medium leading-tight text-sidebar-foreground">
+                  {t("shell.account")}
+                </span>
+                <span className="truncate text-xs leading-tight text-sidebar-foreground/60">
+                  {t("shell.signedIn")}
+                </span>
               </div>
             </SidebarMenuButton>
           </SidebarMenuItem>

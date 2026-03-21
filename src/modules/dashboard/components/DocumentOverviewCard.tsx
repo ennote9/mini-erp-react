@@ -5,6 +5,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { useTranslation } from "@/shared/i18n";
 
 export type DocumentStatChip = {
   key: string;
@@ -23,6 +24,7 @@ type Props = {
  * Compact document-family overview: total + status breakdown chips.
  */
 export function DocumentOverviewCard({ title, listPath, total, stats }: Props) {
+  const { t } = useTranslation();
   return (
     <Card className="min-w-0 border-border/60 bg-card/40 shadow-none">
       <CardHeader className="flex flex-row items-start justify-between gap-2 space-y-0 p-3 pb-2">
@@ -32,7 +34,7 @@ export function DocumentOverviewCard({ title, listPath, total, stats }: Props) {
             to={listPath}
             className="mt-1 inline-block text-[11px] text-muted-foreground hover:text-foreground"
           >
-            Open list →
+            {t("dashboard.openList")}
           </Link>
         </div>
         <div className="shrink-0 text-right">
@@ -40,7 +42,7 @@ export function DocumentOverviewCard({ title, listPath, total, stats }: Props) {
             {total}
           </div>
           <div className="mt-0.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
-            Total
+            {t("dashboard.totalLabel")}
           </div>
         </div>
       </CardHeader>

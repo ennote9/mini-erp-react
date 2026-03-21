@@ -33,9 +33,9 @@ import {
   buildOutgoingRemainingByWarehouseItem,
   buildIncomingRemainingByWarehouseItem,
   computeOperationalFieldsForBalance,
-  STOCK_BALANCE_COVERAGE_LABELS,
   type StockBalanceCoverageStatus,
 } from "../../../shared/stockBalancesOperationalMetrics";
+import { useTranslation } from "@/shared/i18n/context";
 import { save } from "@tauri-apps/plugin-dialog";
 import { invoke } from "@tauri-apps/api/core";
 import { revealItemInDir } from "@tauri-apps/plugin-opener";
@@ -65,35 +65,11 @@ type StockBalanceQuickFilter =
   | "needs_replenishment"
   | "coverage_at_risk";
 
-const QUICK_FILTER_OPTIONS: Array<{
-  value: StockBalanceQuickFilter;
-  label: string;
-  /** Full phrase for aria-label / title */
-  aria: string;
-}> = [
-  { value: "all", label: "All", aria: "Show all rows" },
-  { value: "shortage", label: "Shortage", aria: "Show rows with deficit greater than zero" },
-  { value: "outgoing", label: "Has outgoing", aria: "Show rows with outgoing demand" },
-  { value: "incoming", label: "Has incoming", aria: "Show rows with incoming supply" },
-  {
-    value: "avail_lte_zero",
-    label: "Avail ≤ 0",
-    aria: "Show rows where available quantity is zero or negative",
-  },
-  {
-    value: "needs_replenishment",
-    label: "Need repl.",
-    aria: "Show rows with net shortage greater than zero (uncovered demand after incoming)",
-  },
-  {
-    value: "coverage_at_risk",
-    label: "At risk",
-    aria:
-      "Show rows where outgoing exceeds available but expected incoming covers the gap (covered by incoming, net shortage zero)",
-  },
-];
-
-function filterBySearch(rows: RowData[], query: string): RowData[] {
+function filterBySearch(
+  rows: RowData[],
+  query: string,
+  coverageLabel: (s: StockBalanceCoverageStatus) => string,
+): RowData[] {
   const q = query.trim().toLowerCase();
   if (!q) return rows;
   return rows.filter(
@@ -101,7 +77,7 @@ function filterBySearch(rows: RowData[], query: string): RowData[] {
       r.itemCode.toLowerCase().includes(q) ||
       r.itemName.toLowerCase().includes(q) ||
       r.warehouseName.toLowerCase().includes(q) ||
-      STOCK_BALANCE_COVERAGE_LABELS[r.coverageStatus].toLowerCase().includes(q),
+      coverageLabel(r.coverageStatus).toLowerCase().includes(q),
   );
 }
 
@@ -125,7 +101,10 @@ function filterByQuickFilter(rows: RowData[], f: StockBalanceQuickFilter): RowDa
   return rows;
 }
 
-function buildExportRowsFromBalances(rows: RowData[]): StockBalancesExportRow[] {
+function buildExportRowsFromBalances(
+  rows: RowData[],
+  coverageLabel: (s: StockBalanceCoverageStatus) => string,
+): StockBalancesExportRow[] {
   return rows.map((r, idx) => ({
     no: idx + 1,
     itemCode: r.itemCode,
@@ -138,12 +117,55 @@ function buildExportRowsFromBalances(rows: RowData[]): StockBalancesExportRow[] 
     incomingQty: r.incomingQty,
     deficitQty: r.deficitQty,
     netShortageQty: r.netShortageQty,
-    coverage: STOCK_BALANCE_COVERAGE_LABELS[r.coverageStatus],
+    coverage: coverageLabel(r.coverageStatus),
   }));
 }
 
 export function StockBalancesListPage() {
+  const { t, locale } = useTranslation();
   const { settings } = useSettings();
+
+  const coverageLabel = useCallback(
+    (s: StockBalanceCoverageStatus) => t(`ops.stock.coverage.${s}`),
+    [t],
+  );
+
+  const quickFilterOptions = useMemo(
+    (): Array<{ value: StockBalanceQuickFilter; label: string; aria: string }> => [
+      { value: "all", label: t("ops.stockBalances.quick.all.label"), aria: t("ops.stockBalances.quick.all.aria") },
+      {
+        value: "shortage",
+        label: t("ops.stockBalances.quick.shortage.label"),
+        aria: t("ops.stockBalances.quick.shortage.aria"),
+      },
+      {
+        value: "outgoing",
+        label: t("ops.stockBalances.quick.outgoing.label"),
+        aria: t("ops.stockBalances.quick.outgoing.aria"),
+      },
+      {
+        value: "incoming",
+        label: t("ops.stockBalances.quick.incoming.label"),
+        aria: t("ops.stockBalances.quick.incoming.aria"),
+      },
+      {
+        value: "avail_lte_zero",
+        label: t("ops.stockBalances.quick.avail_lte_zero.label"),
+        aria: t("ops.stockBalances.quick.avail_lte_zero.aria"),
+      },
+      {
+        value: "needs_replenishment",
+        label: t("ops.stockBalances.quick.needs_replenishment.label"),
+        aria: t("ops.stockBalances.quick.needs_replenishment.aria"),
+      },
+      {
+        value: "coverage_at_risk",
+        label: t("ops.stockBalances.quick.coverage_at_risk.label"),
+        aria: t("ops.stockBalances.quick.coverage_at_risk.aria"),
+      },
+    ],
+    [t, locale],
+  );
   const workspaceMode = settings.general.workspaceMode;
   const profileOverrides = settings.general.profileOverrides;
   const showOperationalGrid = getEffectiveWorkspaceFeatureEnabled(
@@ -254,9 +276,9 @@ export function StockBalancesListPage() {
   }, [rowsAfterWarehouse]);
 
   const filteredRows = useMemo(() => {
-    const bySearch = filterBySearch(rowsAfterWarehouse, searchQuery);
+    const bySearch = filterBySearch(rowsAfterWarehouse, searchQuery, coverageLabel);
     return filterByQuickFilter(bySearch, quickFilter);
-  }, [rowsAfterWarehouse, searchQuery, quickFilter]);
+  }, [rowsAfterWarehouse, searchQuery, quickFilter, coverageLabel]);
 
   const isEmpty = filteredRows.length === 0;
 
@@ -302,26 +324,26 @@ export function StockBalancesListPage() {
 
   const getExportRowsCurrentView = useCallback((): StockBalancesExportRow[] => {
     const api = gridRef.current?.api;
-    if (!api) return buildExportRowsFromBalances(filteredRows);
+    if (!api) return buildExportRowsFromBalances(filteredRows, coverageLabel);
     const rows: RowData[] = [];
     api.forEachNodeAfterFilterAndSort((rowNode) => {
       if (rowNode.data) rows.push(rowNode.data);
     });
-    return buildExportRowsFromBalances(rows);
-  }, [filteredRows]);
+    return buildExportRowsFromBalances(rows, coverageLabel);
+  }, [filteredRows, coverageLabel]);
 
   const getExportRowsSelected = useCallback((): StockBalancesExportRow[] => {
     const api = gridRef.current?.api;
     const rows: RowData[] = api ? (api.getSelectedRows() as RowData[]) : [];
-    return buildExportRowsFromBalances(rows);
-  }, []);
+    return buildExportRowsFromBalances(rows, coverageLabel);
+  }, [coverageLabel]);
 
   const runExportWithSaveAs = useCallback(
     async (defaultFilename: string, buildBuffer: () => Promise<ArrayBuffer>) => {
       try {
         const path = await save({
           defaultPath: defaultFilename,
-          filters: [{ name: "Excel", extensions: ["xlsx"] }],
+          filters: [{ name: t("ops.importModal.excelFileFilterName"), extensions: ["xlsx"] }],
         });
         if (path == null) return;
 
@@ -348,7 +370,7 @@ export function StockBalancesListPage() {
         URL.revokeObjectURL(url);
       }
     },
-    [],
+    [t],
   );
 
   const handleExportCurrentView = useCallback(() => {
@@ -365,20 +387,20 @@ export function StockBalancesListPage() {
   const exportSelectedDisabled = selectedCount === 0;
 
   const emptyTitle = hasFilter
-    ? "No stock balances match current search or filters"
-    : "No stock balances yet";
+    ? t("ops.stockBalances.empty.titleFiltered")
+    : t("ops.stockBalances.empty.titleDefault");
   const emptyHint = useMemo(() => {
     if (!hasFilter) {
-      return "Balances will appear after posting receipts and shipments.";
+      return t("ops.stockBalances.empty.hintPosted");
     }
     if (quickFilter !== "all" && searchQuery.trim() === "" && warehouseFilterId == null) {
-      return "No rows match this quick filter. Try All or another filter.";
+      return t("ops.stockBalances.empty.hintQuickOnly");
     }
     if (warehouseFilterId != null && searchQuery.trim() === "" && quickFilter === "all") {
-      return "No stock balances for this warehouse. Try clearing the warehouse filter.";
+      return t("ops.stockBalances.empty.hintWarehouseOnly");
     }
-    return "Try changing the search, quick filter, or warehouse filter.";
-  }, [hasFilter, warehouseFilterId, searchQuery, quickFilter]);
+    return t("ops.stockBalances.empty.hintGeneral");
+  }, [hasFilter, warehouseFilterId, searchQuery, quickFilter, t]);
 
   const qtyCol = (
     field: keyof RowData,
@@ -402,43 +424,43 @@ export function StockBalancesListPage() {
       agGridRowNumberColDef,
       {
         field: "itemCode",
-        headerName: "Item Code",
+        headerName: t("doc.columns.itemCode"),
         width: 118,
         minWidth: 100,
       },
       {
         field: "itemName",
-        headerName: "Item Name",
+        headerName: t("doc.columns.itemName"),
         flex: 1,
         minWidth: 140,
       },
       {
         field: "warehouseName",
-        headerName: "Warehouse",
+        headerName: t("doc.columns.warehouse"),
         minWidth: 120,
         width: 140,
       },
-      qtyCol("qtyOnHand", "Total quantity", 112),
+      qtyCol("qtyOnHand", t("doc.columns.totalQuantity"), 112),
     ];
     if (!showOperationalGrid) return base;
     return [
       ...base,
-      qtyCol("reservedQty", "Reserved", 96),
-      qtyCol("availableQty", "Available", 100),
-      qtyCol("deficitQty", "Deficit", 88),
-      qtyCol("outgoingQty", "Outgoing", 96),
-      qtyCol("incomingQty", "Incoming", 96),
-      qtyCol("netShortageQty", "Net shortage", 104),
+      qtyCol("reservedQty", t("doc.columns.reserved"), 96),
+      qtyCol("availableQty", t("doc.columns.available"), 100),
+      qtyCol("deficitQty", t("doc.columns.deficit"), 88),
+      qtyCol("outgoingQty", t("doc.columns.outgoing"), 96),
+      qtyCol("incomingQty", t("doc.columns.incoming"), 96),
+      qtyCol("netShortageQty", t("doc.columns.netShortage"), 104),
       {
         field: "coverageStatus",
-        headerName: "Coverage",
+        headerName: t("doc.columns.coverage"),
         width: 102,
         minWidth: 92,
         maxWidth: 120,
         sortable: true,
         valueFormatter: (p) =>
           p.value != null
-            ? STOCK_BALANCE_COVERAGE_LABELS[p.value as StockBalanceCoverageStatus] ?? String(p.value)
+            ? coverageLabel(p.value as StockBalanceCoverageStatus)
             : "—",
         cellClass: (p) =>
           p.data?.coverageStatus === "short"
@@ -448,17 +470,17 @@ export function StockBalancesListPage() {
               : "text-muted-foreground/90",
       },
     ];
-  }, [showOperationalGrid]);
+  }, [showOperationalGrid, t, locale, coverageLabel]);
 
   return (
     <ListPageLayout
       header={null}
       controls={
         <>
-          <BackButton to="/" aria-label="Back to Dashboard" />
+          <BackButton to="/" aria-label={t("doc.list.backToDashboard")} />
           {showQuickFilters ? (
-            <ButtonGroup className="list-page__filter-group shrink-0" aria-label="Quick filters">
-              {QUICK_FILTER_OPTIONS.map((opt, index) => (
+            <ButtonGroup className="list-page__filter-group shrink-0" aria-label={t("ops.stockBalances.quickFiltersAria")}>
+              {quickFilterOptions.map((opt, index) => (
                 <Fragment key={opt.value}>
                   {index > 0 && <ButtonGroupSeparator />}
                   <Button
@@ -487,10 +509,10 @@ export function StockBalancesListPage() {
           ) : null}
           <ListPageSearch
             inputRef={listSearchInputRef}
-            placeholder="Search"
+            placeholder={t("ops.stockBalances.searchPlaceholder")}
             value={searchQuery}
             onChange={setSearchQuery}
-            aria-label="Search stock balances"
+            aria-label={t("ops.stockBalances.searchAria")}
             resultCount={filteredRows.length}
           />
           <div className="flex flex-row items-center gap-2 shrink-0 ml-auto">
@@ -498,9 +520,11 @@ export function StockBalancesListPage() {
               <div
                 className="flex h-8 max-w-[min(100%,18rem)] items-center gap-1.5 rounded-md border border-input bg-background px-2 text-xs shrink-0"
                 role="status"
-                aria-label="Warehouse filter active"
+                aria-label={t("ops.stockBalances.warehouseFilterAria")}
               >
-                <span className="text-muted-foreground whitespace-nowrap shrink-0">Warehouse</span>
+                <span className="text-muted-foreground whitespace-nowrap shrink-0">
+                  {t("doc.columns.warehouse")}
+                </span>
                 <span
                   className="truncate font-medium text-foreground/90 min-w-0"
                   title={warehouseFilterLabel}
@@ -514,21 +538,21 @@ export function StockBalancesListPage() {
                   className="h-7 px-1.5 text-xs shrink-0 text-muted-foreground hover:text-foreground"
                   onClick={clearWarehouseFilter}
                 >
-                  Clear
+                  {t("doc.list.clear")}
                 </Button>
               </div>
             )}
             {exportSuccess && (
               <div className="h-8 w-max flex items-center gap-1.5 rounded-md border border-input bg-background px-2 text-sm shrink-0">
-                <span className="text-muted-foreground text-xs">Export completed:</span>
+                <span className="text-muted-foreground text-xs">{t("doc.list.exportCompleted")}</span>
                 <span className="font-medium text-xs truncate max-w-[12rem]" title={exportSuccess.filename}>{exportSuccess.filename}</span>
                 <Button
                   type="button"
                   variant="ghost"
                   size="icon"
                   className="h-7 w-7 shrink-0 text-muted-foreground hover:text-foreground"
-                  title="Open file"
-                  aria-label="Open file"
+                  title={t("doc.list.openFile")}
+                  aria-label={t("doc.list.openFile")}
                   onClick={async () => {
                     try {
                       await invoke("open_export_file", { path: exportSuccess.path });
@@ -546,8 +570,8 @@ export function StockBalancesListPage() {
                   variant="ghost"
                   size="icon"
                   className="h-7 w-7 shrink-0 text-muted-foreground hover:text-foreground"
-                  title="Open folder"
-                  aria-label="Open folder"
+                  title={t("doc.list.openFolder")}
+                  aria-label={t("doc.list.openFolder")}
                   onClick={() => {
                     revealItemInDir(exportSuccess.path);
                     setExportSuccess(null);
@@ -560,8 +584,8 @@ export function StockBalancesListPage() {
                   variant="ghost"
                   size="icon"
                   className="h-6 w-6 shrink-0 text-muted-foreground/80 hover:text-muted-foreground"
-                  title="Dismiss"
-                  aria-label="Dismiss"
+                  title={t("doc.list.dismiss")}
+                  aria-label={t("doc.list.dismiss")}
                   onClick={() => setExportSuccess(null)}
                 >
                   <X className="h-3 w-3" />
@@ -577,7 +601,7 @@ export function StockBalancesListPage() {
                 onClick={handleExportCurrentView}
               >
                 <FileSpreadsheet className="h-4 w-4 shrink-0" />
-                Export
+                {t("doc.list.export")}
               </Button>
               <Popover open={exportOpen} onOpenChange={setExportOpen}>
                 <PopoverTrigger asChild>
@@ -586,7 +610,7 @@ export function StockBalancesListPage() {
                     variant="outline"
                     size="icon"
                     className="h-8 w-8 shrink-0 rounded-l-none border-0 shadow-none"
-                    aria-label="Export options"
+                    aria-label={t("doc.list.exportOptionsAria")}
                   >
                     <ChevronDown className="h-4 w-4" />
                   </Button>
@@ -597,13 +621,13 @@ export function StockBalancesListPage() {
                       type="button"
                       disabled={exportSelectedDisabled}
                       className="w-full rounded-sm px-1.5 py-1 text-left text-sm hover:bg-accent disabled:cursor-not-allowed disabled:opacity-50"
-                      title={exportSelectedDisabled ? "Select one or more rows in the grid first." : undefined}
+                      title={exportSelectedDisabled ? t("doc.list.selectRowsForExport") : undefined}
                       onClick={() => {
                         setExportOpen(false);
                         if (!exportSelectedDisabled) handleExportSelected();
                       }}
                     >
-                      Export selected rows
+                      {t("doc.list.exportSelectedRows")}
                     </button>
                   </div>
                 </PopoverContent>

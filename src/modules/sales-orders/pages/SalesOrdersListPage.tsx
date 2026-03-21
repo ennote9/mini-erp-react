@@ -16,7 +16,7 @@ import {
   AgGridContainer,
   agGridDefaultColDef,
   agGridDefaultGridOptions,
-  agGridRowNumberColDef,
+  getAgGridRowNumberColDef,
   agGridSelectionColumnDef,
   hasMeaningfulTextSelection,
 } from "../../../shared/ui/ag-grid";
@@ -34,6 +34,7 @@ import { buildSalesOrdersListXlsxBuffer, type SalesOrdersExportRow } from "../sa
 import { save } from "@tauri-apps/plugin-dialog";
 import { invoke } from "@tauri-apps/api/core";
 import { revealItemInDir } from "@tauri-apps/plugin-opener";
+import { useTranslation } from "@/shared/i18n/context";
 
 type StatusFilter = "all" | PlanningDocumentStatus;
 
@@ -102,6 +103,7 @@ function buildExportRowsFromSO(rows: RowData[]): SalesOrdersExportRow[] {
 
 export function SalesOrdersListPage() {
   const navigate = useNavigate();
+  const { t, locale } = useTranslation();
   const [searchParams, setSearchParams] = useSearchParams();
   const customerFilterId = useMemo(() => parseQueryId(searchParams, "customerId"), [searchParams]);
   const warehouseFilterId = useMemo(() => parseQueryId(searchParams, "warehouseId"), [searchParams]);
@@ -203,17 +205,19 @@ export function SalesOrdersListPage() {
     return warehouseFilterId;
   }, [warehouseFilterId]);
 
+  const emDash = t("domain.audit.summary.emDash");
+
   const itemFilterLabel = useMemo((): string => {
     if (itemFilterId == null) return "";
     const it = itemRepository.getById(itemFilterId);
     if (it) {
       const code = it.code?.trim() ?? "";
       const name = it.name?.trim() ?? "";
-      if (code && name) return `${code} — ${name}`;
+      if (code && name) return `${code} ${emDash} ${name}`;
       return code || name || itemFilterId;
     }
     return itemFilterId;
-  }, [itemFilterId]);
+  }, [itemFilterId, emDash]);
 
   const getExportRowsCurrentView = useCallback((): SalesOrdersExportRow[] => {
     const api = gridRef.current?.api;
@@ -263,7 +267,7 @@ export function SalesOrdersListPage() {
         URL.revokeObjectURL(url);
       }
     },
-    [],
+    [t],
   );
 
   const handleExportCurrentView = useCallback(() => {
@@ -280,11 +284,11 @@ export function SalesOrdersListPage() {
   const exportSelectedDisabled = selectedCount === 0;
 
   const emptyTitle = hasFilter
-    ? "No sales orders match current search or filters"
-    : "No sales orders yet";
+    ? t("ops.list.salesOrders.emptyFiltered")
+    : t("ops.list.salesOrders.emptyDefault");
   const emptyHint = useMemo(() => {
     if (!hasFilter) {
-      return "Create your first sales order to start sales workflow.";
+      return t("ops.list.salesOrders.hintCreate");
     }
     if (
       customerFilterId != null &&
@@ -293,7 +297,7 @@ export function SalesOrdersListPage() {
       statusFilter === "all" &&
       searchQuery.trim() === ""
     ) {
-      return "No sales orders for this customer. Try clearing the customer filter.";
+      return t("ops.list.salesOrders.hintCustomerOnly");
     }
     if (
       warehouseFilterId != null &&
@@ -302,7 +306,7 @@ export function SalesOrdersListPage() {
       statusFilter === "all" &&
       searchQuery.trim() === ""
     ) {
-      return "No sales orders for this warehouse. Try clearing the warehouse filter.";
+      return t("ops.list.salesOrders.hintWarehouseOnly");
     }
     if (
       itemFilterId != null &&
@@ -311,9 +315,9 @@ export function SalesOrdersListPage() {
       statusFilter === "all" &&
       searchQuery.trim() === ""
     ) {
-      return "No sales orders include this item on any line. Try clearing the item filter.";
+      return t("ops.list.salesOrders.hintItemOnly");
     }
-    return "Try changing the search, status filter, or URL filters (customer, warehouse, item).";
+    return t("ops.list.salesOrders.hintUrlFilters");
   }, [
     hasFilter,
     customerFilterId,
@@ -321,48 +325,53 @@ export function SalesOrdersListPage() {
     itemFilterId,
     statusFilter,
     searchQuery,
+    t,
+    locale,
   ]);
 
-  const statusOptions: { value: StatusFilter; label: string }[] = [
-    { value: "all", label: "All" },
-    { value: "draft", label: "Draft" },
-    { value: "confirmed", label: "Confirmed" },
-    { value: "closed", label: "Closed" },
-    { value: "cancelled", label: "Cancelled" },
-  ];
+  const statusOptions = useMemo(
+    (): { value: StatusFilter; label: string }[] => [
+      { value: "all", label: t("doc.list.all") },
+      { value: "draft", label: t("status.planning.draft") },
+      { value: "confirmed", label: t("status.planning.confirmed") },
+      { value: "closed", label: t("status.planning.closed") },
+      { value: "cancelled", label: t("status.planning.cancelled") },
+    ],
+    [t, locale],
+  );
 
   const columnDefs = useMemo<ColDef<RowData>[]>(
     () => [
-      agGridRowNumberColDef,
+      getAgGridRowNumberColDef(t),
       {
         field: "number",
-        headerName: "Number",
+        headerName: t("doc.columns.number"),
         width: 150,
       },
       {
         field: "date",
-        headerName: "Date",
+        headerName: t("doc.columns.date"),
         width: 140,
         valueFormatter: (params) => normalizeDateForSO(params.value),
       },
       {
         field: "customerName",
-        headerName: "Customer",
+        headerName: t("doc.columns.customer"),
         minWidth: 180,
       },
       {
         field: "warehouseName",
-        headerName: "Warehouse",
+        headerName: t("doc.columns.warehouse"),
         minWidth: 160,
       },
       {
         field: "status",
-        headerName: "Status",
+        headerName: t("doc.columns.status"),
         width: 130,
         cellRenderer: StatusCellRenderer,
       },
     ],
-    [],
+    [t, locale],
   );
 
   return (
@@ -370,8 +379,8 @@ export function SalesOrdersListPage() {
       header={null}
       controls={
         <>
-          <BackButton to="/" aria-label="Back to Dashboard" />
-          <ButtonGroup className="list-page__filter-group" aria-label="Filter by status">
+          <BackButton to="/" aria-label={t("doc.list.backToDashboard")} />
+          <ButtonGroup className="list-page__filter-group" aria-label={t("ops.list.filterStatusAria")}>
             {statusOptions.map(({ value, label }, index) => (
               <React.Fragment key={value}>
                 {index > 0 && <ButtonGroupSeparator />}
@@ -388,10 +397,10 @@ export function SalesOrdersListPage() {
           </ButtonGroup>
           <ListPageSearch
             inputRef={listSearchInputRef}
-            placeholder="Search"
+            placeholder={t("ops.list.salesOrders.searchPlaceholder")}
             value={searchQuery}
             onChange={setSearchQuery}
-            aria-label="Search sales orders"
+            aria-label={t("ops.list.salesOrders.searchAria")}
             resultCount={filteredRows.length}
           />
           <div className="flex flex-row flex-wrap items-center gap-2 shrink-0 ml-auto justify-end">
@@ -399,9 +408,9 @@ export function SalesOrdersListPage() {
               <div
                 className="flex h-8 max-w-[min(100%,18rem)] items-center gap-1.5 rounded-md border border-input bg-background px-2 text-xs shrink-0"
                 role="status"
-                aria-label="Warehouse filter active"
+                aria-label={t("ops.list.salesOrders.filterWarehouseAria")}
               >
-                <span className="text-muted-foreground whitespace-nowrap shrink-0">Warehouse</span>
+                <span className="text-muted-foreground whitespace-nowrap shrink-0">{t("doc.columns.warehouse")}</span>
                 <span
                   className="truncate font-medium text-foreground/90 min-w-0"
                   title={warehouseFilterLabel}
@@ -415,7 +424,7 @@ export function SalesOrdersListPage() {
                   className="h-7 px-1.5 text-xs shrink-0 text-muted-foreground hover:text-foreground"
                   onClick={clearWarehouseFilter}
                 >
-                  Clear
+                  {t("doc.list.clear")}
                 </Button>
               </div>
             )}
@@ -423,9 +432,9 @@ export function SalesOrdersListPage() {
               <div
                 className="flex h-8 max-w-[min(100%,20rem)] items-center gap-1.5 rounded-md border border-input bg-background px-2 text-xs shrink-0"
                 role="status"
-                aria-label="Item filter active"
+                aria-label={t("ops.list.salesOrders.filterItemAria")}
               >
-                <span className="text-muted-foreground whitespace-nowrap shrink-0">Item</span>
+                <span className="text-muted-foreground whitespace-nowrap shrink-0">{t("doc.page.itemLabel")}</span>
                 <span
                   className="truncate font-medium text-foreground/90 min-w-0"
                   title={itemFilterLabel}
@@ -439,7 +448,7 @@ export function SalesOrdersListPage() {
                   className="h-7 px-1.5 text-xs shrink-0 text-muted-foreground hover:text-foreground"
                   onClick={clearItemFilter}
                 >
-                  Clear
+                  {t("doc.list.clear")}
                 </Button>
               </div>
             )}
@@ -447,9 +456,9 @@ export function SalesOrdersListPage() {
               <div
                 className="flex h-8 max-w-[min(100%,18rem)] items-center gap-1.5 rounded-md border border-input bg-background px-2 text-xs shrink-0"
                 role="status"
-                aria-label="Customer filter active"
+                aria-label={t("ops.list.salesOrders.filterCustomerAria")}
               >
-                <span className="text-muted-foreground whitespace-nowrap shrink-0">Customer</span>
+                <span className="text-muted-foreground whitespace-nowrap shrink-0">{t("doc.columns.customer")}</span>
                 <span
                   className="truncate font-medium text-foreground/90 min-w-0"
                   title={customerFilterLabel}
@@ -463,21 +472,21 @@ export function SalesOrdersListPage() {
                   className="h-7 px-1.5 text-xs shrink-0 text-muted-foreground hover:text-foreground"
                   onClick={clearCustomerFilter}
                 >
-                  Clear
+                  {t("doc.list.clear")}
                 </Button>
               </div>
             )}
             {exportSuccess && (
               <div className="h-8 w-max flex items-center gap-1.5 rounded-md border border-input bg-background px-2 text-sm shrink-0">
-                <span className="text-muted-foreground text-xs">Export completed:</span>
+                <span className="text-muted-foreground text-xs">{t("doc.list.exportCompleted")}</span>
                 <span className="font-medium text-xs truncate max-w-[12rem]" title={exportSuccess.filename}>{exportSuccess.filename}</span>
                 <Button
                   type="button"
                   variant="ghost"
                   size="icon"
                   className="h-7 w-7 shrink-0 text-muted-foreground hover:text-foreground"
-                  title="Open file"
-                  aria-label="Open file"
+                  title={t("doc.list.openFile")}
+                  aria-label={t("doc.list.openFile")}
                   onClick={async () => {
                     try {
                       await invoke("open_export_file", { path: exportSuccess.path });
@@ -495,8 +504,8 @@ export function SalesOrdersListPage() {
                   variant="ghost"
                   size="icon"
                   className="h-7 w-7 shrink-0 text-muted-foreground hover:text-foreground"
-                  title="Open folder"
-                  aria-label="Open folder"
+                  title={t("doc.list.openFolder")}
+                  aria-label={t("doc.list.openFolder")}
                   onClick={() => {
                     revealItemInDir(exportSuccess.path);
                     setExportSuccess(null);
@@ -509,8 +518,8 @@ export function SalesOrdersListPage() {
                   variant="ghost"
                   size="icon"
                   className="h-6 w-6 shrink-0 text-muted-foreground/80 hover:text-muted-foreground"
-                  title="Dismiss"
-                  aria-label="Dismiss"
+                  title={t("doc.list.dismiss")}
+                  aria-label={t("doc.list.dismiss")}
                   onClick={() => setExportSuccess(null)}
                 >
                   <X className="h-3 w-3" />
@@ -526,7 +535,7 @@ export function SalesOrdersListPage() {
                 onClick={handleExportCurrentView}
               >
                 <FileSpreadsheet className="h-4 w-4 shrink-0" />
-                Export
+                {t("doc.list.export")}
               </Button>
               <Popover open={exportOpen} onOpenChange={setExportOpen}>
                 <PopoverTrigger asChild>
@@ -535,7 +544,7 @@ export function SalesOrdersListPage() {
                     variant="outline"
                     size="icon"
                     className="h-8 w-8 shrink-0 rounded-l-none border-0 shadow-none"
-                    aria-label="Export options"
+                    aria-label={t("doc.list.exportOptionsAria")}
                   >
                     <ChevronDown className="h-4 w-4" />
                   </Button>
@@ -546,13 +555,13 @@ export function SalesOrdersListPage() {
                       type="button"
                       disabled={exportSelectedDisabled}
                       className="w-full rounded-sm px-1.5 py-1 text-left text-sm hover:bg-accent disabled:cursor-not-allowed disabled:opacity-50"
-                      title={exportSelectedDisabled ? "Select one or more rows in the grid first." : undefined}
+                      title={exportSelectedDisabled ? t("doc.list.selectRowsForExport") : undefined}
                       onClick={() => {
                         setExportOpen(false);
                         if (!exportSelectedDisabled) handleExportSelected();
                       }}
                     >
-                      Export selected rows
+                      {t("doc.list.exportSelectedRows")}
                     </button>
                   </div>
                 </PopoverContent>
@@ -566,7 +575,7 @@ export function SalesOrdersListPage() {
             className="rounded-md bg-white text-black hover:bg-gray-200"
             onClick={() => navigate("/sales-orders/new")}
           >
-            <span className="create-btn__plus">+</span> Create
+            <span className="create-btn__plus">+</span> {t("doc.list.create")}
           </Button>
         </>
       }

@@ -41,6 +41,9 @@ import { save } from "@tauri-apps/plugin-dialog";
 import { invoke } from "@tauri-apps/api/core";
 import { revealItemInDir } from "@tauri-apps/plugin-opener";
 import { factualDocumentIssuesForStrip } from "../../../shared/factualDocumentPageIssues";
+import { useTranslation } from "@/shared/i18n/context";
+import type { TFunction } from "@/shared/i18n/resolve";
+import { translateCancelReason, translateReversalReason } from "@/shared/i18n/reasonLabels";
 import {
   CancelDocumentReasonDialog,
   type CancelDocumentReasonPayload,
@@ -53,18 +56,16 @@ import { DocumentEventLogSection } from "../../../shared/ui/object/DocumentEvent
 import { useSettings } from "../../../shared/settings/SettingsContext";
 import { getEffectiveWorkspaceFeatureEnabled } from "../../../shared/workspace";
 import {
-  CANCEL_DOCUMENT_REASON_LABELS,
-  REVERSAL_DOCUMENT_REASON_LABELS,
   type CancelDocumentReasonCode,
   type ReversalDocumentReasonCode,
 } from "../../../shared/reasonCodes";
 
 type LineWithItem = ShipmentLine & { itemName: string; uom: string };
 
-function shipmentLinesColumnDefs(): ColDef<LineWithItem>[] {
+function shipmentLinesColumnDefs(t: TFunction): ColDef<LineWithItem>[] {
   return [
     {
-      headerName: "№",
+      headerName: t("doc.columns.lineNo"),
       valueGetter: (params) =>
         params.node?.rowIndex != null ? String(params.node.rowIndex + 1) : "",
       width: 52,
@@ -74,7 +75,7 @@ function shipmentLinesColumnDefs(): ColDef<LineWithItem>[] {
       resizable: true,
     },
     {
-      headerName: "Item Code",
+      headerName: t("doc.columns.itemCode"),
       width: 130,
       minWidth: 120,
       maxWidth: 140,
@@ -85,9 +86,9 @@ function shipmentLinesColumnDefs(): ColDef<LineWithItem>[] {
         return item?.code ?? itemId;
       },
     },
-    { field: "itemName", headerName: "Item Name", flex: 1, minWidth: 180 },
+    { field: "itemName", headerName: t("doc.columns.itemName"), flex: 1, minWidth: 180 },
     {
-      headerName: "Brand",
+      headerName: t("doc.columns.brand"),
       width: 130,
       minWidth: 120,
       maxWidth: 140,
@@ -101,7 +102,7 @@ function shipmentLinesColumnDefs(): ColDef<LineWithItem>[] {
       },
     },
     {
-      headerName: "Category",
+      headerName: t("doc.columns.category"),
       width: 130,
       minWidth: 120,
       maxWidth: 140,
@@ -114,8 +115,8 @@ function shipmentLinesColumnDefs(): ColDef<LineWithItem>[] {
         return category?.code ?? "";
       },
     },
-    { field: "qty", headerName: "Qty", width: 100 },
-    { field: "uom", headerName: "UOM", width: 80 },
+    { field: "qty", headerName: t("doc.columns.qty"), width: 100 },
+    { field: "uom", headerName: t("doc.columns.uom"), width: 80 },
   ];
 }
 
@@ -132,12 +133,13 @@ function buildExportRowsFromLinesWithItem(lines: LineWithItem[]): ShipmentExport
       brand,
       category,
       qty,
-      uom: line.uom ?? item?.uom ?? "—",
+      uom: line.uom ?? item?.uom ?? "\u2014",
     };
   });
 }
 
 export function ShipmentPage() {
+  const { t, locale } = useTranslation();
   const { id } = useParams<{ id: string }>();
   const { settings } = useSettings();
   const workspaceMode = settings.general.workspaceMode;
@@ -180,16 +182,20 @@ export function ShipmentPage() {
         : "",
     [doc],
   );
+  const emDash = t("domain.audit.summary.emDash");
+
   const linesWithItem = useMemo<LineWithItem[]>(() => {
     return lines.map((line) => {
       const item = itemRepository.getById(line.itemId);
       return {
         ...line,
         itemName: item?.name ?? line.itemId,
-        uom: item?.uom ?? "—",
+        uom: item?.uom ?? emDash,
       };
     });
-  }, [lines]);
+  }, [lines, emDash]);
+
+  const linesColumnDefs = useMemo(() => shipmentLinesColumnDefs(t), [t, locale]);
 
   const isDraft = doc?.status === "draft";
   const isPosted = doc?.status === "posted";
@@ -218,7 +224,7 @@ export function ShipmentPage() {
       try {
         const path = await save({
           defaultPath: defaultFilename,
-          filters: [{ name: "Excel", extensions: ["xlsx"] }],
+          filters: [{ name: t("doc.page.excelFilterName"), extensions: ["xlsx"] }],
         });
         if (path == null) return;
 
@@ -245,7 +251,7 @@ export function ShipmentPage() {
         URL.revokeObjectURL(url);
       }
     },
-    [],
+    [t],
   );
 
   const handleExportMain = useCallback(() => {
@@ -333,25 +339,25 @@ export function ShipmentPage() {
   if (!id || !doc) {
     return (
       <div className="doc-page doc-page--not-found">
-        <p>Shipment not found.</p>
+        <p>{t("doc.notFound.shipment")}</p>
       </div>
     );
   }
 
   const breadcrumbItems = [
-    { label: "Sales", to: "/sales-orders" },
-    { label: "Shipments", to: "/shipments" },
+    { label: t("shell.sales"), to: "/sales-orders" },
+    { label: t("shell.nav.shipments"), to: "/shipments" },
     { label: doc.number },
   ];
 
   return (
     <DocumentPageLayout
       breadcrumbItems={breadcrumbItems}
-      breadcrumbPrefix={<BackButton to="/shipments" aria-label="Back to Shipments" />}
+      breadcrumbPrefix={<BackButton to="/shipments" aria-label={t("doc.shipment.backToListAria")} />}
       header={
         <div className="doc-header">
           <div className="doc-header__title-row">
-            <h2 className="doc-header__title">Shipment {doc.number}</h2>
+            <h2 className="doc-header__title">{t("doc.shipment.titleNumbered", { number: doc.number })}</h2>
             <StatusBadge status={doc.status} />
           </div>
           <div className="doc-header__right">
@@ -369,16 +375,16 @@ export function ShipmentPage() {
                   disabled={postBlockedByValidation}
                   title={
                     postBlockedByValidation
-                      ? "Resolve blocking errors before posting."
+                      ? t("doc.factual.resolveBeforePost")
                       : undefined
                   }
                 >
-                  Post
+                  {t("doc.factual.post")}
                 </Button>
               )}
               {isDraft && (
                 <Button type="button" variant="outline" onClick={handleCancelDocument}>
-                  Cancel document
+                  {t("doc.page.cancelDocument")}
                 </Button>
               )}
               {isPosted && showReverseDocument && (
@@ -390,7 +396,7 @@ export function ShipmentPage() {
                     setReverseReasonDialogOpen(true);
                   }}
                 >
-                  Reverse document
+                  {t("doc.factual.reverseDocument")}
                 </Button>
               )}
             </div>
@@ -401,47 +407,46 @@ export function ShipmentPage() {
     >
       <Card className="max-w-2xl border-0 shadow-none">
         <CardHeader className="p-4 pb-1">
-          <CardTitle className="text-[0.9rem] font-semibold">Details</CardTitle>
+          <CardTitle className="text-[0.9rem] font-semibold">{t("doc.page.details")}</CardTitle>
           <CardDescription className="text-xs text-muted-foreground">
-            Source sales order, warehouse, and document references.
+            {t("doc.shipment.detailsDescription")}
           </CardDescription>
         </CardHeader>
         <CardContent className="p-4 pt-2">
           <dl className="doc-summary doc-summary--compact">
             <div className="doc-summary__row">
-              <dt className="doc-summary__term">Number</dt>
+              <dt className="doc-summary__term">{t("doc.columns.number")}</dt>
               <dd className="doc-summary__value">{doc.number}</dd>
             </div>
             <div className="doc-summary__row">
-              <dt className="doc-summary__term">Date</dt>
+              <dt className="doc-summary__term">{t("doc.columns.date")}</dt>
               <dd className="doc-summary__value">{doc.date}</dd>
             </div>
             <div className="doc-summary__row">
-              <dt className="doc-summary__term">Related Sales Order</dt>
+              <dt className="doc-summary__term">{t("doc.shipment.relatedSalesOrder")}</dt>
               <dd className="doc-summary__value">{salesOrderNumber}</dd>
             </div>
             <div className="doc-summary__row">
-              <dt className="doc-summary__term">Warehouse</dt>
+              <dt className="doc-summary__term">{t("doc.columns.warehouse")}</dt>
               <dd className="doc-summary__value">{warehouseName}</dd>
             </div>
             {doc.comment != null && doc.comment !== "" && (
               <div className="doc-summary__row">
-                <dt className="doc-summary__term">Comment</dt>
+                <dt className="doc-summary__term">{t("doc.columns.comment")}</dt>
                 <dd className="doc-summary__value">{doc.comment}</dd>
               </div>
             )}
             {doc.status === "cancelled" && doc.cancelReasonCode != null && doc.cancelReasonCode !== "" && (
               <>
                 <div className="doc-summary__row">
-                  <dt className="doc-summary__term">Cancel reason</dt>
+                  <dt className="doc-summary__term">{t("doc.summary.cancelReason")}</dt>
                   <dd className="doc-summary__value">
-                    {CANCEL_DOCUMENT_REASON_LABELS[doc.cancelReasonCode as CancelDocumentReasonCode] ??
-                      doc.cancelReasonCode}
+                    {translateCancelReason(t, doc.cancelReasonCode as CancelDocumentReasonCode)}
                   </dd>
                 </div>
                 {doc.cancelReasonComment != null && doc.cancelReasonComment !== "" && (
                   <div className="doc-summary__row">
-                    <dt className="doc-summary__term">Cancel comment</dt>
+                    <dt className="doc-summary__term">{t("doc.summary.cancelComment")}</dt>
                     <dd className="doc-summary__value">{doc.cancelReasonComment}</dd>
                   </div>
                 )}
@@ -450,15 +455,14 @@ export function ShipmentPage() {
             {isReversed && doc.reversalReasonCode != null && (
               <>
                 <div className="doc-summary__row">
-                  <dt className="doc-summary__term">Reversal reason</dt>
+                  <dt className="doc-summary__term">{t("doc.summary.reversalReason")}</dt>
                   <dd className="doc-summary__value">
-                    {REVERSAL_DOCUMENT_REASON_LABELS[doc.reversalReasonCode as ReversalDocumentReasonCode] ??
-                      doc.reversalReasonCode}
+                    {translateReversalReason(t, doc.reversalReasonCode as ReversalDocumentReasonCode)}
                   </dd>
                 </div>
                 {doc.reversalReasonComment != null && doc.reversalReasonComment !== "" && (
                   <div className="doc-summary__row">
-                    <dt className="doc-summary__term">Reversal comment</dt>
+                    <dt className="doc-summary__term">{t("doc.summary.reversalComment")}</dt>
                     <dd className="doc-summary__value">{doc.reversalReasonComment}</dd>
                   </div>
                 )}
@@ -468,19 +472,19 @@ export function ShipmentPage() {
         </CardContent>
       </Card>
       <div className="doc-lines mt-6">
-        <h3 className="doc-lines__title">Lines</h3>
+        <h3 className="doc-lines__title">{t("doc.page.lines")}</h3>
         <div className="flex flex-row items-center justify-end gap-2 w-full mb-1.5">
           {exportSuccess && (
             <div className="h-8 w-max flex items-center gap-1.5 rounded-md border border-input bg-background px-2 text-sm shrink-0">
-              <span className="text-muted-foreground text-xs">Export completed:</span>
+              <span className="text-muted-foreground text-xs">{t("doc.list.exportCompleted")}</span>
               <span className="font-medium text-xs truncate max-w-[12rem]" title={exportSuccess.filename}>{exportSuccess.filename}</span>
               <Button
                 type="button"
                 variant="ghost"
                 size="icon"
                 className="h-7 w-7 shrink-0 text-muted-foreground hover:text-foreground"
-                title="Open file"
-                aria-label="Open file"
+                title={t("doc.list.openFile")}
+                aria-label={t("doc.list.openFile")}
                 onClick={async () => {
                   try {
                     await invoke("open_export_file", { path: exportSuccess.path });
@@ -498,8 +502,8 @@ export function ShipmentPage() {
                 variant="ghost"
                 size="icon"
                 className="h-7 w-7 shrink-0 text-muted-foreground hover:text-foreground"
-                title="Open folder"
-                aria-label="Open folder"
+                title={t("doc.list.openFolder")}
+                aria-label={t("doc.list.openFolder")}
                 onClick={() => {
                   revealItemInDir(exportSuccess.path);
                   setExportSuccess(null);
@@ -512,8 +516,8 @@ export function ShipmentPage() {
                 variant="ghost"
                 size="icon"
                 className="h-6 w-6 shrink-0 text-muted-foreground/80 hover:text-muted-foreground"
-                title="Dismiss"
-                aria-label="Dismiss"
+                title={t("doc.list.dismiss")}
+                aria-label={t("doc.list.dismiss")}
                 onClick={() => setExportSuccess(null)}
               >
                 <X className="h-3 w-3" />
@@ -529,7 +533,7 @@ export function ShipmentPage() {
               onClick={handleExportMain}
             >
               <FileSpreadsheet className="h-4 w-4 shrink-0" />
-              Export
+              {t("doc.page.export")}
             </Button>
             <Popover open={exportOpen} onOpenChange={setExportOpen}>
               <PopoverTrigger asChild>
@@ -538,7 +542,7 @@ export function ShipmentPage() {
                   variant="outline"
                   size="icon"
                   className="h-8 w-8 shrink-0 rounded-l-none border-0 shadow-none"
-                  aria-label="Export options"
+                  aria-label={t("doc.list.exportOptionsAria")}
                 >
                   <ChevronDown className="h-4 w-4" />
                 </Button>
@@ -549,13 +553,13 @@ export function ShipmentPage() {
                     type="button"
                     disabled={exportSelectedDisabled}
                     className="w-full rounded-sm px-1.5 py-1 text-left text-sm hover:bg-accent disabled:cursor-not-allowed disabled:opacity-50"
-                    title={exportSelectedDisabled ? "Select one or more lines in the grid first." : undefined}
+                    title={exportSelectedDisabled ? t("doc.list.exportSelectLinesFirst") : undefined}
                     onClick={() => {
                       setExportOpen(false);
                       if (!exportSelectedDisabled) handleExportSelected();
                     }}
                   >
-                    Export selected lines
+                    {t("doc.list.exportSelectedRows")}
                   </button>
                   <button
                     type="button"
@@ -565,7 +569,7 @@ export function ShipmentPage() {
                       handleExportAll();
                     }}
                   >
-                    Export all lines
+                    {t("doc.list.exportAllLines")}
                   </button>
                 </div>
               </PopoverContent>
@@ -573,14 +577,14 @@ export function ShipmentPage() {
           </div>
         </div>
         {linesWithItem.length === 0 ? (
-          <p className="doc-lines__empty">No lines on this shipment.</p>
+          <p className="doc-lines__empty">{t("doc.shipment.emptyLines")}</p>
         ) : (
           <div className="doc-lines__grid">
             <AgGridContainer themeClass="doc-lines-grid">
               <AgGridReact<LineWithItem>
                 {...agGridDefaultGridOptions}
                 rowData={linesWithItem}
-                columnDefs={shipmentLinesColumnDefs()}
+                columnDefs={linesColumnDefs}
                 defaultColDef={agGridDefaultColDef}
                 getRowId={(p) => p.data.id}
                 rowSelection={{ mode: "multiRow", checkboxes: true, headerCheckbox: true, enableClickSelection: true }}
@@ -597,13 +601,13 @@ export function ShipmentPage() {
       <CancelDocumentReasonDialog
         open={cancelReasonDialogOpen}
         onOpenChange={setCancelReasonDialogOpen}
-        documentKindLabel="shipment"
+        documentKindLabel={t("doc.kinds.shipment")}
         onConfirm={handleCancelDocumentConfirm}
       />
       <ReverseDocumentReasonDialog
         open={reverseReasonDialogOpen}
         onOpenChange={setReverseReasonDialogOpen}
-        documentKindLabel="shipment"
+        documentKindLabel={t("doc.kinds.shipment")}
         onConfirm={handleReverseDocumentConfirm}
       />
     </DocumentPageLayout>

@@ -72,15 +72,16 @@ import {
 } from "../../../shared/ui/object/CancelDocumentReasonDialog";
 import { DocumentEventLogSection } from "../../../shared/ui/object/DocumentEventLogSection";
 import {
-  CANCEL_DOCUMENT_REASON_LABELS,
   ZERO_PRICE_LINE_REASON_CODES,
-  ZERO_PRICE_LINE_REASON_LABELS,
   type CancelDocumentReasonCode,
   type ZeroPriceLineReasonCode,
 } from "../../../shared/reasonCodes";
+import { useTranslation } from "@/shared/i18n/context";
+import type { TFunction } from "@/shared/i18n/resolve";
+import { translateZeroPriceReason, translateCancelReason } from "@/shared/i18n/reasonLabels";
+import { translatePlanningFulfillmentState } from "@/shared/i18n/fulfillmentLabels";
 import {
   computePurchaseOrderFulfillment,
-  planningFulfillmentStateLabel,
   type PurchaseOrderFulfillment,
   type PoLineFulfillment,
 } from "../../../shared/planningFulfillment";
@@ -96,11 +97,6 @@ type LineFormRow = {
   zeroPriceReasonCode: string;
   _lineId: number;
 };
-
-const ZERO_PRICE_REASON_SELECT_OPTIONS = ZERO_PRICE_LINE_REASON_CODES.map((code) => ({
-  value: code,
-  label: ZERO_PRICE_LINE_REASON_LABELS[code],
-}));
 
 type FormState = {
   date: string;
@@ -171,11 +167,13 @@ function buildExportRowsFromLinesWithItem(lines: LineWithItem[]): PoExportLineRo
 }
 
 function poLinesDisplayColumnDefs(
+  t: TFunction,
   fulfillmentByItemId: Map<string, PoLineFulfillment>,
 ): ColDef<LineFormRow>[] {
+  const dash = t("domain.audit.summary.emDash");
   return [
     {
-      headerName: "№",
+      headerName: t("doc.columns.lineNo"),
       valueGetter: (params) =>
         params.node?.rowIndex != null ? String(params.node.rowIndex + 1) : "",
       width: 52,
@@ -185,7 +183,7 @@ function poLinesDisplayColumnDefs(
       resizable: true,
     },
     {
-      headerName: "Item Code",
+      headerName: t("doc.columns.itemCode"),
       width: 130,
       minWidth: 120,
       maxWidth: 140,
@@ -199,7 +197,7 @@ function poLinesDisplayColumnDefs(
     },
     {
       field: "itemId",
-      headerName: "Item Name",
+      headerName: t("doc.columns.itemName"),
       flex: 1,
       minWidth: 180,
       editable: false,
@@ -210,7 +208,7 @@ function poLinesDisplayColumnDefs(
       },
     },
     {
-      headerName: "Brand",
+      headerName: t("doc.columns.brand"),
       width: 130,
       minWidth: 120,
       maxWidth: 140,
@@ -225,7 +223,7 @@ function poLinesDisplayColumnDefs(
       },
     },
     {
-      headerName: "Category",
+      headerName: t("doc.columns.category"),
       width: 130,
       minWidth: 120,
       maxWidth: 140,
@@ -241,14 +239,14 @@ function poLinesDisplayColumnDefs(
     },
     {
       field: "qty",
-      headerName: "Qty",
+      headerName: t("doc.columns.qty"),
       width: 80,
       minWidth: 70,
       maxWidth: 90,
       editable: false,
     },
     {
-      headerName: "Received",
+      headerName: t("doc.columns.received"),
       width: 86,
       minWidth: 78,
       maxWidth: 96,
@@ -256,14 +254,14 @@ function poLinesDisplayColumnDefs(
       sortable: false,
       valueGetter: (p) => {
         const itemId = p.data?.itemId;
-        if (!itemId) return "—";
+        if (!itemId) return dash;
         const f = fulfillmentByItemId.get(itemId);
-        if (!f) return "—";
+        if (!f) return dash;
         return String(f.receivedQty);
       },
     },
     {
-      headerName: "Remaining",
+      headerName: t("doc.columns.remaining"),
       width: 100,
       minWidth: 88,
       maxWidth: 112,
@@ -271,16 +269,17 @@ function poLinesDisplayColumnDefs(
       sortable: false,
       valueGetter: (p) => {
         const itemId = p.data?.itemId;
-        if (!itemId) return "—";
+        if (!itemId) return dash;
         const f = fulfillmentByItemId.get(itemId);
-        if (!f) return "—";
-        if (f.remainingQty < 0) return `${f.remainingQty} (over)`;
+        if (!f) return dash;
+        if (f.remainingQty < 0)
+          return t("doc.fulfillment.remainingOver", { qty: f.remainingQty });
         return String(f.remainingQty);
       },
     },
     {
       field: "unitPrice",
-      headerName: "Unit price",
+      headerName: t("doc.columns.unitPrice"),
       width: 110,
       minWidth: 100,
       maxWidth: 120,
@@ -291,7 +290,7 @@ function poLinesDisplayColumnDefs(
           : "0.00",
     },
     {
-      headerName: "Line amount",
+      headerName: t("doc.columns.lineAmount"),
       width: 120,
       minWidth: 110,
       maxWidth: 130,
@@ -305,7 +304,7 @@ function poLinesDisplayColumnDefs(
       },
     },
     {
-      headerName: "Zero-price reason",
+      headerName: t("doc.columns.zeroPriceReason"),
       width: 150,
       minWidth: 130,
       maxWidth: 180,
@@ -315,18 +314,20 @@ function poLinesDisplayColumnDefs(
         if (typeof up !== "number" || roundMoney(up) !== 0) return "";
         const c = p.data?.zeroPriceReasonCode;
         if (typeof c !== "string" || c === "") return "";
-        return ZERO_PRICE_LINE_REASON_LABELS[c as ZeroPriceLineReasonCode] ?? c;
+        return translateZeroPriceReason(t, c as ZeroPriceLineReasonCode);
       },
     },
   ];
 }
 
 function poLinesReadOnlyColumnDefs(
+  t: TFunction,
   fulfillment: PurchaseOrderFulfillment | null,
 ): ColDef<LineWithItem>[] {
+  const dash = t("domain.audit.summary.emDash");
   return [
     {
-      headerName: "№",
+      headerName: t("doc.columns.lineNo"),
       valueGetter: (params) =>
         params.node?.rowIndex != null ? String(params.node.rowIndex + 1) : "",
       width: 52,
@@ -336,7 +337,7 @@ function poLinesReadOnlyColumnDefs(
       resizable: true,
     },
     {
-      headerName: "Item Code",
+      headerName: t("doc.columns.itemCode"),
       width: 130,
       minWidth: 120,
       maxWidth: 140,
@@ -347,9 +348,9 @@ function poLinesReadOnlyColumnDefs(
         return item?.code ?? itemId;
       },
     },
-    { field: "itemName", headerName: "Item Name", flex: 1, minWidth: 180 },
+    { field: "itemName", headerName: t("doc.columns.itemName"), flex: 1, minWidth: 180 },
     {
-      headerName: "Brand",
+      headerName: t("doc.columns.brand"),
       width: 130,
       minWidth: 120,
       maxWidth: 140,
@@ -363,7 +364,7 @@ function poLinesReadOnlyColumnDefs(
       },
     },
     {
-      headerName: "Category",
+      headerName: t("doc.columns.category"),
       width: 130,
       minWidth: 120,
       maxWidth: 140,
@@ -376,39 +377,40 @@ function poLinesReadOnlyColumnDefs(
         return category?.code ?? "";
       },
     },
-    { field: "qty", headerName: "Qty", width: 80, minWidth: 70, maxWidth: 90 },
+    { field: "qty", headerName: t("doc.columns.qty"), width: 80, minWidth: 70, maxWidth: 90 },
     {
-      headerName: "Received",
+      headerName: t("doc.columns.received"),
       width: 86,
       minWidth: 78,
       maxWidth: 96,
       sortable: false,
       valueGetter: (p) => {
         const lineId = p.data?.id;
-        if (!lineId || !fulfillment) return "—";
+        if (!lineId || !fulfillment) return dash;
         const row = fulfillment.lines.find((l) => l.lineId === lineId);
-        if (!row) return "—";
+        if (!row) return dash;
         return String(row.receivedQty);
       },
     },
     {
-      headerName: "Remaining",
+      headerName: t("doc.columns.remaining"),
       width: 100,
       minWidth: 88,
       maxWidth: 112,
       sortable: false,
       valueGetter: (p) => {
         const lineId = p.data?.id;
-        if (!lineId || !fulfillment) return "—";
+        if (!lineId || !fulfillment) return dash;
         const row = fulfillment.lines.find((l) => l.lineId === lineId);
-        if (!row) return "—";
-        if (row.remainingQty < 0) return `${row.remainingQty} (over)`;
+        if (!row) return dash;
+        if (row.remainingQty < 0)
+          return t("doc.fulfillment.remainingOver", { qty: row.remainingQty });
         return String(row.remainingQty);
       },
     },
     {
       field: "unitPrice",
-      headerName: "Unit price",
+      headerName: t("doc.columns.unitPrice"),
       width: 110,
       minWidth: 100,
       maxWidth: 120,
@@ -418,7 +420,7 @@ function poLinesReadOnlyColumnDefs(
           : "0.00",
     },
     {
-      headerName: "Line amount",
+      headerName: t("doc.columns.lineAmount"),
       width: 120,
       minWidth: 110,
       maxWidth: 130,
@@ -431,7 +433,7 @@ function poLinesReadOnlyColumnDefs(
       },
     },
     {
-      headerName: "Zero-price reason",
+      headerName: t("doc.columns.zeroPriceReason"),
       width: 150,
       minWidth: 130,
       maxWidth: 180,
@@ -440,7 +442,7 @@ function poLinesReadOnlyColumnDefs(
         if (typeof up !== "number" || roundMoney(up) !== 0) return "";
         const c = p.data?.zeroPriceReasonCode;
         if (typeof c !== "string" || c === "") return "";
-        return ZERO_PRICE_LINE_REASON_LABELS[c as ZeroPriceLineReasonCode] ?? c;
+        return translateZeroPriceReason(t, c as ZeroPriceLineReasonCode);
       },
     },
   ];
@@ -449,6 +451,7 @@ function poLinesReadOnlyColumnDefs(
 export function PurchaseOrderPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const { t, locale } = useTranslation();
   const { settings } = useSettings();
   const workspaceMode = settings.general.workspaceMode;
   const showDocumentEventLogSection = useMemo(
@@ -495,6 +498,15 @@ export function PurchaseOrderPage() {
   const lineEntryQtyInputRef = useRef<HTMLInputElement | null>(null);
   const lineEntryDropdownRightEdgeRef = useRef<HTMLDivElement | null>(null);
   const prevSupplierIdRef = useRef<string | null>(null);
+
+  const zeroPriceReasonOptions = useMemo(
+    () =>
+      ZERO_PRICE_LINE_REASON_CODES.map((code) => ({
+        value: code,
+        label: translateZeroPriceReason(t, code),
+      })),
+    [t, locale],
+  );
 
   useEffect(() => {
     prevSupplierIdRef.current = null;
@@ -716,11 +728,11 @@ export function PurchaseOrderPage() {
 
     const item = itemRepository.getById(itemId);
     if (!item) {
-      setActionIssues([actionIssue("Selected item is invalid and cannot be added.")]);
+      setActionIssues([actionIssue(t("doc.po.errors.invalidItem"))]);
       return;
     }
     if (!item.isActive) {
-      setActionIssues([actionIssue("Inactive items cannot be added.")]);
+      setActionIssues([actionIssue(t("doc.po.errors.inactiveItem"))]);
       return;
     }
 
@@ -962,7 +974,7 @@ export function PurchaseOrderPage() {
       try {
         const path = await save({
           defaultPath: defaultFilename,
-          filters: [{ name: "Excel", extensions: ["xlsx"] }],
+          filters: [{ name: t("doc.page.excelFilterName"), extensions: ["xlsx"] }],
         });
         if (path == null) return;
 
@@ -991,7 +1003,7 @@ export function PurchaseOrderPage() {
         URL.revokeObjectURL(url);
       }
     },
-    [],
+    [t],
   );
 
   const handleExportMain = useCallback(() => {
@@ -1102,8 +1114,13 @@ export function PurchaseOrderPage() {
   }, [poFulfillment]);
 
   const linesColumnDefs = useMemo(
-    () => poLinesDisplayColumnDefs(fulfillmentByItemId),
-    [fulfillmentByItemId],
+    () => poLinesDisplayColumnDefs(t, fulfillmentByItemId),
+    [fulfillmentByItemId, t, locale],
+  );
+
+  const readOnlyLinesColumnDefs = useMemo(
+    () => poLinesReadOnlyColumnDefs(t, poFulfillment),
+    [t, locale, poFulfillment],
   );
 
   usePlanningDocumentHotkeys({
@@ -1121,7 +1138,7 @@ export function PurchaseOrderPage() {
   if (!id) {
     return (
       <div className="doc-page doc-page--not-found">
-        <p>Purchase order not found.</p>
+        <p>{t("doc.notFound.purchaseOrder")}</p>
       </div>
     );
   }
@@ -1129,23 +1146,25 @@ export function PurchaseOrderPage() {
   if (!isNew && !doc) {
     return (
       <div className="doc-page doc-page--not-found">
-        <p>Purchase order not found.</p>
+        <p>{t("doc.notFound.purchaseOrder")}</p>
       </div>
     );
   }
 
   const breadcrumbItems = [
-    { label: "Purchasing", to: "/purchase-orders" },
-    { label: "Purchase Orders", to: "/purchase-orders" },
-    { label: isNew ? "New" : doc!.number },
+    { label: t("shell.purchasing"), to: "/purchase-orders" },
+    { label: t("shell.nav.purchaseOrders"), to: "/purchase-orders" },
+    { label: isNew ? t("doc.page.new") : doc!.number },
   ];
 
-  const displayTitle = isNew ? "New Purchase Order" : `Purchase Order ${doc!.number}`;
+  const displayTitle = isNew
+    ? t("doc.po.titleNew")
+    : t("doc.po.titleNumbered", { number: doc!.number });
 
   return (
     <DocumentPageLayout
       breadcrumbItems={breadcrumbItems}
-      breadcrumbPrefix={<BackButton to="/purchase-orders" aria-label="Back to Purchase Orders" />}
+      breadcrumbPrefix={<BackButton to="/purchase-orders" aria-label={t("doc.po.backToListAria")} />}
       header={
         <div className="doc-header">
           <div className="doc-header__title-row">
@@ -1158,9 +1177,9 @@ export function PurchaseOrderPage() {
             )}
             <div className="doc-header__actions">
               {isEditable && (
-                <Button type="button" onClick={handleSave} title="Save (Ctrl/Cmd+S)">
+                <Button type="button" onClick={handleSave} title={t("doc.page.saveTitle")}>
                   <Save aria-hidden />
-                  Save
+                  {t("common.save")}
                 </Button>
               )}
               {!isNew && isDraft && (
@@ -1174,29 +1193,29 @@ export function PurchaseOrderPage() {
                   title={
                     settings.documents.blockConfirmWhenPlanningHasBlockingErrors &&
                     hasErrors(health.issues)
-                      ? "Fix errors before confirming."
+                      ? t("doc.page.fixErrorsBeforeConfirm")
                       : undefined
                   }
                 >
                   <CircleCheck aria-hidden />
-                  Confirm
+                  {t("doc.page.confirm")}
                 </Button>
               )}
               {!isNew && isConfirmed && (
                 <Button type="button" onClick={handleCreateReceipt}>
-                  <span className="create-btn__plus">+</span> Create Receipt
+                  <span className="create-btn__plus">+</span> {t("doc.page.createReceipt")}
                 </Button>
               )}
               {!isNew && (isDraft || isConfirmed) && (
                 <Button type="button" variant="outline" onClick={handleCancelDocument}>
                   <FileX aria-hidden />
-                  Cancel document
+                  {t("doc.page.cancelDocument")}
                 </Button>
               )}
               {isEditable && (
                 <Button type="button" variant="outline" onClick={handleCancel}>
                   <X aria-hidden />
-                  Cancel
+                  {t("common.cancel")}
                 </Button>
               )}
             </div>
@@ -1209,19 +1228,19 @@ export function PurchaseOrderPage() {
         <>
           <Card className="max-w-2xl border-0 shadow-none">
             <CardHeader className="p-2 pb-0.5">
-              <CardTitle className="text-[0.9rem] font-semibold">Details</CardTitle>
+              <CardTitle className="text-[0.9rem] font-semibold">{t("doc.page.details")}</CardTitle>
             </CardHeader>
             <CardContent className="p-2 pt-1">
               <div className="grid w-fit grid-cols-[280px_280px] gap-x-2 gap-y-1">
                 <div className="flex min-w-0 w-full flex-col gap-0.5">
-                  <Label htmlFor="po-number" className="text-sm">Number</Label>
+                  <Label htmlFor="po-number" className="text-sm">{t("doc.columns.number")}</Label>
                   <div id="po-number" className="flex h-8 items-center text-sm text-muted-foreground">
                     {displayNumber}
                   </div>
                 </div>
                 <div className="flex min-w-0 w-full flex-col gap-0.5">
                   <Label htmlFor="po-date" className="text-sm">
-                    Date <span className="text-destructive">*</span>
+                    {t("doc.columns.date")} <span className="text-destructive">*</span>
                   </Label>
                   <DatePickerField
                     id="po-date"
@@ -1232,7 +1251,7 @@ export function PurchaseOrderPage() {
                 </div>
                 <div className="flex min-w-0 w-full flex-col gap-0.5">
                   <Label htmlFor="po-supplier" className="text-sm">
-                    Supplier <span className="text-destructive">*</span>
+                    {t("doc.columns.supplier")} <span className="text-destructive">*</span>
                   </Label>
                   <SelectField
                     id="po-supplier"
@@ -1244,13 +1263,13 @@ export function PurchaseOrderPage() {
                       value: s.id,
                       label: `${s.code} - ${s.name}`,
                     }))}
-                    placeholder="Select supplier"
-                    aria-label="Supplier"
+                    placeholder={t("doc.page.selectSupplier")}
+                    aria-label={t("doc.columns.supplier")}
                   />
                 </div>
                 <div className="flex min-w-0 w-full flex-col gap-0.5">
                   <Label htmlFor="po-warehouse" className="text-sm">
-                    Warehouse <span className="text-destructive">*</span>
+                    {t("doc.columns.warehouse")} <span className="text-destructive">*</span>
                   </Label>
                   <SelectField
                     id="po-warehouse"
@@ -1262,13 +1281,13 @@ export function PurchaseOrderPage() {
                       value: w.id,
                       label: `${w.code} - ${w.name}`,
                     }))}
-                    placeholder="Select warehouse"
-                    aria-label="Warehouse"
+                    placeholder={t("doc.page.selectWarehouse")}
+                    aria-label={t("doc.columns.warehouse")}
                   />
                 </div>
                 <div className="flex min-w-0 w-full flex-col gap-0.5">
                   <Label htmlFor="po-payment-terms" className="text-sm">
-                    Payment terms (days)
+                    {t("doc.page.paymentTermsDaysLabel")}
                   </Label>
                   <Input
                     id="po-payment-terms"
@@ -1277,18 +1296,18 @@ export function PurchaseOrderPage() {
                     step={1}
                     value={form.paymentTermsDays}
                     onChange={(e) => setForm((f) => ({ ...f, paymentTermsDays: e.target.value }))}
-                    placeholder="From supplier or enter"
+                    placeholder={t("doc.page.paymentTermsInputPlaceholder")}
                     className="h-8 text-sm"
                   />
                 </div>
                 <div className="flex min-w-0 w-full flex-col gap-0.5">
-                  <span className="text-sm text-muted-foreground">Due date</span>
+                  <span className="text-sm text-muted-foreground">{t("doc.page.dueDate")}</span>
                   <div className="flex h-8 items-center text-sm text-foreground/90 tabular-nums">
                     {computedDueDateDisplay}
                   </div>
                 </div>
                 <div className="col-span-2 flex flex-col gap-0.5">
-                  <Label htmlFor="po-comment" className="text-sm">Comment</Label>
+                  <Label htmlFor="po-comment" className="text-sm">{t("doc.columns.comment")}</Label>
                   <Input
                     id="po-comment"
                     type="text"
@@ -1296,7 +1315,7 @@ export function PurchaseOrderPage() {
                     onChange={(e) =>
                       setForm((f) => ({ ...f, comment: e.target.value }))
                     }
-                    placeholder="Optional"
+                    placeholder={t("common.optional")}
                     className="h-8 text-sm"
                   />
                 </div>
@@ -1305,37 +1324,37 @@ export function PurchaseOrderPage() {
           </Card>
           <div className="doc-lines mt-[calc(0.5rem+1cm)]">
             <div className="doc-lines__header mb-1.5 max-w-2xl">
-              <h3 className="doc-lines__title">Lines</h3>
+              <h3 className="doc-lines__title">{t("doc.page.lines")}</h3>
             </div>
             {!isNew && poFulfillment ? (
               <div className="mb-2 max-w-4xl text-xs">
                 <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
-                  <span className="font-medium text-foreground">Receipt fulfillment</span>
+                  <span className="font-medium text-foreground">{t("doc.fulfillment.po.sectionTitle")}</span>
                   <span className="tabular-nums text-muted-foreground">
-                    {planningFulfillmentStateLabel(poFulfillment.state)}
+                    {translatePlanningFulfillmentState(t, poFulfillment.state)}
+                  </span>
+                  <span className="text-muted-foreground tabular-nums">
+                    {t("doc.fulfillment.po.receivedOrdered", {
+                      received: poFulfillment.totalReceived,
+                      ordered: poFulfillment.totalOrdered,
+                    })}
                   </span>
                   <span className="text-muted-foreground">
-                    Received{" "}
-                    <span className="text-foreground tabular-nums">{poFulfillment.totalReceived}</span>
-                    {" / "}
-                    <span className="tabular-nums">{poFulfillment.totalOrdered}</span> ordered
-                  </span>
-                  <span className="text-muted-foreground">
-                    Remaining{" "}
+                    {t("doc.fulfillment.po.remainingLabel")}{" "}
                     <span className="text-foreground tabular-nums">
                       {poFulfillment.totalRemaining < 0
-                        ? `${poFulfillment.totalRemaining} (over)`
+                        ? t("doc.fulfillment.remainingOver", { qty: poFulfillment.totalRemaining })
                         : poFulfillment.totalRemaining}
                     </span>
                   </span>
-                  <span className="text-muted-foreground">
-                    Receipts:{" "}
-                    <span className="text-foreground tabular-nums">{poFulfillment.postedReceiptCount}</span>
-                    {" posted / "}
-                    <span className="tabular-nums">{poFulfillment.relatedReceiptCount}</span> total
+                  <span className="text-muted-foreground tabular-nums">
+                    {t("doc.fulfillment.po.receiptsPostedTotal", {
+                      posted: poFulfillment.postedReceiptCount,
+                      total: poFulfillment.relatedReceiptCount,
+                    })}
                   </span>
                   {poFulfillment.hasOverFulfillment ? (
-                    <span className="text-destructive font-medium">Over-received on line(s)</span>
+                    <span className="text-destructive font-medium">{t("doc.fulfillment.po.overReceived")}</span>
                   ) : null}
                 </div>
               </div>
@@ -1347,7 +1366,7 @@ export function PurchaseOrderPage() {
                     <div className="grid grid-cols-2 md:grid-cols-[minmax(200px,240px)_auto_auto_auto_minmax(160px,220px)_minmax(260px,1fr)] gap-x-2 gap-y-1 items-end w-max max-w-full">
                     <div className="flex flex-col gap-0.5">
                       <Label htmlFor="line-entry-item" className="text-sm">
-                        Item <span className="text-destructive">*</span>
+                        {t("doc.page.itemLabel")} <span className="text-destructive">*</span>
                       </Label>
                       <PurchaseOrderItemAutocomplete
                         ref={lineEntryItemPickerRef}
@@ -1355,14 +1374,14 @@ export function PurchaseOrderPage() {
                         value={lineEntryItemId}
                         onChange={handleLineEntryItemChange}
                         items={itemRepository.list()}
-                        placeholder="Search by code, barcode or name…"
+                        placeholder={t("doc.page.searchItemPlaceholder")}
                         className="w-[240px]"
                         dropdownRightEdgeRef={lineEntryDropdownRightEdgeRef}
                       />
                     </div>
                     <div className="flex flex-col gap-0.5">
                       <Label htmlFor="line-entry-qty" className="text-sm">
-                        Qty <span className="text-destructive">*</span>
+                        {t("doc.columns.qty")} <span className="text-destructive">*</span>
                       </Label>
                       <Input
                         ref={lineEntryQtyInputRef}
@@ -1383,7 +1402,7 @@ export function PurchaseOrderPage() {
                       />
                     </div>
                     <div className="flex flex-col gap-0.5">
-                      <Label htmlFor="line-entry-unit-price" className="text-sm">Unit price</Label>
+                      <Label htmlFor="line-entry-unit-price" className="text-sm">{t("doc.columns.unitPrice")}</Label>
                       <Input
                         id="line-entry-unit-price"
                         type="number"
@@ -1401,7 +1420,7 @@ export function PurchaseOrderPage() {
                     </div>
                     <div className="flex flex-col gap-0.5 md:col-span-1">
                       <Label htmlFor="line-entry-zp-reason" className="text-sm">
-                        Zero-price reason
+                        {t("doc.page.zeroPriceReasonLabel")}
                         {roundMoney(lineEntryUnitPrice) === 0 ? (
                           <span className="text-destructive"> *</span>
                         ) : null}
@@ -1410,8 +1429,12 @@ export function PurchaseOrderPage() {
                         id="line-entry-zp-reason"
                         value={lineEntryZeroPriceReason}
                         onChange={setLineEntryZeroPriceReason}
-                        options={ZERO_PRICE_REASON_SELECT_OPTIONS}
-                        placeholder={roundMoney(lineEntryUnitPrice) === 0 ? "Select reason" : "—"}
+                        options={zeroPriceReasonOptions}
+                        placeholder={
+                          roundMoney(lineEntryUnitPrice) === 0
+                            ? t("doc.cancelDialog.selectPlaceholder")
+                            : t("domain.audit.summary.emDash")
+                        }
                         className="w-[min(100%,220px)] min-w-0"
                         disabled={roundMoney(lineEntryUnitPrice) !== 0}
                       />
@@ -1428,10 +1451,10 @@ export function PurchaseOrderPage() {
                             size="sm"
                             className="h-8 gap-1.5"
                             onClick={addLineFromEntry}
-                            title="Add line (Alt+A)"
+                            title={t("doc.page.addLineTitle")}
                           >
                             <Plus className="h-4 w-4 shrink-0" aria-hidden />
-                            Add line
+                            {t("doc.page.addLine")}
                           </Button>
                           <Button
                             type="button"
@@ -1442,10 +1465,10 @@ export function PurchaseOrderPage() {
                               setLineImportInitialTab("paste");
                               setIsLineImportModalOpen(true);
                             }}
-                            title="Add lines — paste / Excel (Alt+L)"
+                            title={t("doc.page.addLinesTitle")}
                           >
                             <ClipboardPaste className="h-4 w-4 shrink-0" aria-hidden />
-                            Add lines
+                            {t("doc.page.addLines")}
                           </Button>
                         </>
                       ) : (
@@ -1457,7 +1480,7 @@ export function PurchaseOrderPage() {
                             onClick={updateLineFromEntry}
                           >
                             <Check className="h-4 w-4 shrink-0" aria-hidden />
-                            Update line
+                            {t("doc.page.updateLine")}
                           </Button>
                           <Button
                             type="button"
@@ -1473,7 +1496,7 @@ export function PurchaseOrderPage() {
                             }}
                           >
                             <Trash2 className="h-4 w-4 shrink-0" aria-hidden />
-                            Remove
+                            {t("doc.page.remove")}
                           </Button>
                           <Button
                             type="button"
@@ -1483,7 +1506,7 @@ export function PurchaseOrderPage() {
                             onClick={cancelEdit}
                           >
                             <X className="h-4 w-4 shrink-0" aria-hidden />
-                            Cancel edit
+                            {t("doc.page.cancelEdit")}
                           </Button>
                         </>
                       )}
@@ -1491,7 +1514,7 @@ export function PurchaseOrderPage() {
                     <div className="doc-lines__contextual-slot min-h-9 flex items-end">
                       {duplicateChoicePending && editingLineId === null ? (
                         <div className="flex flex-col gap-1">
-                          <span className="text-muted-foreground text-xs leading-tight">Item already exists</span>
+                          <span className="text-muted-foreground text-xs leading-tight">{t("doc.page.itemAlreadyExists")}</span>
                           <div className="flex items-center gap-1.5">
                             <Button
                               type="button"
@@ -1500,7 +1523,7 @@ export function PurchaseOrderPage() {
                               className="h-8"
                               onClick={handleDuplicateIncreaseQty}
                             >
-                              Increase quantity
+                              {t("doc.page.increaseQuantity")}
                             </Button>
                             <Button
                               type="button"
@@ -1509,18 +1532,18 @@ export function PurchaseOrderPage() {
                               className="h-8"
                               onClick={handleDuplicateCancel}
                             >
-                              Cancel
+                              {t("common.cancel")}
                             </Button>
                           </div>
                         </div>
                       ) : selectedLineIds.length >= 2 ? (
                         <div className="flex flex-col gap-1">
                           <span className="text-muted-foreground text-xs leading-tight">
-                            {selectedLineIds.length} lines selected
+                            {t("doc.page.linesSelected", { count: selectedLineIds.length })}
                           </span>
                           <div className="flex items-center gap-1.5">
                             <Button type="button" variant="outline" size="sm" className="h-8" onClick={removeSelectedLines}>
-                              Remove selected lines
+                              {t("doc.page.removeSelectedLines")}
                             </Button>
                           </div>
                         </div>
@@ -1532,15 +1555,15 @@ export function PurchaseOrderPage() {
                 <div className="flex flex-row items-center gap-2 shrink-0">
                   {exportSuccess && (
                     <div className="h-8 w-max flex items-center gap-1.5 rounded-md border border-input bg-background px-2 text-sm shrink-0">
-                      <span className="text-muted-foreground text-xs">Export completed:</span>
+                      <span className="text-muted-foreground text-xs">{t("doc.list.exportCompleted")}</span>
                       <span className="font-medium text-xs truncate max-w-[12rem]" title={exportSuccess.filename}>{exportSuccess.filename}</span>
                       <Button
                         type="button"
                         variant="ghost"
                         size="icon"
                         className="h-7 w-7 shrink-0 text-muted-foreground hover:text-foreground"
-                        title="Open file"
-                        aria-label="Open file"
+                        title={t("doc.list.openFile")}
+                        aria-label={t("doc.list.openFile")}
                         onClick={async () => {
                           const path = exportSuccess.path;
                           console.log("[Export] Open file handler started", { path });
@@ -1561,8 +1584,8 @@ export function PurchaseOrderPage() {
                         variant="ghost"
                         size="icon"
                         className="h-7 w-7 shrink-0 text-muted-foreground hover:text-foreground"
-                        title="Open folder"
-                        aria-label="Open folder"
+                        title={t("doc.list.openFolder")}
+                        aria-label={t("doc.list.openFolder")}
                         onClick={() => {
                           revealItemInDir(exportSuccess.path);
                           setExportSuccess(null);
@@ -1575,8 +1598,8 @@ export function PurchaseOrderPage() {
                         variant="ghost"
                         size="icon"
                         className="h-6 w-6 shrink-0 text-muted-foreground/80 hover:text-muted-foreground"
-                        title="Dismiss"
-                        aria-label="Dismiss"
+                        title={t("doc.list.dismiss")}
+                        aria-label={t("doc.list.dismiss")}
                         onClick={() => setExportSuccess(null)}
                       >
                         <X className="h-3 w-3" />
@@ -1592,7 +1615,7 @@ export function PurchaseOrderPage() {
                       onClick={handleExportMain}
                     >
                       <FileSpreadsheet className="h-4 w-4 shrink-0" />
-                      Export
+                      {t("doc.page.export")}
                     </Button>
                     <Popover open={exportOpen} onOpenChange={setExportOpen}>
                       <PopoverTrigger asChild>
@@ -1601,7 +1624,7 @@ export function PurchaseOrderPage() {
                           variant="outline"
                           size="icon"
                           className="h-8 w-8 shrink-0 rounded-l-none border-0 shadow-none"
-                          aria-label="Export options"
+                          aria-label={t("doc.list.exportOptionsAria")}
                         >
                           <ChevronDown className="h-4 w-4" />
                         </Button>
@@ -1612,13 +1635,19 @@ export function PurchaseOrderPage() {
                             type="button"
                             disabled={exportSelectedDisabled}
                             className="w-full rounded-sm px-1.5 py-1 text-left text-sm hover:bg-accent disabled:cursor-not-allowed disabled:opacity-50"
-                            title={exportSelectedDisabled ? (!isEditable ? "Selection is available in edit mode only." : "Select one or more lines in the grid first.") : undefined}
+                            title={
+                              exportSelectedDisabled
+                                ? !isEditable
+                                  ? t("doc.list.exportSelectionEditModeOnly")
+                                  : t("doc.list.exportSelectLinesFirst")
+                                : undefined
+                            }
                             onClick={() => {
                               setExportOpen(false);
                               if (!exportSelectedDisabled) handleExportSelected();
                             }}
                           >
-                            Export selected lines
+                            {t("doc.list.exportSelectedRows")}
                           </button>
                           <button
                             type="button"
@@ -1628,7 +1657,7 @@ export function PurchaseOrderPage() {
                               handleExportAll();
                             }}
                           >
-                            Export all lines
+                            {t("doc.list.exportAllLines")}
                           </button>
                         </div>
                       </PopoverContent>
@@ -1641,15 +1670,15 @@ export function PurchaseOrderPage() {
               <div className="flex flex-row items-center justify-end gap-2 w-full mb-1.5">
                 {exportSuccess && (
                   <div className="h-8 w-max flex items-center gap-1.5 rounded-md border border-input bg-background px-2 text-sm shrink-0">
-                    <span className="text-muted-foreground text-xs">Export completed:</span>
+                    <span className="text-muted-foreground text-xs">{t("doc.list.exportCompleted")}</span>
                     <span className="font-medium text-xs truncate max-w-[12rem]" title={exportSuccess.filename}>{exportSuccess.filename}</span>
                     <Button
                       type="button"
                       variant="ghost"
                       size="icon"
                       className="h-7 w-7 shrink-0 text-muted-foreground hover:text-foreground"
-                      title="Open file"
-                      aria-label="Open file"
+                      title={t("doc.list.openFile")}
+                      aria-label={t("doc.list.openFile")}
                       onClick={async () => {
                         const path = exportSuccess.path;
                         console.log("[Export] Open file handler started", { path });
@@ -1670,8 +1699,8 @@ export function PurchaseOrderPage() {
                       variant="ghost"
                       size="icon"
                       className="h-7 w-7 shrink-0 text-muted-foreground hover:text-foreground"
-                      title="Open folder"
-                      aria-label="Open folder"
+                      title={t("doc.list.openFolder")}
+                      aria-label={t("doc.list.openFolder")}
                       onClick={() => {
                         revealItemInDir(exportSuccess.path);
                         setExportSuccess(null);
@@ -1684,8 +1713,8 @@ export function PurchaseOrderPage() {
                       variant="ghost"
                       size="icon"
                       className="h-6 w-6 shrink-0 text-muted-foreground/80 hover:text-muted-foreground"
-                      title="Dismiss"
-                      aria-label="Dismiss"
+                      title={t("doc.list.dismiss")}
+                      aria-label={t("doc.list.dismiss")}
                       onClick={() => setExportSuccess(null)}
                     >
                       <X className="h-3 w-3" />
@@ -1701,7 +1730,7 @@ export function PurchaseOrderPage() {
                     onClick={handleExportMain}
                   >
                     <FileSpreadsheet className="h-4 w-4 shrink-0" />
-                    Export
+                    {t("doc.page.export")}
                   </Button>
                   <Popover open={exportOpen} onOpenChange={setExportOpen}>
                     <PopoverTrigger asChild>
@@ -1710,7 +1739,7 @@ export function PurchaseOrderPage() {
                         variant="outline"
                         size="icon"
                         className="h-8 w-8 shrink-0 rounded-l-none border-0 shadow-none"
-                        aria-label="Export options"
+                        aria-label={t("doc.list.exportOptionsAria")}
                       >
                         <ChevronDown className="h-4 w-4" />
                       </Button>
@@ -1721,13 +1750,19 @@ export function PurchaseOrderPage() {
                           type="button"
                           disabled={exportSelectedDisabled}
                           className="w-full rounded-sm px-1.5 py-1 text-left text-sm hover:bg-accent disabled:cursor-not-allowed disabled:opacity-50"
-                          title={exportSelectedDisabled ? (!isEditable ? "Selection is available in edit mode only." : "Select one or more lines in the grid first.") : undefined}
+                          title={
+                            exportSelectedDisabled
+                              ? !isEditable
+                                ? t("doc.list.exportSelectionEditModeOnly")
+                                : t("doc.list.exportSelectLinesFirst")
+                              : undefined
+                          }
                           onClick={() => {
                             setExportOpen(false);
                             if (!exportSelectedDisabled) handleExportSelected();
                           }}
                         >
-                          Export selected lines
+                          {t("doc.list.exportSelectedRows")}
                         </button>
                         <button
                           type="button"
@@ -1737,7 +1772,7 @@ export function PurchaseOrderPage() {
                             handleExportAll();
                           }}
                         >
-                          Export all lines
+                          {t("doc.list.exportAllLines")}
                         </button>
                       </div>
                     </PopoverContent>
@@ -1763,8 +1798,12 @@ export function PurchaseOrderPage() {
             </div>
             {form.lines.length > 0 && (
               <div className="mt-2 flex flex-wrap gap-x-6 gap-y-1 text-sm text-muted-foreground">
-                <span>Total qty: {totals.totalQty}</span>
-                <span>Total amount: {totals.totalAmount.toFixed(2)}</span>
+                <span>
+                  {t("doc.page.totalQty")}: {totals.totalQty}
+                </span>
+                <span>
+                  {t("doc.page.totalAmount")}: {totals.totalAmount.toFixed(2)}
+                </span>
               </div>
             )}
           </div>
@@ -1773,56 +1812,59 @@ export function PurchaseOrderPage() {
         <>
           <Card className="max-w-2xl border-0 shadow-none">
             <CardHeader className="p-2 pb-0.5">
-              <CardTitle className="text-[0.9rem] font-semibold">Details</CardTitle>
+              <CardTitle className="text-[0.9rem] font-semibold">{t("doc.page.details")}</CardTitle>
             </CardHeader>
             <CardContent className="p-2 pt-1">
               <dl className="doc-summary doc-summary--compact doc-summary--dense">
                 <div className="doc-summary__row">
-                  <dt className="doc-summary__term">Number</dt>
+                  <dt className="doc-summary__term">{t("doc.columns.number")}</dt>
                   <dd className="doc-summary__value">{doc!.number}</dd>
                 </div>
                 <div className="doc-summary__row">
-                  <dt className="doc-summary__term">Date</dt>
+                  <dt className="doc-summary__term">{t("doc.columns.date")}</dt>
                   <dd className="doc-summary__value">{normalizeDateForPO(doc!.date)}</dd>
                 </div>
                 <div className="doc-summary__row">
-                  <dt className="doc-summary__term">Supplier</dt>
+                  <dt className="doc-summary__term">{t("doc.columns.supplier")}</dt>
                   <dd className="doc-summary__value">{supplierName}</dd>
                 </div>
                 <div className="doc-summary__row">
-                  <dt className="doc-summary__term">Warehouse</dt>
+                  <dt className="doc-summary__term">{t("doc.columns.warehouse")}</dt>
                   <dd className="doc-summary__value">{warehouseName}</dd>
                 </div>
                 <div className="doc-summary__row">
-                  <dt className="doc-summary__term">Payment terms</dt>
+                  <dt className="doc-summary__term">{t("doc.summary.paymentTerms")}</dt>
                   <dd className="doc-summary__value">
-                    {doc!.paymentTermsDays !== undefined ? `${doc!.paymentTermsDays} days` : "—"}
+                    {doc!.paymentTermsDays !== undefined
+                      ? t("doc.summary.paymentTermsDays", { days: doc!.paymentTermsDays })
+                      : t("domain.audit.summary.emDash")}
                   </dd>
                 </div>
                 <div className="doc-summary__row">
-                  <dt className="doc-summary__term">Due date</dt>
+                  <dt className="doc-summary__term">{t("doc.page.dueDate")}</dt>
                   <dd className="doc-summary__value">
-                    {doc!.dueDate != null && doc!.dueDate !== "" ? doc!.dueDate : "—"}
+                    {doc!.dueDate != null && doc!.dueDate !== ""
+                      ? doc!.dueDate
+                      : t("domain.audit.summary.emDash")}
                   </dd>
                 </div>
                 {doc!.comment != null && doc!.comment !== "" && (
                   <div className="doc-summary__row">
-                    <dt className="doc-summary__term">Comment</dt>
+                    <dt className="doc-summary__term">{t("doc.columns.comment")}</dt>
                     <dd className="doc-summary__value">{doc!.comment}</dd>
                   </div>
                 )}
                 {doc!.status === "cancelled" && doc!.cancelReasonCode != null && doc!.cancelReasonCode !== "" && (
                   <>
                     <div className="doc-summary__row">
-                      <dt className="doc-summary__term">Cancel reason</dt>
+                      <dt className="doc-summary__term">{t("doc.summary.cancelReason")}</dt>
                       <dd className="doc-summary__value">
-                        {CANCEL_DOCUMENT_REASON_LABELS[doc!.cancelReasonCode as CancelDocumentReasonCode] ??
-                          doc!.cancelReasonCode}
+                        {translateCancelReason(t, doc!.cancelReasonCode as CancelDocumentReasonCode)}
                       </dd>
                     </div>
                     {doc!.cancelReasonComment != null && doc!.cancelReasonComment !== "" && (
                       <div className="doc-summary__row">
-                        <dt className="doc-summary__term">Cancel comment</dt>
+                        <dt className="doc-summary__term">{t("doc.summary.cancelComment")}</dt>
                         <dd className="doc-summary__value">{doc!.cancelReasonComment}</dd>
                       </div>
                     )}
@@ -1832,42 +1874,42 @@ export function PurchaseOrderPage() {
             </CardContent>
           </Card>
           <div className="doc-lines mt-[calc(0.5rem+1cm)]">
-            <h3 className="doc-lines__title">Lines</h3>
+            <h3 className="doc-lines__title">{t("doc.page.lines")}</h3>
             {poFulfillment ? (
               <div className="mb-2 max-w-4xl text-xs">
                 <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
-                  <span className="font-medium text-foreground">Receipt fulfillment</span>
+                  <span className="font-medium text-foreground">{t("doc.fulfillment.po.sectionTitle")}</span>
                   <span className="tabular-nums text-muted-foreground">
-                    {planningFulfillmentStateLabel(poFulfillment.state)}
+                    {translatePlanningFulfillmentState(t, poFulfillment.state)}
+                  </span>
+                  <span className="text-muted-foreground tabular-nums">
+                    {t("doc.fulfillment.po.receivedOrdered", {
+                      received: poFulfillment.totalReceived,
+                      ordered: poFulfillment.totalOrdered,
+                    })}
                   </span>
                   <span className="text-muted-foreground">
-                    Received{" "}
-                    <span className="text-foreground tabular-nums">{poFulfillment.totalReceived}</span>
-                    {" / "}
-                    <span className="tabular-nums">{poFulfillment.totalOrdered}</span> ordered
-                  </span>
-                  <span className="text-muted-foreground">
-                    Remaining{" "}
+                    {t("doc.fulfillment.po.remainingLabel")}{" "}
                     <span className="text-foreground tabular-nums">
                       {poFulfillment.totalRemaining < 0
-                        ? `${poFulfillment.totalRemaining} (over)`
+                        ? t("doc.fulfillment.remainingOver", { qty: poFulfillment.totalRemaining })
                         : poFulfillment.totalRemaining}
                     </span>
                   </span>
-                  <span className="text-muted-foreground">
-                    Receipts:{" "}
-                    <span className="text-foreground tabular-nums">{poFulfillment.postedReceiptCount}</span>
-                    {" posted / "}
-                    <span className="tabular-nums">{poFulfillment.relatedReceiptCount}</span> total
+                  <span className="text-muted-foreground tabular-nums">
+                    {t("doc.fulfillment.po.receiptsPostedTotal", {
+                      posted: poFulfillment.postedReceiptCount,
+                      total: poFulfillment.relatedReceiptCount,
+                    })}
                   </span>
                   {poFulfillment.hasOverFulfillment ? (
-                    <span className="text-destructive font-medium">Over-received on line(s)</span>
+                    <span className="text-destructive font-medium">{t("doc.fulfillment.po.overReceived")}</span>
                   ) : null}
                 </div>
               </div>
             ) : null}
             {linesWithItem.length === 0 ? (
-              <p className="doc-lines__empty">No lines.</p>
+              <p className="doc-lines__empty">{t("doc.page.noLines")}</p>
             ) : (
               <>
                 <div className="doc-lines__grid">
@@ -1875,15 +1917,19 @@ export function PurchaseOrderPage() {
                     <AgGridReact<LineWithItem>
                       {...agGridDefaultGridOptions}
                       rowData={linesWithItem}
-                      columnDefs={poLinesReadOnlyColumnDefs(poFulfillment)}
+                      columnDefs={readOnlyLinesColumnDefs}
                       defaultColDef={agGridDefaultColDef}
                       getRowId={(p) => p.data.id}
                     />
                   </AgGridContainer>
                 </div>
                 <div className="mt-2 flex flex-wrap gap-x-6 gap-y-1 text-sm text-muted-foreground">
-                  <span>Total qty: {readonlyTotals.totalQty}</span>
-                  <span>Total amount: {readonlyTotals.totalAmount.toFixed(2)}</span>
+                  <span>
+                    {t("doc.page.totalQty")}: {readonlyTotals.totalQty}
+                  </span>
+                  <span>
+                    {t("doc.page.totalAmount")}: {readonlyTotals.totalAmount.toFixed(2)}
+                  </span>
                 </div>
               </>
             )}
@@ -1904,6 +1950,7 @@ export function PurchaseOrderPage() {
           )
         }
         templateFileName="purchase-order-lines-template.xlsx"
+        templateDisplayLabel={t("doc.po.importTemplateLabel")}
         onOpenChange={setIsLineImportModalOpen}
         onApply={handleApplyImportedLines}
       />
@@ -1913,7 +1960,7 @@ export function PurchaseOrderPage() {
       <CancelDocumentReasonDialog
         open={cancelReasonDialogOpen}
         onOpenChange={setCancelReasonDialogOpen}
-        documentKindLabel="purchase order"
+        documentKindLabel={t("doc.kinds.purchaseOrder")}
         onConfirm={handleCancelDocumentConfirm}
       />
     </DocumentPageLayout>
