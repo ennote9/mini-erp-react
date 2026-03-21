@@ -3,7 +3,7 @@ import { useMemo, useState, useCallback } from "react";
 import { AgGridReact } from "ag-grid-react";
 import type { ColDef, SelectionChangedEvent } from "ag-grid-community";
 import { receiptRepository } from "../repository";
-import { post, cancelDocument } from "../service";
+import { post, cancelDocument, validateReceiptFull } from "../service";
 import { purchaseOrderRepository } from "../../purchase-orders/repository";
 import { warehouseRepository } from "../../warehouses/repository";
 import { itemRepository } from "../../items/repository";
@@ -13,11 +13,17 @@ import type { ReceiptLine } from "../model";
 import { DocumentPageLayout } from "../../../shared/ui/object/DocumentPageLayout";
 import { BackButton } from "../../../shared/ui/list/BackButton";
 import { StatusBadge } from "../../../shared/ui/feedback/StatusBadge";
-import { IssueBlock } from "../../../shared/ui/feedback/IssueBlock";
-import { actionIssue, type Issue } from "../../../shared/issues";
+import { DocumentIssueStrip } from "../../../shared/ui/feedback/DocumentIssueStrip";
+import { actionIssue, getErrorAndWarningMessages, type Issue } from "../../../shared/issues";
 import { AgGridContainer } from "../../../shared/ui/ag-grid/AgGridContainer";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { agGridDefaultColDef, agGridSelectionColumnDef } from "../../../shared/ui/ag-grid/agGridDefaults";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { ChevronDown, FileSpreadsheet, File, FolderOpen, X } from "lucide-react";
@@ -25,6 +31,7 @@ import { buildLinesXlsxBuffer, buildDocumentXlsxBuffer, type ReceiptExportLineRo
 import { save } from "@tauri-apps/plugin-dialog";
 import { invoke } from "@tauri-apps/api/core";
 import { revealItemInDir } from "@tauri-apps/plugin-opener";
+import { factualDocumentIssuesForStrip } from "../../../shared/factualDocumentPageIssues";
 
 type LineWithItem = ReceiptLine & { itemName: string; uom: string };
 
@@ -232,17 +239,22 @@ export function ReceiptPage() {
 
   const handlePost = () => {
     if (!id) return;
-    setActionIssues([]);
     const result = post(id);
-    if (result.success) setRefresh((r) => r + 1);
-    else setActionIssues([actionIssue(result.error)]);
+    if (result.success) {
+      setActionIssues([]);
+      setRefresh((r) => r + 1);
+    }
   };
   const handleCancelDocument = () => {
     if (!id) return;
     setActionIssues([]);
     const result = cancelDocument(id);
-    if (result.success) setRefresh((r) => r + 1);
-    else setActionIssues([actionIssue(result.error)]);
+    if (result.success) {
+      setActionIssues([]);
+      setRefresh((r) => r + 1);
+    } else {
+      setActionIssues([actionIssue(result.error)]);
+    }
   };
 
   if (!id || !doc) {
@@ -259,6 +271,16 @@ export function ReceiptPage() {
     { label: doc.number },
   ];
 
+  const issuesForStrip = useMemo(
+    () => factualDocumentIssuesForStrip(actionIssues, isDraft, id, validateReceiptFull),
+    [actionIssues, isDraft, id, refresh],
+  );
+
+  const { errors: documentErrors, warnings: documentWarnings } =
+    getErrorAndWarningMessages(issuesForStrip);
+  const hasDocumentIssues =
+    documentErrors.length > 0 || documentWarnings.length > 0;
+
   return (
     <DocumentPageLayout
       breadcrumbItems={breadcrumbItems}
@@ -269,29 +291,36 @@ export function ReceiptPage() {
             <h2 className="doc-header__title">Receipt {doc.number}</h2>
             <StatusBadge status={doc.status} />
           </div>
-          <div className="doc-header__actions">
-            <Button type="button" disabled>
-              Save
-            </Button>
-            {isDraft && (
-              <Button type="button" onClick={handlePost}>
-                Post
-              </Button>
+          <div className="doc-header__right">
+            {hasDocumentIssues && (
+              <DocumentIssueStrip
+                errors={documentErrors}
+                warnings={documentWarnings}
+              />
             )}
-            {isDraft && (
-              <Button type="button" variant="outline" onClick={handleCancelDocument}>
-                Cancel document
-              </Button>
-            )}
+            <div className="doc-header__actions">
+              {isDraft && (
+                <Button type="button" onClick={handlePost}>
+                  Post
+                </Button>
+              )}
+              {isDraft && (
+                <Button type="button" variant="outline" onClick={handleCancelDocument}>
+                  Cancel document
+                </Button>
+              )}
+            </div>
           </div>
         </div>
       }
       summary={null}
     >
-      <IssueBlock issues={actionIssues} />
       <Card className="max-w-2xl border-0 shadow-none">
         <CardHeader className="p-4 pb-1">
           <CardTitle className="text-[0.9rem] font-semibold">Details</CardTitle>
+          <CardDescription className="text-xs text-muted-foreground">
+            Source purchase order, warehouse, and document references.
+          </CardDescription>
         </CardHeader>
         <CardContent className="p-4 pt-2">
           <dl className="doc-summary doc-summary--compact">
@@ -320,7 +349,7 @@ export function ReceiptPage() {
           </dl>
         </CardContent>
       </Card>
-      <div className="doc-lines mt-4">
+      <div className="doc-lines mt-6">
         <h3 className="doc-lines__title">Lines</h3>
         <div className="flex flex-row items-center justify-end gap-2 w-full mb-1.5">
           {exportSuccess && (
@@ -426,7 +455,7 @@ export function ReceiptPage() {
           </div>
         </div>
         {linesWithItem.length === 0 ? (
-          <p className="doc-lines__empty">No lines.</p>
+          <p className="doc-lines__empty">No lines on this receipt.</p>
         ) : (
           <div className="doc-lines__grid">
             <AgGridContainer themeClass="doc-lines-grid">

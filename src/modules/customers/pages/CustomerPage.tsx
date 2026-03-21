@@ -2,6 +2,9 @@ import { useParams, useNavigate } from "react-router-dom";
 import { useMemo, useState, useEffect } from "react";
 import { customerRepository } from "../repository";
 import { saveCustomer } from "../service";
+import { salesOrderRepository } from "../../sales-orders/repository";
+import { warehouseRepository } from "../../warehouses/repository";
+import { StatusBadge } from "../../../shared/ui/feedback/StatusBadge";
 import { Breadcrumb } from "../../../shared/ui/object/Breadcrumb";
 import { BackButton } from "../../../shared/ui/list/BackButton";
 import { Button } from "@/components/ui/button";
@@ -63,6 +66,43 @@ export function CustomerPage() {
     () => (id && !isNew ? customerRepository.getById(id) : undefined),
     [id, isNew],
   );
+
+  const relatedSalesOrderRows = useMemo(() => {
+    if (!customer?.id) return [];
+    const sos = salesOrderRepository
+      .list()
+      .filter((so) => so.customerId === customer.id)
+      .slice()
+      .sort((a, b) => {
+        const da = a.date ?? "";
+        const db = b.date ?? "";
+        if (da !== db) return db.localeCompare(da);
+        return b.number.localeCompare(a.number, undefined, { numeric: true });
+      });
+    return sos.map((so) => {
+      const lines = salesOrderRepository.listLines(so.id);
+      const lineCount = lines.length;
+      const totalAmount = lines.reduce((s, l) => s + l.qty * l.unitPrice, 0);
+      const wh = warehouseRepository.getById(so.warehouseId);
+      return {
+        ...so,
+        warehouseName: wh?.name ?? so.warehouseId,
+        lineCount,
+        totalAmount,
+      };
+    });
+  }, [customer?.id]);
+
+  const relatedSoSummary = useMemo(() => {
+    const rows = relatedSalesOrderRows;
+    return {
+      total: rows.length,
+      draft: rows.filter((x) => x.status === "draft").length,
+      confirmed: rows.filter((x) => x.status === "confirmed").length,
+      closed: rows.filter((x) => x.status === "closed").length,
+      cancelled: rows.filter((x) => x.status === "cancelled").length,
+    };
+  }, [relatedSalesOrderRows]);
 
   const [form, setForm] = useState<FormState>(defaultForm);
   const [actionIssues, setActionIssues] = useState<Issue[]>([]);
@@ -373,6 +413,108 @@ export function CustomerPage() {
           </div>
         </CardContent>
       </Card>
+
+      {!isNew && customer ? (
+        <Card className="mt-4 w-full max-w-4xl min-w-0 border-0 shadow-none">
+          <CardHeader className="p-2 pb-0.5 space-y-0">
+            <div className="flex flex-wrap items-start justify-between gap-2 gap-y-1.5">
+              <div className="min-w-0 space-y-0.5 flex-1">
+                <CardTitle className="text-[0.9rem] font-semibold tracking-tight">
+                  Related Sales Orders
+                </CardTitle>
+                <CardDescription className="text-xs leading-snug">
+                  Linked sales documents. Read-only; open a row for detail.
+                </CardDescription>
+              </div>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="h-7 shrink-0 px-2.5 text-xs"
+                onClick={() =>
+                  navigate(`/sales-orders?customerId=${encodeURIComponent(customer.id)}`)
+                }
+              >
+                Open all sales orders
+              </Button>
+            </div>
+          </CardHeader>
+          <CardContent className="p-2 pt-1 space-y-2">
+            <div
+              className="flex flex-wrap gap-1.5"
+              aria-label="Related sales orders summary"
+            >
+              <span className="inline-flex items-baseline gap-1 rounded border border-border/50 bg-muted/25 px-2 py-0.5 text-[11px] tabular-nums leading-none">
+                <span className="text-muted-foreground">Orders</span>
+                <span className="font-medium text-foreground/90">{relatedSoSummary.total}</span>
+              </span>
+              <span className="inline-flex items-baseline gap-1 rounded border border-border/50 bg-muted/25 px-2 py-0.5 text-[11px] tabular-nums leading-none">
+                <span className="text-muted-foreground">Draft</span>
+                <span className="font-medium text-foreground/90">{relatedSoSummary.draft}</span>
+              </span>
+              <span className="inline-flex items-baseline gap-1 rounded border border-border/50 bg-muted/25 px-2 py-0.5 text-[11px] tabular-nums leading-none">
+                <span className="text-muted-foreground">Confirmed</span>
+                <span className="font-medium text-foreground/90">{relatedSoSummary.confirmed}</span>
+              </span>
+              <span className="inline-flex items-baseline gap-1 rounded border border-border/50 bg-muted/25 px-2 py-0.5 text-[11px] tabular-nums leading-none">
+                <span className="text-muted-foreground">Closed</span>
+                <span className="font-medium text-foreground/90">{relatedSoSummary.closed}</span>
+              </span>
+              <span className="inline-flex items-baseline gap-1 rounded border border-border/50 bg-muted/25 px-2 py-0.5 text-[11px] tabular-nums leading-none">
+                <span className="text-muted-foreground">Cancelled</span>
+                <span className="font-medium text-foreground/90">{relatedSoSummary.cancelled}</span>
+              </span>
+            </div>
+            {relatedSalesOrderRows.length === 0 ? (
+              <p className="text-sm text-muted-foreground py-3 m-0">
+                No sales orders linked to this customer yet.
+              </p>
+            ) : (
+              <div className="min-w-0 overflow-x-auto rounded-md border border-border/60">
+                <table className="list-table text-sm">
+                  <thead>
+                    <tr>
+                      <th className="list-table__cell--code">Number</th>
+                      <th className="min-w-[100px]">Status</th>
+                      <th className="min-w-[120px]">Warehouse</th>
+                      <th className="w-14 text-right whitespace-nowrap tabular-nums">Lines</th>
+                      <th className="w-24 text-right whitespace-nowrap tabular-nums">Total</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {relatedSalesOrderRows.map((so) => (
+                      <tr
+                        key={so.id}
+                        className="list-table__row list-table__row--clickable"
+                        onClick={() => navigate(`/sales-orders/${so.id}`)}
+                        role="button"
+                        tabIndex={0}
+                        aria-label={`Open sales order ${so.number}`}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter" || e.key === " ") {
+                            e.preventDefault();
+                            navigate(`/sales-orders/${so.id}`);
+                          }
+                        }}
+                      >
+                        <td className="list-table__cell--code font-medium">{so.number}</td>
+                        <td>
+                          <StatusBadge status={so.status} />
+                        </td>
+                        <td className="truncate max-w-[14rem]" title={so.warehouseName}>
+                          {so.warehouseName}
+                        </td>
+                        <td className="text-right tabular-nums">{so.lineCount}</td>
+                        <td className="text-right tabular-nums">{so.totalAmount.toFixed(2)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      ) : null}
     </div>
   );
 }

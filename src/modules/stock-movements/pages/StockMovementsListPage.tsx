@@ -2,7 +2,7 @@
  * Stock Movements — Stage 4: Readability polish — Movement Type badge, wider columns, readable datetime.
  */
 import { useMemo, useState, useRef, useCallback } from "react";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { AgGridReact } from "ag-grid-react";
 import type { ColDef, ICellRendererParams, SelectionChangedEvent } from "ag-grid-community";
 import { stockMovementRepository } from "../repository";
@@ -115,6 +115,11 @@ function filterBySearch(rows: RowData[], query: string): RowData[] {
   );
 }
 
+function filterByWarehouseId(rows: RowData[], warehouseId: string | null): RowData[] {
+  if (warehouseId == null) return rows;
+  return rows.filter((r) => r.warehouseId === warehouseId);
+}
+
 function buildExportRowsFromMovements(rows: RowData[]): StockMovementsExportRow[] {
   return rows.map((r, idx) => ({
     no: idx + 1,
@@ -134,6 +139,14 @@ function buildExportRowsFromMovements(rows: RowData[]): StockMovementsExportRow[
 }
 
 export function StockMovementsListPage() {
+  const [searchParams, setSearchParams] = useSearchParams();
+  const warehouseFilterId = useMemo(() => {
+    const raw = searchParams.get("warehouseId");
+    if (raw == null || raw === "") return null;
+    const t = raw.trim();
+    return t === "" ? null : t;
+  }, [searchParams]);
+
   const [searchQuery, setSearchQuery] = useState("");
   const [exportSuccess, setExportSuccess] = useState<{ path: string; filename: string } | null>(null);
   const [exportOpen, setExportOpen] = useState(false);
@@ -167,13 +180,26 @@ export function StockMovementsListPage() {
       );
   }, []);
 
-  const filteredRows = useMemo(
-    () => filterBySearch(rowsWithNames, searchQuery),
-    [rowsWithNames, searchQuery],
-  );
+  const filteredRows = useMemo(() => {
+    const bySearch = filterBySearch(rowsWithNames, searchQuery);
+    return filterByWarehouseId(bySearch, warehouseFilterId);
+  }, [rowsWithNames, searchQuery, warehouseFilterId]);
 
   const isEmpty = filteredRows.length === 0;
-  const hasFilter = searchQuery.trim() !== "";
+  const hasFilter = searchQuery.trim() !== "" || warehouseFilterId != null;
+
+  const warehouseFilterLabel = useMemo((): string => {
+    if (warehouseFilterId == null) return "";
+    const w = warehouseRepository.getById(warehouseFilterId);
+    if (w) return w.name || w.code || warehouseFilterId;
+    return warehouseFilterId;
+  }, [warehouseFilterId]);
+
+  const clearWarehouseFilter = useCallback(() => {
+    const next = new URLSearchParams(searchParams);
+    next.delete("warehouseId");
+    setSearchParams(next, { replace: true });
+  }, [searchParams, setSearchParams]);
 
   const getExportRowsCurrentView = useCallback((): StockMovementsExportRow[] => {
     const api = gridRef.current?.api;
@@ -240,11 +266,17 @@ export function StockMovementsListPage() {
   const exportSelectedDisabled = selectedCount === 0;
 
   const emptyTitle = hasFilter
-    ? "No stock movements match current search"
+    ? "No stock movements match current search or filters"
     : "No stock movements yet";
-  const emptyHint = hasFilter
-    ? "Try changing the search."
-    : "Movements will appear after posting receipts and shipments.";
+  const emptyHint = useMemo(() => {
+    if (!hasFilter) {
+      return "Movements will appear after posting receipts and shipments.";
+    }
+    if (warehouseFilterId != null && searchQuery.trim() === "") {
+      return "No stock movements for this warehouse. Try clearing the warehouse filter.";
+    }
+    return "Try changing the search or warehouse filter.";
+  }, [hasFilter, warehouseFilterId, searchQuery]);
 
   const columnDefs = useMemo<ColDef<RowData>[]>(
     () => [
@@ -312,6 +344,30 @@ export function StockMovementsListPage() {
             resultCount={filteredRows.length}
           />
           <div className="flex flex-row items-center gap-2 shrink-0 ml-auto">
+            {warehouseFilterId != null && (
+              <div
+                className="flex h-8 max-w-[min(100%,18rem)] items-center gap-1.5 rounded-md border border-input bg-background px-2 text-xs shrink-0"
+                role="status"
+                aria-label="Warehouse filter active"
+              >
+                <span className="text-muted-foreground whitespace-nowrap shrink-0">Warehouse</span>
+                <span
+                  className="truncate font-medium text-foreground/90 min-w-0"
+                  title={warehouseFilterLabel}
+                >
+                  {warehouseFilterLabel}
+                </span>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="h-7 px-1.5 text-xs shrink-0 text-muted-foreground hover:text-foreground"
+                  onClick={clearWarehouseFilter}
+                >
+                  Clear
+                </Button>
+              </div>
+            )}
             {exportSuccess && (
               <div className="h-8 w-max flex items-center gap-1.5 rounded-md border border-input bg-background px-2 text-sm shrink-0">
                 <span className="text-muted-foreground text-xs">Export completed:</span>

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -104,12 +104,43 @@ export function DocumentLineImportModal(props: Props) {
   const [pastePreviewFilter, setPastePreviewFilter] = useState<PreviewFilter>("all");
   const [excelPreviewFilter, setExcelPreviewFilter] = useState<PreviewFilter>("all");
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  /** Bumps on each session reset so in-flight async work does not mutate state after close. */
+  const modalSessionRef = useRef(0);
+
+  const resetTemporarySessionState = useCallback(() => {
+    modalSessionRef.current += 1;
+    setPasteInput("");
+    setPastePreview(null);
+    setExcelPreview(null);
+    setImportFileName(null);
+    setIsImportingExcel(false);
+    setFileErrorMessage(null);
+    setTemplateDownloadResult(null);
+    setPastePreviewFilter("all");
+    setExcelPreviewFilter("all");
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  }, []);
 
   useEffect(() => {
-    if (open) {
-      setActiveTab(initialTab);
+    if (!open) {
+      resetTemporarySessionState();
+      return;
     }
-  }, [open, initialTab]);
+    resetTemporarySessionState();
+    setActiveTab(initialTab);
+  }, [open, initialTab, resetTemporarySessionState]);
+
+  useEffect(() => {
+    if (!open) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        e.preventDefault();
+        onOpenChange(false);
+      }
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [open, onOpenChange]);
 
   if (!open) return null;
 
@@ -132,6 +163,7 @@ export function DocumentLineImportModal(props: Props) {
 
   const handleDownloadTemplate = async () => {
     const defaultFilename = templateFileName;
+    const sessionAtStart = modalSessionRef.current;
     try {
       const path = await save({
         defaultPath: defaultFilename,
@@ -145,6 +177,7 @@ export function DocumentLineImportModal(props: Props) {
       for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
       const contentsBase64 = btoa(binary);
       await invoke("write_export_file", { path, contentsBase64 });
+      if (modalSessionRef.current !== sessionAtStart) return;
       const filename = path.replace(/^.*[/\\]/, "") || defaultFilename;
       setTemplateDownloadResult({ filename, path });
       return;
@@ -159,6 +192,7 @@ export function DocumentLineImportModal(props: Props) {
       a.download = defaultFilename;
       a.click();
       URL.revokeObjectURL(url);
+      if (modalSessionRef.current !== sessionAtStart) return;
       setTemplateDownloadResult({ filename: defaultFilename, path: null });
     }
   };
@@ -183,6 +217,7 @@ export function DocumentLineImportModal(props: Props) {
 
   const handleExcelFileSelected = async (file: File | null) => {
     if (!file) return;
+    const sessionAtStart = modalSessionRef.current;
     setFileErrorMessage(null);
     setExcelPreview(null);
     setImportFileName(file.name);
@@ -192,13 +227,17 @@ export function DocumentLineImportModal(props: Props) {
         items,
         getDefaultUnitPrice,
       });
+      if (modalSessionRef.current !== sessionAtStart) return;
       setExcelPreview(preview);
       setExcelPreviewFilter("all");
     } catch (e) {
+      if (modalSessionRef.current !== sessionAtStart) return;
       setFileErrorMessage(e instanceof Error ? e.message : "Failed to parse Excel file.");
     } finally {
-      setIsImportingExcel(false);
-      if (fileInputRef.current) fileInputRef.current.value = "";
+      if (modalSessionRef.current === sessionAtStart) {
+        setIsImportingExcel(false);
+        if (fileInputRef.current) fileInputRef.current.value = "";
+      }
     }
   };
 
@@ -223,9 +262,6 @@ export function DocumentLineImportModal(props: Props) {
         pastePreview.invalidFormatCount +
         pastePreview.headerSkippedCount;
       onApply({ lines, skippedRows });
-      setPasteInput("");
-      setPastePreview(null);
-      setFileErrorMessage(null);
       close();
       return;
     }
@@ -242,9 +278,6 @@ export function DocumentLineImportModal(props: Props) {
       excelPreview.invalidQuantityRows +
       excelPreview.invalidFormatRows;
     onApply({ lines, skippedRows });
-    setExcelPreview(null);
-    setImportFileName(null);
-    setFileErrorMessage(null);
     close();
   };
 
@@ -278,8 +311,17 @@ export function DocumentLineImportModal(props: Props) {
   const excelErrorCount = excelPreview ? excelPreview.rows.length - excelValidCount : 0;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
-      <div className="w-full max-w-4xl rounded-md border border-border bg-card shadow-xl">
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"
+      role="presentation"
+      onMouseDown={(e) => {
+        if (e.target === e.currentTarget) onOpenChange(false);
+      }}
+    >
+      <div
+        className="w-full max-w-4xl rounded-md border border-border bg-card shadow-xl"
+        onMouseDown={(e) => e.stopPropagation()}
+      >
         <div className="flex items-start justify-between border-b border-border px-4 py-3">
           <div>
             <h3 className="text-sm font-semibold">Add lines</h3>

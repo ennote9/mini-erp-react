@@ -1,5 +1,5 @@
 import React, { useMemo, useState, useRef, useCallback } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { AgGridReact } from "ag-grid-react";
 import type { ColDef, ICellRendererParams, SelectionChangedEvent } from "ag-grid-community";
 import { receiptRepository } from "../repository";
@@ -52,6 +52,11 @@ function filterByStatus(rows: RowData[], statusFilter: StatusFilter): RowData[] 
   return rows.filter((r) => r.status === statusFilter);
 }
 
+function filterByWarehouseId(rows: RowData[], warehouseId: string | null): RowData[] {
+  if (warehouseId == null) return rows;
+  return rows.filter((r) => r.warehouseId === warehouseId);
+}
+
 function StatusCellRenderer(params: ICellRendererParams<RowData>) {
   const status = params.value as string | undefined;
   if (status == null) return null;
@@ -71,6 +76,14 @@ function buildExportRowsFromReceipts(rows: RowData[]): ReceiptsExportRow[] {
 
 export function ReceiptsListPage() {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const warehouseFilterId = useMemo(() => {
+    const raw = searchParams.get("warehouseId");
+    if (raw == null || raw === "") return null;
+    const t = raw.trim();
+    return t === "" ? null : t;
+  }, [searchParams]);
+
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [exportSuccess, setExportSuccess] = useState<{ path: string; filename: string } | null>(null);
@@ -97,11 +110,28 @@ export function ReceiptsListPage() {
 
   const filteredRows = useMemo(() => {
     const bySearch = filterBySearch(rowsWithNames, searchQuery);
-    return filterByStatus(bySearch, statusFilter);
-  }, [rowsWithNames, searchQuery, statusFilter]);
+    const byWarehouse = filterByWarehouseId(bySearch, warehouseFilterId);
+    return filterByStatus(byWarehouse, statusFilter);
+  }, [rowsWithNames, searchQuery, statusFilter, warehouseFilterId]);
 
   const isEmpty = filteredRows.length === 0;
-  const hasFilter = statusFilter !== "all" || searchQuery.trim() !== "";
+  const hasFilter =
+    statusFilter !== "all" ||
+    searchQuery.trim() !== "" ||
+    warehouseFilterId != null;
+
+  const warehouseFilterLabel = useMemo((): string => {
+    if (warehouseFilterId == null) return "";
+    const w = warehouseRepository.getById(warehouseFilterId);
+    if (w) return w.name || w.code || warehouseFilterId;
+    return warehouseFilterId;
+  }, [warehouseFilterId]);
+
+  const clearWarehouseFilter = useCallback(() => {
+    const next = new URLSearchParams(searchParams);
+    next.delete("warehouseId");
+    setSearchParams(next, { replace: true });
+  }, [searchParams, setSearchParams]);
 
   const getExportRowsCurrentView = useCallback((): ReceiptsExportRow[] => {
     const api = gridRef.current?.api;
@@ -170,9 +200,15 @@ export function ReceiptsListPage() {
   const emptyTitle = hasFilter
     ? "No receipts match current search or filters"
     : "No receipts yet";
-  const emptyHint = hasFilter
-    ? "Try changing the search or filter."
-    : "Receipts are created from confirmed purchase orders.";
+  const emptyHint = useMemo(() => {
+    if (!hasFilter) {
+      return "Receipts are created from confirmed purchase orders.";
+    }
+    if (warehouseFilterId != null && statusFilter === "all" && searchQuery.trim() === "") {
+      return "No receipts for this warehouse. Try clearing the warehouse filter.";
+    }
+    return "Try changing the search, status filter, or warehouse filter.";
+  }, [hasFilter, warehouseFilterId, statusFilter, searchQuery]);
 
   const statusOptions: { value: StatusFilter; label: string }[] = [
     { value: "all", label: "All" },
@@ -243,6 +279,30 @@ export function ReceiptsListPage() {
             resultCount={filteredRows.length}
           />
           <div className="flex flex-row items-center gap-2 shrink-0 ml-auto">
+            {warehouseFilterId != null && (
+              <div
+                className="flex h-8 max-w-[min(100%,18rem)] items-center gap-1.5 rounded-md border border-input bg-background px-2 text-xs shrink-0"
+                role="status"
+                aria-label="Warehouse filter active"
+              >
+                <span className="text-muted-foreground whitespace-nowrap shrink-0">Warehouse</span>
+                <span
+                  className="truncate font-medium text-foreground/90 min-w-0"
+                  title={warehouseFilterLabel}
+                >
+                  {warehouseFilterLabel}
+                </span>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="h-7 px-1.5 text-xs shrink-0 text-muted-foreground hover:text-foreground"
+                  onClick={clearWarehouseFilter}
+                >
+                  Clear
+                </Button>
+              </div>
+            )}
             {exportSuccess && (
               <div className="h-8 w-max flex items-center gap-1.5 rounded-md border border-input bg-background px-2 text-sm shrink-0">
                 <span className="text-muted-foreground text-xs">Export completed:</span>

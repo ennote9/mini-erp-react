@@ -7,4 +7,4 @@ export {
   getReceiptPersistBusy,
   getLastReceiptPersistError,
 } from "./repository";
-export { receiptService } from "./service";
+export { receiptService, validateReceiptFull } from "./service";

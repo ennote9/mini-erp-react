@@ -27,6 +27,7 @@ export function validateShipmentFull(shipmentId: string): Issue[] {
   }
   if (shipment.status !== "draft") {
     issues.push(actionIssue("Only draft shipments can be posted."));
+    return issues;
   }
 
   const soIdTrimmed = normalizeTrim(shipment.salesOrderId);
@@ -105,13 +106,13 @@ export function validateShipmentFull(shipmentId: string): Issue[] {
         if (onHand < qty) {
           issues.push(
             actionIssue(
-              `Insufficient stock for item ${code}. Available: ${onHand}, required: ${qty}.`,
+              `Item ${code}: insufficient stock to post (available ${onHand}, required ${qty}).`,
             ),
           );
         } else if (onHand === qty && qty > 0) {
           issues.push(
             actionWarning(
-              `Item ${code}: no stock buffer (quantity equals available).`,
+              `Item ${code}: no buffer remaining (shipped quantity equals available stock).`,
             ),
           );
         }

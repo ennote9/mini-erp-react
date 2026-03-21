@@ -7,4 +7,4 @@ export {
   getShipmentPersistBusy,
   getLastShipmentPersistError,
 } from "./repository";
-export { shipmentService } from "./service";
+export { shipmentService, validateShipmentFull } from "./service";

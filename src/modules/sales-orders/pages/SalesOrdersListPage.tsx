@@ -1,5 +1,5 @@
 import React, { useMemo, useState, useRef, useCallback } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { AgGridReact } from "ag-grid-react";
 import type { ColDef, ICellRendererParams, SelectionChangedEvent } from "ag-grid-community";
 import { salesOrderRepository } from "../repository";
@@ -56,6 +56,11 @@ function filterByStatus(
   return rows.filter((r) => r.status === statusFilter);
 }
 
+function filterByCustomerId(rows: RowData[], customerId: string | null): RowData[] {
+  if (customerId == null) return rows;
+  return rows.filter((r) => r.customerId === customerId);
+}
+
 function StatusCellRenderer(params: ICellRendererParams<RowData>) {
   const status = params.value as string | undefined;
   if (status == null) return null;
@@ -75,6 +80,14 @@ function buildExportRowsFromSO(rows: RowData[]): SalesOrdersExportRow[] {
 
 export function SalesOrdersListPage() {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const customerFilterId = useMemo(() => {
+    const raw = searchParams.get("customerId");
+    if (raw == null || raw === "") return null;
+    const t = raw.trim();
+    return t === "" ? null : t;
+  }, [searchParams]);
+
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [exportSuccess, setExportSuccess] = useState<{ path: string; filename: string } | null>(null);
@@ -101,11 +114,28 @@ export function SalesOrdersListPage() {
 
   const filteredRows = useMemo(() => {
     const bySearch = filterBySearch(rowsWithNames, searchQuery);
-    return filterByStatus(bySearch, statusFilter);
-  }, [rowsWithNames, searchQuery, statusFilter]);
+    const byCustomer = filterByCustomerId(bySearch, customerFilterId);
+    return filterByStatus(byCustomer, statusFilter);
+  }, [rowsWithNames, searchQuery, statusFilter, customerFilterId]);
 
   const isEmpty = filteredRows.length === 0;
-  const hasFilter = statusFilter !== "all" || searchQuery.trim() !== "";
+  const hasFilter =
+    statusFilter !== "all" ||
+    searchQuery.trim() !== "" ||
+    customerFilterId != null;
+
+  const customerFilterLabel = useMemo((): string => {
+    if (customerFilterId == null) return "";
+    const c = customerRepository.getById(customerFilterId);
+    if (c) return c.name || c.code || customerFilterId;
+    return customerFilterId;
+  }, [customerFilterId]);
+
+  const clearCustomerFilter = useCallback(() => {
+    const next = new URLSearchParams(searchParams);
+    next.delete("customerId");
+    setSearchParams(next, { replace: true });
+  }, [searchParams, setSearchParams]);
 
   const getExportRowsCurrentView = useCallback((): SalesOrdersExportRow[] => {
     const api = gridRef.current?.api;
@@ -174,9 +204,15 @@ export function SalesOrdersListPage() {
   const emptyTitle = hasFilter
     ? "No sales orders match current search or filters"
     : "No sales orders yet";
-  const emptyHint = hasFilter
-    ? "Try changing the search or filter."
-    : "Create your first sales order to start sales workflow.";
+  const emptyHint = useMemo(() => {
+    if (!hasFilter) {
+      return "Create your first sales order to start sales workflow.";
+    }
+    if (customerFilterId != null && statusFilter === "all" && searchQuery.trim() === "") {
+      return "No sales orders for this customer. Try clearing the customer filter.";
+    }
+    return "Try changing the search, status filter, or customer filter.";
+  }, [hasFilter, customerFilterId, statusFilter, searchQuery]);
 
   const statusOptions: { value: StatusFilter; label: string }[] = [
     { value: "all", label: "All" },
@@ -249,6 +285,30 @@ export function SalesOrdersListPage() {
             resultCount={filteredRows.length}
           />
           <div className="flex flex-row items-center gap-2 shrink-0 ml-auto">
+            {customerFilterId != null && (
+              <div
+                className="flex h-8 max-w-[min(100%,18rem)] items-center gap-1.5 rounded-md border border-input bg-background px-2 text-xs shrink-0"
+                role="status"
+                aria-label="Customer filter active"
+              >
+                <span className="text-muted-foreground whitespace-nowrap shrink-0">Customer</span>
+                <span
+                  className="truncate font-medium text-foreground/90 min-w-0"
+                  title={customerFilterLabel}
+                >
+                  {customerFilterLabel}
+                </span>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="h-7 px-1.5 text-xs shrink-0 text-muted-foreground hover:text-foreground"
+                  onClick={clearCustomerFilter}
+                >
+                  Clear
+                </Button>
+              </div>
+            )}
             {exportSuccess && (
               <div className="h-8 w-max flex items-center gap-1.5 rounded-md border border-input bg-background px-2 text-sm shrink-0">
                 <span className="text-muted-foreground text-xs">Export completed:</span>

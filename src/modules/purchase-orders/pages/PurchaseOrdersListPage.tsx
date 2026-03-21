@@ -1,5 +1,5 @@
 import React, { useMemo, useState, useRef, useCallback } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { AgGridReact } from "ag-grid-react";
 import type { ColDef, ICellRendererParams, SelectionChangedEvent } from "ag-grid-community";
 import { purchaseOrderRepository } from "../repository";
@@ -56,6 +56,11 @@ function filterByStatus(
   return rows.filter((r) => r.status === statusFilter);
 }
 
+function filterBySupplierId(rows: RowData[], supplierId: string | null): RowData[] {
+  if (supplierId == null) return rows;
+  return rows.filter((r) => r.supplierId === supplierId);
+}
+
 function StatusCellRenderer(params: ICellRendererParams<RowData>) {
   const status = params.value as string | undefined;
   if (status == null) return null;
@@ -75,6 +80,14 @@ function buildExportRowsFromPO(rows: RowData[]): PurchaseOrdersExportRow[] {
 
 export function PurchaseOrdersListPage() {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const supplierFilterId = useMemo(() => {
+    const raw = searchParams.get("supplierId");
+    if (raw == null || raw === "") return null;
+    const t = raw.trim();
+    return t === "" ? null : t;
+  }, [searchParams]);
+
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [exportSuccess, setExportSuccess] = useState<{ path: string; filename: string } | null>(null);
@@ -101,11 +114,28 @@ export function PurchaseOrdersListPage() {
 
   const filteredRows = useMemo(() => {
     const bySearch = filterBySearch(rowsWithNames, searchQuery);
-    return filterByStatus(bySearch, statusFilter);
-  }, [rowsWithNames, searchQuery, statusFilter]);
+    const bySupplier = filterBySupplierId(bySearch, supplierFilterId);
+    return filterByStatus(bySupplier, statusFilter);
+  }, [rowsWithNames, searchQuery, statusFilter, supplierFilterId]);
 
   const isEmpty = filteredRows.length === 0;
-  const hasFilter = statusFilter !== "all" || searchQuery.trim() !== "";
+  const hasFilter =
+    statusFilter !== "all" ||
+    searchQuery.trim() !== "" ||
+    supplierFilterId != null;
+
+  const supplierFilterLabel = useMemo((): string => {
+    if (supplierFilterId == null) return "";
+    const s = supplierRepository.getById(supplierFilterId);
+    if (s) return s.name || s.code || supplierFilterId;
+    return supplierFilterId;
+  }, [supplierFilterId]);
+
+  const clearSupplierFilter = useCallback(() => {
+    const next = new URLSearchParams(searchParams);
+    next.delete("supplierId");
+    setSearchParams(next, { replace: true });
+  }, [searchParams, setSearchParams]);
 
   const getExportRowsCurrentView = useCallback((): PurchaseOrdersExportRow[] => {
     const api = gridRef.current?.api;
@@ -174,9 +204,15 @@ export function PurchaseOrdersListPage() {
   const emptyTitle = hasFilter
     ? "No purchase orders match current search or filters"
     : "No purchase orders yet";
-  const emptyHint = hasFilter
-    ? "Try changing the search or filter."
-    : "Create your first purchase order to start purchasing workflow.";
+  const emptyHint = useMemo(() => {
+    if (!hasFilter) {
+      return "Create your first purchase order to start purchasing workflow.";
+    }
+    if (supplierFilterId != null && statusFilter === "all" && searchQuery.trim() === "") {
+      return "No purchase orders for this supplier. Try clearing the supplier filter.";
+    }
+    return "Try changing the search, status filter, or supplier filter.";
+  }, [hasFilter, supplierFilterId, statusFilter, searchQuery]);
 
   const statusOptions: { value: StatusFilter; label: string }[] = [
     { value: "all", label: "All" },
@@ -249,6 +285,30 @@ export function PurchaseOrdersListPage() {
             resultCount={filteredRows.length}
           />
           <div className="flex flex-row items-center gap-2 shrink-0 ml-auto">
+            {supplierFilterId != null && (
+              <div
+                className="flex h-8 max-w-[min(100%,18rem)] items-center gap-1.5 rounded-md border border-input bg-background px-2 text-xs shrink-0"
+                role="status"
+                aria-label="Supplier filter active"
+              >
+                <span className="text-muted-foreground whitespace-nowrap shrink-0">Supplier</span>
+                <span
+                  className="truncate font-medium text-foreground/90 min-w-0"
+                  title={supplierFilterLabel}
+                >
+                  {supplierFilterLabel}
+                </span>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="h-7 px-1.5 text-xs shrink-0 text-muted-foreground hover:text-foreground"
+                  onClick={clearSupplierFilter}
+                >
+                  Clear
+                </Button>
+              </div>
+            )}
             {exportSuccess && (
               <div className="h-8 w-max flex items-center gap-1.5 rounded-md border border-input bg-background px-2 text-sm shrink-0">
                 <span className="text-muted-foreground text-xs">Export completed:</span>
