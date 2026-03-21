@@ -76,6 +76,12 @@ export function CancelDocumentReasonDialog({
             "data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95",
           )}
           onOpenAutoFocus={(e) => e.preventDefault()}
+          onKeyDown={(e) => {
+            if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
+              e.preventDefault();
+              handleConfirm();
+            }
+          }}
         >
           <Dialog.Title className="text-base font-semibold text-foreground">
             Cancel {documentKindLabel}
@@ -123,7 +129,12 @@ export function CancelDocumentReasonDialog({
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
               Back
             </Button>
-            <Button type="button" variant="destructive" onClick={handleConfirm}>
+            <Button
+              type="button"
+              variant="destructive"
+              onClick={handleConfirm}
+              title="Confirm cancellation (Ctrl/Cmd+Enter)"
+            >
               Confirm cancellation
             </Button>
           </div>

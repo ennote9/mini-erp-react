@@ -21,6 +21,29 @@ body,
   min-height: 100vh;
 }
 
+/* --- Copy-friendly selection: readable surfaces selectable; keep controls predictable --- */
+html {
+  user-select: text;
+  -webkit-user-select: text;
+}
+
+button:not(:disabled),
+[role="button"]:not([aria-disabled="true"]),
+[role="tab"],
+[role="checkbox"],
+[role="switch"],
+[role="radio"],
+[role="menuitem"],
+[role="menuitemcheckbox"],
+[role="menuitemradio"],
+[role="slider"],
+summary,
+.ag-checkbox-input-wrapper,
+.ag-header-cell-menu-button {
+  user-select: none;
+  -webkit-user-select: none;
+}
+
 /* --- App shell: desktop-first layout --- */
 .app-shell {
   display: flex;

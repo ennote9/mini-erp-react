@@ -9,11 +9,14 @@ import { EmptyState } from "../../../shared/ui/feedback/EmptyState";
 import {
   AgGridContainer,
   agGridDefaultColDef,
+  agGridDefaultGridOptions,
   agGridRowNumberColDef,
   agGridSelectionColumnDef,
+  hasMeaningfulTextSelection,
 } from "../../../shared/ui/ag-grid";
 import { BackButton } from "../../../shared/ui/list/BackButton";
 import { ListPageSearch } from "../../../shared/ui/list/ListPageSearch";
+import { useListPageSearchHotkey } from "../../../shared/hotkeys";
 import { Button } from "@/components/ui/button";
 import {
   ButtonGroup,
@@ -66,6 +69,8 @@ export function CustomersListPage() {
   const [exportOpen, setExportOpen] = useState(false);
   const [selectedCount, setSelectedCount] = useState(0);
   const gridRef = useRef<AgGridReact<Customer> | null>(null);
+  const listSearchInputRef = useRef<HTMLInputElement>(null);
+  useListPageSearchHotkey(listSearchInputRef);
 
   const onSelectionChanged = useCallback((e: SelectionChangedEvent<Customer>) => {
     setSelectedCount(e.api.getSelectedRows().length);
@@ -233,6 +238,7 @@ export function CustomersListPage() {
             ))}
           </ButtonGroup>
           <ListPageSearch
+            inputRef={listSearchInputRef}
             placeholder="Search"
             value={searchQuery}
             onChange={setSearchQuery}
@@ -349,6 +355,7 @@ export function CustomersListPage() {
       ) : (
         <AgGridContainer themeClass="customers-grid">
           <AgGridReact<Customer>
+            {...agGridDefaultGridOptions}
             ref={gridRef}
             rowData={filteredRows}
             columnDefs={columnDefs}
@@ -356,7 +363,10 @@ export function CustomersListPage() {
             rowSelection={{ mode: "multiRow", checkboxes: true, headerCheckbox: true, enableClickSelection: true }}
             selectionColumnDef={agGridSelectionColumnDef}
             getRowId={(params) => params.data.id}
-            onRowClicked={(e) => e.data && navigate(`/customers/${e.data.id}`)}
+            onRowClicked={(e) => {
+              if (hasMeaningfulTextSelection()) return;
+              if (e.data) navigate(`/customers/${e.data.id}`);
+            }}
             onSelectionChanged={onSelectionChanged}
           />
         </AgGridContainer>

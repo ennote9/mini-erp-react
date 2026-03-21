@@ -15,11 +15,14 @@ import { StatusBadge } from "../../../shared/ui/feedback/StatusBadge";
 import {
   AgGridContainer,
   agGridDefaultColDef,
+  agGridDefaultGridOptions,
   agGridRowNumberColDef,
   agGridSelectionColumnDef,
+  hasMeaningfulTextSelection,
 } from "../../../shared/ui/ag-grid";
 import { BackButton } from "../../../shared/ui/list/BackButton";
 import { ListPageSearch } from "../../../shared/ui/list/ListPageSearch";
+import { useListPageSearchHotkey } from "../../../shared/hotkeys";
 import { Button } from "@/components/ui/button";
 import {
   ButtonGroup,
@@ -125,6 +128,8 @@ export function PurchaseOrdersListPage() {
   const [exportOpen, setExportOpen] = useState(false);
   const [selectedCount, setSelectedCount] = useState(0);
   const gridRef = useRef<AgGridReact<RowData> | null>(null);
+  const listSearchInputRef = useRef<HTMLInputElement>(null);
+  useListPageSearchHotkey(listSearchInputRef);
 
   const onSelectionChanged = useCallback((e: SelectionChangedEvent<RowData>) => {
     setSelectedCount(e.api.getSelectedRows().length);
@@ -382,6 +387,7 @@ export function PurchaseOrdersListPage() {
             ))}
           </ButtonGroup>
           <ListPageSearch
+            inputRef={listSearchInputRef}
             placeholder="Search"
             value={searchQuery}
             onChange={setSearchQuery}
@@ -570,6 +576,7 @@ export function PurchaseOrdersListPage() {
       ) : (
         <AgGridContainer themeClass="purchase-orders-grid">
           <AgGridReact<RowData>
+            {...agGridDefaultGridOptions}
             ref={gridRef}
             rowData={filteredRows}
             columnDefs={columnDefs}
@@ -577,7 +584,10 @@ export function PurchaseOrdersListPage() {
             rowSelection={{ mode: "multiRow", checkboxes: true, headerCheckbox: true, enableClickSelection: true }}
             selectionColumnDef={agGridSelectionColumnDef}
             getRowId={(params) => params.data.id}
-            onRowClicked={(e) => e.data && navigate(`/purchase-orders/${e.data.id}`)}
+            onRowClicked={(e) => {
+              if (hasMeaningfulTextSelection()) return;
+              if (e.data) navigate(`/purchase-orders/${e.data.id}`);
+            }}
             onSelectionChanged={onSelectionChanged}
           />
         </AgGridContainer>

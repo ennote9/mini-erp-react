@@ -1,4 +1,12 @@
-import type { ColDef } from "ag-grid-community";
+import type { ColDef, GridOptions } from "ag-grid-community";
+
+/**
+ * Grid options applied across ERP grids so visible cell values can be selected/copied.
+ * (AG root defaults to .ag-unselectable; this toggles selectable cell value behavior.)
+ */
+export const agGridDefaultGridOptions = {
+  enableCellTextSelection: true,
+} as const satisfies Pick<GridOptions, "enableCellTextSelection">;
 
 /**
  * Shared default column definition for list-page AG Grids.

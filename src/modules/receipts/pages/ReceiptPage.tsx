@@ -24,7 +24,11 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { agGridDefaultColDef, agGridSelectionColumnDef } from "../../../shared/ui/ag-grid/agGridDefaults";
+import {
+  agGridDefaultColDef,
+  agGridDefaultGridOptions,
+  agGridSelectionColumnDef,
+} from "../../../shared/ui/ag-grid/agGridDefaults";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { ChevronDown, FileSpreadsheet, File, FolderOpen, X } from "lucide-react";
 import { buildLinesXlsxBuffer, buildDocumentXlsxBuffer, type ReceiptExportLineRow, type ReceiptDocumentSummary } from "../receiptExport";
@@ -543,6 +547,7 @@ export function ReceiptPage() {
           <div className="doc-lines__grid">
             <AgGridContainer themeClass="doc-lines-grid">
               <AgGridReact<LineWithItem>
+                {...agGridDefaultGridOptions}
                 rowData={linesWithItem}
                 columnDefs={receiptLinesColumnDefs()}
                 defaultColDef={agGridDefaultColDef}

@@ -20,8 +20,13 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { SelectField } from "@/components/ui/select-field";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { agGridDefaultColDef, agGridSelectionColumnDef } from "../../../shared/ui/ag-grid/agGridDefaults";
+import {
+  agGridDefaultColDef,
+  agGridDefaultGridOptions,
+  agGridSelectionColumnDef,
+} from "../../../shared/ui/ag-grid/agGridDefaults";
 import { todayYYYYMMDD, normalizeDateForSO } from "../dateUtils";
+import { usePlanningDocumentHotkeys } from "../../../shared/hotkeys";
 import {
   lineAmountMoney,
   roundMoney,
@@ -1161,6 +1166,20 @@ export function SalesOrderPage() {
 
   const exportSelectedDisabled = !isEditable || selectedLineIds.length === 0;
 
+  usePlanningDocumentHotkeys({
+    isEditable,
+    editingLineId,
+    isLineImportModalOpen,
+    onSave: handleSave,
+    onAddLine: addLineFromEntry,
+    onOpenLineImport: () => {
+      setLineImportInitialTab("paste");
+      setIsLineImportModalOpen(true);
+    },
+    allocateStockAvailable: !isNew && isConfirmed,
+    onAllocateStock: handleAllocateStock,
+  });
+
   if (!id) {
     return (
       <div className="doc-page doc-page--not-found">
@@ -1202,7 +1221,11 @@ export function SalesOrderPage() {
             )}
             <div className="doc-header__actions">
               {isEditable && (
-                <Button type="button" onClick={handleSave}>
+                <Button
+                  type="button"
+                  onClick={handleSave}
+                  title="Save (Ctrl/Cmd+S)"
+                >
                   <Save aria-hidden />
                   Save
                 </Button>
@@ -1219,7 +1242,12 @@ export function SalesOrderPage() {
                 </Button>
               )}
               {!isNew && isConfirmed && (
-                <Button type="button" variant="outline" onClick={handleAllocateStock}>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={handleAllocateStock}
+                  title="Allocate stock (Alt+Shift+A)"
+                >
                   Allocate stock
                 </Button>
               )}
@@ -1490,6 +1518,7 @@ export function SalesOrderPage() {
                             size="sm"
                             className="h-8 gap-1.5"
                             onClick={addLineFromEntry}
+                            title="Add line (Alt+A)"
                           >
                             <Plus className="h-4 w-4 shrink-0" aria-hidden />
                             Add line
@@ -1503,6 +1532,7 @@ export function SalesOrderPage() {
                               setLineImportInitialTab("paste");
                               setIsLineImportModalOpen(true);
                             }}
+                            title="Add lines — paste / Excel (Alt+L)"
                           >
                             <ClipboardPaste className="h-4 w-4 shrink-0" aria-hidden />
                             Add lines
@@ -1947,6 +1977,7 @@ export function SalesOrderPage() {
                 <div className="doc-lines__grid">
                   <AgGridContainer themeClass="doc-lines-grid">
                     <AgGridReact<LineWithItem>
+                      {...agGridDefaultGridOptions}
                       rowData={linesWithItem}
                       columnDefs={soLinesReadOnlyColumnDefs(soFulfillment, soAllocationView)}
                       defaultColDef={agGridDefaultColDef}

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, type Ref } from "react";
 import { Search, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -13,6 +13,8 @@ type Props = {
   id?: string;
   /** Optional name for the input (defaults to "search" for form semantics). */
   name?: string;
+  /** Ref to the search input (e.g. for `/` list-page hotkey). */
+  inputRef?: Ref<HTMLInputElement>;
 };
 
 /**
@@ -27,6 +29,7 @@ export function ListPageSearch({
   resultCount,
   id,
   name = "search",
+  inputRef,
 }: Props) {
   const [focused, setFocused] = useState(false);
   const showLeftOverlay = value === "" && !focused;
@@ -58,6 +61,7 @@ export function ListPageSearch({
         </button>
       )}
       <input
+        ref={inputRef}
         type="search"
         id={id}
         name={name}

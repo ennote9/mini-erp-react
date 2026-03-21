@@ -19,8 +19,13 @@ import { DatePickerField } from "@/components/ui/date-picker-field";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { agGridDefaultColDef, agGridSelectionColumnDef } from "../../../shared/ui/ag-grid/agGridDefaults";
+import {
+  agGridDefaultColDef,
+  agGridDefaultGridOptions,
+  agGridSelectionColumnDef,
+} from "../../../shared/ui/ag-grid/agGridDefaults";
 import { todayYYYYMMDD, normalizeDateForPO } from "../dateUtils";
+import { usePlanningDocumentHotkeys } from "../../../shared/hotkeys";
 import {
   lineAmountMoney,
   roundMoney,
@@ -1088,6 +1093,18 @@ export function PurchaseOrderPage() {
     [fulfillmentByItemId],
   );
 
+  usePlanningDocumentHotkeys({
+    isEditable,
+    editingLineId,
+    isLineImportModalOpen,
+    onSave: handleSave,
+    onAddLine: addLineFromEntry,
+    onOpenLineImport: () => {
+      setLineImportInitialTab("paste");
+      setIsLineImportModalOpen(true);
+    },
+  });
+
   if (!id) {
     return (
       <div className="doc-page doc-page--not-found">
@@ -1128,7 +1145,7 @@ export function PurchaseOrderPage() {
             )}
             <div className="doc-header__actions">
               {isEditable && (
-                <Button type="button" onClick={handleSave}>
+                <Button type="button" onClick={handleSave} title="Save (Ctrl/Cmd+S)">
                   <Save aria-hidden />
                   Save
                 </Button>
@@ -1390,6 +1407,7 @@ export function PurchaseOrderPage() {
                             size="sm"
                             className="h-8 gap-1.5"
                             onClick={addLineFromEntry}
+                            title="Add line (Alt+A)"
                           >
                             <Plus className="h-4 w-4 shrink-0" aria-hidden />
                             Add line
@@ -1403,6 +1421,7 @@ export function PurchaseOrderPage() {
                               setLineImportInitialTab("paste");
                               setIsLineImportModalOpen(true);
                             }}
+                            title="Add lines — paste / Excel (Alt+L)"
                           >
                             <ClipboardPaste className="h-4 w-4 shrink-0" aria-hidden />
                             Add lines
@@ -1708,6 +1727,7 @@ export function PurchaseOrderPage() {
             <div className="doc-lines__grid">
               <AgGridContainer themeClass="doc-lines-grid">
                 <AgGridReact<LineFormRow>
+                  {...agGridDefaultGridOptions}
                   ref={linesGridRef}
                   rowData={form.lines}
                   columnDefs={linesColumnDefs}
@@ -1832,6 +1852,7 @@ export function PurchaseOrderPage() {
                 <div className="doc-lines__grid">
                   <AgGridContainer themeClass="doc-lines-grid">
                     <AgGridReact<LineWithItem>
+                      {...agGridDefaultGridOptions}
                       rowData={linesWithItem}
                       columnDefs={poLinesReadOnlyColumnDefs(poFulfillment)}
                       defaultColDef={agGridDefaultColDef}

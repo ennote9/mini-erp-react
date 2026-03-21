@@ -16,11 +16,14 @@ import { EmptyState } from "../../../shared/ui/feedback/EmptyState";
 import {
   AgGridContainer,
   agGridDefaultColDef,
+  agGridDefaultGridOptions,
   agGridRowNumberColDef,
   agGridSelectionColumnDef,
+  hasMeaningfulTextSelection,
 } from "../../../shared/ui/ag-grid";
 import { BackButton } from "../../../shared/ui/list/BackButton";
 import { ListPageSearch } from "../../../shared/ui/list/ListPageSearch";
+import { useListPageSearchHotkey } from "../../../shared/hotkeys";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Button } from "@/components/ui/button";
 import { ButtonGroup, ButtonGroupSeparator } from "@/components/ui/button-group";
@@ -153,6 +156,8 @@ export function StockBalancesListPage() {
   const [exportOpen, setExportOpen] = useState(false);
   const [selectedCount, setSelectedCount] = useState(0);
   const gridRef = useRef<AgGridReact<RowData> | null>(null);
+  const listSearchInputRef = useRef<HTMLInputElement>(null);
+  useListPageSearchHotkey(listSearchInputRef);
 
   const onSelectionChanged = useCallback((e: SelectionChangedEvent<RowData>) => {
     setSelectedCount(e.api.getSelectedRows().length);
@@ -239,6 +244,7 @@ export function StockBalancesListPage() {
   }, [isEmpty]);
 
   const onRowClicked = useCallback((e: RowClickedEvent<RowData>) => {
+    if (hasMeaningfulTextSelection()) return;
     if (e.data) setDetailRow(e.data);
   }, []);
 
@@ -442,6 +448,7 @@ export function StockBalancesListPage() {
             ))}
           </ButtonGroup>
           <ListPageSearch
+            inputRef={listSearchInputRef}
             placeholder="Search"
             value={searchQuery}
             onChange={setSearchQuery}
@@ -572,11 +579,9 @@ export function StockBalancesListPage() {
         <EmptyState title={emptyTitle} hint={emptyHint} />
       ) : (
         <>
-          <p className="text-xs text-muted-foreground mb-1.5">
-            Click a row to open the source breakdown in a dialog (reservations, outgoing, incoming).
-          </p>
           <AgGridContainer themeClass="stock-balances-grid">
             <AgGridReact<RowData>
+              {...agGridDefaultGridOptions}
               ref={gridRef}
               rowData={filteredRows}
               columnDefs={columnDefs}

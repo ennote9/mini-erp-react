@@ -131,20 +131,6 @@ export function DocumentLineImportModal(props: Props) {
     setActiveTab(initialTab);
   }, [open, initialTab, resetTemporarySessionState]);
 
-  useEffect(() => {
-    if (!open) return;
-    const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
-        e.preventDefault();
-        onOpenChange(false);
-      }
-    };
-    window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
-  }, [open, onOpenChange]);
-
-  if (!open) return null;
-
   const close = () => onOpenChange(false);
 
   const currentValidLineCount =
@@ -282,6 +268,30 @@ export function DocumentLineImportModal(props: Props) {
     close();
   };
 
+  const applyKeyboardRef = useRef({ apply: handleAddAllValid, count: currentValidLineCount });
+  applyKeyboardRef.current = { apply: handleAddAllValid, count: currentValidLineCount };
+
+  useEffect(() => {
+    if (!open) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        e.preventDefault();
+        onOpenChange(false);
+        return;
+      }
+      if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
+        if (e.target instanceof HTMLTextAreaElement) return;
+        const { apply, count } = applyKeyboardRef.current;
+        if (count > 0) {
+          e.preventDefault();
+          apply();
+        }
+      }
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [open, onOpenChange]);
+
   const isPasteRowValid = (status: string): boolean => status === "valid";
   const isExcelRowValid = (status: string): boolean => status === "valid";
 
@@ -311,6 +321,8 @@ export function DocumentLineImportModal(props: Props) {
     : 0;
   const excelErrorCount = excelPreview ? excelPreview.rows.length - excelValidCount : 0;
 
+  if (!open) return null;
+
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"
@@ -320,12 +332,18 @@ export function DocumentLineImportModal(props: Props) {
       }}
     >
       <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="line-import-title"
+        data-state="open"
         className="w-full max-w-4xl rounded-md border border-border bg-card shadow-xl"
         onMouseDown={(e) => e.stopPropagation()}
       >
         <div className="flex items-start justify-between border-b border-border px-4 py-3">
           <div>
-            <h3 className="text-sm font-semibold">Add lines</h3>
+            <h3 id="line-import-title" className="text-sm font-semibold">
+              Add lines
+            </h3>
             <p className="text-xs text-muted-foreground">
               Paste item codes/barcodes or import an Excel file. Review the preview before adding lines.
             </p>
@@ -624,6 +642,7 @@ export function DocumentLineImportModal(props: Props) {
             type="button"
             onClick={handleAddAllValid}
             disabled={currentValidLineCount <= 0}
+            title="Add all valid lines (Ctrl/Cmd+Enter)"
           >
             <Check className="h-4 w-4 shrink-0" aria-hidden />
             Add all valid lines

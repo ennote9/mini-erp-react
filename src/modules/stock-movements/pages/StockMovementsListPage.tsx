@@ -17,11 +17,13 @@ import { EmptyState } from "../../../shared/ui/feedback/EmptyState";
 import {
   AgGridContainer,
   agGridDefaultColDef,
+  agGridDefaultGridOptions,
   agGridRowNumberColDef,
   agGridSelectionColumnDef,
 } from "../../../shared/ui/ag-grid";
 import { BackButton } from "../../../shared/ui/list/BackButton";
 import { ListPageSearch } from "../../../shared/ui/list/ListPageSearch";
+import { useListPageSearchHotkey } from "../../../shared/hotkeys";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Button } from "@/components/ui/button";
 import { ChevronDown, FileSpreadsheet, File, FolderOpen, X } from "lucide-react";
@@ -154,6 +156,8 @@ export function StockMovementsListPage() {
   const [exportOpen, setExportOpen] = useState(false);
   const [selectedCount, setSelectedCount] = useState(0);
   const gridRef = useRef<AgGridReact<RowData> | null>(null);
+  const listSearchInputRef = useRef<HTMLInputElement>(null);
+  useListPageSearchHotkey(listSearchInputRef);
 
   const onSelectionChanged = useCallback((e: SelectionChangedEvent<RowData>) => {
     setSelectedCount(e.api.getSelectedRows().length);
@@ -339,6 +343,7 @@ export function StockMovementsListPage() {
         <>
           <BackButton to="/" aria-label="Back to Dashboard" />
           <ListPageSearch
+            inputRef={listSearchInputRef}
             placeholder="Search"
             value={searchQuery}
             onChange={setSearchQuery}
@@ -470,6 +475,7 @@ export function StockMovementsListPage() {
       ) : (
         <AgGridContainer themeClass="stock-movements-grid">
           <AgGridReact<RowData>
+            {...agGridDefaultGridOptions}
             ref={gridRef}
             rowData={filteredRows}
             columnDefs={columnDefs}

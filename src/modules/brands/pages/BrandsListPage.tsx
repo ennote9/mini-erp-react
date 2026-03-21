@@ -9,11 +9,14 @@ import { EmptyState } from "../../../shared/ui/feedback/EmptyState";
 import {
   AgGridContainer,
   agGridDefaultColDef,
+  agGridDefaultGridOptions,
   agGridRowNumberColDef,
   agGridSelectionColumnDef,
+  hasMeaningfulTextSelection,
 } from "../../../shared/ui/ag-grid";
 import { BackButton } from "../../../shared/ui/list/BackButton";
 import { ListPageSearch } from "../../../shared/ui/list/ListPageSearch";
+import { useListPageSearchHotkey } from "../../../shared/hotkeys";
 import { Button } from "@/components/ui/button";
 import {
   ButtonGroup,
@@ -64,6 +67,8 @@ export function BrandsListPage() {
   const [exportOpen, setExportOpen] = useState(false);
   const [selectedCount, setSelectedCount] = useState(0);
   const gridRef = useRef<AgGridReact<Brand> | null>(null);
+  const listSearchInputRef = useRef<HTMLInputElement>(null);
+  useListPageSearchHotkey(listSearchInputRef);
 
   const onSelectionChanged = useCallback((e: SelectionChangedEvent<Brand>) => {
     setSelectedCount(e.api.getSelectedRows().length);
@@ -204,6 +209,7 @@ export function BrandsListPage() {
             ))}
           </ButtonGroup>
           <ListPageSearch
+            inputRef={listSearchInputRef}
             placeholder="Search"
             value={searchQuery}
             onChange={setSearchQuery}
@@ -320,6 +326,7 @@ export function BrandsListPage() {
       ) : (
         <AgGridContainer themeClass="brands-grid">
           <AgGridReact<Brand>
+            {...agGridDefaultGridOptions}
             ref={gridRef}
             rowData={filteredRows}
             columnDefs={columnDefs}
@@ -327,7 +334,10 @@ export function BrandsListPage() {
             rowSelection={{ mode: "multiRow", checkboxes: true, headerCheckbox: true, enableClickSelection: true }}
             selectionColumnDef={agGridSelectionColumnDef}
             getRowId={(params) => params.data.id}
-            onRowClicked={(e) => e.data && navigate(`/brands/${e.data.id}`)}
+            onRowClicked={(e) => {
+              if (hasMeaningfulTextSelection()) return;
+              if (e.data) navigate(`/brands/${e.data.id}`);
+            }}
             onSelectionChanged={onSelectionChanged}
           />
         </AgGridContainer>

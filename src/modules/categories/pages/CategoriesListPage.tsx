@@ -9,11 +9,14 @@ import { EmptyState } from "../../../shared/ui/feedback/EmptyState";
 import {
   AgGridContainer,
   agGridDefaultColDef,
+  agGridDefaultGridOptions,
   agGridRowNumberColDef,
   agGridSelectionColumnDef,
+  hasMeaningfulTextSelection,
 } from "../../../shared/ui/ag-grid";
 import { BackButton } from "../../../shared/ui/list/BackButton";
 import { ListPageSearch } from "../../../shared/ui/list/ListPageSearch";
+import { useListPageSearchHotkey } from "../../../shared/hotkeys";
 import { Button } from "@/components/ui/button";
 import {
   ButtonGroup,
@@ -64,6 +67,8 @@ export function CategoriesListPage() {
   const [exportOpen, setExportOpen] = useState(false);
   const [selectedCount, setSelectedCount] = useState(0);
   const gridRef = useRef<AgGridReact<Category> | null>(null);
+  const listSearchInputRef = useRef<HTMLInputElement>(null);
+  useListPageSearchHotkey(listSearchInputRef);
 
   const onSelectionChanged = useCallback((e: SelectionChangedEvent<Category>) => {
     setSelectedCount(e.api.getSelectedRows().length);
@@ -204,6 +209,7 @@ export function CategoriesListPage() {
             ))}
           </ButtonGroup>
           <ListPageSearch
+            inputRef={listSearchInputRef}
             placeholder="Search"
             value={searchQuery}
             onChange={setSearchQuery}
@@ -320,6 +326,7 @@ export function CategoriesListPage() {
       ) : (
         <AgGridContainer themeClass="categories-grid">
           <AgGridReact<Category>
+            {...agGridDefaultGridOptions}
             ref={gridRef}
             rowData={filteredRows}
             columnDefs={columnDefs}
@@ -327,7 +334,10 @@ export function CategoriesListPage() {
             rowSelection={{ mode: "multiRow", checkboxes: true, headerCheckbox: true, enableClickSelection: true }}
             selectionColumnDef={agGridSelectionColumnDef}
             getRowId={(params) => params.data.id}
-            onRowClicked={(e) => e.data && navigate(`/categories/${e.data.id}`)}
+            onRowClicked={(e) => {
+              if (hasMeaningfulTextSelection()) return;
+              if (e.data) navigate(`/categories/${e.data.id}`);
+            }}
             onSelectionChanged={onSelectionChanged}
           />
         </AgGridContainer>
