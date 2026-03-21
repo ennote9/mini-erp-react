@@ -40,6 +40,8 @@ import { save } from "@tauri-apps/plugin-dialog";
 import { invoke } from "@tauri-apps/api/core";
 import { revealItemInDir } from "@tauri-apps/plugin-opener";
 import { StockBalanceRowDrillDown } from "../components/StockBalanceRowDrillDown";
+import { useSettings } from "../../../shared/settings/SettingsContext";
+import { getEffectiveWorkspaceFeatureEnabled } from "../../../shared/workspace";
 
 type RowData = StockBalance & {
   itemCode: string;
@@ -141,6 +143,25 @@ function buildExportRowsFromBalances(rows: RowData[]): StockBalancesExportRow[] 
 }
 
 export function StockBalancesListPage() {
+  const { settings } = useSettings();
+  const workspaceMode = settings.general.workspaceMode;
+  const profileOverrides = settings.general.profileOverrides;
+  const showOperationalGrid = getEffectiveWorkspaceFeatureEnabled(
+    workspaceMode,
+    profileOverrides,
+    "stockBalancesOperationalGrid",
+  );
+  const showQuickFilters = getEffectiveWorkspaceFeatureEnabled(
+    workspaceMode,
+    profileOverrides,
+    "stockBalancesQuickFilters",
+  );
+  const showDrillDownModal = getEffectiveWorkspaceFeatureEnabled(
+    workspaceMode,
+    profileOverrides,
+    "stockBalancesDrillDownModal",
+  );
+
   const [searchParams, setSearchParams] = useSearchParams();
   const warehouseFilterId = useMemo(() => {
     const raw = searchParams.get("warehouseId");
@@ -243,10 +264,22 @@ export function StockBalancesListPage() {
     if (isEmpty) setDetailRow(null);
   }, [isEmpty]);
 
-  const onRowClicked = useCallback((e: RowClickedEvent<RowData>) => {
-    if (hasMeaningfulTextSelection()) return;
-    if (e.data) setDetailRow(e.data);
-  }, []);
+  useEffect(() => {
+    if (!showQuickFilters) setQuickFilter("all");
+  }, [showQuickFilters]);
+
+  useEffect(() => {
+    if (!showDrillDownModal) setDetailRow(null);
+  }, [showDrillDownModal]);
+
+  const onRowClicked = useCallback(
+    (e: RowClickedEvent<RowData>) => {
+      if (!showDrillDownModal) return;
+      if (hasMeaningfulTextSelection()) return;
+      if (e.data) setDetailRow(e.data);
+    },
+    [showDrillDownModal],
+  );
 
   const onDrillDownOpenChange = useCallback((open: boolean) => {
     if (!open) setDetailRow(null);
@@ -364,8 +397,8 @@ export function StockBalancesListPage() {
       typeof p.value === "number" && !Number.isNaN(p.value) ? String(p.value) : "—",
   });
 
-  const columnDefs = useMemo<ColDef<RowData>[]>(
-    () => [
+  const columnDefs = useMemo<ColDef<RowData>[]>(() => {
+    const base: ColDef<RowData>[] = [
       agGridRowNumberColDef,
       {
         field: "itemCode",
@@ -386,6 +419,10 @@ export function StockBalancesListPage() {
         width: 140,
       },
       qtyCol("qtyOnHand", "Total quantity", 112),
+    ];
+    if (!showOperationalGrid) return base;
+    return [
+      ...base,
       qtyCol("reservedQty", "Reserved", 96),
       qtyCol("availableQty", "Available", 100),
       qtyCol("deficitQty", "Deficit", 88),
@@ -410,9 +447,8 @@ export function StockBalancesListPage() {
               ? "text-muted-foreground"
               : "text-muted-foreground/90",
       },
-    ],
-    [],
-  );
+    ];
+  }, [showOperationalGrid]);
 
   return (
     <ListPageLayout
@@ -420,33 +456,35 @@ export function StockBalancesListPage() {
       controls={
         <>
           <BackButton to="/" aria-label="Back to Dashboard" />
-          <ButtonGroup className="list-page__filter-group shrink-0" aria-label="Quick filters">
-            {QUICK_FILTER_OPTIONS.map((opt, index) => (
-              <Fragment key={opt.value}>
-                {index > 0 && <ButtonGroupSeparator />}
-                <Button
-                  type="button"
-                  variant={quickFilter === opt.value ? "default" : "outline"}
-                  size="sm"
-                  className="px-2 text-xs gap-1"
-                  title={opt.aria}
-                  aria-pressed={quickFilter === opt.value}
-                  onClick={() => setQuickFilter(opt.value)}
-                >
-                  <span>{opt.label}</span>
-                  <span
-                    className={
-                      quickFilter === opt.value
-                        ? "tabular-nums font-normal opacity-90"
-                        : "tabular-nums text-muted-foreground font-normal"
-                    }
+          {showQuickFilters ? (
+            <ButtonGroup className="list-page__filter-group shrink-0" aria-label="Quick filters">
+              {QUICK_FILTER_OPTIONS.map((opt, index) => (
+                <Fragment key={opt.value}>
+                  {index > 0 && <ButtonGroupSeparator />}
+                  <Button
+                    type="button"
+                    variant={quickFilter === opt.value ? "default" : "outline"}
+                    size="sm"
+                    className="px-2 text-xs gap-1"
+                    title={opt.aria}
+                    aria-pressed={quickFilter === opt.value}
+                    onClick={() => setQuickFilter(opt.value)}
                   >
-                    ({quickFilterCounts[opt.value]})
-                  </span>
-                </Button>
-              </Fragment>
-            ))}
-          </ButtonGroup>
+                    <span>{opt.label}</span>
+                    <span
+                      className={
+                        quickFilter === opt.value
+                          ? "tabular-nums font-normal opacity-90"
+                          : "tabular-nums text-muted-foreground font-normal"
+                      }
+                    >
+                      ({quickFilterCounts[opt.value]})
+                    </span>
+                  </Button>
+                </Fragment>
+              ))}
+            </ButtonGroup>
+          ) : null}
           <ListPageSearch
             inputRef={listSearchInputRef}
             placeholder="Search"
@@ -594,7 +632,7 @@ export function StockBalancesListPage() {
               onRowClicked={onRowClicked}
             />
           </AgGridContainer>
-          {detailRow ? (
+          {showDrillDownModal && detailRow ? (
             <StockBalanceRowDrillDown
               key={detailRow.id}
               row={{

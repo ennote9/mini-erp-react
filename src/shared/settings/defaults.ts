@@ -1,7 +1,11 @@
+import { NULL_PROFILE_OVERRIDES } from "../workspace/profileOverrides";
 import type { AppSettings } from "./types";
 
 export const DEFAULT_APP_SETTINGS: AppSettings = {
   general: {
+    /** Preserves today’s full visible surface for existing installs. */
+    workspaceMode: "advanced",
+    profileOverrides: { ...NULL_PROFILE_OVERRIDES },
     theme: "dark",
     dateFormat: "iso",
     numberFormat: "commaDot",

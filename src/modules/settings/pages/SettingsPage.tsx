@@ -1,7 +1,7 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Checkbox } from "@/components/ui/checkbox";
+import { Switch } from "@/components/ui/switch";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { SelectField } from "@/components/ui/select-field";
@@ -9,7 +9,7 @@ import { cn } from "@/lib/utils";
 import {
   registryEntriesForSection,
   SETTINGS_SECTION_META,
-  SETTINGS_SECTION_ORDER,
+  settingsSectionsVisibleForWorkspace,
   useSettings,
   type AppSettings,
   type SettingReadiness,
@@ -17,6 +17,8 @@ import {
   type SettingsSectionId,
   type SettingsPersistenceState,
 } from "@/shared/settings";
+import { NULL_PROFILE_OVERRIDES, isWorkspaceFeatureVisible } from "@/shared/workspace";
+import { WorkspaceProfileSettingsCard } from "../components/WorkspaceProfileSettingsCard";
 
 function SettingsPersistenceNote({
   hydrated,
@@ -184,7 +186,19 @@ export function SettingsPage() {
     corruptRestoredOnLoad,
     persistenceTechnicalDetail,
   } = useSettings();
-  const [activeSection, setActiveSection] = useState<SettingsSectionId>("general");
+  const [activeSection, setActiveSection] = useState<SettingsSectionId>("workspaceProfile");
+  const workspaceMode = settings.general.workspaceMode;
+
+  const visibleSettingsSections = useMemo(
+    () => settingsSectionsVisibleForWorkspace(workspaceMode),
+    [workspaceMode],
+  );
+
+  useEffect(() => {
+    if (!visibleSettingsSections.includes(activeSection)) {
+      setActiveSection(visibleSettingsSections[0] ?? "workspaceProfile");
+    }
+  }, [visibleSettingsSections, activeSection]);
 
   const onBoolean = useCallback(
     (entry: SettingRegistryEntry, checked: boolean) => {
@@ -287,8 +301,8 @@ export function SettingsPage() {
   );
 
   const sectionEntries = useMemo(
-    () => registryEntriesForSection(activeSection),
-    [activeSection],
+    () => registryEntriesForSection(activeSection, workspaceMode),
+    [activeSection, workspaceMode],
   );
 
   const meta = SETTINGS_SECTION_META[activeSection];
@@ -316,7 +330,7 @@ export function SettingsPage() {
           className="settings-page__nav flex w-44 shrink-0 flex-col gap-0.5 border-r border-border pr-3"
           aria-label="Settings sections"
         >
-          {SETTINGS_SECTION_ORDER.map((id) => (
+          {visibleSettingsSections.map((id) => (
             <button
               key={id}
               type="button"
@@ -334,6 +348,32 @@ export function SettingsPage() {
         </nav>
 
         <div className="min-h-0 min-w-0 flex-1 overflow-y-auto erp-dark-scrollbar">
+          {activeSection === "workspaceProfile" ? (
+            <>
+              <WorkspaceProfileSettingsCard
+                workspaceMode={workspaceMode}
+                profileOverrides={settings.general.profileOverrides}
+                requireReservationBeforeShipment={settings.inventory.requireReservationBeforeShipment}
+                onSelectMode={(mode) => patch({ general: { workspaceMode: mode } })}
+                onPatchProfileOverrides={(next) => patch({ general: { profileOverrides: next } })}
+                onResetProfileOverrides={() =>
+                  patch({ general: { profileOverrides: { ...NULL_PROFILE_OVERRIDES } } })
+                }
+              />
+              <div className="mt-2 flex flex-wrap gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="h-8 text-xs text-muted-foreground"
+                  onClick={() => resetSection("workspaceProfile")}
+                >
+                  Reset this section to defaults
+                </Button>
+              </div>
+            </>
+          ) : (
+            <>
           <Card className="border-border/80 bg-card/40">
             <CardHeader className="pb-3">
               <CardTitle className="text-base">{meta.title}</CardTitle>
@@ -375,11 +415,11 @@ export function SettingsPage() {
                     </div>
                     <div className="flex shrink-0 items-center gap-2 sm:justify-end">
                       {entry.valueType === "boolean" && (
-                        <Checkbox
+                        <Switch
                           id={entry.id}
                           checked={Boolean(value)}
                           disabled={boolDisabled}
-                          onCheckedChange={(c) => onBoolean(entry, c === true)}
+                          onCheckedChange={(c) => onBoolean(entry, c)}
                           aria-label={entry.label}
                         />
                       )}
@@ -417,7 +457,9 @@ export function SettingsPage() {
                 );
               })}
 
-              {activeSection === "dataAudit" && hydrated && (
+              {activeSection === "dataAudit" &&
+                isWorkspaceFeatureVisible(workspaceMode, "settingsDataAudit") &&
+                hydrated && (
                 <div className="flex flex-col gap-1 border-t border-border/80 py-3 sm:flex-row sm:items-center sm:justify-between">
                   <div className="min-w-0 space-y-1 pr-4">
                     <Label className="text-sm font-medium text-foreground">Settings persistence</Label>
@@ -431,7 +473,9 @@ export function SettingsPage() {
                 </div>
               )}
 
-              {activeSection === "dataAudit" && settings.dataAudit.showAppVersion && (
+              {activeSection === "dataAudit" &&
+                isWorkspaceFeatureVisible(workspaceMode, "settingsDataAudit") &&
+                settings.dataAudit.showAppVersion && (
                 <div className="flex flex-col gap-1 border-t border-border/80 py-3 sm:flex-row sm:items-center sm:justify-between">
                   <div className="min-w-0 space-y-1 pr-4">
                     <Label className="text-sm font-medium text-foreground">Application</Label>
@@ -456,6 +500,8 @@ export function SettingsPage() {
               Reset this section to defaults
             </Button>
           </div>
+            </>
+          )}
         </div>
       </div>
     </div>

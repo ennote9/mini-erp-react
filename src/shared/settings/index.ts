@@ -1,10 +1,12 @@
 export type {
   AppSettings,
+  ProfileOverridesState,
   SettingReadiness,
   SettingRegistryEntry,
   SettingsSectionId,
   ThemePreference,
   SettingValueType,
+  WorkspaceModeId,
 } from "./types";
 export { DEFAULT_APP_SETTINGS } from "./defaults";
 export {
@@ -29,7 +31,9 @@ export {
   SETTINGS_REGISTRY,
   SETTINGS_SECTION_META,
   SETTINGS_SECTION_ORDER,
+  isRegistryEntryVisibleForWorkspace,
   registryEntriesForSection,
+  settingsSectionsVisibleForWorkspace,
 } from "./registry";
 export { SettingsProvider, useSettings } from "./SettingsContext";
 export { applyThemeToDocument } from "./themeApply";

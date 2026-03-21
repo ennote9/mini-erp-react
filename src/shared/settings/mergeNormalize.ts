@@ -5,7 +5,9 @@ import type {
   DateFormatId,
   NumberFormatId,
   PartnerTermsOverwriteId,
+  ProfileOverridesState,
   ThemePreference,
+  WorkspaceModeId,
 } from "./types";
 
 export type DeepPartialAppSettings = {
@@ -40,6 +42,35 @@ function asPartnerTermsOverwriteId(v: unknown): PartnerTermsOverwriteId | undefi
   return v === "document_wins" || v === "master_wins" ? v : undefined;
 }
 
+function asWorkspaceModeId(v: unknown): WorkspaceModeId | undefined {
+  return v === "lite" || v === "standard" || v === "advanced" ? v : undefined;
+}
+
+function coalesceProfileOverride(v: unknown, fallback: boolean | null): boolean | null {
+  if (v === null) return null;
+  if (typeof v === "boolean") return v;
+  return fallback;
+}
+
+function normalizeProfileOverridesFromUnknown(
+  raw: unknown,
+  base: ProfileOverridesState,
+): ProfileOverridesState {
+  if (!isRecord(raw)) return { ...base };
+  const r = raw as Record<string, unknown>;
+  return {
+    documentEventLog: coalesceProfileOverride(r.documentEventLog, base.documentEventLog),
+    reverseDocumentActions: coalesceProfileOverride(r.reverseDocumentActions, base.reverseDocumentActions),
+    stockMovementsNav: coalesceProfileOverride(r.stockMovementsNav, base.stockMovementsNav),
+    advancedStockBalanceAnalytics: coalesceProfileOverride(
+      r.advancedStockBalanceAnalytics,
+      base.advancedStockBalanceAnalytics,
+    ),
+    stockBalanceSourceModal: coalesceProfileOverride(r.stockBalanceSourceModal, base.stockBalanceSourceModal),
+    allocationControls: coalesceProfileOverride(r.allocationControls, base.allocationControls),
+  };
+}
+
 function asBool(v: unknown): boolean | undefined {
   return typeof v === "boolean" ? v : undefined;
 }
@@ -68,6 +99,11 @@ export function normalizeAppSettingsFromUnknown(raw: unknown): AppSettings {
 
   return {
     general: {
+      workspaceMode: asWorkspaceModeId(g.workspaceMode) ?? base.general.workspaceMode,
+      profileOverrides: normalizeProfileOverridesFromUnknown(
+        (g as Record<string, unknown>).profileOverrides,
+        base.general.profileOverrides,
+      ),
       theme: asThemePreference(g.theme) ?? base.general.theme,
       dateFormat: asDateFormatId(g.dateFormat) ?? base.general.dateFormat,
       numberFormat: asNumberFormatId(g.numberFormat) ?? base.general.numberFormat,
@@ -136,7 +172,14 @@ export function mergeAppSettingsPatch(
   patch: DeepPartialAppSettings,
 ): AppSettings {
   return {
-    general: { ...current.general, ...patch.general },
+    general: {
+      ...current.general,
+      ...patch.general,
+      profileOverrides:
+        patch.general?.profileOverrides !== undefined
+          ? { ...current.general.profileOverrides, ...patch.general.profileOverrides }
+          : current.general.profileOverrides,
+    },
     documents: { ...current.documents, ...patch.documents },
     inventory: { ...current.inventory, ...patch.inventory },
     commercial: {

@@ -1,4 +1,7 @@
 import { useMemo } from "react";
+import { cn } from "@/lib/utils";
+import { useSettings } from "@/shared/settings";
+import { getEffectiveWorkspaceFeatureEnabled } from "@/shared/workspace";
 import {
   getPurchaseOrderBreakdown,
   getSalesOrderBreakdown,
@@ -18,6 +21,14 @@ import {
 } from "../components";
 
 export function DashboardPage() {
+  const { settings } = useSettings();
+  const workspaceMode = settings.general.workspaceMode;
+  const showStockMovementsCard = getEffectiveWorkspaceFeatureEnabled(
+    workspaceMode,
+    settings.general.profileOverrides,
+    "dashboardStockMovementsCard",
+  );
+
   const po = useMemo(() => getPurchaseOrderBreakdown(), []);
   const so = useMemo(() => getSalesOrderBreakdown(), []);
   const receipts = useMemo(() => getReceiptBreakdown(), []);
@@ -101,17 +112,24 @@ export function DashboardPage() {
         >
           Inventory
         </h2>
-        <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+        <div
+          className={cn(
+            "grid grid-cols-1 gap-3",
+            showStockMovementsCard ? "md:grid-cols-3" : "md:grid-cols-2",
+          )}
+        >
           <InventoryOverviewCard
             title="Stock balances"
             listPath="/stock-balances"
             metrics={[{ key: "rows", label: "Balance rows", value: inventory.balanceRows }]}
           />
-          <InventoryOverviewCard
-            title="Stock movements"
-            listPath="/stock-movements"
-            metrics={[{ key: "rows", label: "Movement rows", value: inventory.movementRows }]}
-          />
+          {showStockMovementsCard ? (
+            <InventoryOverviewCard
+              title="Stock movements"
+              listPath="/stock-movements"
+              metrics={[{ key: "rows", label: "Movement rows", value: inventory.movementRows }]}
+            />
+          ) : null}
           <InventoryOverviewCard
             title="Items"
             listPath="/items"

@@ -51,6 +51,7 @@ import {
 } from "../../../shared/ui/object/ReverseDocumentReasonDialog";
 import { DocumentEventLogSection } from "../../../shared/ui/object/DocumentEventLogSection";
 import { useSettings } from "../../../shared/settings/SettingsContext";
+import { getEffectiveWorkspaceFeatureEnabled } from "../../../shared/workspace";
 import {
   CANCEL_DOCUMENT_REASON_LABELS,
   REVERSAL_DOCUMENT_REASON_LABELS,
@@ -139,6 +140,16 @@ function buildExportRowsFromLinesWithItem(lines: LineWithItem[]): ReceiptExportL
 export function ReceiptPage() {
   const { id } = useParams<{ id: string }>();
   const { settings } = useSettings();
+  const workspaceMode = settings.general.workspaceMode;
+  const profileOverrides = settings.general.profileOverrides;
+  const showReverseDocument = getEffectiveWorkspaceFeatureEnabled(
+    workspaceMode,
+    profileOverrides,
+    "documentReversePosted",
+  );
+  const showDocumentEventLogSection =
+    getEffectiveWorkspaceFeatureEnabled(workspaceMode, profileOverrides, "documentEventLog") &&
+    settings.documents.showDocumentEventLog;
   const [refresh, setRefresh] = useState(0);
   const [actionIssues, setActionIssues] = useState<Issue[]>([]);
   const [selectedLineIds, setSelectedLineIds] = useState<string[]>([]);
@@ -370,7 +381,7 @@ export function ReceiptPage() {
                   Cancel document
                 </Button>
               )}
-              {isPosted && (
+              {isPosted && showReverseDocument && (
                 <Button
                   type="button"
                   variant="outline"
@@ -580,7 +591,7 @@ export function ReceiptPage() {
           </div>
         )}
       </div>
-      {id && settings.documents.showDocumentEventLog ? (
+      {id && showDocumentEventLogSection ? (
         <DocumentEventLogSection entityType="receipt" entityId={id} refresh={refresh} />
       ) : null}
       <CancelDocumentReasonDialog

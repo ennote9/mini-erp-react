@@ -29,15 +29,23 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
 } from "@/components/ui/sidebar";
+import { useSettings } from "@/shared/settings";
+import { getEffectiveWorkspaceFeatureEnabled, WORKSPACE_MODE_OPTIONS } from "@/shared/workspace";
 
-const nav = [
-  { label: "Dashboard", to: "/", end: true as const, icon: LayoutDashboard },
+type NavLinkItem = {
+  label: string;
+  to: string;
+  icon: ComponentType<{ className?: string }>;
+  feature?: "navBrandsCategories" | "navStockMovements";
+};
+
+const nav: ReadonlyArray<{ label: string; links: readonly NavLinkItem[] }> = [
   {
     label: "Master Data",
     links: [
       { label: "Items", to: "/items", icon: Package },
-      { label: "Brands", to: "/brands", icon: Tag },
-      { label: "Categories", to: "/categories", icon: FolderOpen },
+      { label: "Brands", to: "/brands", icon: Tag, feature: "navBrandsCategories" as const },
+      { label: "Categories", to: "/categories", icon: FolderOpen, feature: "navBrandsCategories" as const },
       { label: "Suppliers", to: "/suppliers", icon: Truck },
       { label: "Customers", to: "/customers", icon: Users },
       { label: "Warehouses", to: "/warehouses", icon: Warehouse },
@@ -61,10 +69,10 @@ const nav = [
     label: "Inventory",
     links: [
       { label: "Stock Balances", to: "/stock-balances", icon: Scale },
-      { label: "Stock Movements", to: "/stock-movements", icon: ArrowLeftRight },
+      { label: "Stock Movements", to: "/stock-movements", icon: ArrowLeftRight, feature: "navStockMovements" },
     ],
   },
-] as const;
+];
 
 function SidebarNavLink({
   to,
@@ -98,6 +106,11 @@ function SidebarNavLink({
  * workspace-style header, nav with icons, footer block, inset-ready shell.
  */
 export function AppSidebar() {
+  const { settings } = useSettings();
+  const mode = settings.general.workspaceMode;
+  const overrides = settings.general.profileOverrides;
+  const modeLabel = WORKSPACE_MODE_OPTIONS.find((o) => o.value === mode)?.label ?? mode;
+
   return (
     <Sidebar collapsible="none" variant="inset">
       <SidebarHeader>
@@ -112,7 +125,9 @@ export function AppSidebar() {
               </div>
               <div className="grid min-w-0 flex-1 gap-0.5 text-left">
                 <span className="truncate text-sm font-semibold leading-tight text-sidebar-foreground">Mini ERP</span>
-                <span className="truncate text-xs leading-tight text-sidebar-foreground/70">Workspace</span>
+                <span className="truncate text-xs leading-tight text-sidebar-foreground/70" title="Current workspace complexity profile">
+                  {modeLabel} workspace
+                </span>
               </div>
             </SidebarMenuButton>
           </SidebarMenuItem>
@@ -124,34 +139,35 @@ export function AppSidebar() {
           <SidebarGroupContent>
             <SidebarMenu>
               <SidebarMenuItem>
-                <SidebarNavLink
-                  to="/"
-                  label="Dashboard"
-                  end
-                  icon={nav[0].icon}
-                />
+                <SidebarNavLink to="/" label="Dashboard" end icon={LayoutDashboard} />
               </SidebarMenuItem>
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
-        {nav.filter((x) => "links" in x).map((group) => (
-          <SidebarGroup key={group.label}>
-            <SidebarGroupLabel>{group.label}</SidebarGroupLabel>
-            <SidebarGroupContent>
-              <SidebarMenu>
-                {group.links.map((link) => (
-                  <SidebarMenuItem key={link.to}>
-                    <SidebarNavLink
-                      to={link.to}
-                      label={link.label}
-                      icon={link.icon}
-                    />
-                  </SidebarMenuItem>
-                ))}
-              </SidebarMenu>
-            </SidebarGroupContent>
-          </SidebarGroup>
-        ))}
+        {nav.filter((x) => "links" in x).map((group) => {
+          const links = group.links.filter((link) => {
+            if (link.feature === "navBrandsCategories")
+              return getEffectiveWorkspaceFeatureEnabled(mode, overrides, "navBrandsCategories");
+            if (link.feature === "navStockMovements")
+              return getEffectiveWorkspaceFeatureEnabled(mode, overrides, "navStockMovements");
+            return true;
+          });
+          if (links.length === 0) return null;
+          return (
+            <SidebarGroup key={group.label}>
+              <SidebarGroupLabel>{group.label}</SidebarGroupLabel>
+              <SidebarGroupContent>
+                <SidebarMenu>
+                  {links.map((link) => (
+                    <SidebarMenuItem key={link.to}>
+                      <SidebarNavLink to={link.to} label={link.label} icon={link.icon} />
+                    </SidebarMenuItem>
+                  ))}
+                </SidebarMenu>
+              </SidebarGroupContent>
+            </SidebarGroup>
+          );
+        })}
       </SidebarContent>
       <SidebarFooter>
         <SidebarMenu>

@@ -85,6 +85,7 @@ import {
   type PoLineFulfillment,
 } from "../../../shared/planningFulfillment";
 import { useSettings } from "../../../shared/settings/SettingsContext";
+import { getEffectiveWorkspaceFeatureEnabled } from "../../../shared/workspace";
 
 type LineWithItem = PurchaseOrderLine & { itemName: string };
 
@@ -449,6 +450,16 @@ export function PurchaseOrderPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { settings } = useSettings();
+  const workspaceMode = settings.general.workspaceMode;
+  const showDocumentEventLogSection = useMemo(
+    () =>
+      getEffectiveWorkspaceFeatureEnabled(
+        workspaceMode,
+        settings.general.profileOverrides,
+        "documentEventLog",
+      ) && settings.documents.showDocumentEventLog,
+    [workspaceMode, settings.general.profileOverrides, settings.documents.showDocumentEventLog],
+  );
   const [refresh, setRefresh] = useState(0);
   const isNew = id === "new";
   const doc = useMemo(
@@ -1896,7 +1907,7 @@ export function PurchaseOrderPage() {
         onOpenChange={setIsLineImportModalOpen}
         onApply={handleApplyImportedLines}
       />
-      {!isNew && id && settings.documents.showDocumentEventLog ? (
+      {!isNew && id && showDocumentEventLogSection ? (
         <DocumentEventLogSection entityType="purchase_order" entityId={id} refresh={refresh} />
       ) : null}
       <CancelDocumentReasonDialog

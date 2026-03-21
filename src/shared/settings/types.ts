@@ -3,6 +3,7 @@
  */
 
 export type SettingsSectionId =
+  | "workspaceProfile"
   | "general"
   | "documents"
   | "inventory"
@@ -11,6 +12,26 @@ export type SettingsSectionId =
 
 /** Dark-first app; system follows OS preference. */
 export type ThemePreference = "dark" | "system";
+
+/**
+ * Product complexity / visibility profile. Drives which UI and settings are shown (phase 1: mostly visibility).
+ * - lite: small business, minimal surface
+ * - standard: balanced operational depth
+ * - advanced: full current ERP-style controls
+ */
+export type WorkspaceModeId = "lite" | "standard" | "advanced";
+
+/**
+ * Exceptions to workspace-mode defaults. Each field `null` means “use the current profile (Lite/Standard/Advanced)”.
+ */
+export type ProfileOverridesState = {
+  documentEventLog: boolean | null;
+  reverseDocumentActions: boolean | null;
+  stockMovementsNav: boolean | null;
+  advancedStockBalanceAnalytics: boolean | null;
+  stockBalanceSourceModal: boolean | null;
+  allocationControls: boolean | null;
+};
 
 export type DateFormatId = "iso" | "eu" | "us";
 
@@ -24,6 +45,8 @@ export type PartnerTermsOverwriteId = "document_wins" | "master_wins";
 
 export type AppSettings = {
   general: {
+    workspaceMode: WorkspaceModeId;
+    profileOverrides: ProfileOverridesState;
     theme: ThemePreference;
     dateFormat: DateFormatId;
     numberFormat: NumberFormatId;
@@ -102,6 +125,11 @@ export type SettingRegistryEntry = {
   label: string;
   description: string;
   readiness: SettingReadiness;
+  /**
+   * When set, this row is hidden below the chosen workspace mode (Settings UI only).
+   * Omitted = visible in Lite and above.
+   */
+  minWorkspaceMode?: WorkspaceModeId;
   /** For enum/select rows */
   options?: ReadonlyArray<{ value: string; label: string }>;
   /** Clamp for number inputs */

@@ -74,14 +74,21 @@ export function patchAppSettings(patch: DeepPartialAppSettings): void {
 export function resetSettingsSection(section: SettingsSectionId): void {
   const d = DEFAULT_APP_SETTINGS;
   const patch: DeepPartialAppSettings =
-    section === "general"
-      ? { general: d.general }
-      : section === "documents"
-        ? { documents: d.documents }
-        : section === "inventory"
-          ? { inventory: d.inventory }
-          : section === "commercial"
-            ? { commercial: d.commercial }
-            : { dataAudit: d.dataAudit };
+    section === "workspaceProfile"
+      ? {
+          general: {
+            workspaceMode: d.general.workspaceMode,
+            profileOverrides: d.general.profileOverrides,
+          },
+        }
+      : section === "general"
+        ? { general: d.general }
+        : section === "documents"
+          ? { documents: d.documents }
+          : section === "inventory"
+            ? { inventory: d.inventory }
+            : section === "commercial"
+              ? { commercial: d.commercial }
+              : { dataAudit: d.dataAudit };
   patchAppSettings(patch);
 }

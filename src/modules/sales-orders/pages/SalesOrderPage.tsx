@@ -67,6 +67,7 @@ import {
 } from "../../../shared/ui/object/CancelDocumentReasonDialog";
 import { DocumentEventLogSection } from "../../../shared/ui/object/DocumentEventLogSection";
 import { useSettings } from "../../../shared/settings/SettingsContext";
+import { getEffectiveWorkspaceFeatureEnabled } from "../../../shared/workspace";
 import {
   CANCEL_DOCUMENT_REASON_LABELS,
   ZERO_PRICE_LINE_REASON_CODES,
@@ -125,7 +126,43 @@ function defaultForm(): FormState {
 function soLinesDisplayColumnDefs(
   fulfillmentByItemId: Map<string, SoLineFulfillment>,
   allocationByItemId: Map<string, SoLineAllocationRow>,
+  includeAllocationColumns: boolean,
 ): ColDef<LineFormRow>[] {
+  const allocationCols: ColDef<LineFormRow>[] = includeAllocationColumns
+    ? [
+        {
+          headerName: "Reserved",
+          width: 78,
+          minWidth: 70,
+          maxWidth: 88,
+          editable: false,
+          sortable: false,
+          valueGetter: (p) => {
+            const itemId = p.data?.itemId;
+            if (!itemId) return "—";
+            const a = allocationByItemId.get(itemId);
+            if (!a) return "—";
+            return String(a.reservedQty);
+          },
+        },
+        {
+          headerName: "Shortage",
+          width: 78,
+          minWidth: 70,
+          maxWidth: 88,
+          editable: false,
+          sortable: false,
+          valueGetter: (p) => {
+            const itemId = p.data?.itemId;
+            if (!itemId) return "—";
+            const a = allocationByItemId.get(itemId);
+            if (!a) return "—";
+            return String(a.shortageQty);
+          },
+        },
+      ]
+    : [];
+
   return [
     {
       headerName: "№",
@@ -231,36 +268,7 @@ function soLinesDisplayColumnDefs(
         return String(f.remainingQty);
       },
     },
-    {
-      headerName: "Reserved",
-      width: 78,
-      minWidth: 70,
-      maxWidth: 88,
-      editable: false,
-      sortable: false,
-      valueGetter: (p) => {
-        const itemId = p.data?.itemId;
-        if (!itemId) return "—";
-        const a = allocationByItemId.get(itemId);
-        if (!a) return "—";
-        return String(a.reservedQty);
-      },
-    },
-    {
-      headerName: "Shortage",
-      width: 78,
-      minWidth: 70,
-      maxWidth: 88,
-      editable: false,
-      sortable: false,
-      valueGetter: (p) => {
-        const itemId = p.data?.itemId;
-        if (!itemId) return "—";
-        const a = allocationByItemId.get(itemId);
-        if (!a) return "—";
-        return String(a.shortageQty);
-      },
-    },
+    ...allocationCols,
     {
       field: "unitPrice",
       headerName: "Unit price",
@@ -307,7 +315,41 @@ function soLinesDisplayColumnDefs(
 function soLinesReadOnlyColumnDefs(
   fulfillment: SalesOrderFulfillment | null,
   allocation: SalesOrderAllocationView | null,
+  includeAllocationColumns: boolean,
 ): ColDef<LineWithItem>[] {
+  const allocationCols: ColDef<LineWithItem>[] = includeAllocationColumns
+    ? [
+        {
+          headerName: "Reserved",
+          width: 78,
+          minWidth: 70,
+          maxWidth: 88,
+          sortable: false,
+          valueGetter: (p) => {
+            const lineId = p.data?.id;
+            if (!lineId || !allocation) return "—";
+            const row = allocation.lines.find((l) => l.lineId === lineId);
+            if (!row) return "—";
+            return String(row.reservedQty);
+          },
+        },
+        {
+          headerName: "Shortage",
+          width: 78,
+          minWidth: 70,
+          maxWidth: 88,
+          sortable: false,
+          valueGetter: (p) => {
+            const lineId = p.data?.id;
+            if (!lineId || !allocation) return "—";
+            const row = allocation.lines.find((l) => l.lineId === lineId);
+            if (!row) return "—";
+            return String(row.shortageQty);
+          },
+        },
+      ]
+    : [];
+
   return [
     {
       headerName: "№",
@@ -390,34 +432,7 @@ function soLinesReadOnlyColumnDefs(
         return String(row.remainingQty);
       },
     },
-    {
-      headerName: "Reserved",
-      width: 78,
-      minWidth: 70,
-      maxWidth: 88,
-      sortable: false,
-      valueGetter: (p) => {
-        const lineId = p.data?.id;
-        if (!lineId || !allocation) return "—";
-        const row = allocation.lines.find((l) => l.lineId === lineId);
-        if (!row) return "—";
-        return String(row.reservedQty);
-      },
-    },
-    {
-      headerName: "Shortage",
-      width: 78,
-      minWidth: 70,
-      maxWidth: 88,
-      sortable: false,
-      valueGetter: (p) => {
-        const lineId = p.data?.id;
-        if (!lineId || !allocation) return "—";
-        const row = allocation.lines.find((l) => l.lineId === lineId);
-        if (!row) return "—";
-        return String(row.shortageQty);
-      },
-    },
+    ...allocationCols,
     {
       field: "unitPrice",
       headerName: "Unit price",
@@ -641,6 +656,27 @@ export function SalesOrderPage() {
   const isDraft = doc?.status === "draft";
   const isConfirmed = doc?.status === "confirmed";
   const isEditable = isNew || isDraft;
+
+  const workspaceMode = settings.general.workspaceMode;
+  const profileOverrides = settings.general.profileOverrides;
+  const showSalesOrderAllocationUi = useMemo(() => {
+    return getEffectiveWorkspaceFeatureEnabled(
+      workspaceMode,
+      profileOverrides,
+      "salesOrderAllocateStock",
+      { requireReservationBeforeShipment: settings.inventory.requireReservationBeforeShipment },
+    );
+  }, [
+    workspaceMode,
+    profileOverrides,
+    settings.inventory.requireReservationBeforeShipment,
+  ]);
+  const showDocumentEventLogSection = useMemo(
+    () =>
+      getEffectiveWorkspaceFeatureEnabled(workspaceMode, profileOverrides, "documentEventLog") &&
+      settings.documents.showDocumentEventLog,
+    [workspaceMode, profileOverrides, settings.documents.showDocumentEventLog],
+  );
 
   useEffect(() => {
     if (!isEditable) return;
@@ -1063,8 +1099,13 @@ export function SalesOrderPage() {
   }, [soAllocationView]);
 
   const linesColumnDefs = useMemo(
-    () => soLinesDisplayColumnDefs(soFulfillmentByItemId, soAllocationByItemId),
-    [soFulfillmentByItemId, soAllocationByItemId],
+    () =>
+      soLinesDisplayColumnDefs(
+        soFulfillmentByItemId,
+        soAllocationByItemId,
+        showSalesOrderAllocationUi,
+      ),
+    [soFulfillmentByItemId, soAllocationByItemId, showSalesOrderAllocationUi],
   );
 
   const soNumberForFile = doc?.number ?? "new";
@@ -1178,7 +1219,7 @@ export function SalesOrderPage() {
       setLineImportInitialTab("paste");
       setIsLineImportModalOpen(true);
     },
-    allocateStockAvailable: !isNew && isConfirmed,
+    allocateStockAvailable: !isNew && isConfirmed && showSalesOrderAllocationUi,
     onAllocateStock: handleAllocateStock,
   });
 
@@ -1251,7 +1292,7 @@ export function SalesOrderPage() {
                   Confirm
                 </Button>
               )}
-              {!isNew && isConfirmed && (
+              {!isNew && isConfirmed && showSalesOrderAllocationUi && (
                 <Button
                   type="button"
                   variant="outline"
@@ -1419,7 +1460,7 @@ export function SalesOrderPage() {
                 </div>
               </div>
             ) : null}
-            {!isNew && soAllocationView ? (
+            {!isNew && showSalesOrderAllocationUi && soAllocationView ? (
               <div className="mb-2 max-w-4xl text-xs">
                 <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
                   <span className="font-medium text-foreground">Stock allocation</span>
@@ -1858,7 +1899,7 @@ export function SalesOrderPage() {
                 </div>
               </div>
             ) : null}
-            {soAllocationView ? (
+            {showSalesOrderAllocationUi && soAllocationView ? (
               <div className="mb-2 max-w-4xl text-xs">
                 <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
                   <span className="font-medium text-foreground">Stock allocation</span>
@@ -1989,7 +2030,11 @@ export function SalesOrderPage() {
                     <AgGridReact<LineWithItem>
                       {...agGridDefaultGridOptions}
                       rowData={linesWithItem}
-                      columnDefs={soLinesReadOnlyColumnDefs(soFulfillment, soAllocationView)}
+                      columnDefs={soLinesReadOnlyColumnDefs(
+                        soFulfillment,
+                        soAllocationView,
+                        showSalesOrderAllocationUi,
+                      )}
                       defaultColDef={agGridDefaultColDef}
                       getRowId={(p) => p.data.id}
                       rowSelection={{ mode: "multiRow", checkboxes: true, headerCheckbox: true, enableClickSelection: true }}
@@ -2027,7 +2072,7 @@ export function SalesOrderPage() {
         onOpenChange={setIsLineImportModalOpen}
         onApply={handleApplyImportedLines}
       />
-      {!isNew && id && settings.documents.showDocumentEventLog ? (
+      {!isNew && id && showDocumentEventLogSection ? (
         <DocumentEventLogSection entityType="sales_order" entityId={id} refresh={refresh} />
       ) : null}
       <CancelDocumentReasonDialog
