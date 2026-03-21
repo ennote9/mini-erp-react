@@ -5,6 +5,7 @@ import type { ColDef, ICellRendererParams, SelectionChangedEvent } from "ag-grid
 import { purchaseOrderRepository } from "../repository";
 import { supplierRepository } from "../../suppliers/repository";
 import { warehouseRepository } from "../../warehouses/repository";
+import { itemRepository } from "../../items/repository";
 import { normalizeDateForPO } from "../dateUtils";
 import type { PurchaseOrder } from "../model";
 import type { PlanningDocumentStatus } from "../../../shared/domain";
@@ -61,6 +62,24 @@ function filterBySupplierId(rows: RowData[], supplierId: string | null): RowData
   return rows.filter((r) => r.supplierId === supplierId);
 }
 
+function filterByWarehouseId(rows: RowData[], warehouseId: string | null): RowData[] {
+  if (warehouseId == null) return rows;
+  return rows.filter((r) => r.warehouseId === warehouseId);
+}
+
+/** When `allowIds` is null, no item filter is applied. */
+function filterByDocumentIdSet(rows: RowData[], allowIds: Set<string> | null): RowData[] {
+  if (allowIds == null) return rows;
+  return rows.filter((r) => allowIds.has(r.id));
+}
+
+function parseQueryId(searchParams: URLSearchParams, key: string): string | null {
+  const raw = searchParams.get(key);
+  if (raw == null) return null;
+  const t = raw.trim();
+  return t === "" ? null : t;
+}
+
 function StatusCellRenderer(params: ICellRendererParams<RowData>) {
   const status = params.value as string | undefined;
   if (status == null) return null;
@@ -81,12 +100,24 @@ function buildExportRowsFromPO(rows: RowData[]): PurchaseOrdersExportRow[] {
 export function PurchaseOrdersListPage() {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
-  const supplierFilterId = useMemo(() => {
-    const raw = searchParams.get("supplierId");
-    if (raw == null || raw === "") return null;
-    const t = raw.trim();
-    return t === "" ? null : t;
-  }, [searchParams]);
+  const supplierFilterId = useMemo(() => parseQueryId(searchParams, "supplierId"), [searchParams]);
+  const warehouseFilterId = useMemo(() => parseQueryId(searchParams, "warehouseId"), [searchParams]);
+  const itemFilterId = useMemo(() => parseQueryId(searchParams, "itemId"), [searchParams]);
+
+  const purchaseOrderIdsContainingItem = useMemo(() => {
+    if (itemFilterId == null) return null;
+    const ids = new Set<string>();
+    for (const po of purchaseOrderRepository.list()) {
+      const lines = purchaseOrderRepository.listLines(po.id);
+      for (const line of lines) {
+        if (line.itemId === itemFilterId) {
+          ids.add(po.id);
+          break;
+        }
+      }
+    }
+    return ids;
+  }, [itemFilterId]);
 
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
@@ -113,16 +144,27 @@ export function PurchaseOrdersListPage() {
   }, []);
 
   const filteredRows = useMemo(() => {
-    const bySearch = filterBySearch(rowsWithNames, searchQuery);
-    const bySupplier = filterBySupplierId(bySearch, supplierFilterId);
-    return filterByStatus(bySupplier, statusFilter);
-  }, [rowsWithNames, searchQuery, statusFilter, supplierFilterId]);
+    let next = filterBySearch(rowsWithNames, searchQuery);
+    next = filterBySupplierId(next, supplierFilterId);
+    next = filterByWarehouseId(next, warehouseFilterId);
+    next = filterByDocumentIdSet(next, purchaseOrderIdsContainingItem);
+    return filterByStatus(next, statusFilter);
+  }, [
+    rowsWithNames,
+    searchQuery,
+    statusFilter,
+    supplierFilterId,
+    warehouseFilterId,
+    purchaseOrderIdsContainingItem,
+  ]);
 
   const isEmpty = filteredRows.length === 0;
   const hasFilter =
     statusFilter !== "all" ||
     searchQuery.trim() !== "" ||
-    supplierFilterId != null;
+    supplierFilterId != null ||
+    warehouseFilterId != null ||
+    itemFilterId != null;
 
   const supplierFilterLabel = useMemo((): string => {
     if (supplierFilterId == null) return "";
@@ -136,6 +178,37 @@ export function PurchaseOrdersListPage() {
     next.delete("supplierId");
     setSearchParams(next, { replace: true });
   }, [searchParams, setSearchParams]);
+
+  const clearWarehouseFilter = useCallback(() => {
+    const next = new URLSearchParams(searchParams);
+    next.delete("warehouseId");
+    setSearchParams(next, { replace: true });
+  }, [searchParams, setSearchParams]);
+
+  const clearItemFilter = useCallback(() => {
+    const next = new URLSearchParams(searchParams);
+    next.delete("itemId");
+    setSearchParams(next, { replace: true });
+  }, [searchParams, setSearchParams]);
+
+  const warehouseFilterLabel = useMemo((): string => {
+    if (warehouseFilterId == null) return "";
+    const w = warehouseRepository.getById(warehouseFilterId);
+    if (w) return w.name || w.code || warehouseFilterId;
+    return warehouseFilterId;
+  }, [warehouseFilterId]);
+
+  const itemFilterLabel = useMemo((): string => {
+    if (itemFilterId == null) return "";
+    const it = itemRepository.getById(itemFilterId);
+    if (it) {
+      const code = it.code?.trim() ?? "";
+      const name = it.name?.trim() ?? "";
+      if (code && name) return `${code} — ${name}`;
+      return code || name || itemFilterId;
+    }
+    return itemFilterId;
+  }, [itemFilterId]);
 
   const getExportRowsCurrentView = useCallback((): PurchaseOrdersExportRow[] => {
     const api = gridRef.current?.api;
@@ -208,11 +281,42 @@ export function PurchaseOrdersListPage() {
     if (!hasFilter) {
       return "Create your first purchase order to start purchasing workflow.";
     }
-    if (supplierFilterId != null && statusFilter === "all" && searchQuery.trim() === "") {
+    if (
+      supplierFilterId != null &&
+      warehouseFilterId == null &&
+      itemFilterId == null &&
+      statusFilter === "all" &&
+      searchQuery.trim() === ""
+    ) {
       return "No purchase orders for this supplier. Try clearing the supplier filter.";
     }
-    return "Try changing the search, status filter, or supplier filter.";
-  }, [hasFilter, supplierFilterId, statusFilter, searchQuery]);
+    if (
+      warehouseFilterId != null &&
+      itemFilterId == null &&
+      supplierFilterId == null &&
+      statusFilter === "all" &&
+      searchQuery.trim() === ""
+    ) {
+      return "No purchase orders for this warehouse. Try clearing the warehouse filter.";
+    }
+    if (
+      itemFilterId != null &&
+      warehouseFilterId == null &&
+      supplierFilterId == null &&
+      statusFilter === "all" &&
+      searchQuery.trim() === ""
+    ) {
+      return "No purchase orders include this item on any line. Try clearing the item filter.";
+    }
+    return "Try changing the search, status filter, or URL filters (supplier, warehouse, item).";
+  }, [
+    hasFilter,
+    supplierFilterId,
+    warehouseFilterId,
+    itemFilterId,
+    statusFilter,
+    searchQuery,
+  ]);
 
   const statusOptions: { value: StatusFilter; label: string }[] = [
     { value: "all", label: "All" },
@@ -284,7 +388,55 @@ export function PurchaseOrdersListPage() {
             aria-label="Search purchase orders"
             resultCount={filteredRows.length}
           />
-          <div className="flex flex-row items-center gap-2 shrink-0 ml-auto">
+          <div className="flex flex-row flex-wrap items-center gap-2 shrink-0 ml-auto justify-end">
+            {warehouseFilterId != null && (
+              <div
+                className="flex h-8 max-w-[min(100%,18rem)] items-center gap-1.5 rounded-md border border-input bg-background px-2 text-xs shrink-0"
+                role="status"
+                aria-label="Warehouse filter active"
+              >
+                <span className="text-muted-foreground whitespace-nowrap shrink-0">Warehouse</span>
+                <span
+                  className="truncate font-medium text-foreground/90 min-w-0"
+                  title={warehouseFilterLabel}
+                >
+                  {warehouseFilterLabel}
+                </span>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="h-7 px-1.5 text-xs shrink-0 text-muted-foreground hover:text-foreground"
+                  onClick={clearWarehouseFilter}
+                >
+                  Clear
+                </Button>
+              </div>
+            )}
+            {itemFilterId != null && (
+              <div
+                className="flex h-8 max-w-[min(100%,20rem)] items-center gap-1.5 rounded-md border border-input bg-background px-2 text-xs shrink-0"
+                role="status"
+                aria-label="Item filter active"
+              >
+                <span className="text-muted-foreground whitespace-nowrap shrink-0">Item</span>
+                <span
+                  className="truncate font-medium text-foreground/90 min-w-0"
+                  title={itemFilterLabel}
+                >
+                  {itemFilterLabel}
+                </span>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="h-7 px-1.5 text-xs shrink-0 text-muted-foreground hover:text-foreground"
+                  onClick={clearItemFilter}
+                >
+                  Clear
+                </Button>
+              </div>
+            )}
             {supplierFilterId != null && (
               <div
                 className="flex h-8 max-w-[min(100%,18rem)] items-center gap-1.5 rounded-md border border-input bg-background px-2 text-xs shrink-0"

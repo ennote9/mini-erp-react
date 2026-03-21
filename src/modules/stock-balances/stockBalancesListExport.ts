@@ -11,6 +11,8 @@ export type StockBalancesExportRow = {
   outgoingQty: number;
   incomingQty: number;
   deficitQty: number;
+  netShortageQty: number;
+  coverage: string;
 };
 
 const COLUMN_HEADERS = [
@@ -24,6 +26,8 @@ const COLUMN_HEADERS = [
   "Deficit",
   "Outgoing",
   "Incoming",
+  "Net shortage",
+  "Coverage",
 ] as const;
 const SHEET_NAME = "Stock Balances";
 const TABLE_NAME_BASE = "StockBalancesTable";
@@ -58,6 +62,8 @@ const WIDTH_BOUNDS = [
   { min: 10, max: 14 },
   { min: 10, max: 14 },
   { min: 10, max: 14 },
+  { min: 10, max: 14 },
+  { min: 10, max: 18 },
 ];
 
 function addSheet(workbook: Workbook, rows: StockBalancesExportRow[]): void {
@@ -80,6 +86,8 @@ function addSheet(workbook: Workbook, rows: StockBalancesExportRow[]): void {
     r.deficitQty,
     r.outgoingQty,
     r.incomingQty,
+    r.netShortageQty,
+    r.coverage,
   ]);
   sheet.addTable({
     name: sanitizeTableName(TABLE_NAME_BASE),
@@ -103,6 +111,8 @@ function addSheet(workbook: Workbook, rows: StockBalancesExportRow[]): void {
           r.deficitQty,
           r.outgoingQty,
           r.incomingQty,
+          r.netShortageQty,
+          r.coverage,
         ][c],
       ),
     );

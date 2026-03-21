@@ -24,6 +24,39 @@ export function computeStockDeficit(availableQty: number, outgoingQty: number): 
   return Math.max(0, outgoingQty - availableQty);
 }
 
+/** Demand not covered by available stock or expected incoming (read-only, not persisted). */
+export function computeNetShortage(
+  availableQty: number,
+  outgoingQty: number,
+  incomingQty: number,
+): number {
+  return Math.max(0, outgoingQty - availableQty - incomingQty);
+}
+
+export type StockBalanceCoverageStatus = "covered" | "at_risk" | "short";
+
+/**
+ * - short: net uncovered demand after counting incoming (netShortage > 0)
+ * - at_risk: demand exceeds available but incoming is expected to close the gap (netShortage = 0, incoming > 0)
+ * - covered: otherwise (demand <= available, or no pending incoming dependency)
+ */
+export function computeStockBalanceCoverageStatus(
+  availableQty: number,
+  outgoingQty: number,
+  incomingQty: number,
+  netShortageQty: number,
+): StockBalanceCoverageStatus {
+  if (netShortageQty > 0) return "short";
+  if (outgoingQty > availableQty && incomingQty > 0) return "at_risk";
+  return "covered";
+}
+
+export const STOCK_BALANCE_COVERAGE_LABELS: Record<StockBalanceCoverageStatus, string> = {
+  covered: "Covered",
+  at_risk: "At risk",
+  short: "Short",
+};
+
 /**
  * Per warehouse+item: sum of max(0, remainingQty) from each line of
  * computeSalesOrderFulfillment, for sales orders with status **confirmed** only.
@@ -81,6 +114,9 @@ export type StockBalanceOperationalFields = {
   incomingQty: number;
   /** max(0, outgoingQty - availableQty) */
   deficitQty: number;
+  /** max(0, outgoingQty - availableQty - incomingQty) */
+  netShortageQty: number;
+  coverageStatus: StockBalanceCoverageStatus;
 };
 
 export function computeOperationalFieldsForBalance(
@@ -96,12 +132,22 @@ export function computeOperationalFieldsForBalance(
   const k = warehouseItemKey(balance.warehouseId, balance.itemId);
   const availableQty = totalQty - reservedQty;
   const outgoingQty = outgoingByWhItem.get(k) ?? 0;
+  const incomingQty = incomingByWhItem.get(k) ?? 0;
+  const deficitQty = computeStockDeficit(availableQty, outgoingQty);
+  const netShortageQty = computeNetShortage(availableQty, outgoingQty, incomingQty);
   return {
     totalQty,
     reservedQty,
     availableQty,
     outgoingQty,
-    incomingQty: incomingByWhItem.get(k) ?? 0,
-    deficitQty: computeStockDeficit(availableQty, outgoingQty),
+    incomingQty,
+    deficitQty,
+    netShortageQty,
+    coverageStatus: computeStockBalanceCoverageStatus(
+      availableQty,
+      outgoingQty,
+      incomingQty,
+      netShortageQty,
+    ),
   };
 }

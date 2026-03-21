@@ -2,8 +2,8 @@
  * Stock Balances list — AG Grid migration (same pattern as Stock Movements).
  * Repository-backed data, search, empty states, dark theme. Plain text columns only.
  */
-import { Fragment, useMemo, useState, useRef, useCallback } from "react";
-import type { RowClassParams } from "ag-grid-community";
+import { Fragment, useMemo, useState, useRef, useCallback, useEffect } from "react";
+import type { RowClassParams, RowClickedEvent } from "ag-grid-community";
 import { useSearchParams } from "react-router-dom";
 import { AgGridReact } from "ag-grid-react";
 import type { ColDef, SelectionChangedEvent } from "ag-grid-community";
@@ -30,10 +30,13 @@ import {
   buildOutgoingRemainingByWarehouseItem,
   buildIncomingRemainingByWarehouseItem,
   computeOperationalFieldsForBalance,
+  STOCK_BALANCE_COVERAGE_LABELS,
+  type StockBalanceCoverageStatus,
 } from "../../../shared/stockBalancesOperationalMetrics";
 import { save } from "@tauri-apps/plugin-dialog";
 import { invoke } from "@tauri-apps/api/core";
 import { revealItemInDir } from "@tauri-apps/plugin-opener";
+import { StockBalanceRowDrillDown } from "../components/StockBalanceRowDrillDown";
 
 type RowData = StockBalance & {
   itemCode: string;
@@ -44,6 +47,8 @@ type RowData = StockBalance & {
   outgoingQty: number;
   incomingQty: number;
   deficitQty: number;
+  netShortageQty: number;
+  coverageStatus: StockBalanceCoverageStatus;
 };
 
 type StockBalanceQuickFilter =
@@ -51,7 +56,9 @@ type StockBalanceQuickFilter =
   | "shortage"
   | "outgoing"
   | "incoming"
-  | "avail_lte_zero";
+  | "avail_lte_zero"
+  | "needs_replenishment"
+  | "coverage_at_risk";
 
 const QUICK_FILTER_OPTIONS: Array<{
   value: StockBalanceQuickFilter;
@@ -68,6 +75,17 @@ const QUICK_FILTER_OPTIONS: Array<{
     label: "Avail ≤ 0",
     aria: "Show rows where available quantity is zero or negative",
   },
+  {
+    value: "needs_replenishment",
+    label: "Need repl.",
+    aria: "Show rows with net shortage greater than zero (uncovered demand after incoming)",
+  },
+  {
+    value: "coverage_at_risk",
+    label: "At risk",
+    aria:
+      "Show rows where outgoing exceeds available but expected incoming covers the gap (covered by incoming, net shortage zero)",
+  },
 ];
 
 function filterBySearch(rows: RowData[], query: string): RowData[] {
@@ -77,7 +95,8 @@ function filterBySearch(rows: RowData[], query: string): RowData[] {
     (r) =>
       r.itemCode.toLowerCase().includes(q) ||
       r.itemName.toLowerCase().includes(q) ||
-      r.warehouseName.toLowerCase().includes(q),
+      r.warehouseName.toLowerCase().includes(q) ||
+      STOCK_BALANCE_COVERAGE_LABELS[r.coverageStatus].toLowerCase().includes(q),
   );
 }
 
@@ -92,6 +111,12 @@ function filterByQuickFilter(rows: RowData[], f: StockBalanceQuickFilter): RowDa
   if (f === "outgoing") return rows.filter((r) => r.outgoingQty > 0);
   if (f === "incoming") return rows.filter((r) => r.incomingQty > 0);
   if (f === "avail_lte_zero") return rows.filter((r) => r.availableQty <= 0);
+  if (f === "needs_replenishment") return rows.filter((r) => r.netShortageQty > 0);
+  if (f === "coverage_at_risk")
+    return rows.filter(
+      (r) =>
+        r.outgoingQty > r.availableQty && r.incomingQty > 0 && r.netShortageQty === 0,
+    );
   return rows;
 }
 
@@ -107,6 +132,8 @@ function buildExportRowsFromBalances(rows: RowData[]): StockBalancesExportRow[] 
     outgoingQty: r.outgoingQty,
     incomingQty: r.incomingQty,
     deficitQty: r.deficitQty,
+    netShortageQty: r.netShortageQty,
+    coverage: STOCK_BALANCE_COVERAGE_LABELS[r.coverageStatus],
   }));
 }
 
@@ -121,6 +148,7 @@ export function StockBalancesListPage() {
 
   const [searchQuery, setSearchQuery] = useState("");
   const [quickFilter, setQuickFilter] = useState<StockBalanceQuickFilter>("all");
+  const [detailRow, setDetailRow] = useState<RowData | null>(null);
   const [exportSuccess, setExportSuccess] = useState<{ path: string; filename: string } | null>(null);
   const [exportOpen, setExportOpen] = useState(false);
   const [selectedCount, setSelectedCount] = useState(0);
@@ -148,6 +176,8 @@ export function StockBalancesListPage() {
         outgoingQty: op.outgoingQty,
         incomingQty: op.incomingQty,
         deficitQty: op.deficitQty,
+        netShortageQty: op.netShortageQty,
+        coverageStatus: op.coverageStatus,
       };
     });
   }, []);
@@ -155,7 +185,9 @@ export function StockBalancesListPage() {
   const getRowClass = useCallback((params: RowClassParams<RowData>) => {
     const d = params.data;
     if (!d) return "";
-    return d.deficitQty > 0 ? "stock-balances-row--tight-availability" : "";
+    if (d.netShortageQty > 0) return "stock-balances-row--tight-availability";
+    if (d.coverageStatus === "at_risk") return "stock-balances-row--at-risk";
+    return "";
   }, []);
 
   /** Base slice after warehouse URL filter (counts and search use this). */
@@ -169,11 +201,20 @@ export function StockBalancesListPage() {
     let outgoing = 0;
     let incoming = 0;
     let availLteZero = 0;
+    let needsRepl = 0;
+    let atRisk = 0;
     for (const r of rowsAfterWarehouse) {
       if (r.deficitQty > 0) shortage++;
       if (r.outgoingQty > 0) outgoing++;
       if (r.incomingQty > 0) incoming++;
       if (r.availableQty <= 0) availLteZero++;
+      if (r.netShortageQty > 0) needsRepl++;
+      if (
+        r.outgoingQty > r.availableQty &&
+        r.incomingQty > 0 &&
+        r.netShortageQty === 0
+      )
+        atRisk++;
     }
     return {
       all: rowsAfterWarehouse.length,
@@ -181,6 +222,8 @@ export function StockBalancesListPage() {
       outgoing,
       incoming,
       avail_lte_zero: availLteZero,
+      needs_replenishment: needsRepl,
+      coverage_at_risk: atRisk,
     };
   }, [rowsAfterWarehouse]);
 
@@ -190,6 +233,18 @@ export function StockBalancesListPage() {
   }, [rowsAfterWarehouse, searchQuery, quickFilter]);
 
   const isEmpty = filteredRows.length === 0;
+
+  useEffect(() => {
+    if (isEmpty) setDetailRow(null);
+  }, [isEmpty]);
+
+  const onRowClicked = useCallback((e: RowClickedEvent<RowData>) => {
+    if (e.data) setDetailRow(e.data);
+  }, []);
+
+  const onDrillDownOpenChange = useCallback((open: boolean) => {
+    if (!open) setDetailRow(null);
+  }, []);
   const hasFilter =
     searchQuery.trim() !== "" || warehouseFilterId != null || quickFilter !== "all";
 
@@ -330,6 +385,25 @@ export function StockBalancesListPage() {
       qtyCol("deficitQty", "Deficit", 88),
       qtyCol("outgoingQty", "Outgoing", 96),
       qtyCol("incomingQty", "Incoming", 96),
+      qtyCol("netShortageQty", "Net shortage", 104),
+      {
+        field: "coverageStatus",
+        headerName: "Coverage",
+        width: 102,
+        minWidth: 92,
+        maxWidth: 120,
+        sortable: true,
+        valueFormatter: (p) =>
+          p.value != null
+            ? STOCK_BALANCE_COVERAGE_LABELS[p.value as StockBalanceCoverageStatus] ?? String(p.value)
+            : "—",
+        cellClass: (p) =>
+          p.data?.coverageStatus === "short"
+            ? "font-medium"
+            : p.data?.coverageStatus === "at_risk"
+              ? "text-muted-foreground"
+              : "text-muted-foreground/90",
+      },
     ],
     [],
   );
@@ -497,19 +571,46 @@ export function StockBalancesListPage() {
       {isEmpty ? (
         <EmptyState title={emptyTitle} hint={emptyHint} />
       ) : (
-        <AgGridContainer themeClass="stock-balances-grid">
-          <AgGridReact<RowData>
-            ref={gridRef}
-            rowData={filteredRows}
-            columnDefs={columnDefs}
-            defaultColDef={agGridDefaultColDef}
-            rowSelection={{ mode: "multiRow", checkboxes: true, headerCheckbox: true, enableClickSelection: true }}
-            selectionColumnDef={agGridSelectionColumnDef}
-            getRowId={(params) => params.data.id}
-            getRowClass={getRowClass}
-            onSelectionChanged={onSelectionChanged}
-          />
-        </AgGridContainer>
+        <>
+          <p className="text-xs text-muted-foreground mb-1.5">
+            Click a row to open the source breakdown in a dialog (reservations, outgoing, incoming).
+          </p>
+          <AgGridContainer themeClass="stock-balances-grid">
+            <AgGridReact<RowData>
+              ref={gridRef}
+              rowData={filteredRows}
+              columnDefs={columnDefs}
+              defaultColDef={agGridDefaultColDef}
+              rowSelection={{ mode: "multiRow", checkboxes: true, headerCheckbox: true, enableClickSelection: true }}
+              selectionColumnDef={agGridSelectionColumnDef}
+              getRowId={(params) => params.data.id}
+              getRowClass={getRowClass}
+              onSelectionChanged={onSelectionChanged}
+              onRowClicked={onRowClicked}
+            />
+          </AgGridContainer>
+          {detailRow ? (
+            <StockBalanceRowDrillDown
+              key={detailRow.id}
+              row={{
+                itemId: detailRow.itemId,
+                warehouseId: detailRow.warehouseId,
+                itemCode: detailRow.itemCode,
+                itemName: detailRow.itemName,
+                warehouseName: detailRow.warehouseName,
+                qtyOnHand: detailRow.qtyOnHand,
+                reservedQty: detailRow.reservedQty,
+                availableQty: detailRow.availableQty,
+                outgoingQty: detailRow.outgoingQty,
+                incomingQty: detailRow.incomingQty,
+                deficitQty: detailRow.deficitQty,
+                netShortageQty: detailRow.netShortageQty,
+                coverageStatus: detailRow.coverageStatus,
+              }}
+              onOpenChange={onDrillDownOpenChange}
+            />
+          ) : null}
+        </>
       )}
     </ListPageLayout>
   );

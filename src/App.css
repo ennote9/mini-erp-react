@@ -642,9 +642,14 @@ body,
   cursor: pointer;
 }
 
-/* Stock balances: subtle left accent when deficit > 0 (outgoing exceeds available) */
+/* Stock balances: net shortage (uncovered demand) */
 .list-page__content > .stock-balances-grid.ag-theme-quartz-dark .ag-row.stock-balances-row--tight-availability .ag-cell:first-child {
   box-shadow: inset 2px 0 0 0 hsl(32 50% 44% / 0.5);
+}
+
+/* Stock balances: at risk — gap covered by expected incoming only (lighter cue) */
+.list-page__content > .stock-balances-grid.ag-theme-quartz-dark .ag-row.stock-balances-row--at-risk .ag-cell:first-child {
+  box-shadow: inset 2px 0 0 0 hsl(210 35% 42% / 0.28);
 }
 
 /* Active/Inactive as plain text only (no pill) — scoped to grid cells */
