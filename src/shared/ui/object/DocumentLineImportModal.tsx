@@ -17,6 +17,7 @@ import {
   X,
 } from "lucide-react";
 import type { Item } from "../../../modules/items/model";
+import { roundMoney } from "../../commercialMoney";
 import {
   resolveBatchPastedItems,
   type BatchPastePreview,
@@ -270,7 +271,7 @@ export function DocumentLineImportModal(props: Props) {
     const lines: ResolvedImportLine[] = excelPreview.groupedValid.map((grouped) => ({
       itemId: grouped.itemId,
       qty: grouped.qty,
-      unitPrice: grouped.unitPrice,
+      unitPrice: roundMoney(grouped.unitPrice),
     }));
     const skippedRows =
       excelPreview.inactiveRows +

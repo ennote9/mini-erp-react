@@ -11,7 +11,13 @@ export interface SalesOrder {
   customerId: string;
   warehouseId: string;
   status: PlanningDocumentStatus;
+  /** Net payment terms in whole days (optional). Empty on document = none / not specified. */
+  paymentTermsDays?: number;
+  /** Due date YYYY-MM-DD derived from date + paymentTermsDays when terms are set; omitted when terms unset. */
+  dueDate?: string;
   comment?: string;
+  cancelReasonCode?: string;
+  cancelReasonComment?: string;
 }
 
 /**
@@ -23,4 +29,5 @@ export interface SalesOrderLine {
   itemId: string;
   qty: number;
   unitPrice: number;
+  zeroPriceReasonCode?: string;
 }

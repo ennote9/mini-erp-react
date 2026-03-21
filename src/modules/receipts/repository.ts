@@ -6,6 +6,7 @@ import {
   writeDocumentPayload,
 } from "../../shared/documentPersistence";
 import { registerPersistenceFlush } from "../../shared/persistenceCoordinator";
+import { isCancelDocumentReasonCode } from "../../shared/reasonCodes";
 
 export type CreateReceiptHeaderInput = Omit<Receipt, "id" | "number">;
 export type ReceiptLineInput = { itemId: string; qty: number };
@@ -98,6 +99,11 @@ function normalizeReceiptRecord(raw: unknown): ReceiptPersistRecord | null {
     warehouseId: rec.warehouseId,
     status: rec.status,
     comment: asOptionalString(rec.comment),
+    cancelReasonCode:
+      typeof rec.cancelReasonCode === "string" && isCancelDocumentReasonCode(rec.cancelReasonCode)
+        ? rec.cancelReasonCode
+        : undefined,
+    cancelReasonComment: asOptionalString(rec.cancelReasonComment),
     lines,
   };
 }

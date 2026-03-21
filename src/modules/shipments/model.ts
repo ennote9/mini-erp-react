@@ -12,6 +12,8 @@ export interface Shipment {
   warehouseId: string;
   status: FactualDocumentStatus;
   comment?: string;
+  cancelReasonCode?: string;
+  cancelReasonComment?: string;
 }
 
 /**

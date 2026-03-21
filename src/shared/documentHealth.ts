@@ -10,6 +10,9 @@ import { fieldIssue } from "./issues";
 import { normalizeTrim } from "./validation";
 import { parseDocumentLineQty } from "./documentValidation";
 import { itemRepository } from "../modules/items/repository";
+import { lineAmountMoney, roundMoney } from "./commercialMoney";
+import { validatePaymentTermsDaysForm } from "./planningCommercialDates";
+import { isZeroPriceLineReasonCode } from "./reasonCodes";
 
 export type DocumentHealth = {
   /** Document-level issues; use getErrorAndWarningMessages(issues) for message lists. */
@@ -18,7 +21,14 @@ export type DocumentHealth = {
   lineHealth: Map<number, "error" | "warning" | null>;
 };
 
-type LineFormRow = { itemId: string; qty: number; unitPrice: number; _lineId: number };
+type LineFormRow = {
+  itemId: string;
+  qty: number;
+  unitPrice: number;
+  _lineId: number;
+  /** Required when unitPrice is 0 (draft form uses "" when unset). */
+  zeroPriceReasonCode?: string;
+};
 
 function docIssue(severity: Issue["severity"], message: string): Issue {
   return { severity, scope: "document", message };
@@ -26,13 +36,16 @@ function docIssue(severity: Issue["severity"], message: string): Issue {
 
 function lineAmount(line: LineFormRow): number {
   const q = typeof line.qty === "number" && !Number.isNaN(line.qty) ? line.qty : 0;
-  const p = typeof line.unitPrice === "number" && !Number.isNaN(line.unitPrice) ? line.unitPrice : 0;
-  return q * p;
+  const rawP = line.unitPrice;
+  const p = typeof rawP === "number" && Number.isFinite(rawP) ? roundMoney(rawP) : 0;
+  return lineAmountMoney(q, p);
 }
 
 export type PurchaseOrderHealthInput = {
   supplierId: string;
   warehouseId: string;
+  /** Raw payment terms field (draft); empty allowed. */
+  paymentTermsDays?: string;
   lines: LineFormRow[];
 };
 
@@ -47,10 +60,16 @@ export function getPurchaseOrderHealth(input: PurchaseOrderHealthInput): Documen
     issues.push(fieldIssue("error", "warehouseId", "Warehouse is required."));
   }
 
+  const termsErrPo = validatePaymentTermsDaysForm(input.paymentTermsDays);
+  if (termsErrPo) {
+    issues.push(fieldIssue("error", "paymentTermsDays", termsErrPo));
+  }
+
   const lines = input.lines ?? [];
   let validLineCount = 0;
   let linesWithZeroPrice = 0;
   let linesWithZeroAmount = 0;
+  let linesWithZeroPriceMissingReason = 0;
   let hasAnyInactiveItem = false;
 
   for (const line of lines) {
@@ -71,13 +90,27 @@ export function getPurchaseOrderHealth(input: PurchaseOrderHealthInput): Documen
     }
 
     validLineCount += 1;
-    const up = typeof line.unitPrice === "number" && !Number.isNaN(line.unitPrice) ? line.unitPrice : 0;
+    const rawUp = line.unitPrice;
+    const upOk = typeof rawUp === "number" && Number.isFinite(rawUp);
+    if (!upOk || rawUp < 0) {
+      lineHealth.set(line._lineId, "error");
+      continue;
+    }
+    const up = roundMoney(rawUp);
     const amount = lineAmount(line);
-    const hasWarning = up <= 0 || amount <= 0;
+    const hasZeroPriceReason = isZeroPriceLineReasonCode(line.zeroPriceReasonCode);
+    if (up === 0 && !hasZeroPriceReason) {
+      lineHealth.set(line._lineId, "error");
+      linesWithZeroPriceMissingReason += 1;
+      linesWithZeroPrice += 1;
+      if (amount === 0) linesWithZeroAmount += 1;
+      continue;
+    }
+    const hasWarning = up === 0 || amount === 0;
     if (hasWarning) {
       lineHealth.set(line._lineId, "warning");
-      if (up <= 0) linesWithZeroPrice += 1;
-      if (amount <= 0) linesWithZeroAmount += 1;
+      if (up === 0) linesWithZeroPrice += 1;
+      if (amount === 0) linesWithZeroAmount += 1;
     } else {
       lineHealth.set(line._lineId, null);
     }
@@ -100,15 +133,32 @@ export function getPurchaseOrderHealth(input: PurchaseOrderHealthInput): Documen
     if (hasAnyInvalidQty) {
       issues.push(docIssue("error", "One or more lines have invalid or zero quantity."));
     }
+    const hasAnyInvalidUnitPrice = lines.some((l) => {
+      const u = l.unitPrice;
+      return !(typeof u === "number" && Number.isFinite(u) && u >= 0);
+    });
+    if (hasAnyInvalidUnitPrice) {
+      issues.push(docIssue("error", "One or more lines have an invalid unit price (must be a number ≥ 0)."));
+    }
   }
 
-  if (linesWithZeroPrice > 0) {
+  if (linesWithZeroPriceMissingReason > 0) {
+    issues.push(
+      docIssue(
+        "error",
+        linesWithZeroPriceMissingReason === 1
+          ? "One line has zero unit price without a reason. Select a zero-price reason for that line."
+          : `${linesWithZeroPriceMissingReason} lines have zero unit price without a reason.`,
+      ),
+    );
+  }
+  if (linesWithZeroPrice > 0 && linesWithZeroPriceMissingReason === 0) {
     issues.push(
       docIssue(
         "warning",
         linesWithZeroPrice === 1
-          ? "1 line has zero unit price."
-          : `${linesWithZeroPrice} lines have zero unit price.`,
+          ? "1 line has zero unit price (reason recorded)."
+          : `${linesWithZeroPrice} lines have zero unit price (reasons recorded).`,
       ),
     );
   }
@@ -129,6 +179,7 @@ export function getPurchaseOrderHealth(input: PurchaseOrderHealthInput): Documen
 export type SalesOrderHealthInput = {
   customerId: string;
   warehouseId: string;
+  paymentTermsDays?: string;
   lines: LineFormRow[];
 };
 
@@ -143,10 +194,16 @@ export function getSalesOrderHealth(input: SalesOrderHealthInput): DocumentHealt
     issues.push(fieldIssue("error", "warehouseId", "Warehouse is required."));
   }
 
+  const termsErrSo = validatePaymentTermsDaysForm(input.paymentTermsDays);
+  if (termsErrSo) {
+    issues.push(fieldIssue("error", "paymentTermsDays", termsErrSo));
+  }
+
   const lines = input.lines ?? [];
   let validLineCount = 0;
   let linesWithZeroPrice = 0;
   let linesWithZeroAmount = 0;
+  let linesWithZeroPriceMissingReason = 0;
   let hasAnyInactiveItem = false;
 
   for (const line of lines) {
@@ -167,13 +224,27 @@ export function getSalesOrderHealth(input: SalesOrderHealthInput): DocumentHealt
     }
 
     validLineCount += 1;
-    const up = typeof line.unitPrice === "number" && !Number.isNaN(line.unitPrice) ? line.unitPrice : 0;
+    const rawUp = line.unitPrice;
+    const upOk = typeof rawUp === "number" && Number.isFinite(rawUp);
+    if (!upOk || rawUp < 0) {
+      lineHealth.set(line._lineId, "error");
+      continue;
+    }
+    const up = roundMoney(rawUp);
     const amount = lineAmount(line);
-    const hasWarning = up <= 0 || amount <= 0;
+    const hasZeroPriceReason = isZeroPriceLineReasonCode(line.zeroPriceReasonCode);
+    if (up === 0 && !hasZeroPriceReason) {
+      lineHealth.set(line._lineId, "error");
+      linesWithZeroPriceMissingReason += 1;
+      linesWithZeroPrice += 1;
+      if (amount === 0) linesWithZeroAmount += 1;
+      continue;
+    }
+    const hasWarning = up === 0 || amount === 0;
     if (hasWarning) {
       lineHealth.set(line._lineId, "warning");
-      if (up <= 0) linesWithZeroPrice += 1;
-      if (amount <= 0) linesWithZeroAmount += 1;
+      if (up === 0) linesWithZeroPrice += 1;
+      if (amount === 0) linesWithZeroAmount += 1;
     } else {
       lineHealth.set(line._lineId, null);
     }
@@ -196,15 +267,32 @@ export function getSalesOrderHealth(input: SalesOrderHealthInput): DocumentHealt
     if (hasAnyInvalidQty) {
       issues.push(docIssue("error", "One or more lines have invalid or zero quantity."));
     }
+    const hasAnyInvalidUnitPrice = lines.some((l) => {
+      const u = l.unitPrice;
+      return !(typeof u === "number" && Number.isFinite(u) && u >= 0);
+    });
+    if (hasAnyInvalidUnitPrice) {
+      issues.push(docIssue("error", "One or more lines have an invalid unit price (must be a number ≥ 0)."));
+    }
   }
 
-  if (linesWithZeroPrice > 0) {
+  if (linesWithZeroPriceMissingReason > 0) {
+    issues.push(
+      docIssue(
+        "error",
+        linesWithZeroPriceMissingReason === 1
+          ? "One line has zero unit price without a reason. Select a zero-price reason for that line."
+          : `${linesWithZeroPriceMissingReason} lines have zero unit price without a reason.`,
+      ),
+    );
+  }
+  if (linesWithZeroPrice > 0 && linesWithZeroPriceMissingReason === 0) {
     issues.push(
       docIssue(
         "warning",
         linesWithZeroPrice === 1
-          ? "1 line has zero unit price."
-          : `${linesWithZeroPrice} lines have zero unit price.`,
+          ? "1 line has zero unit price (reason recorded)."
+          : `${linesWithZeroPrice} lines have zero unit price (reasons recorded).`,
       ),
     );
   }

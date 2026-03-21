@@ -11,7 +11,14 @@ export interface PurchaseOrder {
   supplierId: string;
   warehouseId: string;
   status: PlanningDocumentStatus;
+  /** Net payment terms in whole days (optional). Empty on document = none / not specified. */
+  paymentTermsDays?: number;
+  /** Due date YYYY-MM-DD derived from date + paymentTermsDays when terms are set; omitted when terms unset. */
+  dueDate?: string;
   comment?: string;
+  /** Set when status becomes cancelled (controlled exception). */
+  cancelReasonCode?: string;
+  cancelReasonComment?: string;
 }
 
 /**
@@ -23,4 +30,6 @@ export interface PurchaseOrderLine {
   itemId: string;
   qty: number;
   unitPrice: number;
+  /** Required in business rules when unitPrice is 0. */
+  zeroPriceReasonCode?: string;
 }

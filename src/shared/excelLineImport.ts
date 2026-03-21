@@ -1,4 +1,5 @@
 import type { Item } from "../modules/items/model";
+import { roundMoney } from "./commercialMoney";
 
 export type ExcelImportRowStatus =
   | "valid"
@@ -333,9 +334,9 @@ export async function parseExcelLineImport(
         invalidFormatRows++;
         continue;
       }
-      unitPrice = parsed;
+      unitPrice = roundMoney(parsed);
     } else {
-      unitPrice = options.getDefaultUnitPrice(matched);
+      unitPrice = roundMoney(options.getDefaultUnitPrice(matched));
     }
 
     rows.push({

@@ -4,6 +4,8 @@
  */
 
 import { normalizeTrim } from "./validation";
+import { parseCommercialUnitPrice, roundMoney } from "./commercialMoney";
+import { isZeroPriceLineReasonCode } from "./reasonCodes";
 
 export type DocumentLineInput = { itemId: string; qty: number };
 
@@ -51,6 +53,39 @@ export function validateDocumentLines(
     if (!item.isActive) return "Selected item is inactive.";
     if (itemIds.has(itemIdTrimmed)) return "Duplicate items are not allowed in the same document.";
     itemIds.add(itemIdTrimmed);
+  }
+  return null;
+}
+
+/**
+ * Validate unit price on each line (PO/SO draft save). Must parse as finite, ≥ 0 (after commercial rounding rules).
+ */
+export function validatePlanningLineUnitPrices(
+  lines: ReadonlyArray<{ unitPrice?: unknown }>,
+): string | null {
+  if (!lines || lines.length === 0) return null;
+  for (const line of lines) {
+    if (parseCommercialUnitPrice(line.unitPrice) === null) {
+      return "Each line must have a valid unit price (number ≥ 0).";
+    }
+  }
+  return null;
+}
+
+/**
+ * Lines with zero unit price (after commercial rules) must declare an explicit reason code.
+ */
+export function validatePlanningLinesZeroPriceReasons(
+  lines: ReadonlyArray<{ unitPrice?: unknown; zeroPriceReasonCode?: unknown }>,
+): string | null {
+  if (!lines || lines.length === 0) return null;
+  for (const line of lines) {
+    const up = parseCommercialUnitPrice(line.unitPrice);
+    if (up === null) continue;
+    if (roundMoney(up) !== 0) continue;
+    if (!isZeroPriceLineReasonCode(line.zeroPriceReasonCode)) {
+      return "Each line with zero unit price must have a zero-price reason.";
+    }
   }
   return null;
 }

@@ -8,6 +8,12 @@ import { stockMovementRepository } from "../stock-movements/repository";
 import { stockBalanceRepository } from "../stock-balances/repository";
 import { parseDocumentLineQty } from "../../shared/documentValidation";
 import { normalizeTrim } from "../../shared/validation";
+import {
+  normalizeCancelReasonComment,
+  validateCancelDocumentReasonForm,
+  type CancelDocumentReasonCode,
+  type CancelDocumentReasonInput,
+} from "../../shared/reasonCodes";
 
 export type PostResult = { success: true } | { success: false; issues: Issue[] };
 export type CancelDocumentResult =
@@ -160,12 +166,23 @@ export function post(shipmentId: string): PostResult {
   return { success: true };
 }
 
-export function cancelDocument(shipmentId: string): CancelDocumentResult {
+export function cancelDocument(
+  shipmentId: string,
+  input: CancelDocumentReasonInput,
+): CancelDocumentResult {
+  const reasonErr = validateCancelDocumentReasonForm(input.cancelReasonCode);
+  if (reasonErr) return { success: false, error: reasonErr };
   const shipment = shipmentRepository.getById(shipmentId);
   if (!shipment) return { success: false, error: "Shipment not found." };
   if (shipment.status !== "draft")
     return { success: false, error: "Only draft shipments can be cancelled." };
-  shipmentRepository.update(shipmentId, { status: "cancelled" });
+  const code = input.cancelReasonCode as CancelDocumentReasonCode;
+  const comment = normalizeCancelReasonComment(input.cancelReasonComment);
+  shipmentRepository.update(shipmentId, {
+    status: "cancelled",
+    cancelReasonCode: code,
+    ...(comment !== undefined ? { cancelReasonComment: comment } : {}),
+  });
   return { success: true };
 }
 

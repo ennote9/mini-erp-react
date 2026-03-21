@@ -8,13 +8,29 @@ import {
   validateDocumentLines,
   parseDocumentLineQty,
   normalizeDocumentComment,
+  validatePlanningLineUnitPrices,
+  validatePlanningLinesZeroPriceReasons,
 } from "../../shared/documentValidation";
 import { normalizeTrim } from "../../shared/validation";
+import { parseCommercialUnitPrice } from "../../shared/commercialMoney";
+import {
+  computePlanningDueDate,
+  parsePaymentTermsDaysToStore,
+  validatePaymentTermsDaysForm,
+} from "../../shared/planningCommercialDates";
+import {
+  normalizeCancelReasonComment,
+  validateCancelDocumentReasonForm,
+  zeroPriceReasonCodeForStore,
+  type CancelDocumentReasonCode,
+  type CancelDocumentReasonInput,
+} from "../../shared/reasonCodes";
 
 export type ConfirmResult = { success: true } | { success: false; error: string };
 export type CancelDocumentResult =
   | { success: true }
   | { success: false; error: string };
+
 export type CreateShipmentResult =
   | { success: true; shipmentId: string }
   | { success: false; error: string };
@@ -23,8 +39,14 @@ export type SaveDraftInput = {
   date: string;
   customerId: string;
   warehouseId: string;
+  paymentTermsDays?: string;
   comment?: string;
-  lines: Array<{ itemId: string; qty: number; unitPrice?: number }>;
+  lines: Array<{
+    itemId: string;
+    qty: number;
+    unitPrice?: number;
+    zeroPriceReasonCode?: string;
+  }>;
 };
 export type SaveDraftResult =
   | { success: true; id: string }
@@ -45,25 +67,49 @@ function validateSaveDraft(data: SaveDraftInput): string | null {
   if (!warehouse.isActive) return "Selected warehouse is inactive.";
   const lineErr = validateDocumentLines(data.lines, itemRepository);
   if (lineErr) return lineErr;
+  const priceErr = validatePlanningLineUnitPrices(data.lines);
+  if (priceErr) return priceErr;
+  const zpErr = validatePlanningLinesZeroPriceReasons(data.lines);
+  if (zpErr) return zpErr;
+  const termsErr = validatePaymentTermsDaysForm(data.paymentTermsDays);
+  if (termsErr) return termsErr;
   return null;
 }
 
 function normalizeSOLines(
-  lines: Array<{ itemId: string; qty: number; unitPrice?: number }>,
-): Array<{ itemId: string; qty: number; unitPrice: number }> {
-  return lines.map((l) => {
-    const qty = parseDocumentLineQty(l.qty) ?? 1;
-    const rawPrice = l.unitPrice;
-    const unitPrice =
-      typeof rawPrice === "number" && !Number.isNaN(rawPrice) && rawPrice >= 0
-        ? rawPrice
-        : 0;
-    return {
+  lines: Array<{
+    itemId: string;
+    qty: number;
+    unitPrice?: number;
+    zeroPriceReasonCode?: string;
+  }>,
+): Array<{
+  itemId: string;
+  qty: number;
+  unitPrice: number;
+  zeroPriceReasonCode?: string;
+}> | null {
+  const out: Array<{
+    itemId: string;
+    qty: number;
+    unitPrice: number;
+    zeroPriceReasonCode?: string;
+  }> = [];
+  for (const l of lines) {
+    const qty = parseDocumentLineQty(l.qty);
+    if (qty === null) return null;
+    const unitPrice = parseCommercialUnitPrice(l.unitPrice);
+    if (unitPrice === null) return null;
+    const zpr = zeroPriceReasonCodeForStore(unitPrice, l.zeroPriceReasonCode);
+    const row: { itemId: string; qty: number; unitPrice: number; zeroPriceReasonCode?: string } = {
       itemId: normalizeTrim(l.itemId),
       qty,
       unitPrice,
     };
-  });
+    if (zpr !== undefined) row.zeroPriceReasonCode = zpr;
+    out.push(row);
+  }
+  return out;
 }
 
 export function saveDraft(
@@ -77,7 +123,11 @@ export function saveDraft(
   const customerId = normalizeTrim(data.customerId);
   const warehouseId = normalizeTrim(data.warehouseId);
   const comment = normalizeDocumentComment(data.comment);
+  const paymentTermsDays = parsePaymentTermsDaysToStore(data.paymentTermsDays);
+  const dueDate = computePlanningDueDate(date, paymentTermsDays);
   const lines = normalizeSOLines(data.lines);
+  if (lines === null)
+    return { success: false, error: "Each line must have a valid unit price (number ≥ 0)." };
 
   const header = {
     date,
@@ -85,6 +135,8 @@ export function saveDraft(
     warehouseId,
     status: "draft" as const,
     comment: comment ?? "",
+    paymentTermsDays,
+    dueDate,
   };
   if (existingId) {
     const so = salesOrderRepository.getById(existingId);
@@ -117,6 +169,10 @@ function validateConfirm(soId: string): string | null {
   const lines = salesOrderRepository.listLines(soId);
   const lineErr = validateDocumentLines(lines, itemRepository);
   if (lineErr) return lineErr;
+  const priceErr = validatePlanningLineUnitPrices(lines);
+  if (priceErr) return priceErr;
+  const zpErr = validatePlanningLinesZeroPriceReasons(lines);
+  if (zpErr) return zpErr;
   return null;
 }
 
@@ -127,7 +183,12 @@ export function confirm(soId: string): ConfirmResult {
   return { success: true };
 }
 
-export function cancelDocument(soId: string): CancelDocumentResult {
+export function cancelDocument(
+  soId: string,
+  input: CancelDocumentReasonInput,
+): CancelDocumentResult {
+  const reasonErr = validateCancelDocumentReasonForm(input.cancelReasonCode);
+  if (reasonErr) return { success: false, error: reasonErr };
   const so = salesOrderRepository.getById(soId);
   if (!so) return { success: false, error: "Sales order not found." };
   if (so.status !== "draft" && so.status !== "confirmed")
@@ -135,7 +196,13 @@ export function cancelDocument(soId: string): CancelDocumentResult {
       success: false,
       error: "Only draft or confirmed sales orders can be cancelled.",
     };
-  salesOrderRepository.update(soId, { status: "cancelled" });
+  const code = input.cancelReasonCode as CancelDocumentReasonCode;
+  const comment = normalizeCancelReasonComment(input.cancelReasonComment);
+  salesOrderRepository.update(soId, {
+    status: "cancelled",
+    cancelReasonCode: code,
+    ...(comment !== undefined ? { cancelReasonComment: comment } : {}),
+  });
   return { success: true };
 }
 

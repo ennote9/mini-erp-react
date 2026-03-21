@@ -1,6 +1,7 @@
 import type { SalesOrder, SalesOrderLine } from "./model";
 import { todayYYYYMMDD } from "./dateUtils";
 import { itemRepository } from "../items/repository";
+import { roundMoney } from "../../shared/commercialMoney";
 import type { PlanningDocumentStatus } from "../../shared/domain";
 import {
   getDocumentsFilePath,
@@ -8,12 +9,21 @@ import {
   writeDocumentPayload,
 } from "../../shared/documentPersistence";
 import { registerPersistenceFlush } from "../../shared/persistenceCoordinator";
+import {
+  isCancelDocumentReasonCode,
+  zeroPriceReasonCodeForStore,
+} from "../../shared/reasonCodes";
 
 export type CreateSalesOrderHeaderInput = Omit<
   SalesOrder,
   "id" | "number"
 >;
-export type SalesOrderLineInput = { itemId: string; qty: number; unitPrice: number };
+export type SalesOrderLineInput = {
+  itemId: string;
+  qty: number;
+  unitPrice: number;
+  zeroPriceReasonCode?: string;
+};
 export type UpdateSalesOrderPatch = Partial<
   Omit<SalesOrder, "id" | "number">
 >;
@@ -35,6 +45,14 @@ type SalesOrderPersistRecord = SalesOrder & {
 
 function asOptionalString(v: unknown): string | undefined {
   return typeof v === "string" ? v : undefined;
+}
+
+function asOptionalPaymentTermsDays(v: unknown): number | undefined {
+  if (v == null) return undefined;
+  if (typeof v !== "number" || !Number.isFinite(v)) return undefined;
+  const n = Math.trunc(v);
+  if (n < 0) return undefined;
+  return n;
 }
 
 function isPlanningStatus(v: unknown): v is PlanningDocumentStatus {
@@ -75,13 +93,17 @@ function normalizeLine(raw: unknown): SalesOrderLine | null {
   ) {
     return null;
   }
-  return {
+  const unitPrice = roundMoney(rec.unitPrice as number);
+  const zpr = zeroPriceReasonCodeForStore(unitPrice, rec.zeroPriceReasonCode);
+  const line: SalesOrderLine = {
     id: rec.id,
     salesOrderId: rec.salesOrderId,
     itemId: rec.itemId,
     qty: rec.qty,
-    unitPrice: rec.unitPrice,
+    unitPrice,
   };
+  if (zpr !== undefined) line.zeroPriceReasonCode = zpr;
+  return line;
 }
 
 function normalizeSORecord(raw: unknown): SalesOrderPersistRecord | null {
@@ -107,7 +129,14 @@ function normalizeSORecord(raw: unknown): SalesOrderPersistRecord | null {
     customerId: rec.customerId,
     warehouseId: rec.warehouseId,
     status: rec.status,
+    paymentTermsDays: asOptionalPaymentTermsDays(rec.paymentTermsDays),
+    dueDate: asOptionalString(rec.dueDate),
     comment: asOptionalString(rec.comment),
+    cancelReasonCode:
+      typeof rec.cancelReasonCode === "string" && isCancelDocumentReasonCode(rec.cancelReasonCode)
+        ? rec.cancelReasonCode
+        : undefined,
+    cancelReasonComment: asOptionalString(rec.cancelReasonComment),
     lines,
   };
 }
@@ -231,13 +260,19 @@ export const salesOrderRepository = {
     };
     headerStore.push(doc);
     for (const l of lines) {
-      lineStore.push({
+      const unitPrice = roundMoney(
+        typeof l.unitPrice === "number" && !Number.isNaN(l.unitPrice) ? l.unitPrice : 0,
+      );
+      const zpr = zeroPriceReasonCodeForStore(unitPrice, l.zeroPriceReasonCode);
+      const row: SalesOrderLine = {
         id: nextLineId(),
         salesOrderId: id,
         itemId: l.itemId,
         qty: l.qty,
-        unitPrice: typeof l.unitPrice === "number" && !Number.isNaN(l.unitPrice) ? l.unitPrice : 0,
-      });
+        unitPrice,
+      };
+      if (zpr !== undefined) row.zeroPriceReasonCode = zpr;
+      lineStore.push(row);
     }
     schedulePersist();
     return doc;
@@ -260,7 +295,10 @@ export const salesOrderRepository = {
     lineStore.push(...existing);
     const newLines: SalesOrderLine[] = [];
     for (const l of lines) {
-      const unitPrice = typeof l.unitPrice === "number" && !Number.isNaN(l.unitPrice) ? l.unitPrice : 0;
+      const unitPrice = roundMoney(
+        typeof l.unitPrice === "number" && !Number.isNaN(l.unitPrice) ? l.unitPrice : 0,
+      );
+      const zpr = zeroPriceReasonCodeForStore(unitPrice, l.zeroPriceReasonCode);
       const line: SalesOrderLine = {
         id: nextLineId(),
         salesOrderId: documentId,
@@ -268,6 +306,7 @@ export const salesOrderRepository = {
         qty: l.qty,
         unitPrice,
       };
+      if (zpr !== undefined) line.zeroPriceReasonCode = zpr;
       lineStore.push(line);
       newLines.push(line);
     }

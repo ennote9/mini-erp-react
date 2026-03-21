@@ -22,6 +22,12 @@ import { SelectField } from "@/components/ui/select-field";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { agGridDefaultColDef, agGridSelectionColumnDef } from "../../../shared/ui/ag-grid/agGridDefaults";
 import { todayYYYYMMDD, normalizeDateForSO } from "../dateUtils";
+import {
+  lineAmountMoney,
+  roundMoney,
+  sumPlanningDocumentLineAmounts,
+} from "../../../shared/commercialMoney";
+import { computePlanningDueDate, parsePaymentTermsDaysToStore } from "../../../shared/planningCommercialDates";
 import { getSalesOrderHealth } from "../../../shared/documentHealth";
 import { getErrorAndWarningMessages, actionIssue, actionWarning, combineIssues, hasErrors, issueListContainsMessage, type Issue } from "../../../shared/issues";
 import { DocumentIssueStrip } from "../../../shared/ui/feedback/DocumentIssueStrip";
@@ -50,15 +56,38 @@ import { buildLinesXlsxBuffer, buildDocumentXlsxBuffer, type SoExportLineRow, ty
 import { save } from "@tauri-apps/plugin-dialog";
 import { invoke } from "@tauri-apps/api/core";
 import { revealItemInDir } from "@tauri-apps/plugin-opener";
+import {
+  CancelDocumentReasonDialog,
+  type CancelDocumentReasonPayload,
+} from "../../../shared/ui/object/CancelDocumentReasonDialog";
+import {
+  CANCEL_DOCUMENT_REASON_LABELS,
+  ZERO_PRICE_LINE_REASON_CODES,
+  ZERO_PRICE_LINE_REASON_LABELS,
+  type CancelDocumentReasonCode,
+  type ZeroPriceLineReasonCode,
+} from "../../../shared/reasonCodes";
 
 type LineWithItem = SalesOrderLine & { itemName: string };
 
-type LineFormRow = { itemId: string; qty: number; unitPrice: number; _lineId: number };
+type LineFormRow = {
+  itemId: string;
+  qty: number;
+  unitPrice: number;
+  zeroPriceReasonCode: string;
+  _lineId: number;
+};
+
+const ZERO_PRICE_REASON_SELECT_OPTIONS = ZERO_PRICE_LINE_REASON_CODES.map((code) => ({
+  value: code,
+  label: ZERO_PRICE_LINE_REASON_LABELS[code],
+}));
 
 type FormState = {
   date: string;
   customerId: string;
   warehouseId: string;
+  paymentTermsDays: string;
   comment: string;
   lines: LineFormRow[];
 };
@@ -68,6 +97,7 @@ function defaultForm(): FormState {
     date: todayYYYYMMDD(),
     customerId: "",
     warehouseId: "",
+    paymentTermsDays: "",
     comment: "",
     lines: [],
   };
@@ -170,8 +200,22 @@ function soLinesDisplayColumnDefs(): ColDef<LineFormRow>[] {
         const qty = p.data?.qty;
         const unitPrice = p.data?.unitPrice;
         if (typeof qty !== "number" || typeof unitPrice !== "number") return "0.00";
-        const amount = qty * unitPrice;
+        const amount = lineAmountMoney(qty, unitPrice);
         return Number.isNaN(amount) ? "0.00" : amount.toFixed(2);
+      },
+    },
+    {
+      headerName: "Zero-price reason",
+      width: 150,
+      minWidth: 130,
+      maxWidth: 180,
+      editable: false,
+      valueGetter: (p) => {
+        const up = p.data?.unitPrice;
+        if (typeof up !== "number" || roundMoney(up) !== 0) return "";
+        const c = p.data?.zeroPriceReasonCode;
+        if (typeof c !== "string" || c === "") return "";
+        return ZERO_PRICE_LINE_REASON_LABELS[c as ZeroPriceLineReasonCode] ?? c;
       },
     },
   ];
@@ -251,8 +295,21 @@ function soLinesReadOnlyColumnDefs(): ColDef<LineWithItem>[] {
         const qty = p.data?.qty;
         const unitPrice = p.data?.unitPrice;
         if (typeof qty !== "number" || typeof unitPrice !== "number") return "0.00";
-        const amount = qty * unitPrice;
+        const amount = lineAmountMoney(qty, unitPrice);
         return Number.isNaN(amount) ? "0.00" : amount.toFixed(2);
+      },
+    },
+    {
+      headerName: "Zero-price reason",
+      width: 150,
+      minWidth: 130,
+      maxWidth: 180,
+      valueGetter: (p) => {
+        const up = p.data?.unitPrice;
+        if (typeof up !== "number" || roundMoney(up) !== 0) return "";
+        const c = p.data?.zeroPriceReasonCode;
+        if (typeof c !== "string" || c === "") return "";
+        return ZERO_PRICE_LINE_REASON_LABELS[c as ZeroPriceLineReasonCode] ?? c;
       },
     },
   ];
@@ -264,9 +321,9 @@ function buildExportRowsFromFormLines(lines: LineFormRow[]): SoExportLineRow[] {
     const qty = typeof line.qty === "number" && !Number.isNaN(line.qty) ? line.qty : 0;
     const unitPrice =
       typeof line.unitPrice === "number" && !Number.isNaN(line.unitPrice) && line.unitPrice >= 0
-        ? line.unitPrice
+        ? roundMoney(line.unitPrice)
         : 0;
-    const lineAmount = qty * unitPrice;
+    const lineAmount = lineAmountMoney(qty, unitPrice);
     const brand = item?.brandId ? brandRepository.getById(item.brandId)?.code ?? "" : "";
     const category = item?.categoryId ? categoryRepository.getById(item.categoryId)?.code ?? "" : "";
     return {
@@ -288,9 +345,9 @@ function buildExportRowsFromLinesWithItem(lines: LineWithItem[]): SoExportLineRo
     const qty = typeof line.qty === "number" && !Number.isNaN(line.qty) ? line.qty : 0;
     const unitPrice =
       typeof line.unitPrice === "number" && !Number.isNaN(line.unitPrice) && line.unitPrice >= 0
-        ? line.unitPrice
+        ? roundMoney(line.unitPrice)
         : 0;
-    const lineAmount = qty * unitPrice;
+    const lineAmount = lineAmountMoney(qty, unitPrice);
     const brand = item?.brandId ? brandRepository.getById(item.brandId)?.code ?? "" : "";
     const category = item?.categoryId ? categoryRepository.getById(item.categoryId)?.code ?? "" : "";
     return {
@@ -326,6 +383,8 @@ export function SalesOrderPage() {
   const [lineEntryItemId, setLineEntryItemId] = useState("");
   const [lineEntryQty, setLineEntryQty] = useState(1);
   const [lineEntryUnitPrice, setLineEntryUnitPrice] = useState(0);
+  const [lineEntryZeroPriceReason, setLineEntryZeroPriceReason] = useState("");
+  const [cancelReasonDialogOpen, setCancelReasonDialogOpen] = useState(false);
   const [duplicateChoicePending, setDuplicateChoicePending] = useState<{
     itemId: string;
     qty: number;
@@ -341,19 +400,26 @@ export function SalesOrderPage() {
   const lineEntryItemPickerRef = useRef<SalesOrderItemAutocompleteRef | null>(null);
   const lineEntryQtyInputRef = useRef<HTMLInputElement | null>(null);
   const lineEntryDropdownRightEdgeRef = useRef<HTMLDivElement | null>(null);
+  const prevCustomerIdRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    prevCustomerIdRef.current = null;
+  }, [id]);
 
   useEffect(() => {
     setActionIssues([]);
-  }, [form.customerId, form.warehouseId, form.lines]);
+  }, [form.customerId, form.warehouseId, form.paymentTermsDays, form.lines]);
 
   useEffect(() => {
     if (isNew) {
       nextLineIdRef.current = 0;
+      prevCustomerIdRef.current = null;
       setForm(defaultForm());
       setEditingLineId(null);
       setLineEntryItemId("");
       setLineEntryQty(1);
       setLineEntryUnitPrice(0);
+      setLineEntryZeroPriceReason("");
       setDuplicateChoicePending(null);
       return;
     }
@@ -364,7 +430,11 @@ export function SalesOrderPage() {
           ? draftLines.map((l, idx) => ({
               itemId: l.itemId,
               qty: l.qty,
-              unitPrice: typeof l.unitPrice === "number" && !Number.isNaN(l.unitPrice) ? l.unitPrice : 0,
+              unitPrice:
+                typeof l.unitPrice === "number" && !Number.isNaN(l.unitPrice)
+                  ? roundMoney(l.unitPrice)
+                  : 0,
+              zeroPriceReasonCode: l.zeroPriceReasonCode ?? "",
               _lineId: idx,
             }))
           : [];
@@ -373,6 +443,10 @@ export function SalesOrderPage() {
         date: normalizeDateForSO(doc.date),
         customerId: doc.customerId,
         warehouseId: doc.warehouseId,
+        paymentTermsDays:
+          doc.paymentTermsDays !== undefined && Number.isInteger(doc.paymentTermsDays)
+            ? String(doc.paymentTermsDays)
+            : "",
         comment: doc.comment ?? "",
         lines: linesWithId,
       });
@@ -380,9 +454,21 @@ export function SalesOrderPage() {
       setLineEntryItemId("");
       setLineEntryQty(1);
       setLineEntryUnitPrice(0);
+      setLineEntryZeroPriceReason("");
       setDuplicateChoicePending(null);
     }
-  }, [id, isNew, doc?.id, doc?.status, doc?.date, doc?.customerId, doc?.warehouseId, doc?.comment, refresh]);
+  }, [
+    id,
+    isNew,
+    doc?.id,
+    doc?.status,
+    doc?.date,
+    doc?.customerId,
+    doc?.warehouseId,
+    doc?.paymentTermsDays,
+    doc?.comment,
+    refresh,
+  ]);
 
   const customerName = useMemo(
     () =>
@@ -412,6 +498,32 @@ export function SalesOrderPage() {
   const isConfirmed = doc?.status === "confirmed";
   const isEditable = isNew || isDraft;
 
+  useEffect(() => {
+    if (!isEditable) return;
+    const cid = form.customerId;
+    if (prevCustomerIdRef.current === null) {
+      prevCustomerIdRef.current = cid;
+      return;
+    }
+    if (prevCustomerIdRef.current === cid) return;
+    prevCustomerIdRef.current = cid;
+    const cust = customerRepository.getById(cid);
+    const d = cust?.paymentTermsDays;
+    setForm((f) => ({
+      ...f,
+      paymentTermsDays:
+        d !== undefined && Number.isFinite(d) && Number.isInteger(d) && d >= 0 ? String(d) : "",
+    }));
+  }, [form.customerId, isEditable]);
+
+  const computedDueDateDisplay = useMemo(() => {
+    const d = computePlanningDueDate(
+      normalizeDateForSO(form.date),
+      parsePaymentTermsDaysToStore(form.paymentTermsDays),
+    );
+    return d ?? "—";
+  }, [form.date, form.paymentTermsDays]);
+
   const activeCustomers = useMemo(
     () => customerRepository.list().filter((c) => c.isActive),
     [],
@@ -430,9 +542,7 @@ export function SalesOrderPage() {
   const handleCancelDocument = () => {
     if (!id || isNew) return;
     setActionIssues([]);
-    const result = cancelDocument(id);
-    if (result.success) setRefresh((r) => r + 1);
-    else if (!issueListContainsMessage(health.issues, result.error)) setActionIssues([actionIssue(result.error)]);
+    setCancelReasonDialogOpen(true);
   };
   const handleCreateShipment = () => {
     if (!id || isNew) return;
@@ -448,16 +558,25 @@ export function SalesOrderPage() {
       .filter(
         (l) => l.itemId.trim() !== "" && typeof l.qty === "number" && l.qty > 0,
       )
-      .map(({ itemId, qty, unitPrice }) => ({
-        itemId,
-        qty,
-        unitPrice: typeof unitPrice === "number" && !Number.isNaN(unitPrice) && unitPrice >= 0 ? unitPrice : 0,
-      }));
+      .map(({ itemId, qty, unitPrice, zeroPriceReasonCode }) => {
+        const up = roundMoney(
+          typeof unitPrice === "number" && !Number.isNaN(unitPrice) && unitPrice >= 0 ? unitPrice : 0,
+        );
+        return {
+          itemId,
+          qty,
+          unitPrice: up,
+          ...(up === 0 && zeroPriceReasonCode.trim() !== ""
+            ? { zeroPriceReasonCode: zeroPriceReasonCode.trim() }
+            : {}),
+        };
+      });
     const result = saveDraft(
       {
         date: normalizeDateForSO(form.date),
         customerId: form.customerId,
         warehouseId: form.warehouseId,
+        paymentTermsDays: form.paymentTermsDays,
         comment: form.comment || undefined,
         lines: linesToSave,
       },
@@ -485,6 +604,7 @@ export function SalesOrderPage() {
       setLineEntryItemId("");
       setLineEntryQty(1);
       setLineEntryUnitPrice(0);
+      setLineEntryZeroPriceReason("");
       linesGridRef.current?.api?.deselectAll();
     }
   }, [editingLineId]);
@@ -505,20 +625,23 @@ export function SalesOrderPage() {
     }
 
     const rawPrice = Number(lineEntryUnitPrice);
-    const unitPrice = Number.isFinite(rawPrice) && rawPrice >= 0 ? rawPrice : 0;
+    const unitPrice = roundMoney(Number.isFinite(rawPrice) && rawPrice >= 0 ? rawPrice : 0);
     const isDuplicate = form.lines.some((l) => l.itemId === itemId);
     if (isDuplicate) {
       setDuplicateChoicePending({ itemId, qty, unitPrice });
       return;
     }
     const _lineId = nextLineIdRef.current++;
+    const zp =
+      unitPrice === 0 && lineEntryZeroPriceReason.trim() !== "" ? lineEntryZeroPriceReason.trim() : "";
     setForm((f) => ({
       ...f,
-      lines: [...f.lines, { itemId, qty, unitPrice, _lineId }],
+      lines: [...f.lines, { itemId, qty, unitPrice, zeroPriceReasonCode: zp, _lineId }],
     }));
     setLineEntryItemId("");
     setLineEntryQty(1);
     setLineEntryUnitPrice(0);
+    setLineEntryZeroPriceReason("");
     setTimeout(() => lineEntryItemPickerRef.current?.focus(), 0);
   };
 
@@ -531,6 +654,7 @@ export function SalesOrderPage() {
       setLineEntryItemId("");
       setLineEntryQty(1);
       setLineEntryUnitPrice(0);
+      setLineEntryZeroPriceReason("");
       return;
     }
     setForm((f) => ({
@@ -543,6 +667,7 @@ export function SalesOrderPage() {
     setLineEntryItemId("");
     setLineEntryQty(1);
     setLineEntryUnitPrice(0);
+    setLineEntryZeroPriceReason("");
     setTimeout(() => lineEntryItemPickerRef.current?.focus(), 0);
   };
 
@@ -557,17 +682,20 @@ export function SalesOrderPage() {
     const qty = Number(lineEntryQty);
     if (!itemId || !Number.isFinite(qty) || qty <= 0) return;
     const rawPrice = Number(lineEntryUnitPrice);
-    const unitPrice = Number.isFinite(rawPrice) && rawPrice >= 0 ? rawPrice : 0;
+    const unitPrice = roundMoney(Number.isFinite(rawPrice) && rawPrice >= 0 ? rawPrice : 0);
+    const zp =
+      unitPrice === 0 && lineEntryZeroPriceReason.trim() !== "" ? lineEntryZeroPriceReason.trim() : "";
     setForm((f) => ({
       ...f,
       lines: f.lines.map((l) =>
-        l._lineId === editingLineId ? { ...l, itemId, qty, unitPrice } : l,
+        l._lineId === editingLineId ? { ...l, itemId, qty, unitPrice, zeroPriceReasonCode: zp } : l,
       ),
     }));
     setEditingLineId(null);
     setLineEntryItemId("");
     setLineEntryQty(1);
     setLineEntryUnitPrice(0);
+    setLineEntryZeroPriceReason("");
     linesGridRef.current?.api?.deselectAll();
   };
 
@@ -576,6 +704,7 @@ export function SalesOrderPage() {
     setLineEntryItemId("");
     setLineEntryQty(1);
     setLineEntryUnitPrice(0);
+    setLineEntryZeroPriceReason("");
     setDuplicateChoicePending(null);
     linesGridRef.current?.api?.deselectAll();
   };
@@ -590,12 +719,22 @@ export function SalesOrderPage() {
       setEditingLineId(row._lineId);
       setLineEntryItemId(row.itemId);
       setLineEntryQty(row.qty);
-      setLineEntryUnitPrice(typeof row.unitPrice === "number" && !Number.isNaN(row.unitPrice) ? row.unitPrice : 0);
+      setLineEntryUnitPrice(
+        roundMoney(
+          typeof row.unitPrice === "number" && !Number.isNaN(row.unitPrice) && row.unitPrice >= 0
+            ? row.unitPrice
+            : 0,
+        ),
+      );
+      setLineEntryZeroPriceReason(
+        typeof row.zeroPriceReasonCode === "string" ? row.zeroPriceReasonCode : "",
+      );
     } else {
       setEditingLineId(null);
       setLineEntryItemId("");
       setLineEntryQty(1);
       setLineEntryUnitPrice(0);
+      setLineEntryZeroPriceReason("");
     }
   }, []);
 
@@ -613,6 +752,7 @@ export function SalesOrderPage() {
       setLineEntryItemId("");
       setLineEntryQty(1);
       setLineEntryUnitPrice(0);
+      setLineEntryZeroPriceReason("");
     }
   }, [selectedLineIds, editingLineId]);
 
@@ -620,7 +760,11 @@ export function SalesOrderPage() {
     setLineEntryItemId(itemId);
     const item = itemId ? itemRepository.getById(itemId) : undefined;
     const price = item?.salePrice;
-    setLineEntryUnitPrice(typeof price === "number" && !Number.isNaN(price) && price >= 0 ? price : 0);
+    const up = roundMoney(
+      typeof price === "number" && !Number.isNaN(price) && price >= 0 ? price : 0,
+    );
+    setLineEntryUnitPrice(up);
+    if (up !== 0) setLineEntryZeroPriceReason("");
     if (itemId && editingLineId === null) {
       setTimeout(() => {
         lineEntryQtyInputRef.current?.focus();
@@ -647,7 +791,12 @@ export function SalesOrderPage() {
           _lineId: nextLineIdRef.current++,
           itemId: grouped.itemId,
           qty: grouped.qty,
-          unitPrice: grouped.unitPrice,
+          unitPrice: roundMoney(
+            typeof grouped.unitPrice === "number" && Number.isFinite(grouped.unitPrice) && grouped.unitPrice >= 0
+              ? grouped.unitPrice
+              : 0,
+          ),
+          zeroPriceReasonCode: "",
         });
         lineIndexByItemId.set(grouped.itemId, nextLines.length - 1);
       }
@@ -669,25 +818,21 @@ export function SalesOrderPage() {
 
   const totals = useMemo(() => {
     let totalQty = 0;
-    let totalAmount = 0;
     for (const l of form.lines) {
       const q = typeof l.qty === "number" && !Number.isNaN(l.qty) ? l.qty : 0;
-      const p = typeof l.unitPrice === "number" && !Number.isNaN(l.unitPrice) ? l.unitPrice : 0;
       totalQty += q;
-      totalAmount += q * p;
     }
+    const totalAmount = sumPlanningDocumentLineAmounts(form.lines);
     return { totalQty, totalAmount };
   }, [form.lines]);
 
   const readonlyTotals = useMemo(() => {
     let totalQty = 0;
-    let totalAmount = 0;
     for (const l of lines) {
       const q = typeof l.qty === "number" && !Number.isNaN(l.qty) ? l.qty : 0;
-      const p = typeof l.unitPrice === "number" && !Number.isNaN(l.unitPrice) ? l.unitPrice : 0;
       totalQty += q;
-      totalAmount += q * p;
     }
+    const totalAmount = sumPlanningDocumentLineAmounts(lines);
     return { totalQty, totalAmount };
   }, [lines]);
 
@@ -696,10 +841,20 @@ export function SalesOrderPage() {
       getSalesOrderHealth({
         customerId: form.customerId,
         warehouseId: form.warehouseId,
+        paymentTermsDays: form.paymentTermsDays,
         lines: form.lines,
       }),
-    [form.customerId, form.warehouseId, form.lines],
+    [form.customerId, form.warehouseId, form.paymentTermsDays, form.lines],
   );
+
+  const handleCancelDocumentConfirm = (payload: CancelDocumentReasonPayload) => {
+    if (!id || isNew) return;
+    setActionIssues([]);
+    const result = cancelDocument(id, payload);
+    if (result.success) setRefresh((r) => r + 1);
+    else if (!issueListContainsMessage(health.issues, result.error))
+      setActionIssues([actionIssue(result.error)]);
+  };
 
   const combinedIssues = useMemo(
     () => combineIssues(health.issues, actionIssues),
@@ -970,6 +1125,27 @@ export function SalesOrderPage() {
                     className="w-full min-w-0"
                   />
                 </div>
+                <div className="flex min-w-0 w-full flex-col gap-0.5">
+                  <Label htmlFor="so-payment-terms" className="text-sm">
+                    Payment terms (days)
+                  </Label>
+                  <Input
+                    id="so-payment-terms"
+                    type="number"
+                    min={0}
+                    step={1}
+                    value={form.paymentTermsDays}
+                    onChange={(e) => setForm((f) => ({ ...f, paymentTermsDays: e.target.value }))}
+                    placeholder="From customer or enter"
+                    className="h-8 text-sm"
+                  />
+                </div>
+                <div className="flex min-w-0 w-full flex-col gap-0.5">
+                  <span className="text-sm text-muted-foreground">Due date</span>
+                  <div className="flex h-8 items-center text-sm text-foreground/90 tabular-nums">
+                    {computedDueDateDisplay}
+                  </div>
+                </div>
                 <div className="col-span-2 flex flex-col gap-0.5">
                   <Label htmlFor="so-comment" className="text-sm">Comment</Label>
                   <Input
@@ -994,7 +1170,7 @@ export function SalesOrderPage() {
               <div className="flex items-end gap-2 w-full mb-1.5">
                 <Card className="border-0 shadow-none flex-1 min-w-0">
                   <CardContent className="p-2 pb-0">
-                    <div className="grid grid-cols-2 md:grid-cols-[minmax(200px,240px)_auto_auto_auto_260px] gap-x-2 gap-y-0 items-end w-max max-w-full">
+                    <div className="grid grid-cols-2 md:grid-cols-[minmax(200px,240px)_auto_auto_auto_minmax(160px,220px)_minmax(260px,1fr)] gap-x-2 gap-y-1 items-end w-max max-w-full">
                     <div className="flex flex-col gap-0.5">
                       <Label htmlFor="line-entry-item" className="text-sm">
                         Item <span className="text-destructive">*</span>
@@ -1044,9 +1220,28 @@ export function SalesOrderPage() {
                         value={lineEntryUnitPrice}
                         onChange={(e) => {
                           const v = Number(e.target.value);
-                          setLineEntryUnitPrice(Number.isFinite(v) && v >= 0 ? v : 0);
+                          const next = Number.isFinite(v) && v >= 0 ? v : 0;
+                          setLineEntryUnitPrice(next);
+                          if (roundMoney(next) !== 0) setLineEntryZeroPriceReason("");
                         }}
                         className="h-8 w-[80px] text-sm text-right align-middle [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                      />
+                    </div>
+                    <div className="flex flex-col gap-0.5 md:col-span-1">
+                      <Label htmlFor="so-line-entry-zp-reason" className="text-sm">
+                        Zero-price reason
+                        {roundMoney(lineEntryUnitPrice) === 0 ? (
+                          <span className="text-destructive"> *</span>
+                        ) : null}
+                      </Label>
+                      <SelectField
+                        id="so-line-entry-zp-reason"
+                        value={lineEntryZeroPriceReason}
+                        onChange={setLineEntryZeroPriceReason}
+                        options={ZERO_PRICE_REASON_SELECT_OPTIONS}
+                        placeholder={roundMoney(lineEntryUnitPrice) === 0 ? "Select reason" : "—"}
+                        className="w-[min(100%,220px)] min-w-0"
+                        disabled={roundMoney(lineEntryUnitPrice) !== 0}
                       />
                     </div>
                     <div
@@ -1316,11 +1511,40 @@ export function SalesOrderPage() {
                   <dt className="doc-summary__term">Warehouse</dt>
                   <dd className="doc-summary__value">{warehouseName}</dd>
                 </div>
+                <div className="doc-summary__row">
+                  <dt className="doc-summary__term">Payment terms (days)</dt>
+                  <dd className="doc-summary__value">
+                    {doc!.paymentTermsDays !== undefined ? `${doc!.paymentTermsDays} days` : "—"}
+                  </dd>
+                </div>
+                <div className="doc-summary__row">
+                  <dt className="doc-summary__term">Due date</dt>
+                  <dd className="doc-summary__value">
+                    {doc!.dueDate != null && doc!.dueDate !== "" ? doc!.dueDate : "—"}
+                  </dd>
+                </div>
                 {doc!.comment != null && doc!.comment !== "" && (
                   <div className="doc-summary__row">
                     <dt className="doc-summary__term">Comment</dt>
                     <dd className="doc-summary__value">{doc!.comment}</dd>
                   </div>
+                )}
+                {doc!.status === "cancelled" && doc!.cancelReasonCode != null && doc!.cancelReasonCode !== "" && (
+                  <>
+                    <div className="doc-summary__row">
+                      <dt className="doc-summary__term">Cancel reason</dt>
+                      <dd className="doc-summary__value">
+                        {CANCEL_DOCUMENT_REASON_LABELS[doc!.cancelReasonCode as CancelDocumentReasonCode] ??
+                          doc!.cancelReasonCode}
+                      </dd>
+                    </div>
+                    {doc!.cancelReasonComment != null && doc!.cancelReasonComment !== "" && (
+                      <div className="doc-summary__row">
+                        <dt className="doc-summary__term">Cancel comment</dt>
+                        <dd className="doc-summary__value">{doc!.cancelReasonComment}</dd>
+                      </div>
+                    )}
+                  </>
                 )}
               </dl>
             </CardContent>
@@ -1464,15 +1688,23 @@ export function SalesOrderPage() {
         initialTab={lineImportInitialTab}
         items={itemRepository.list()}
         getDefaultUnitPrice={(item) =>
-          typeof item.salePrice === "number" &&
-          Number.isFinite(item.salePrice) &&
-          item.salePrice >= 0
-            ? item.salePrice
-            : 0
+          roundMoney(
+            typeof item.salePrice === "number" &&
+              Number.isFinite(item.salePrice) &&
+              item.salePrice >= 0
+              ? item.salePrice
+              : 0,
+          )
         }
         templateFileName="sales-order-lines-template.xlsx"
         onOpenChange={setIsLineImportModalOpen}
         onApply={handleApplyImportedLines}
+      />
+      <CancelDocumentReasonDialog
+        open={cancelReasonDialogOpen}
+        onOpenChange={setCancelReasonDialogOpen}
+        documentKindLabel="sales order"
+        onConfirm={handleCancelDocumentConfirm}
       />
     </DocumentPageLayout>
   );

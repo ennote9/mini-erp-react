@@ -8,11 +8,31 @@ import {
   validateDocumentLines,
   parseDocumentLineQty,
   normalizeDocumentComment,
+  validatePlanningLineUnitPrices,
+  validatePlanningLinesZeroPriceReasons,
 } from "../../shared/documentValidation";
 import { normalizeTrim } from "../../shared/validation";
+import { parseCommercialUnitPrice } from "../../shared/commercialMoney";
+import {
+  computePlanningDueDate,
+  parsePaymentTermsDaysToStore,
+  validatePaymentTermsDaysForm,
+} from "../../shared/planningCommercialDates";
+import {
+  normalizeCancelReasonComment,
+  validateCancelDocumentReasonForm,
+  zeroPriceReasonCodeForStore,
+  type CancelDocumentReasonCode,
+  type CancelDocumentReasonInput,
+} from "../../shared/reasonCodes";
 
 export type ConfirmResult = { success: true } | { success: false; error: string };
 export type CancelDocumentResult = { success: true } | { success: false; error: string };
+
+export type CancelDocumentWithReasonInput = {
+  cancelReasonCode: string;
+  cancelReasonComment?: string;
+};
 export type CreateReceiptResult =
   | { success: true; receiptId: string }
   | { success: false; error: string };
@@ -21,8 +41,15 @@ export type SaveDraftInput = {
   date: string;
   supplierId: string;
   warehouseId: string;
+  /** Raw form text; empty = no terms stored. */
+  paymentTermsDays?: string;
   comment?: string;
-  lines: Array<{ itemId: string; qty: number; unitPrice?: number }>;
+  lines: Array<{
+    itemId: string;
+    qty: number;
+    unitPrice?: number;
+    zeroPriceReasonCode?: string;
+  }>;
 };
 export type SaveDraftResult =
   | { success: true; id: string }
@@ -43,25 +70,49 @@ function validateSaveDraft(data: SaveDraftInput): string | null {
   if (!warehouse.isActive) return "Selected warehouse is inactive.";
   const lineErr = validateDocumentLines(data.lines, itemRepository);
   if (lineErr) return lineErr;
+  const priceErr = validatePlanningLineUnitPrices(data.lines);
+  if (priceErr) return priceErr;
+  const zpErr = validatePlanningLinesZeroPriceReasons(data.lines);
+  if (zpErr) return zpErr;
+  const termsErr = validatePaymentTermsDaysForm(data.paymentTermsDays);
+  if (termsErr) return termsErr;
   return null;
 }
 
 function normalizePOLines(
-  lines: Array<{ itemId: string; qty: number; unitPrice?: number }>,
-): Array<{ itemId: string; qty: number; unitPrice: number }> {
-  return lines.map((l) => {
-    const qty = parseDocumentLineQty(l.qty) ?? 1;
-    const rawPrice = l.unitPrice;
-    const unitPrice =
-      typeof rawPrice === "number" && !Number.isNaN(rawPrice) && rawPrice >= 0
-        ? rawPrice
-        : 0;
-    return {
+  lines: Array<{
+    itemId: string;
+    qty: number;
+    unitPrice?: number;
+    zeroPriceReasonCode?: string;
+  }>,
+): Array<{
+  itemId: string;
+  qty: number;
+  unitPrice: number;
+  zeroPriceReasonCode?: string;
+}> | null {
+  const out: Array<{
+    itemId: string;
+    qty: number;
+    unitPrice: number;
+    zeroPriceReasonCode?: string;
+  }> = [];
+  for (const l of lines) {
+    const qty = parseDocumentLineQty(l.qty);
+    if (qty === null) return null;
+    const unitPrice = parseCommercialUnitPrice(l.unitPrice);
+    if (unitPrice === null) return null;
+    const zpr = zeroPriceReasonCodeForStore(unitPrice, l.zeroPriceReasonCode);
+    const row: { itemId: string; qty: number; unitPrice: number; zeroPriceReasonCode?: string } = {
       itemId: normalizeTrim(l.itemId),
       qty,
       unitPrice,
     };
-  });
+    if (zpr !== undefined) row.zeroPriceReasonCode = zpr;
+    out.push(row);
+  }
+  return out;
 }
 
 export function saveDraft(
@@ -75,7 +126,11 @@ export function saveDraft(
   const supplierId = normalizeTrim(data.supplierId);
   const warehouseId = normalizeTrim(data.warehouseId);
   const comment = normalizeDocumentComment(data.comment);
+  const paymentTermsDays = parsePaymentTermsDaysToStore(data.paymentTermsDays);
+  const dueDate = computePlanningDueDate(date, paymentTermsDays);
   const lines = normalizePOLines(data.lines);
+  if (lines === null)
+    return { success: false, error: "Each line must have a valid unit price (number ≥ 0)." };
 
   const header = {
     date,
@@ -83,6 +138,8 @@ export function saveDraft(
     warehouseId,
     status: "draft" as const,
     comment: comment ?? "",
+    paymentTermsDays,
+    dueDate,
   };
   if (existingId) {
     const po = purchaseOrderRepository.getById(existingId);
@@ -114,6 +171,10 @@ function validateConfirm(poId: string): string | null {
   const lines = purchaseOrderRepository.listLines(poId);
   const lineErr = validateDocumentLines(lines, itemRepository);
   if (lineErr) return lineErr;
+  const priceErr = validatePlanningLineUnitPrices(lines);
+  if (priceErr) return priceErr;
+  const zpErr = validatePlanningLinesZeroPriceReasons(lines);
+  if (zpErr) return zpErr;
   return null;
 }
 
@@ -124,12 +185,23 @@ export function confirm(poId: string): ConfirmResult {
   return { success: true };
 }
 
-export function cancelDocument(poId: string): CancelDocumentResult {
+export function cancelDocument(
+  poId: string,
+  input: CancelDocumentReasonInput,
+): CancelDocumentResult {
+  const reasonErr = validateCancelDocumentReasonForm(input.cancelReasonCode);
+  if (reasonErr) return { success: false, error: reasonErr };
   const po = purchaseOrderRepository.getById(poId);
   if (!po) return { success: false, error: "Purchase order not found." };
   if (po.status !== "draft" && po.status !== "confirmed")
     return { success: false, error: "Only draft or confirmed purchase orders can be cancelled." };
-  purchaseOrderRepository.update(poId, { status: "cancelled" });
+  const code = input.cancelReasonCode as CancelDocumentReasonCode;
+  const comment = normalizeCancelReasonComment(input.cancelReasonComment);
+  purchaseOrderRepository.update(poId, {
+    status: "cancelled",
+    cancelReasonCode: code,
+    ...(comment !== undefined ? { cancelReasonComment: comment } : {}),
+  });
   return { success: true };
 }
 

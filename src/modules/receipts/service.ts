@@ -8,6 +8,12 @@ import { stockMovementRepository } from "../stock-movements/repository";
 import { stockBalanceRepository } from "../stock-balances/repository";
 import { parseDocumentLineQty } from "../../shared/documentValidation";
 import { normalizeTrim } from "../../shared/validation";
+import {
+  normalizeCancelReasonComment,
+  validateCancelDocumentReasonForm,
+  type CancelDocumentReasonCode,
+  type CancelDocumentReasonInput,
+} from "../../shared/reasonCodes";
 
 export type PostResult = { success: true } | { success: false; issues: Issue[] };
 export type CancelDocumentResult =
@@ -142,12 +148,23 @@ export function post(receiptId: string): PostResult {
   return { success: true };
 }
 
-export function cancelDocument(receiptId: string): CancelDocumentResult {
+export function cancelDocument(
+  receiptId: string,
+  input: CancelDocumentReasonInput,
+): CancelDocumentResult {
+  const reasonErr = validateCancelDocumentReasonForm(input.cancelReasonCode);
+  if (reasonErr) return { success: false, error: reasonErr };
   const receipt = receiptRepository.getById(receiptId);
   if (!receipt) return { success: false, error: "Receipt not found." };
   if (receipt.status !== "draft")
     return { success: false, error: "Only draft receipts can be cancelled." };
-  receiptRepository.update(receiptId, { status: "cancelled" });
+  const code = input.cancelReasonCode as CancelDocumentReasonCode;
+  const comment = normalizeCancelReasonComment(input.cancelReasonComment);
+  receiptRepository.update(receiptId, {
+    status: "cancelled",
+    cancelReasonCode: code,
+    ...(comment !== undefined ? { cancelReasonComment: comment } : {}),
+  });
   return { success: true };
 }
 

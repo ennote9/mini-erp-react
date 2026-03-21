@@ -32,6 +32,14 @@ import { save } from "@tauri-apps/plugin-dialog";
 import { invoke } from "@tauri-apps/api/core";
 import { revealItemInDir } from "@tauri-apps/plugin-opener";
 import { factualDocumentIssuesForStrip } from "../../../shared/factualDocumentPageIssues";
+import {
+  CancelDocumentReasonDialog,
+  type CancelDocumentReasonPayload,
+} from "../../../shared/ui/object/CancelDocumentReasonDialog";
+import {
+  CANCEL_DOCUMENT_REASON_LABELS,
+  type CancelDocumentReasonCode,
+} from "../../../shared/reasonCodes";
 
 type LineWithItem = ShipmentLine & { itemName: string; uom: string };
 
@@ -118,6 +126,7 @@ export function ShipmentPage() {
   const [selectedLineIds, setSelectedLineIds] = useState<string[]>([]);
   const [exportSuccess, setExportSuccess] = useState<{ path: string; filename: string } | null>(null);
   const [exportOpen, setExportOpen] = useState(false);
+  const [cancelReasonDialogOpen, setCancelReasonDialogOpen] = useState(false);
   const doc = useMemo(
     () => (id ? shipmentRepository.getById(id) : undefined),
     [id, refresh],
@@ -248,7 +257,13 @@ export function ShipmentPage() {
   const handleCancelDocument = () => {
     if (!id) return;
     setActionIssues([]);
-    const result = cancelDocument(id);
+    setCancelReasonDialogOpen(true);
+  };
+
+  const handleCancelDocumentConfirm = (payload: CancelDocumentReasonPayload) => {
+    if (!id) return;
+    setActionIssues([]);
+    const result = cancelDocument(id, payload);
     if (result.success) {
       setActionIssues([]);
       setRefresh((r) => r + 1);
@@ -345,6 +360,23 @@ export function ShipmentPage() {
                 <dt className="doc-summary__term">Comment</dt>
                 <dd className="doc-summary__value">{doc.comment}</dd>
               </div>
+            )}
+            {doc.status === "cancelled" && doc.cancelReasonCode != null && doc.cancelReasonCode !== "" && (
+              <>
+                <div className="doc-summary__row">
+                  <dt className="doc-summary__term">Cancel reason</dt>
+                  <dd className="doc-summary__value">
+                    {CANCEL_DOCUMENT_REASON_LABELS[doc.cancelReasonCode as CancelDocumentReasonCode] ??
+                      doc.cancelReasonCode}
+                  </dd>
+                </div>
+                {doc.cancelReasonComment != null && doc.cancelReasonComment !== "" && (
+                  <div className="doc-summary__row">
+                    <dt className="doc-summary__term">Cancel comment</dt>
+                    <dd className="doc-summary__value">{doc.cancelReasonComment}</dd>
+                  </div>
+                )}
+              </>
             )}
           </dl>
         </CardContent>
@@ -472,6 +504,12 @@ export function ShipmentPage() {
           </div>
         )}
       </div>
+      <CancelDocumentReasonDialog
+        open={cancelReasonDialogOpen}
+        onOpenChange={setCancelReasonDialogOpen}
+        documentKindLabel="shipment"
+        onConfirm={handleCancelDocumentConfirm}
+      />
     </DocumentPageLayout>
   );
 }
