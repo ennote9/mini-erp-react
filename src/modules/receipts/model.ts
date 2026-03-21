@@ -1,4 +1,5 @@
 import type { FactualDocumentStatus } from "../../shared/domain";
+import type { ReversalDocumentReasonCode } from "../../shared/reasonCodes";
 
 /**
  * Receipt entity per docs/01_product_core/02_Domain_Model.md.
@@ -14,6 +15,9 @@ export interface Receipt {
   comment?: string;
   cancelReasonCode?: string;
   cancelReasonComment?: string;
+  /** Set when status is `reversed` (posted receipt was reversed). */
+  reversalReasonCode?: ReversalDocumentReasonCode;
+  reversalReasonComment?: string;
 }
 
 /**

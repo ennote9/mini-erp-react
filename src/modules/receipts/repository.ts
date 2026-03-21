@@ -6,7 +6,10 @@ import {
   writeDocumentPayload,
 } from "../../shared/documentPersistence";
 import { registerPersistenceFlush } from "../../shared/persistenceCoordinator";
-import { isCancelDocumentReasonCode } from "../../shared/reasonCodes";
+import {
+  isCancelDocumentReasonCode,
+  isReversalDocumentReasonCode,
+} from "../../shared/reasonCodes";
 
 export type CreateReceiptHeaderInput = Omit<Receipt, "id" | "number">;
 export type ReceiptLineInput = { itemId: string; qty: number };
@@ -32,7 +35,9 @@ function asOptionalString(v: unknown): string | undefined {
 }
 
 function isFactualStatus(v: unknown): v is FactualDocumentStatus {
-  return v === "draft" || v === "posted" || v === "cancelled";
+  return (
+    v === "draft" || v === "posted" || v === "cancelled" || v === "reversed"
+  );
 }
 
 function computeNextNumericId(records: Array<{ id: string }>): number {
@@ -104,6 +109,12 @@ function normalizeReceiptRecord(raw: unknown): ReceiptPersistRecord | null {
         ? rec.cancelReasonCode
         : undefined,
     cancelReasonComment: asOptionalString(rec.cancelReasonComment),
+    reversalReasonCode:
+      typeof rec.reversalReasonCode === "string" &&
+      isReversalDocumentReasonCode(rec.reversalReasonCode)
+        ? rec.reversalReasonCode
+        : undefined,
+    reversalReasonComment: asOptionalString(rec.reversalReasonComment),
     lines,
   };
 }

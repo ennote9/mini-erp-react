@@ -11,14 +11,22 @@ import { normalizeTrim } from "../../shared/validation";
 import {
   normalizeCancelReasonComment,
   validateCancelDocumentReasonForm,
+  normalizeReversalReasonComment,
+  validateReversalDocumentReasonForm,
   type CancelDocumentReasonCode,
   type CancelDocumentReasonInput,
+  type ReversalDocumentReasonCode,
+  type ReversalDocumentReasonInput,
 } from "../../shared/reasonCodes";
 import { appendAuditEvent } from "../../shared/audit/eventLogRepository";
 import { AUDIT_ACTOR_LOCAL_USER } from "../../shared/audit/eventLogTypes";
 
 export type PostResult = { success: true } | { success: false; issues: Issue[] };
 export type CancelDocumentResult =
+  | { success: true }
+  | { success: false; error: string };
+
+export type ReverseDocumentResult =
   | { success: true }
   | { success: false; error: string };
 
@@ -197,7 +205,109 @@ export function cancelDocument(
   return { success: true };
 }
 
+/**
+ * Full reversal of a posted receipt: compensating stock movements (receipt_reversal),
+ * balances reduced, status → reversed, linked PO reopened to confirmed. One-time only.
+ */
+export function reverseDocument(
+  receiptId: string,
+  input: ReversalDocumentReasonInput,
+): ReverseDocumentResult {
+  const reasonErr = validateReversalDocumentReasonForm(input.reversalReasonCode);
+  if (reasonErr) return { success: false, error: reasonErr };
+
+  const receipt = receiptRepository.getById(receiptId);
+  if (!receipt) return { success: false, error: "Receipt not found." };
+  if (receipt.status === "reversed") {
+    return { success: false, error: "This receipt is already reversed." };
+  }
+  if (receipt.status !== "posted") {
+    return { success: false, error: "Only posted receipts can be reversed." };
+  }
+
+  const lines = receiptRepository.listLines(receiptId);
+  if (lines.length === 0) {
+    return { success: false, error: "Receipt has no lines; cannot reverse." };
+  }
+
+  for (const line of lines) {
+    const qty = parseDocumentLineQty(line.qty);
+    if (qty === null) {
+      return { success: false, error: "One or more lines have invalid quantity for reversal." };
+    }
+    const balance = stockBalanceRepository.getByItemAndWarehouse(
+      line.itemId,
+      receipt.warehouseId,
+    );
+    const onHand = balance?.qtyOnHand ?? 0;
+    if (onHand < qty) {
+      const item = itemRepository.getById(line.itemId);
+      const code = item?.code ?? line.itemId;
+      return {
+        success: false,
+        error: `Item ${code}: insufficient stock to reverse receipt (available ${onHand}, required ${qty}).`,
+      };
+    }
+  }
+
+  const now = new Date().toISOString();
+  const code = input.reversalReasonCode as ReversalDocumentReasonCode;
+  const revComment = normalizeReversalReasonComment(input.reversalReasonComment);
+
+  for (const line of lines) {
+    const qty = parseDocumentLineQty(line.qty)!;
+    stockMovementRepository.create({
+      datetime: now,
+      movementType: "receipt_reversal",
+      itemId: line.itemId,
+      warehouseId: receipt.warehouseId,
+      qtyDelta: -qty,
+      sourceDocumentType: "receipt",
+      sourceDocumentId: receiptId,
+      comment: "Receipt reversal (compensating movement)",
+    });
+    const existing = stockBalanceRepository.getByItemAndWarehouse(
+      line.itemId,
+      receipt.warehouseId,
+    );
+    const newQty = Math.max(0, (existing?.qtyOnHand ?? 0) - qty);
+    stockBalanceRepository.upsert({
+      itemId: line.itemId,
+      warehouseId: receipt.warehouseId,
+      qtyOnHand: newQty,
+    });
+  }
+
+  const prevStatus = receipt.status;
+  receiptRepository.update(receiptId, {
+    status: "reversed",
+    reversalReasonCode: code,
+    ...(revComment !== undefined ? { reversalReasonComment: revComment } : {}),
+  });
+
+  purchaseOrderRepository.update(receipt.purchaseOrderId, { status: "confirmed" });
+
+  appendAuditEvent({
+    entityType: "receipt",
+    entityId: receiptId,
+    eventType: "document_reversed",
+    actor: AUDIT_ACTOR_LOCAL_USER,
+    payload: {
+      documentNumber: receipt.number,
+      previousStatus: prevStatus,
+      newStatus: "reversed" as const,
+      reversalReasonCode: code,
+      reversalReasonComment: revComment ?? null,
+      movementLineCount: lines.length,
+      purchaseOrderId: receipt.purchaseOrderId,
+    },
+  });
+
+  return { success: true };
+}
+
 export const receiptService = {
   post,
   cancelDocument,
+  reverseDocument,
 };

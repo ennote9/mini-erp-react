@@ -3,7 +3,7 @@ import { useMemo, useState, useCallback } from "react";
 import { AgGridReact } from "ag-grid-react";
 import type { ColDef, SelectionChangedEvent } from "ag-grid-community";
 import { shipmentRepository } from "../repository";
-import { post, cancelDocument, validateShipmentFull } from "../service";
+import { post, cancelDocument, reverseDocument, validateShipmentFull } from "../service";
 import { salesOrderRepository } from "../../sales-orders/repository";
 import { warehouseRepository } from "../../warehouses/repository";
 import { itemRepository } from "../../items/repository";
@@ -36,10 +36,16 @@ import {
   CancelDocumentReasonDialog,
   type CancelDocumentReasonPayload,
 } from "../../../shared/ui/object/CancelDocumentReasonDialog";
+import {
+  ReverseDocumentReasonDialog,
+  type ReverseDocumentReasonPayload,
+} from "../../../shared/ui/object/ReverseDocumentReasonDialog";
 import { DocumentEventLogSection } from "../../../shared/ui/object/DocumentEventLogSection";
 import {
   CANCEL_DOCUMENT_REASON_LABELS,
+  REVERSAL_DOCUMENT_REASON_LABELS,
   type CancelDocumentReasonCode,
+  type ReversalDocumentReasonCode,
 } from "../../../shared/reasonCodes";
 
 type LineWithItem = ShipmentLine & { itemName: string; uom: string };
@@ -128,6 +134,7 @@ export function ShipmentPage() {
   const [exportSuccess, setExportSuccess] = useState<{ path: string; filename: string } | null>(null);
   const [exportOpen, setExportOpen] = useState(false);
   const [cancelReasonDialogOpen, setCancelReasonDialogOpen] = useState(false);
+  const [reverseReasonDialogOpen, setReverseReasonDialogOpen] = useState(false);
   const doc = useMemo(
     () => (id ? shipmentRepository.getById(id) : undefined),
     [id, refresh],
@@ -163,6 +170,8 @@ export function ShipmentPage() {
   }, [lines]);
 
   const isDraft = doc?.status === "draft";
+  const isPosted = doc?.status === "posted";
+  const isReversed = doc?.status === "reversed";
 
   const onLinesSelectionChanged = useCallback((e: SelectionChangedEvent<LineWithItem>) => {
     const ids = e.api.getSelectedRows().map((r) => r.id);
@@ -273,6 +282,18 @@ export function ShipmentPage() {
     }
   };
 
+  const handleReverseDocumentConfirm = (payload: ReverseDocumentReasonPayload) => {
+    if (!id) return;
+    setActionIssues([]);
+    const result = reverseDocument(id, payload);
+    if (result.success) {
+      setActionIssues([]);
+      setRefresh((r) => r + 1);
+    } else {
+      setActionIssues([actionIssue(result.error)]);
+    }
+  };
+
   if (!id || !doc) {
     return (
       <div className="doc-page doc-page--not-found">
@@ -325,6 +346,18 @@ export function ShipmentPage() {
                   Cancel document
                 </Button>
               )}
+              {isPosted && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => {
+                    setActionIssues([]);
+                    setReverseReasonDialogOpen(true);
+                  }}
+                >
+                  Reverse document
+                </Button>
+              )}
             </div>
           </div>
         </div>
@@ -375,6 +408,23 @@ export function ShipmentPage() {
                   <div className="doc-summary__row">
                     <dt className="doc-summary__term">Cancel comment</dt>
                     <dd className="doc-summary__value">{doc.cancelReasonComment}</dd>
+                  </div>
+                )}
+              </>
+            )}
+            {isReversed && doc.reversalReasonCode != null && (
+              <>
+                <div className="doc-summary__row">
+                  <dt className="doc-summary__term">Reversal reason</dt>
+                  <dd className="doc-summary__value">
+                    {REVERSAL_DOCUMENT_REASON_LABELS[doc.reversalReasonCode as ReversalDocumentReasonCode] ??
+                      doc.reversalReasonCode}
+                  </dd>
+                </div>
+                {doc.reversalReasonComment != null && doc.reversalReasonComment !== "" && (
+                  <div className="doc-summary__row">
+                    <dt className="doc-summary__term">Reversal comment</dt>
+                    <dd className="doc-summary__value">{doc.reversalReasonComment}</dd>
                   </div>
                 )}
               </>
@@ -511,6 +561,12 @@ export function ShipmentPage() {
         onOpenChange={setCancelReasonDialogOpen}
         documentKindLabel="shipment"
         onConfirm={handleCancelDocumentConfirm}
+      />
+      <ReverseDocumentReasonDialog
+        open={reverseReasonDialogOpen}
+        onOpenChange={setReverseReasonDialogOpen}
+        documentKindLabel="shipment"
+        onConfirm={handleReverseDocumentConfirm}
       />
     </DocumentPageLayout>
   );

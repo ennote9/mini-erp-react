@@ -67,7 +67,7 @@ Future growth guidance:
 - No partial shipment
 - One Purchase Order -> one Receipt
 - One Sales Order -> one Shipment
-- Posted Receipt / Shipment cannot be reversed in MVP
+- Posted Receipt / Shipment can be **fully reversed once** (reason required, compensating stock movements); no partial reversal in MVP
 - Stock Balance is stored physically and updated by posting, but is logically derived from stock movements
 - Receipt and Shipment are created only from their source documents
 

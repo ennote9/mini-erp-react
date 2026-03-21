@@ -9,6 +9,7 @@ const DISPLAY: Record<string, string> = {
   closed: "Closed",
   cancelled: "Cancelled",
   posted: "Posted",
+  reversed: "Reversed",
 };
 
 function toDisplay(status: string): string {

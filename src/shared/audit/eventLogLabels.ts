@@ -1,4 +1,8 @@
 import type { AuditEventType } from "./eventLogTypes";
+import {
+  REVERSAL_DOCUMENT_REASON_LABELS,
+  type ReversalDocumentReasonCode,
+} from "../reasonCodes";
 
 const LABELS: Record<AuditEventType, string> = {
   document_created: "Created",
@@ -6,6 +10,7 @@ const LABELS: Record<AuditEventType, string> = {
   document_confirmed: "Confirmed",
   document_posted: "Posted",
   document_cancelled: "Cancelled",
+  document_reversed: "Reversed",
   line_added: "Line added",
   line_removed: "Line removed",
   line_qty_changed: "Quantity changed",
@@ -31,6 +36,17 @@ export function auditEventSummary(payload: Record<string, unknown>): string {
 
   if (typeof payload.cancelReasonCode === "string" && payload.cancelReasonCode) {
     parts.push(`Reason: ${payload.cancelReasonCode}`);
+  }
+
+  if (typeof payload.reversalReasonCode === "string" && payload.reversalReasonCode) {
+    const rc = payload.reversalReasonCode as ReversalDocumentReasonCode;
+    const rl =
+      REVERSAL_DOCUMENT_REASON_LABELS[rc] ?? payload.reversalReasonCode;
+    parts.push(`Reason: ${rl}`);
+  }
+
+  if (typeof payload.movementLineCount === "number") {
+    parts.push(`${payload.movementLineCount} movement line(s)`);
   }
 
   if (typeof payload.itemCode === "string" || typeof payload.itemId === "string") {

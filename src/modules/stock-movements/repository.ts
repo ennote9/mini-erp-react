@@ -26,7 +26,12 @@ function asFiniteNumber(v: unknown): number | null {
 }
 
 function isMovementType(v: unknown): v is MovementType {
-  return v === "receipt" || v === "shipment";
+  return (
+    v === "receipt" ||
+    v === "shipment" ||
+    v === "receipt_reversal" ||
+    v === "shipment_reversal"
+  );
 }
 
 function isSourceDocumentType(v: unknown): v is SourceDocumentType {

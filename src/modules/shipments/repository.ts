@@ -6,7 +6,10 @@ import {
   writeDocumentPayload,
 } from "../../shared/documentPersistence";
 import { registerPersistenceFlush } from "../../shared/persistenceCoordinator";
-import { isCancelDocumentReasonCode } from "../../shared/reasonCodes";
+import {
+  isCancelDocumentReasonCode,
+  isReversalDocumentReasonCode,
+} from "../../shared/reasonCodes";
 
 export type CreateShipmentHeaderInput = Omit<Shipment, "id" | "number">;
 export type ShipmentLineInput = { itemId: string; qty: number };
@@ -104,6 +107,12 @@ function normalizeShipmentRecord(raw: unknown): ShipmentPersistRecord | null {
         ? rec.cancelReasonCode
         : undefined,
     cancelReasonComment: asOptionalString(rec.cancelReasonComment),
+    reversalReasonCode:
+      typeof rec.reversalReasonCode === "string" &&
+      isReversalDocumentReasonCode(rec.reversalReasonCode)
+        ? rec.reversalReasonCode
+        : undefined,
+    reversalReasonComment: asOptionalString(rec.reversalReasonComment),
     lines,
   };
 }

@@ -10,6 +10,7 @@ export type AuditEventType =
   | "document_confirmed"
   | "document_posted"
   | "document_cancelled"
+  | "document_reversed"
   | "line_added"
   | "line_removed"
   | "line_qty_changed"

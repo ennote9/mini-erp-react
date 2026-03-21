@@ -76,6 +76,7 @@ export function DashboardPage() {
             stats={[
               { key: "draft", label: "Draft", value: receipts.draft },
               { key: "posted", label: "Posted", value: receipts.posted },
+              { key: "reversed", label: "Reversed", value: receipts.reversed },
               { key: "cancelled", label: "Cancelled", value: receipts.cancelled },
             ]}
           />
@@ -86,6 +87,7 @@ export function DashboardPage() {
             stats={[
               { key: "draft", label: "Draft", value: shipments.draft },
               { key: "posted", label: "Posted", value: shipments.posted },
+              { key: "reversed", label: "Reversed", value: shipments.reversed },
               { key: "cancelled", label: "Cancelled", value: shipments.cancelled },
             ]}
           />

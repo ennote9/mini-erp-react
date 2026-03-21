@@ -11,14 +11,22 @@ import { normalizeTrim } from "../../shared/validation";
 import {
   normalizeCancelReasonComment,
   validateCancelDocumentReasonForm,
+  normalizeReversalReasonComment,
+  validateReversalDocumentReasonForm,
   type CancelDocumentReasonCode,
   type CancelDocumentReasonInput,
+  type ReversalDocumentReasonCode,
+  type ReversalDocumentReasonInput,
 } from "../../shared/reasonCodes";
 import { appendAuditEvent } from "../../shared/audit/eventLogRepository";
 import { AUDIT_ACTOR_LOCAL_USER } from "../../shared/audit/eventLogTypes";
 
 export type PostResult = { success: true } | { success: false; issues: Issue[] };
 export type CancelDocumentResult =
+  | { success: true }
+  | { success: false; error: string };
+
+export type ReverseDocumentResult =
   | { success: true }
   | { success: false; error: string };
 
@@ -215,7 +223,96 @@ export function cancelDocument(
   return { success: true };
 }
 
+/**
+ * Full reversal of a posted shipment: compensating stock movements (shipment_reversal),
+ * balances increased, status → reversed, linked SO reopened to confirmed. One-time only.
+ */
+export function reverseDocument(
+  shipmentId: string,
+  input: ReversalDocumentReasonInput,
+): ReverseDocumentResult {
+  const reasonErr = validateReversalDocumentReasonForm(input.reversalReasonCode);
+  if (reasonErr) return { success: false, error: reasonErr };
+
+  const shipment = shipmentRepository.getById(shipmentId);
+  if (!shipment) return { success: false, error: "Shipment not found." };
+  if (shipment.status === "reversed") {
+    return { success: false, error: "This shipment is already reversed." };
+  }
+  if (shipment.status !== "posted") {
+    return { success: false, error: "Only posted shipments can be reversed." };
+  }
+
+  const lines = shipmentRepository.listLines(shipmentId);
+  if (lines.length === 0) {
+    return { success: false, error: "Shipment has no lines; cannot reverse." };
+  }
+
+  for (const line of lines) {
+    const qty = parseDocumentLineQty(line.qty);
+    if (qty === null) {
+      return { success: false, error: "One or more lines have invalid quantity for reversal." };
+    }
+  }
+
+  const now = new Date().toISOString();
+  const code = input.reversalReasonCode as ReversalDocumentReasonCode;
+  const revComment = normalizeReversalReasonComment(input.reversalReasonComment);
+
+  for (const line of lines) {
+    const qty = parseDocumentLineQty(line.qty)!;
+    stockMovementRepository.create({
+      datetime: now,
+      movementType: "shipment_reversal",
+      itemId: line.itemId,
+      warehouseId: shipment.warehouseId,
+      qtyDelta: qty,
+      sourceDocumentType: "shipment",
+      sourceDocumentId: shipmentId,
+      comment: "Shipment reversal (compensating movement)",
+    });
+    const existing = stockBalanceRepository.getByItemAndWarehouse(
+      line.itemId,
+      shipment.warehouseId,
+    );
+    const newQty = (existing?.qtyOnHand ?? 0) + qty;
+    stockBalanceRepository.upsert({
+      itemId: line.itemId,
+      warehouseId: shipment.warehouseId,
+      qtyOnHand: newQty,
+    });
+  }
+
+  const prevStatus = shipment.status;
+  shipmentRepository.update(shipmentId, {
+    status: "reversed",
+    reversalReasonCode: code,
+    ...(revComment !== undefined ? { reversalReasonComment: revComment } : {}),
+  });
+
+  salesOrderRepository.update(shipment.salesOrderId, { status: "confirmed" });
+
+  appendAuditEvent({
+    entityType: "shipment",
+    entityId: shipmentId,
+    eventType: "document_reversed",
+    actor: AUDIT_ACTOR_LOCAL_USER,
+    payload: {
+      documentNumber: shipment.number,
+      previousStatus: prevStatus,
+      newStatus: "reversed" as const,
+      reversalReasonCode: code,
+      reversalReasonComment: revComment ?? null,
+      movementLineCount: lines.length,
+      salesOrderId: shipment.salesOrderId,
+    },
+  });
+
+  return { success: true };
+}
+
 export const shipmentService = {
   post,
   cancelDocument,
+  reverseDocument,
 };

@@ -26,6 +26,7 @@ export type FactualBreakdown = {
   total: number;
   draft: number;
   posted: number;
+  reversed: number;
   cancelled: number;
 };
 
@@ -71,6 +72,7 @@ export function getReceiptBreakdown(): FactualBreakdown {
     total: list.length,
     draft: countFactualStatus(list, "draft"),
     posted: countFactualStatus(list, "posted"),
+    reversed: countFactualStatus(list, "reversed"),
     cancelled: countFactualStatus(list, "cancelled"),
   };
 }
@@ -81,6 +83,7 @@ export function getShipmentBreakdown(): FactualBreakdown {
     total: list.length,
     draft: countFactualStatus(list, "draft"),
     posted: countFactualStatus(list, "posted"),
+    reversed: countFactualStatus(list, "reversed"),
     cancelled: countFactualStatus(list, "cancelled"),
   };
 }

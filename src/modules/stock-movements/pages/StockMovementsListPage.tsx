@@ -41,6 +41,8 @@ type RowData = StockMovement & {
 const MOVEMENT_TYPE_LABEL: Record<string, string> = {
   receipt: "Receipt",
   shipment: "Shipment",
+  receipt_reversal: "Receipt reversal",
+  shipment_reversal: "Shipment reversal",
 };
 
 const DATE_TIME_FORMAT: Intl.DateTimeFormatOptions = {

@@ -11,13 +11,18 @@ export type PlanningDocumentStatus =
   | "cancelled";
 
 /** Factual documents: Receipt, Shipment. Internal values lowercase. */
-export type FactualDocumentStatus = "draft" | "posted" | "cancelled";
+export type FactualDocumentStatus = "draft" | "posted" | "cancelled" | "reversed";
 
 /**
  * Type of inventory movement: receipt = incoming, shipment = outgoing.
+ * *_reversal = compensating movement for a posted document reversal (explicit audit trail).
  * Separate domain concept from SourceDocumentType.
  */
-export type MovementType = "receipt" | "shipment";
+export type MovementType =
+  | "receipt"
+  | "shipment"
+  | "receipt_reversal"
+  | "shipment_reversal";
 
 /**
  * Type of the document that caused a stock movement.

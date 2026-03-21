@@ -214,6 +214,7 @@ export function ReceiptsListPage() {
     { value: "all", label: "All" },
     { value: "draft", label: "Draft" },
     { value: "posted", label: "Posted" },
+    { value: "reversed", label: "Reversed" },
     { value: "cancelled", label: "Cancelled" },
   ];
 
