@@ -2,7 +2,7 @@
  * Stock Balances list — AG Grid migration (same pattern as Stock Movements).
  * Repository-backed data, search, empty states, dark theme. Plain text columns only.
  */
-import { useMemo, useState, useRef, useCallback } from "react";
+import { Fragment, useMemo, useState, useRef, useCallback } from "react";
 import type { RowClassParams } from "ag-grid-community";
 import { useSearchParams } from "react-router-dom";
 import { AgGridReact } from "ag-grid-react";
@@ -23,6 +23,7 @@ import { BackButton } from "../../../shared/ui/list/BackButton";
 import { ListPageSearch } from "../../../shared/ui/list/ListPageSearch";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Button } from "@/components/ui/button";
+import { ButtonGroup, ButtonGroupSeparator } from "@/components/ui/button-group";
 import { ChevronDown, FileSpreadsheet, File, FolderOpen, X } from "lucide-react";
 import { buildStockBalancesListXlsxBuffer, type StockBalancesExportRow } from "../stockBalancesListExport";
 import {
@@ -42,7 +43,32 @@ type RowData = StockBalance & {
   availableQty: number;
   outgoingQty: number;
   incomingQty: number;
+  deficitQty: number;
 };
+
+type StockBalanceQuickFilter =
+  | "all"
+  | "shortage"
+  | "outgoing"
+  | "incoming"
+  | "avail_lte_zero";
+
+const QUICK_FILTER_OPTIONS: Array<{
+  value: StockBalanceQuickFilter;
+  label: string;
+  /** Full phrase for aria-label / title */
+  aria: string;
+}> = [
+  { value: "all", label: "All", aria: "Show all rows" },
+  { value: "shortage", label: "Shortage", aria: "Show rows with deficit greater than zero" },
+  { value: "outgoing", label: "Has outgoing", aria: "Show rows with outgoing demand" },
+  { value: "incoming", label: "Has incoming", aria: "Show rows with incoming supply" },
+  {
+    value: "avail_lte_zero",
+    label: "Avail ≤ 0",
+    aria: "Show rows where available quantity is zero or negative",
+  },
+];
 
 function filterBySearch(rows: RowData[], query: string): RowData[] {
   const q = query.trim().toLowerCase();
@@ -60,6 +86,15 @@ function filterByWarehouseId(rows: RowData[], warehouseId: string | null): RowDa
   return rows.filter((r) => r.warehouseId === warehouseId);
 }
 
+function filterByQuickFilter(rows: RowData[], f: StockBalanceQuickFilter): RowData[] {
+  if (f === "all") return rows;
+  if (f === "shortage") return rows.filter((r) => r.deficitQty > 0);
+  if (f === "outgoing") return rows.filter((r) => r.outgoingQty > 0);
+  if (f === "incoming") return rows.filter((r) => r.incomingQty > 0);
+  if (f === "avail_lte_zero") return rows.filter((r) => r.availableQty <= 0);
+  return rows;
+}
+
 function buildExportRowsFromBalances(rows: RowData[]): StockBalancesExportRow[] {
   return rows.map((r, idx) => ({
     no: idx + 1,
@@ -71,6 +106,7 @@ function buildExportRowsFromBalances(rows: RowData[]): StockBalancesExportRow[] 
     availableQty: r.availableQty,
     outgoingQty: r.outgoingQty,
     incomingQty: r.incomingQty,
+    deficitQty: r.deficitQty,
   }));
 }
 
@@ -84,6 +120,7 @@ export function StockBalancesListPage() {
   }, [searchParams]);
 
   const [searchQuery, setSearchQuery] = useState("");
+  const [quickFilter, setQuickFilter] = useState<StockBalanceQuickFilter>("all");
   const [exportSuccess, setExportSuccess] = useState<{ path: string; filename: string } | null>(null);
   const [exportOpen, setExportOpen] = useState(false);
   const [selectedCount, setSelectedCount] = useState(0);
@@ -110,6 +147,7 @@ export function StockBalancesListPage() {
         availableQty: op.availableQty,
         outgoingQty: op.outgoingQty,
         incomingQty: op.incomingQty,
+        deficitQty: op.deficitQty,
       };
     });
   }, []);
@@ -117,18 +155,43 @@ export function StockBalancesListPage() {
   const getRowClass = useCallback((params: RowClassParams<RowData>) => {
     const d = params.data;
     if (!d) return "";
-    const tight =
-      d.availableQty < 0 || (d.outgoingQty > 0 && d.availableQty < d.outgoingQty);
-    return tight ? "stock-balances-row--tight-availability" : "";
+    return d.deficitQty > 0 ? "stock-balances-row--tight-availability" : "";
   }, []);
 
+  /** Base slice after warehouse URL filter (counts and search use this). */
+  const rowsAfterWarehouse = useMemo(
+    () => filterByWarehouseId(rowsWithNames, warehouseFilterId),
+    [rowsWithNames, warehouseFilterId],
+  );
+
+  const quickFilterCounts = useMemo((): Record<StockBalanceQuickFilter, number> => {
+    let shortage = 0;
+    let outgoing = 0;
+    let incoming = 0;
+    let availLteZero = 0;
+    for (const r of rowsAfterWarehouse) {
+      if (r.deficitQty > 0) shortage++;
+      if (r.outgoingQty > 0) outgoing++;
+      if (r.incomingQty > 0) incoming++;
+      if (r.availableQty <= 0) availLteZero++;
+    }
+    return {
+      all: rowsAfterWarehouse.length,
+      shortage,
+      outgoing,
+      incoming,
+      avail_lte_zero: availLteZero,
+    };
+  }, [rowsAfterWarehouse]);
+
   const filteredRows = useMemo(() => {
-    const bySearch = filterBySearch(rowsWithNames, searchQuery);
-    return filterByWarehouseId(bySearch, warehouseFilterId);
-  }, [rowsWithNames, searchQuery, warehouseFilterId]);
+    const bySearch = filterBySearch(rowsAfterWarehouse, searchQuery);
+    return filterByQuickFilter(bySearch, quickFilter);
+  }, [rowsAfterWarehouse, searchQuery, quickFilter]);
 
   const isEmpty = filteredRows.length === 0;
-  const hasFilter = searchQuery.trim() !== "" || warehouseFilterId != null;
+  const hasFilter =
+    searchQuery.trim() !== "" || warehouseFilterId != null || quickFilter !== "all";
 
   const warehouseFilterLabel = useMemo((): string => {
     if (warehouseFilterId == null) return "";
@@ -214,11 +277,14 @@ export function StockBalancesListPage() {
     if (!hasFilter) {
       return "Balances will appear after posting receipts and shipments.";
     }
-    if (warehouseFilterId != null && searchQuery.trim() === "") {
+    if (quickFilter !== "all" && searchQuery.trim() === "" && warehouseFilterId == null) {
+      return "No rows match this quick filter. Try All or another filter.";
+    }
+    if (warehouseFilterId != null && searchQuery.trim() === "" && quickFilter === "all") {
       return "No stock balances for this warehouse. Try clearing the warehouse filter.";
     }
-    return "Try changing the search or warehouse filter.";
-  }, [hasFilter, warehouseFilterId, searchQuery]);
+    return "Try changing the search, quick filter, or warehouse filter.";
+  }, [hasFilter, warehouseFilterId, searchQuery, quickFilter]);
 
   const qtyCol = (
     field: keyof RowData,
@@ -261,6 +327,7 @@ export function StockBalancesListPage() {
       qtyCol("qtyOnHand", "Total quantity", 112),
       qtyCol("reservedQty", "Reserved", 96),
       qtyCol("availableQty", "Available", 100),
+      qtyCol("deficitQty", "Deficit", 88),
       qtyCol("outgoingQty", "Outgoing", 96),
       qtyCol("incomingQty", "Incoming", 96),
     ],
@@ -273,6 +340,33 @@ export function StockBalancesListPage() {
       controls={
         <>
           <BackButton to="/" aria-label="Back to Dashboard" />
+          <ButtonGroup className="list-page__filter-group shrink-0" aria-label="Quick filters">
+            {QUICK_FILTER_OPTIONS.map((opt, index) => (
+              <Fragment key={opt.value}>
+                {index > 0 && <ButtonGroupSeparator />}
+                <Button
+                  type="button"
+                  variant={quickFilter === opt.value ? "default" : "outline"}
+                  size="sm"
+                  className="px-2 text-xs gap-1"
+                  title={opt.aria}
+                  aria-pressed={quickFilter === opt.value}
+                  onClick={() => setQuickFilter(opt.value)}
+                >
+                  <span>{opt.label}</span>
+                  <span
+                    className={
+                      quickFilter === opt.value
+                        ? "tabular-nums font-normal opacity-90"
+                        : "tabular-nums text-muted-foreground font-normal"
+                    }
+                  >
+                    ({quickFilterCounts[opt.value]})
+                  </span>
+                </Button>
+              </Fragment>
+            ))}
+          </ButtonGroup>
           <ListPageSearch
             placeholder="Search"
             value={searchQuery}

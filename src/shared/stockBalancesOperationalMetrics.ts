@@ -17,6 +17,14 @@ export function warehouseItemKey(warehouseId: string, itemId: string): string {
 }
 
 /**
+ * Uncovered outgoing demand vs available free stock (read-only, not persisted).
+ * max(0, outgoing - available); 0 when outgoing <= available.
+ */
+export function computeStockDeficit(availableQty: number, outgoingQty: number): number {
+  return Math.max(0, outgoingQty - availableQty);
+}
+
+/**
  * Per warehouse+item: sum of max(0, remainingQty) from each line of
  * computeSalesOrderFulfillment, for sales orders with status **confirmed** only.
  * Posted shipments reduce remaining; draft / cancelled / closed SOs are excluded.
@@ -71,6 +79,8 @@ export type StockBalanceOperationalFields = {
   outgoingQty: number;
   /** Sum of PO line remainings (confirmed POs, matching fulfillment logic). */
   incomingQty: number;
+  /** max(0, outgoingQty - availableQty) */
+  deficitQty: number;
 };
 
 export function computeOperationalFieldsForBalance(
@@ -84,11 +94,14 @@ export function computeOperationalFieldsForBalance(
     balance.itemId,
   );
   const k = warehouseItemKey(balance.warehouseId, balance.itemId);
+  const availableQty = totalQty - reservedQty;
+  const outgoingQty = outgoingByWhItem.get(k) ?? 0;
   return {
     totalQty,
     reservedQty,
-    availableQty: totalQty - reservedQty,
-    outgoingQty: outgoingByWhItem.get(k) ?? 0,
+    availableQty,
+    outgoingQty,
     incomingQty: incomingByWhItem.get(k) ?? 0,
+    deficitQty: computeStockDeficit(availableQty, outgoingQty),
   };
 }

@@ -10,6 +10,7 @@ export type StockBalancesExportRow = {
   availableQty: number;
   outgoingQty: number;
   incomingQty: number;
+  deficitQty: number;
 };
 
 const COLUMN_HEADERS = [
@@ -20,6 +21,7 @@ const COLUMN_HEADERS = [
   "Total quantity",
   "Reserved",
   "Available",
+  "Deficit",
   "Outgoing",
   "Incoming",
 ] as const;
@@ -55,6 +57,7 @@ const WIDTH_BOUNDS = [
   { min: 10, max: 14 },
   { min: 10, max: 14 },
   { min: 10, max: 14 },
+  { min: 10, max: 14 },
 ];
 
 function addSheet(workbook: Workbook, rows: StockBalancesExportRow[]): void {
@@ -74,6 +77,7 @@ function addSheet(workbook: Workbook, rows: StockBalancesExportRow[]): void {
     r.totalQty,
     r.reservedQty,
     r.availableQty,
+    r.deficitQty,
     r.outgoingQty,
     r.incomingQty,
   ]);
@@ -96,6 +100,7 @@ function addSheet(workbook: Workbook, rows: StockBalancesExportRow[]): void {
           r.totalQty,
           r.reservedQty,
           r.availableQty,
+          r.deficitQty,
           r.outgoingQty,
           r.incomingQty,
         ][c],
