@@ -73,6 +73,12 @@ import {
   type CancelDocumentReasonCode,
   type ZeroPriceLineReasonCode,
 } from "../../../shared/reasonCodes";
+import {
+  computePurchaseOrderFulfillment,
+  planningFulfillmentStateLabel,
+  type PurchaseOrderFulfillment,
+  type PoLineFulfillment,
+} from "../../../shared/planningFulfillment";
 
 type LineWithItem = PurchaseOrderLine & { itemName: string };
 
@@ -157,7 +163,9 @@ function buildExportRowsFromLinesWithItem(lines: LineWithItem[]): PoExportLineRo
   });
 }
 
-function poLinesDisplayColumnDefs(): ColDef<LineFormRow>[] {
+function poLinesDisplayColumnDefs(
+  fulfillmentByItemId: Map<string, PoLineFulfillment>,
+): ColDef<LineFormRow>[] {
   return [
     {
       headerName: "№",
@@ -233,6 +241,37 @@ function poLinesDisplayColumnDefs(): ColDef<LineFormRow>[] {
       editable: false,
     },
     {
+      headerName: "Received",
+      width: 86,
+      minWidth: 78,
+      maxWidth: 96,
+      editable: false,
+      sortable: false,
+      valueGetter: (p) => {
+        const itemId = p.data?.itemId;
+        if (!itemId) return "—";
+        const f = fulfillmentByItemId.get(itemId);
+        if (!f) return "—";
+        return String(f.receivedQty);
+      },
+    },
+    {
+      headerName: "Remaining",
+      width: 100,
+      minWidth: 88,
+      maxWidth: 112,
+      editable: false,
+      sortable: false,
+      valueGetter: (p) => {
+        const itemId = p.data?.itemId;
+        if (!itemId) return "—";
+        const f = fulfillmentByItemId.get(itemId);
+        if (!f) return "—";
+        if (f.remainingQty < 0) return `${f.remainingQty} (over)`;
+        return String(f.remainingQty);
+      },
+    },
+    {
       field: "unitPrice",
       headerName: "Unit price",
       width: 110,
@@ -275,7 +314,9 @@ function poLinesDisplayColumnDefs(): ColDef<LineFormRow>[] {
   ];
 }
 
-function poLinesReadOnlyColumnDefs(): ColDef<LineWithItem>[] {
+function poLinesReadOnlyColumnDefs(
+  fulfillment: PurchaseOrderFulfillment | null,
+): ColDef<LineWithItem>[] {
   return [
     {
       headerName: "№",
@@ -329,6 +370,35 @@ function poLinesReadOnlyColumnDefs(): ColDef<LineWithItem>[] {
       },
     },
     { field: "qty", headerName: "Qty", width: 80, minWidth: 70, maxWidth: 90 },
+    {
+      headerName: "Received",
+      width: 86,
+      minWidth: 78,
+      maxWidth: 96,
+      sortable: false,
+      valueGetter: (p) => {
+        const lineId = p.data?.id;
+        if (!lineId || !fulfillment) return "—";
+        const row = fulfillment.lines.find((l) => l.lineId === lineId);
+        if (!row) return "—";
+        return String(row.receivedQty);
+      },
+    },
+    {
+      headerName: "Remaining",
+      width: 100,
+      minWidth: 88,
+      maxWidth: 112,
+      sortable: false,
+      valueGetter: (p) => {
+        const lineId = p.data?.id;
+        if (!lineId || !fulfillment) return "—";
+        const row = fulfillment.lines.find((l) => l.lineId === lineId);
+        if (!row) return "—";
+        if (row.remainingQty < 0) return `${row.remainingQty} (over)`;
+        return String(row.remainingQty);
+      },
+    },
     {
       field: "unitPrice",
       headerName: "Unit price",
@@ -999,9 +1069,23 @@ export function PurchaseOrderPage() {
     [health.lineHealth, editingLineId],
   );
 
+  const poFulfillment = useMemo(() => {
+    if (!id || isNew) return null;
+    return computePurchaseOrderFulfillment(id);
+  }, [id, isNew, refresh]);
+
+  const fulfillmentByItemId = useMemo(() => {
+    const m = new Map<string, PoLineFulfillment>();
+    if (!poFulfillment) return m;
+    for (const row of poFulfillment.lines) {
+      m.set(row.itemId, row);
+    }
+    return m;
+  }, [poFulfillment]);
+
   const linesColumnDefs = useMemo(
-    () => poLinesDisplayColumnDefs(),
-    [],
+    () => poLinesDisplayColumnDefs(fulfillmentByItemId),
+    [fulfillmentByItemId],
   );
 
   if (!id) {
@@ -1185,6 +1269,39 @@ export function PurchaseOrderPage() {
             <div className="doc-lines__header mb-1.5 max-w-2xl">
               <h3 className="doc-lines__title">Lines</h3>
             </div>
+            {!isNew && poFulfillment ? (
+              <div className="mb-2 max-w-4xl text-xs">
+                <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
+                  <span className="font-medium text-foreground">Receipt fulfillment</span>
+                  <span className="tabular-nums text-muted-foreground">
+                    {planningFulfillmentStateLabel(poFulfillment.state)}
+                  </span>
+                  <span className="text-muted-foreground">
+                    Received{" "}
+                    <span className="text-foreground tabular-nums">{poFulfillment.totalReceived}</span>
+                    {" / "}
+                    <span className="tabular-nums">{poFulfillment.totalOrdered}</span> ordered
+                  </span>
+                  <span className="text-muted-foreground">
+                    Remaining{" "}
+                    <span className="text-foreground tabular-nums">
+                      {poFulfillment.totalRemaining < 0
+                        ? `${poFulfillment.totalRemaining} (over)`
+                        : poFulfillment.totalRemaining}
+                    </span>
+                  </span>
+                  <span className="text-muted-foreground">
+                    Receipts:{" "}
+                    <span className="text-foreground tabular-nums">{poFulfillment.postedReceiptCount}</span>
+                    {" posted / "}
+                    <span className="tabular-nums">{poFulfillment.relatedReceiptCount}</span> total
+                  </span>
+                  {poFulfillment.hasOverFulfillment ? (
+                    <span className="text-destructive font-medium">Over-received on line(s)</span>
+                  ) : null}
+                </div>
+              </div>
+            ) : null}
             {isEditable && (
               <div className="flex items-end gap-2 w-full mb-1.5">
                 <Card className="border-0 shadow-none flex-1 min-w-0">
@@ -1675,6 +1792,39 @@ export function PurchaseOrderPage() {
           </Card>
           <div className="doc-lines mt-[calc(0.5rem+1cm)]">
             <h3 className="doc-lines__title">Lines</h3>
+            {poFulfillment ? (
+              <div className="mb-2 max-w-4xl text-xs">
+                <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
+                  <span className="font-medium text-foreground">Receipt fulfillment</span>
+                  <span className="tabular-nums text-muted-foreground">
+                    {planningFulfillmentStateLabel(poFulfillment.state)}
+                  </span>
+                  <span className="text-muted-foreground">
+                    Received{" "}
+                    <span className="text-foreground tabular-nums">{poFulfillment.totalReceived}</span>
+                    {" / "}
+                    <span className="tabular-nums">{poFulfillment.totalOrdered}</span> ordered
+                  </span>
+                  <span className="text-muted-foreground">
+                    Remaining{" "}
+                    <span className="text-foreground tabular-nums">
+                      {poFulfillment.totalRemaining < 0
+                        ? `${poFulfillment.totalRemaining} (over)`
+                        : poFulfillment.totalRemaining}
+                    </span>
+                  </span>
+                  <span className="text-muted-foreground">
+                    Receipts:{" "}
+                    <span className="text-foreground tabular-nums">{poFulfillment.postedReceiptCount}</span>
+                    {" posted / "}
+                    <span className="tabular-nums">{poFulfillment.relatedReceiptCount}</span> total
+                  </span>
+                  {poFulfillment.hasOverFulfillment ? (
+                    <span className="text-destructive font-medium">Over-received on line(s)</span>
+                  ) : null}
+                </div>
+              </div>
+            ) : null}
             {linesWithItem.length === 0 ? (
               <p className="doc-lines__empty">No lines.</p>
             ) : (
@@ -1683,7 +1833,7 @@ export function PurchaseOrderPage() {
                   <AgGridContainer themeClass="doc-lines-grid">
                     <AgGridReact<LineWithItem>
                       rowData={linesWithItem}
-                      columnDefs={poLinesReadOnlyColumnDefs()}
+                      columnDefs={poLinesReadOnlyColumnDefs(poFulfillment)}
                       defaultColDef={agGridDefaultColDef}
                       getRowId={(p) => p.data.id}
                     />

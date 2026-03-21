@@ -20,6 +20,11 @@ import {
 } from "../../shared/reasonCodes";
 import { appendAuditEvent } from "../../shared/audit/eventLogRepository";
 import { AUDIT_ACTOR_LOCAL_USER } from "../../shared/audit/eventLogTypes";
+import {
+  aggregateShippedQtyByItemForSalesOrder,
+  computeSalesOrderFulfillment,
+  getSalesOrderOrderedQtyByItemId,
+} from "../../shared/planningFulfillment";
 
 export type PostResult = { success: true } | { success: false; issues: Issue[] };
 export type CancelDocumentResult =
@@ -98,16 +103,38 @@ export function validateShipmentFull(shipmentId: string): Issue[] {
     }
 
     if (shipment) {
-      const postedForSameSo = shipmentRepository
-        .list()
-        .some(
-          (s) =>
-            s.salesOrderId === shipment.salesOrderId &&
-            s.id !== shipmentId &&
-            s.status === "posted",
+      const soIdForMatch = normalizeTrim(shipment.salesOrderId);
+      if (soIdForMatch !== "") {
+        const orderedByItem = getSalesOrderOrderedQtyByItemId(soIdForMatch);
+        const shippedExcludingThis = aggregateShippedQtyByItemForSalesOrder(
+          soIdForMatch,
+          shipmentId,
         );
-      if (postedForSameSo) {
-        issues.push(actionIssue("A posted shipment already exists for this sales order."));
+        for (const line of lines) {
+          const itemIdTrimmed = normalizeTrim(line.itemId);
+          if (itemIdTrimmed === "") continue;
+          const ordered = orderedByItem.get(itemIdTrimmed);
+          if (ordered === undefined) {
+            const item = itemRepository.getById(itemIdTrimmed);
+            const code = item?.code ?? itemIdTrimmed;
+            issues.push(
+              actionIssue(`Item ${code} is not on the related sales order.`),
+            );
+            continue;
+          }
+          const already = shippedExcludingThis.get(itemIdTrimmed) ?? 0;
+          const q = parseDocumentLineQty(line.qty);
+          if (q === null) continue;
+          if (already + q > ordered) {
+            const item = itemRepository.getById(itemIdTrimmed);
+            const code = item?.code ?? itemIdTrimmed;
+            issues.push(
+              actionIssue(
+                `Item ${code}: shipment quantity exceeds remaining to ship (ordered ${ordered}, already shipped ${already}, this shipment ${q}).`,
+              ),
+            );
+          }
+        }
       }
 
       for (const line of lines) {
@@ -173,7 +200,10 @@ export function post(shipmentId: string): PostResult {
 
   const prevStatus = shipment.status;
   shipmentRepository.update(shipmentId, { status: "posted" });
-  salesOrderRepository.update(shipment.salesOrderId, { status: "closed" });
+  const soFulfillment = computeSalesOrderFulfillment(shipment.salesOrderId);
+  salesOrderRepository.update(shipment.salesOrderId, {
+    status: soFulfillment.state === "complete" ? "closed" : "confirmed",
+  });
   appendAuditEvent({
     entityType: "shipment",
     entityId: shipmentId,

@@ -32,6 +32,10 @@ import {
   appendPlanningLineChangeAudit,
   planningHeaderChangedFields,
 } from "../../shared/audit/planningLineAudit";
+import {
+  computeSalesOrderFulfillment,
+  isSalesOrderShipmentFulfillmentComplete,
+} from "../../shared/planningFulfillment";
 import type { SalesOrder } from "./model";
 
 export type ConfirmResult = { success: true } | { success: false; error: string };
@@ -306,10 +310,10 @@ export function cancelDocument(
   return { success: true };
 }
 
-function hasPostedShipmentForSo(soId: string): boolean {
+function hasDraftShipmentForSo(soId: string): boolean {
   return shipmentRepository
     .list()
-    .some((s) => s.salesOrderId === soId && s.status === "posted");
+    .some((s) => s.salesOrderId === soId && s.status === "draft");
 }
 
 export function createShipment(soId: string): CreateShipmentResult {
@@ -320,14 +324,29 @@ export function createShipment(soId: string): CreateShipmentResult {
       success: false,
       error: "Only confirmed sales orders can have a shipment created.",
     };
-  if (hasPostedShipmentForSo(soId))
+  if (isSalesOrderShipmentFulfillmentComplete(soId)) {
     return {
       success: false,
-      error: "A posted shipment already exists for this sales order.",
+      error: "Sales order is already fully shipped (posted shipments).",
     };
+  }
+  if (hasDraftShipmentForSo(soId)) {
+    return {
+      success: false,
+      error: "A draft shipment already exists for this sales order.",
+    };
+  }
 
-  const lines = salesOrderRepository.listLines(soId);
-  const shipmentLines = lines.map((l) => ({ itemId: l.itemId, qty: l.qty }));
+  const fulfillment = computeSalesOrderFulfillment(soId);
+  const shipmentLines = fulfillment.lines
+    .filter((row) => row.remainingQty > 0)
+    .map((row) => ({ itemId: row.itemId, qty: row.remainingQty }));
+  if (shipmentLines.length === 0) {
+    return {
+      success: false,
+      error: "Nothing remaining to ship for this sales order.",
+    };
+  }
   const shipment = shipmentRepository.create(
     {
       date: so.date,

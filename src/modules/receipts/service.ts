@@ -20,6 +20,11 @@ import {
 } from "../../shared/reasonCodes";
 import { appendAuditEvent } from "../../shared/audit/eventLogRepository";
 import { AUDIT_ACTOR_LOCAL_USER } from "../../shared/audit/eventLogTypes";
+import {
+  aggregateReceivedQtyByItemForPurchaseOrder,
+  computePurchaseOrderFulfillment,
+  getPurchaseOrderOrderedQtyByItemId,
+} from "../../shared/planningFulfillment";
 
 export type PostResult = { success: true } | { success: false; issues: Issue[] };
 export type CancelDocumentResult =
@@ -101,19 +106,36 @@ export function validateReceiptFull(receiptId: string): Issue[] {
       itemIds.add(itemIdTrimmed);
     }
 
-    if (receipt) {
-      const postedForSamePo = receiptRepository
-        .list()
-        .some(
-          (r) =>
-            r.purchaseOrderId === receipt.purchaseOrderId &&
-            r.id !== receiptId &&
-            r.status === "posted",
-        );
-      if (postedForSamePo) {
-        issues.push(
-          actionIssue("A posted receipt already exists for this purchase order."),
-        );
+    if (receipt && poIdTrimmed !== "") {
+      const orderedByItem = getPurchaseOrderOrderedQtyByItemId(poIdTrimmed);
+      const receivedExcludingThis = aggregateReceivedQtyByItemForPurchaseOrder(
+        poIdTrimmed,
+        receiptId,
+      );
+      for (const line of lines) {
+        const itemIdTrimmed = normalizeTrim(line.itemId);
+        if (itemIdTrimmed === "") continue;
+        const ordered = orderedByItem.get(itemIdTrimmed);
+        if (ordered === undefined) {
+          const item = itemRepository.getById(itemIdTrimmed);
+          const code = item?.code ?? itemIdTrimmed;
+          issues.push(
+            actionIssue(`Item ${code} is not on the related purchase order.`),
+          );
+          continue;
+        }
+        const already = receivedExcludingThis.get(itemIdTrimmed) ?? 0;
+        const q = parseDocumentLineQty(line.qty);
+        if (q === null) continue;
+        if (already + q > ordered) {
+          const item = itemRepository.getById(itemIdTrimmed);
+          const code = item?.code ?? itemIdTrimmed;
+          issues.push(
+            actionIssue(
+              `Item ${code}: receipt quantity exceeds remaining to receive (ordered ${ordered}, already received ${already}, this receipt ${q}).`,
+            ),
+          );
+        }
       }
     }
   }
@@ -155,7 +177,10 @@ export function post(receiptId: string): PostResult {
 
   const prevStatus = receipt.status;
   receiptRepository.update(receiptId, { status: "posted" });
-  purchaseOrderRepository.update(receipt.purchaseOrderId, { status: "closed" });
+  const poFulfillment = computePurchaseOrderFulfillment(receipt.purchaseOrderId);
+  purchaseOrderRepository.update(receipt.purchaseOrderId, {
+    status: poFulfillment.state === "complete" ? "closed" : "confirmed",
+  });
   appendAuditEvent({
     entityType: "receipt",
     entityId: receiptId,

@@ -32,6 +32,10 @@ import {
   appendPlanningLineChangeAudit,
   planningHeaderChangedFields,
 } from "../../shared/audit/planningLineAudit";
+import {
+  computePurchaseOrderFulfillment,
+  isPurchaseOrderReceiptFulfillmentComplete,
+} from "../../shared/planningFulfillment";
 import type { PurchaseOrder } from "./model";
 
 export type ConfirmResult = { success: true } | { success: false; error: string };
@@ -301,10 +305,10 @@ export function cancelDocument(
   return { success: true };
 }
 
-function hasPostedReceiptForPo(poId: string): boolean {
+function hasDraftReceiptForPo(poId: string): boolean {
   return receiptRepository
     .list()
-    .some((r) => r.purchaseOrderId === poId && r.status === "posted");
+    .some((r) => r.purchaseOrderId === poId && r.status === "draft");
 }
 
 export function createReceipt(poId: string): CreateReceiptResult {
@@ -312,11 +316,29 @@ export function createReceipt(poId: string): CreateReceiptResult {
   if (!po) return { success: false, error: "Purchase order not found." };
   if (po.status !== "confirmed")
     return { success: false, error: "Only confirmed purchase orders can have a receipt created." };
-  if (hasPostedReceiptForPo(poId))
-    return { success: false, error: "A posted receipt already exists for this purchase order." };
+  if (isPurchaseOrderReceiptFulfillmentComplete(poId)) {
+    return {
+      success: false,
+      error: "Purchase order is already fully received (posted receipts).",
+    };
+  }
+  if (hasDraftReceiptForPo(poId)) {
+    return {
+      success: false,
+      error: "A draft receipt already exists for this purchase order.",
+    };
+  }
 
-  const lines = purchaseOrderRepository.listLines(poId);
-  const receiptLines = lines.map((l) => ({ itemId: l.itemId, qty: l.qty }));
+  const fulfillment = computePurchaseOrderFulfillment(poId);
+  const receiptLines = fulfillment.lines
+    .filter((row) => row.remainingQty > 0)
+    .map((row) => ({ itemId: row.itemId, qty: row.remainingQty }));
+  if (receiptLines.length === 0) {
+    return {
+      success: false,
+      error: "Nothing remaining to receive for this purchase order.",
+    };
+  }
   const receipt = receiptRepository.create(
     {
       date: po.date,

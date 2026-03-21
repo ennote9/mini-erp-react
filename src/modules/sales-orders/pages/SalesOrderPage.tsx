@@ -68,6 +68,12 @@ import {
   type CancelDocumentReasonCode,
   type ZeroPriceLineReasonCode,
 } from "../../../shared/reasonCodes";
+import {
+  computeSalesOrderFulfillment,
+  planningFulfillmentStateLabel,
+  type SalesOrderFulfillment,
+  type SoLineFulfillment,
+} from "../../../shared/planningFulfillment";
 
 type LineWithItem = SalesOrderLine & { itemName: string };
 
@@ -104,7 +110,9 @@ function defaultForm(): FormState {
   };
 }
 
-function soLinesDisplayColumnDefs(): ColDef<LineFormRow>[] {
+function soLinesDisplayColumnDefs(
+  fulfillmentByItemId: Map<string, SoLineFulfillment>,
+): ColDef<LineFormRow>[] {
   return [
     {
       headerName: "№",
@@ -180,6 +188,37 @@ function soLinesDisplayColumnDefs(): ColDef<LineFormRow>[] {
       editable: false,
     },
     {
+      headerName: "Shipped",
+      width: 86,
+      minWidth: 78,
+      maxWidth: 96,
+      editable: false,
+      sortable: false,
+      valueGetter: (p) => {
+        const itemId = p.data?.itemId;
+        if (!itemId) return "—";
+        const f = fulfillmentByItemId.get(itemId);
+        if (!f) return "—";
+        return String(f.shippedQty);
+      },
+    },
+    {
+      headerName: "Remaining",
+      width: 100,
+      minWidth: 88,
+      maxWidth: 112,
+      editable: false,
+      sortable: false,
+      valueGetter: (p) => {
+        const itemId = p.data?.itemId;
+        if (!itemId) return "—";
+        const f = fulfillmentByItemId.get(itemId);
+        if (!f) return "—";
+        if (f.remainingQty < 0) return `${f.remainingQty} (over)`;
+        return String(f.remainingQty);
+      },
+    },
+    {
       field: "unitPrice",
       headerName: "Unit price",
       width: 110,
@@ -222,7 +261,9 @@ function soLinesDisplayColumnDefs(): ColDef<LineFormRow>[] {
   ];
 }
 
-function soLinesReadOnlyColumnDefs(): ColDef<LineWithItem>[] {
+function soLinesReadOnlyColumnDefs(
+  fulfillment: SalesOrderFulfillment | null,
+): ColDef<LineWithItem>[] {
   return [
     {
       headerName: "№",
@@ -276,6 +317,35 @@ function soLinesReadOnlyColumnDefs(): ColDef<LineWithItem>[] {
       },
     },
     { field: "qty", headerName: "Qty", width: 80, minWidth: 70, maxWidth: 90 },
+    {
+      headerName: "Shipped",
+      width: 86,
+      minWidth: 78,
+      maxWidth: 96,
+      sortable: false,
+      valueGetter: (p) => {
+        const lineId = p.data?.id;
+        if (!lineId || !fulfillment) return "—";
+        const row = fulfillment.lines.find((l) => l.lineId === lineId);
+        if (!row) return "—";
+        return String(row.shippedQty);
+      },
+    },
+    {
+      headerName: "Remaining",
+      width: 100,
+      minWidth: 88,
+      maxWidth: 112,
+      sortable: false,
+      valueGetter: (p) => {
+        const lineId = p.data?.id;
+        if (!lineId || !fulfillment) return "—";
+        const row = fulfillment.lines.find((l) => l.lineId === lineId);
+        if (!row) return "—";
+        if (row.remainingQty < 0) return `${row.remainingQty} (over)`;
+        return String(row.remainingQty);
+      },
+    },
     {
       field: "unitPrice",
       headerName: "Unit price",
@@ -883,9 +953,23 @@ export function SalesOrderPage() {
     [health.lineHealth, editingLineId],
   );
 
+  const soFulfillment = useMemo(() => {
+    if (!id || isNew) return null;
+    return computeSalesOrderFulfillment(id);
+  }, [id, isNew, refresh]);
+
+  const soFulfillmentByItemId = useMemo(() => {
+    const m = new Map<string, SoLineFulfillment>();
+    if (!soFulfillment) return m;
+    for (const row of soFulfillment.lines) {
+      m.set(row.itemId, row);
+    }
+    return m;
+  }, [soFulfillment]);
+
   const linesColumnDefs = useMemo(
-    () => soLinesDisplayColumnDefs(),
-    [],
+    () => soLinesDisplayColumnDefs(soFulfillmentByItemId),
+    [soFulfillmentByItemId],
   );
 
   const soNumberForFile = doc?.number ?? "new";
@@ -1171,6 +1255,39 @@ export function SalesOrderPage() {
             <div className="doc-lines__header mb-1.5 max-w-2xl">
               <h3 className="doc-lines__title">Lines</h3>
             </div>
+            {!isNew && soFulfillment ? (
+              <div className="mb-2 max-w-4xl text-xs">
+                <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
+                  <span className="font-medium text-foreground">Shipment fulfillment</span>
+                  <span className="tabular-nums text-muted-foreground">
+                    {planningFulfillmentStateLabel(soFulfillment.state)}
+                  </span>
+                  <span className="text-muted-foreground">
+                    Shipped{" "}
+                    <span className="text-foreground tabular-nums">{soFulfillment.totalShipped}</span>
+                    {" / "}
+                    <span className="tabular-nums">{soFulfillment.totalOrdered}</span> ordered
+                  </span>
+                  <span className="text-muted-foreground">
+                    Remaining{" "}
+                    <span className="text-foreground tabular-nums">
+                      {soFulfillment.totalRemaining < 0
+                        ? `${soFulfillment.totalRemaining} (over)`
+                        : soFulfillment.totalRemaining}
+                    </span>
+                  </span>
+                  <span className="text-muted-foreground">
+                    Shipments:{" "}
+                    <span className="text-foreground tabular-nums">{soFulfillment.postedShipmentCount}</span>
+                    {" posted / "}
+                    <span className="tabular-nums">{soFulfillment.relatedShipmentCount}</span> total
+                  </span>
+                  {soFulfillment.hasOverFulfillment ? (
+                    <span className="text-destructive font-medium">Over-shipped on line(s)</span>
+                  ) : null}
+                </div>
+              </div>
+            ) : null}
             {isEditable && (
               <div className="flex items-end gap-2 w-full mb-1.5">
                 <Card className="border-0 shadow-none flex-1 min-w-0">
@@ -1556,6 +1673,39 @@ export function SalesOrderPage() {
           </Card>
           <div className="doc-lines mt-[calc(0.5rem+1cm)]">
             <h3 className="doc-lines__title">Lines</h3>
+            {soFulfillment ? (
+              <div className="mb-2 max-w-4xl text-xs">
+                <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
+                  <span className="font-medium text-foreground">Shipment fulfillment</span>
+                  <span className="tabular-nums text-muted-foreground">
+                    {planningFulfillmentStateLabel(soFulfillment.state)}
+                  </span>
+                  <span className="text-muted-foreground">
+                    Shipped{" "}
+                    <span className="text-foreground tabular-nums">{soFulfillment.totalShipped}</span>
+                    {" / "}
+                    <span className="tabular-nums">{soFulfillment.totalOrdered}</span> ordered
+                  </span>
+                  <span className="text-muted-foreground">
+                    Remaining{" "}
+                    <span className="text-foreground tabular-nums">
+                      {soFulfillment.totalRemaining < 0
+                        ? `${soFulfillment.totalRemaining} (over)`
+                        : soFulfillment.totalRemaining}
+                    </span>
+                  </span>
+                  <span className="text-muted-foreground">
+                    Shipments:{" "}
+                    <span className="text-foreground tabular-nums">{soFulfillment.postedShipmentCount}</span>
+                    {" posted / "}
+                    <span className="tabular-nums">{soFulfillment.relatedShipmentCount}</span> total
+                  </span>
+                  {soFulfillment.hasOverFulfillment ? (
+                    <span className="text-destructive font-medium">Over-shipped on line(s)</span>
+                  ) : null}
+                </div>
+              </div>
+            ) : null}
             <div className="flex flex-row items-center justify-end gap-2 w-full mb-1.5">
               {exportSuccess && (
                 <div className="h-8 w-max flex items-center gap-1.5 rounded-md border border-input bg-background px-2 text-sm shrink-0">
@@ -1667,7 +1817,7 @@ export function SalesOrderPage() {
                   <AgGridContainer themeClass="doc-lines-grid">
                     <AgGridReact<LineWithItem>
                       rowData={linesWithItem}
-                      columnDefs={soLinesReadOnlyColumnDefs()}
+                      columnDefs={soLinesReadOnlyColumnDefs(soFulfillment)}
                       defaultColDef={agGridDefaultColDef}
                       getRowId={(p) => p.data.id}
                       rowSelection={{ mode: "multiRow", checkboxes: true, headerCheckbox: true, enableClickSelection: true }}
