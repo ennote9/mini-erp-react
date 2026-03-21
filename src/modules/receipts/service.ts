@@ -14,6 +14,8 @@ import {
   type CancelDocumentReasonCode,
   type CancelDocumentReasonInput,
 } from "../../shared/reasonCodes";
+import { appendAuditEvent } from "../../shared/audit/eventLogRepository";
+import { AUDIT_ACTOR_LOCAL_USER } from "../../shared/audit/eventLogTypes";
 
 export type PostResult = { success: true } | { success: false; issues: Issue[] };
 export type CancelDocumentResult =
@@ -143,8 +145,21 @@ export function post(receiptId: string): PostResult {
     });
   }
 
+  const prevStatus = receipt.status;
   receiptRepository.update(receiptId, { status: "posted" });
   purchaseOrderRepository.update(receipt.purchaseOrderId, { status: "closed" });
+  appendAuditEvent({
+    entityType: "receipt",
+    entityId: receiptId,
+    eventType: "document_posted",
+    actor: AUDIT_ACTOR_LOCAL_USER,
+    payload: {
+      documentNumber: receipt.number,
+      previousStatus: prevStatus,
+      newStatus: "posted" as const,
+      purchaseOrderId: receipt.purchaseOrderId,
+    },
+  });
   return { success: true };
 }
 
@@ -160,10 +175,24 @@ export function cancelDocument(
     return { success: false, error: "Only draft receipts can be cancelled." };
   const code = input.cancelReasonCode as CancelDocumentReasonCode;
   const comment = normalizeCancelReasonComment(input.cancelReasonComment);
+  const prevStatus = receipt.status;
   receiptRepository.update(receiptId, {
     status: "cancelled",
     cancelReasonCode: code,
     ...(comment !== undefined ? { cancelReasonComment: comment } : {}),
+  });
+  appendAuditEvent({
+    entityType: "receipt",
+    entityId: receiptId,
+    eventType: "document_cancelled",
+    actor: AUDIT_ACTOR_LOCAL_USER,
+    payload: {
+      documentNumber: receipt.number,
+      previousStatus: prevStatus,
+      newStatus: "cancelled" as const,
+      cancelReasonCode: code,
+      cancelReasonComment: comment ?? null,
+    },
   });
   return { success: true };
 }

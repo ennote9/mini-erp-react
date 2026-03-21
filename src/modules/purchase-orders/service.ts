@@ -25,14 +25,18 @@ import {
   type CancelDocumentReasonCode,
   type CancelDocumentReasonInput,
 } from "../../shared/reasonCodes";
+import { appendAuditEvent } from "../../shared/audit/eventLogRepository";
+import { AUDIT_ACTOR_LOCAL_USER } from "../../shared/audit/eventLogTypes";
+import { auditReceiptDocumentCreated } from "../../shared/audit/factualDocumentAudit";
+import {
+  appendPlanningLineChangeAudit,
+  planningHeaderChangedFields,
+} from "../../shared/audit/planningLineAudit";
+import type { PurchaseOrder } from "./model";
 
 export type ConfirmResult = { success: true } | { success: false; error: string };
 export type CancelDocumentResult = { success: true } | { success: false; error: string };
 
-export type CancelDocumentWithReasonInput = {
-  cancelReasonCode: string;
-  cancelReasonComment?: string;
-};
 export type CreateReceiptResult =
   | { success: true; receiptId: string }
   | { success: false; error: string };
@@ -115,6 +119,21 @@ function normalizePOLines(
   return out;
 }
 
+function itemCodeForAudit(itemId: string): string {
+  return itemRepository.getById(itemId)?.code ?? itemId;
+}
+
+function poHeaderFlat(po: PurchaseOrder) {
+  return {
+    date: po.date,
+    supplierId: po.supplierId,
+    warehouseId: po.warehouseId,
+    comment: po.comment ?? "",
+    paymentTermsDays: po.paymentTermsDays ?? null,
+    dueDate: po.dueDate ?? null,
+  };
+}
+
 export function saveDraft(
   data: SaveDraftInput,
   existingId?: string,
@@ -146,11 +165,62 @@ export function saveDraft(
     if (!po) return { success: false, error: "Purchase order not found." };
     if (po.status !== "draft")
       return { success: false, error: "Only draft purchase orders can be saved." };
+    const oldLines = purchaseOrderRepository.listLines(existingId);
+    const beforeHeader = poHeaderFlat(po);
     purchaseOrderRepository.update(existingId, header);
     purchaseOrderRepository.replaceLines(existingId, lines);
+    const poAfter = purchaseOrderRepository.getById(existingId)!;
+    const newLines = purchaseOrderRepository.listLines(existingId);
+    const afterHeader = poHeaderFlat(poAfter);
+    const changedFields = planningHeaderChangedFields(
+      beforeHeader as unknown as Record<string, unknown>,
+      afterHeader as unknown as Record<string, unknown>,
+      ["date", "supplierId", "warehouseId", "comment", "paymentTermsDays", "dueDate"],
+    );
+    if (changedFields.length > 0) {
+      appendAuditEvent({
+        entityType: "purchase_order",
+        entityId: existingId,
+        eventType: "document_saved",
+        actor: AUDIT_ACTOR_LOCAL_USER,
+        payload: {
+          documentNumber: poAfter.number,
+          changedFields,
+        },
+      });
+    }
+    appendPlanningLineChangeAudit({
+      entityType: "purchase_order",
+      entityId: existingId,
+      documentNumber: poAfter.number,
+      oldLines,
+      newLinesFromDb: newLines,
+      itemCode: itemCodeForAudit,
+    });
     return { success: true, id: existingId };
   }
   const created = purchaseOrderRepository.create(header, lines);
+  const doc = purchaseOrderRepository.getById(created.id)!;
+  const createdLines = purchaseOrderRepository.listLines(created.id);
+  appendAuditEvent({
+    entityType: "purchase_order",
+    entityId: created.id,
+    eventType: "document_created",
+    actor: AUDIT_ACTOR_LOCAL_USER,
+    payload: {
+      documentNumber: doc.number,
+      status: doc.status,
+      lineCount: createdLines.length,
+      lines: createdLines.map((l) => ({
+        lineId: l.id,
+        itemId: l.itemId,
+        itemCode: itemCodeForAudit(l.itemId),
+        qty: l.qty,
+        unitPrice: l.unitPrice,
+        ...(l.zeroPriceReasonCode ? { zeroPriceReasonCode: l.zeroPriceReasonCode } : {}),
+      })),
+    },
+  });
   return { success: true, id: created.id };
 }
 
@@ -181,7 +251,19 @@ function validateConfirm(poId: string): string | null {
 export function confirm(poId: string): ConfirmResult {
   const err = validateConfirm(poId);
   if (err) return { success: false, error: err };
+  const po = purchaseOrderRepository.getById(poId)!;
   purchaseOrderRepository.update(poId, { status: "confirmed" });
+  appendAuditEvent({
+    entityType: "purchase_order",
+    entityId: poId,
+    eventType: "document_confirmed",
+    actor: AUDIT_ACTOR_LOCAL_USER,
+    payload: {
+      documentNumber: po.number,
+      previousStatus: po.status,
+      newStatus: "confirmed" as const,
+    },
+  });
   return { success: true };
 }
 
@@ -197,10 +279,24 @@ export function cancelDocument(
     return { success: false, error: "Only draft or confirmed purchase orders can be cancelled." };
   const code = input.cancelReasonCode as CancelDocumentReasonCode;
   const comment = normalizeCancelReasonComment(input.cancelReasonComment);
+  const prevStatus = po.status;
   purchaseOrderRepository.update(poId, {
     status: "cancelled",
     cancelReasonCode: code,
     ...(comment !== undefined ? { cancelReasonComment: comment } : {}),
+  });
+  appendAuditEvent({
+    entityType: "purchase_order",
+    entityId: poId,
+    eventType: "document_cancelled",
+    actor: AUDIT_ACTOR_LOCAL_USER,
+    payload: {
+      documentNumber: po.number,
+      previousStatus: prevStatus,
+      newStatus: "cancelled" as const,
+      cancelReasonCode: code,
+      cancelReasonComment: comment ?? null,
+    },
   });
   return { success: true };
 }
@@ -230,6 +326,7 @@ export function createReceipt(poId: string): CreateReceiptResult {
     },
     receiptLines,
   );
+  auditReceiptDocumentCreated(receipt);
   return { success: true, receiptId: receipt.id };
 }
 

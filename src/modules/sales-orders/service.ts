@@ -25,6 +25,14 @@ import {
   type CancelDocumentReasonCode,
   type CancelDocumentReasonInput,
 } from "../../shared/reasonCodes";
+import { appendAuditEvent } from "../../shared/audit/eventLogRepository";
+import { AUDIT_ACTOR_LOCAL_USER } from "../../shared/audit/eventLogTypes";
+import { auditShipmentDocumentCreated } from "../../shared/audit/factualDocumentAudit";
+import {
+  appendPlanningLineChangeAudit,
+  planningHeaderChangedFields,
+} from "../../shared/audit/planningLineAudit";
+import type { SalesOrder } from "./model";
 
 export type ConfirmResult = { success: true } | { success: false; error: string };
 export type CancelDocumentResult =
@@ -112,6 +120,21 @@ function normalizeSOLines(
   return out;
 }
 
+function itemCodeForAudit(itemId: string): string {
+  return itemRepository.getById(itemId)?.code ?? itemId;
+}
+
+function soHeaderFlat(so: SalesOrder) {
+  return {
+    date: so.date,
+    customerId: so.customerId,
+    warehouseId: so.warehouseId,
+    comment: so.comment ?? "",
+    paymentTermsDays: so.paymentTermsDays ?? null,
+    dueDate: so.dueDate ?? null,
+  };
+}
+
 export function saveDraft(
   data: SaveDraftInput,
   existingId?: string,
@@ -143,11 +166,62 @@ export function saveDraft(
     if (!so) return { success: false, error: "Sales order not found." };
     if (so.status !== "draft")
       return { success: false, error: "Only draft sales orders can be saved." };
+    const oldLines = salesOrderRepository.listLines(existingId);
+    const beforeHeader = soHeaderFlat(so);
     salesOrderRepository.update(existingId, header);
     salesOrderRepository.replaceLines(existingId, lines);
+    const soAfter = salesOrderRepository.getById(existingId)!;
+    const newLines = salesOrderRepository.listLines(existingId);
+    const afterHeader = soHeaderFlat(soAfter);
+    const changedFields = planningHeaderChangedFields(
+      beforeHeader as unknown as Record<string, unknown>,
+      afterHeader as unknown as Record<string, unknown>,
+      ["date", "customerId", "warehouseId", "comment", "paymentTermsDays", "dueDate"],
+    );
+    if (changedFields.length > 0) {
+      appendAuditEvent({
+        entityType: "sales_order",
+        entityId: existingId,
+        eventType: "document_saved",
+        actor: AUDIT_ACTOR_LOCAL_USER,
+        payload: {
+          documentNumber: soAfter.number,
+          changedFields,
+        },
+      });
+    }
+    appendPlanningLineChangeAudit({
+      entityType: "sales_order",
+      entityId: existingId,
+      documentNumber: soAfter.number,
+      oldLines,
+      newLinesFromDb: newLines,
+      itemCode: itemCodeForAudit,
+    });
     return { success: true, id: existingId };
   }
   const created = salesOrderRepository.create(header, lines);
+  const doc = salesOrderRepository.getById(created.id)!;
+  const createdLines = salesOrderRepository.listLines(created.id);
+  appendAuditEvent({
+    entityType: "sales_order",
+    entityId: created.id,
+    eventType: "document_created",
+    actor: AUDIT_ACTOR_LOCAL_USER,
+    payload: {
+      documentNumber: doc.number,
+      status: doc.status,
+      lineCount: createdLines.length,
+      lines: createdLines.map((l) => ({
+        lineId: l.id,
+        itemId: l.itemId,
+        itemCode: itemCodeForAudit(l.itemId),
+        qty: l.qty,
+        unitPrice: l.unitPrice,
+        ...(l.zeroPriceReasonCode ? { zeroPriceReasonCode: l.zeroPriceReasonCode } : {}),
+      })),
+    },
+  });
   return { success: true, id: created.id };
 }
 
@@ -179,7 +253,19 @@ function validateConfirm(soId: string): string | null {
 export function confirm(soId: string): ConfirmResult {
   const err = validateConfirm(soId);
   if (err) return { success: false, error: err };
+  const so = salesOrderRepository.getById(soId)!;
   salesOrderRepository.update(soId, { status: "confirmed" });
+  appendAuditEvent({
+    entityType: "sales_order",
+    entityId: soId,
+    eventType: "document_confirmed",
+    actor: AUDIT_ACTOR_LOCAL_USER,
+    payload: {
+      documentNumber: so.number,
+      previousStatus: so.status,
+      newStatus: "confirmed" as const,
+    },
+  });
   return { success: true };
 }
 
@@ -198,10 +284,24 @@ export function cancelDocument(
     };
   const code = input.cancelReasonCode as CancelDocumentReasonCode;
   const comment = normalizeCancelReasonComment(input.cancelReasonComment);
+  const prevStatus = so.status;
   salesOrderRepository.update(soId, {
     status: "cancelled",
     cancelReasonCode: code,
     ...(comment !== undefined ? { cancelReasonComment: comment } : {}),
+  });
+  appendAuditEvent({
+    entityType: "sales_order",
+    entityId: soId,
+    eventType: "document_cancelled",
+    actor: AUDIT_ACTOR_LOCAL_USER,
+    payload: {
+      documentNumber: so.number,
+      previousStatus: prevStatus,
+      newStatus: "cancelled" as const,
+      cancelReasonCode: code,
+      cancelReasonComment: comment ?? null,
+    },
   });
   return { success: true };
 }
@@ -237,6 +337,7 @@ export function createShipment(soId: string): CreateShipmentResult {
     },
     shipmentLines,
   );
+  auditShipmentDocumentCreated(shipment);
   return { success: true, shipmentId: shipment.id };
 }
 

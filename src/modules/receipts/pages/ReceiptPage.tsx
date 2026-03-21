@@ -36,6 +36,7 @@ import {
   CancelDocumentReasonDialog,
   type CancelDocumentReasonPayload,
 } from "../../../shared/ui/object/CancelDocumentReasonDialog";
+import { DocumentEventLogSection } from "../../../shared/ui/object/DocumentEventLogSection";
 import {
   CANCEL_DOCUMENT_REASON_LABELS,
   type CancelDocumentReasonCode,
@@ -504,6 +505,7 @@ export function ReceiptPage() {
           </div>
         )}
       </div>
+      {id ? <DocumentEventLogSection entityType="receipt" entityId={id} refresh={refresh} /> : null}
       <CancelDocumentReasonDialog
         open={cancelReasonDialogOpen}
         onOpenChange={setCancelReasonDialogOpen}

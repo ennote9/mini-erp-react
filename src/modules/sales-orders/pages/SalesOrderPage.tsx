@@ -60,6 +60,7 @@ import {
   CancelDocumentReasonDialog,
   type CancelDocumentReasonPayload,
 } from "../../../shared/ui/object/CancelDocumentReasonDialog";
+import { DocumentEventLogSection } from "../../../shared/ui/object/DocumentEventLogSection";
 import {
   CANCEL_DOCUMENT_REASON_LABELS,
   ZERO_PRICE_LINE_REASON_CODES,
@@ -583,7 +584,11 @@ export function SalesOrderPage() {
       isNew ? undefined : id ?? undefined,
     );
     if (result.success) {
-      navigate("/sales-orders");
+      if (isNew) {
+        navigate(`/sales-orders/${result.id}`, { replace: true });
+      } else {
+        setRefresh((r) => r + 1);
+      }
     } else if (!issueListContainsMessage(health.issues, result.error)) {
       setActionIssues([actionIssue(result.error)]);
     }
@@ -1700,6 +1705,9 @@ export function SalesOrderPage() {
         onOpenChange={setIsLineImportModalOpen}
         onApply={handleApplyImportedLines}
       />
+      {!isNew && id ? (
+        <DocumentEventLogSection entityType="sales_order" entityId={id} refresh={refresh} />
+      ) : null}
       <CancelDocumentReasonDialog
         open={cancelReasonDialogOpen}
         onOpenChange={setCancelReasonDialogOpen}

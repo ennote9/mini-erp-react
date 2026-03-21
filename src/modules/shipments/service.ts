@@ -14,6 +14,8 @@ import {
   type CancelDocumentReasonCode,
   type CancelDocumentReasonInput,
 } from "../../shared/reasonCodes";
+import { appendAuditEvent } from "../../shared/audit/eventLogRepository";
+import { AUDIT_ACTOR_LOCAL_USER } from "../../shared/audit/eventLogTypes";
 
 export type PostResult = { success: true } | { success: false; issues: Issue[] };
 export type CancelDocumentResult =
@@ -161,8 +163,21 @@ export function post(shipmentId: string): PostResult {
     });
   }
 
+  const prevStatus = shipment.status;
   shipmentRepository.update(shipmentId, { status: "posted" });
   salesOrderRepository.update(shipment.salesOrderId, { status: "closed" });
+  appendAuditEvent({
+    entityType: "shipment",
+    entityId: shipmentId,
+    eventType: "document_posted",
+    actor: AUDIT_ACTOR_LOCAL_USER,
+    payload: {
+      documentNumber: shipment.number,
+      previousStatus: prevStatus,
+      newStatus: "posted" as const,
+      salesOrderId: shipment.salesOrderId,
+    },
+  });
   return { success: true };
 }
 
@@ -178,10 +193,24 @@ export function cancelDocument(
     return { success: false, error: "Only draft shipments can be cancelled." };
   const code = input.cancelReasonCode as CancelDocumentReasonCode;
   const comment = normalizeCancelReasonComment(input.cancelReasonComment);
+  const prevStatus = shipment.status;
   shipmentRepository.update(shipmentId, {
     status: "cancelled",
     cancelReasonCode: code,
     ...(comment !== undefined ? { cancelReasonComment: comment } : {}),
+  });
+  appendAuditEvent({
+    entityType: "shipment",
+    entityId: shipmentId,
+    eventType: "document_cancelled",
+    actor: AUDIT_ACTOR_LOCAL_USER,
+    payload: {
+      documentNumber: shipment.number,
+      previousStatus: prevStatus,
+      newStatus: "cancelled" as const,
+      cancelReasonCode: code,
+      cancelReasonComment: comment ?? null,
+    },
   });
   return { success: true };
 }
