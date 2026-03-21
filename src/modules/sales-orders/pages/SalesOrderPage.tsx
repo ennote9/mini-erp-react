@@ -3,7 +3,7 @@ import { useMemo, useState, useEffect, useRef, useCallback } from "react";
 import { AgGridReact } from "ag-grid-react";
 import type { ColDef, SelectionChangedEvent } from "ag-grid-community";
 import { salesOrderRepository } from "../repository";
-import { confirm, cancelDocument, createShipment, saveDraft } from "../service";
+import { allocateStock, confirm, cancelDocument, createShipment, saveDraft } from "../service";
 import { customerRepository } from "../../customers/repository";
 import { warehouseRepository } from "../../warehouses/repository";
 import { itemRepository } from "../../items/repository";
@@ -74,6 +74,12 @@ import {
   type SalesOrderFulfillment,
   type SoLineFulfillment,
 } from "../../../shared/planningFulfillment";
+import {
+  computeSalesOrderAllocationView,
+  salesOrderAllocationStateLabel,
+  type SalesOrderAllocationView,
+  type SoLineAllocationRow,
+} from "../../../shared/soAllocation";
 
 type LineWithItem = SalesOrderLine & { itemName: string };
 
@@ -112,6 +118,7 @@ function defaultForm(): FormState {
 
 function soLinesDisplayColumnDefs(
   fulfillmentByItemId: Map<string, SoLineFulfillment>,
+  allocationByItemId: Map<string, SoLineAllocationRow>,
 ): ColDef<LineFormRow>[] {
   return [
     {
@@ -219,6 +226,36 @@ function soLinesDisplayColumnDefs(
       },
     },
     {
+      headerName: "Reserved",
+      width: 78,
+      minWidth: 70,
+      maxWidth: 88,
+      editable: false,
+      sortable: false,
+      valueGetter: (p) => {
+        const itemId = p.data?.itemId;
+        if (!itemId) return "—";
+        const a = allocationByItemId.get(itemId);
+        if (!a) return "—";
+        return String(a.reservedQty);
+      },
+    },
+    {
+      headerName: "Shortage",
+      width: 78,
+      minWidth: 70,
+      maxWidth: 88,
+      editable: false,
+      sortable: false,
+      valueGetter: (p) => {
+        const itemId = p.data?.itemId;
+        if (!itemId) return "—";
+        const a = allocationByItemId.get(itemId);
+        if (!a) return "—";
+        return String(a.shortageQty);
+      },
+    },
+    {
       field: "unitPrice",
       headerName: "Unit price",
       width: 110,
@@ -263,6 +300,7 @@ function soLinesDisplayColumnDefs(
 
 function soLinesReadOnlyColumnDefs(
   fulfillment: SalesOrderFulfillment | null,
+  allocation: SalesOrderAllocationView | null,
 ): ColDef<LineWithItem>[] {
   return [
     {
@@ -344,6 +382,34 @@ function soLinesReadOnlyColumnDefs(
         if (!row) return "—";
         if (row.remainingQty < 0) return `${row.remainingQty} (over)`;
         return String(row.remainingQty);
+      },
+    },
+    {
+      headerName: "Reserved",
+      width: 78,
+      minWidth: 70,
+      maxWidth: 88,
+      sortable: false,
+      valueGetter: (p) => {
+        const lineId = p.data?.id;
+        if (!lineId || !allocation) return "—";
+        const row = allocation.lines.find((l) => l.lineId === lineId);
+        if (!row) return "—";
+        return String(row.reservedQty);
+      },
+    },
+    {
+      headerName: "Shortage",
+      width: 78,
+      minWidth: 70,
+      maxWidth: 88,
+      sortable: false,
+      valueGetter: (p) => {
+        const lineId = p.data?.id;
+        if (!lineId || !allocation) return "—";
+        const row = allocation.lines.find((l) => l.lineId === lineId);
+        if (!row) return "—";
+        return String(row.shortageQty);
       },
     },
     {
@@ -620,6 +686,14 @@ export function SalesOrderPage() {
     setActionIssues([]);
     const result = createShipment(id);
     if (result.success) navigate(`/shipments/${result.shipmentId}`);
+    else if (!issueListContainsMessage(health.issues, result.error)) setActionIssues([actionIssue(result.error)]);
+  };
+
+  const handleAllocateStock = () => {
+    if (!id || isNew) return;
+    setActionIssues([]);
+    const result = allocateStock(id);
+    if (result.success) setRefresh((r) => r + 1);
     else if (!issueListContainsMessage(health.issues, result.error)) setActionIssues([actionIssue(result.error)]);
   };
 
@@ -967,9 +1041,23 @@ export function SalesOrderPage() {
     return m;
   }, [soFulfillment]);
 
+  const soAllocationView = useMemo(() => {
+    if (!id || isNew) return null;
+    return computeSalesOrderAllocationView(id);
+  }, [id, isNew, refresh]);
+
+  const soAllocationByItemId = useMemo(() => {
+    const m = new Map<string, SoLineAllocationRow>();
+    if (!soAllocationView) return m;
+    for (const row of soAllocationView.lines) {
+      m.set(row.itemId, row);
+    }
+    return m;
+  }, [soAllocationView]);
+
   const linesColumnDefs = useMemo(
-    () => soLinesDisplayColumnDefs(soFulfillmentByItemId),
-    [soFulfillmentByItemId],
+    () => soLinesDisplayColumnDefs(soFulfillmentByItemId, soAllocationByItemId),
+    [soFulfillmentByItemId, soAllocationByItemId],
   );
 
   const soNumberForFile = doc?.number ?? "new";
@@ -1131,6 +1219,11 @@ export function SalesOrderPage() {
                 </Button>
               )}
               {!isNew && isConfirmed && (
+                <Button type="button" variant="outline" onClick={handleAllocateStock}>
+                  Allocate stock
+                </Button>
+              )}
+              {!isNew && isConfirmed && (
                 <Button type="button" onClick={handleCreateShipment}>
                   <span className="create-btn__plus">+</span> Create Shipment
                 </Button>
@@ -1285,6 +1378,25 @@ export function SalesOrderPage() {
                   {soFulfillment.hasOverFulfillment ? (
                     <span className="text-destructive font-medium">Over-shipped on line(s)</span>
                   ) : null}
+                </div>
+              </div>
+            ) : null}
+            {!isNew && soAllocationView ? (
+              <div className="mb-2 max-w-4xl text-xs">
+                <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
+                  <span className="font-medium text-foreground">Stock allocation</span>
+                  <span className="tabular-nums text-muted-foreground">
+                    {salesOrderAllocationStateLabel(soAllocationView.state)}
+                  </span>
+                  <span className="text-muted-foreground">
+                    Reserved{" "}
+                    <span className="text-foreground tabular-nums">{soAllocationView.totalReserved}</span>
+                  </span>
+                  <span className="text-muted-foreground">
+                    Shortage{" "}
+                    <span className="text-foreground tabular-nums">{soAllocationView.totalShortage}</span>
+                    <span className="text-muted-foreground/80"> (remaining not reserved)</span>
+                  </span>
                 </div>
               </div>
             ) : null}
@@ -1706,6 +1818,25 @@ export function SalesOrderPage() {
                 </div>
               </div>
             ) : null}
+            {soAllocationView ? (
+              <div className="mb-2 max-w-4xl text-xs">
+                <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
+                  <span className="font-medium text-foreground">Stock allocation</span>
+                  <span className="tabular-nums text-muted-foreground">
+                    {salesOrderAllocationStateLabel(soAllocationView.state)}
+                  </span>
+                  <span className="text-muted-foreground">
+                    Reserved{" "}
+                    <span className="text-foreground tabular-nums">{soAllocationView.totalReserved}</span>
+                  </span>
+                  <span className="text-muted-foreground">
+                    Shortage{" "}
+                    <span className="text-foreground tabular-nums">{soAllocationView.totalShortage}</span>
+                    <span className="text-muted-foreground/80"> (remaining not reserved)</span>
+                  </span>
+                </div>
+              </div>
+            ) : null}
             <div className="flex flex-row items-center justify-end gap-2 w-full mb-1.5">
               {exportSuccess && (
                 <div className="h-8 w-max flex items-center gap-1.5 rounded-md border border-input bg-background px-2 text-sm shrink-0">
@@ -1817,7 +1948,7 @@ export function SalesOrderPage() {
                   <AgGridContainer themeClass="doc-lines-grid">
                     <AgGridReact<LineWithItem>
                       rowData={linesWithItem}
-                      columnDefs={soLinesReadOnlyColumnDefs(soFulfillment)}
+                      columnDefs={soLinesReadOnlyColumnDefs(soFulfillment, soAllocationView)}
                       defaultColDef={agGridDefaultColDef}
                       getRowId={(p) => p.data.id}
                       rowSelection={{ mode: "multiRow", checkboxes: true, headerCheckbox: true, enableClickSelection: true }}

@@ -5,10 +5,24 @@ export type StockBalancesExportRow = {
   itemCode: string;
   itemName: string;
   warehouse: string;
-  qtyOnHand: number;
+  totalQty: number;
+  reservedQty: number;
+  availableQty: number;
+  outgoingQty: number;
+  incomingQty: number;
 };
 
-const COLUMN_HEADERS = ["№", "Item Code", "Item Name", "Warehouse", "Qty On Hand"] as const;
+const COLUMN_HEADERS = [
+  "№",
+  "Item Code",
+  "Item Name",
+  "Warehouse",
+  "Total quantity",
+  "Reserved",
+  "Available",
+  "Outgoing",
+  "Incoming",
+] as const;
 const SHEET_NAME = "Stock Balances";
 const TABLE_NAME_BASE = "StockBalancesTable";
 const WIDTH_PADDING = 1.5;
@@ -36,7 +50,11 @@ const WIDTH_BOUNDS = [
   { min: 10, max: 24 },
   { min: 10, max: 42 },
   { min: 10, max: 24 },
-  { min: 12, max: 16 },
+  { min: 10, max: 14 },
+  { min: 10, max: 14 },
+  { min: 10, max: 14 },
+  { min: 10, max: 14 },
+  { min: 10, max: 14 },
 ];
 
 function addSheet(workbook: Workbook, rows: StockBalancesExportRow[]): void {
@@ -48,7 +66,17 @@ function addSheet(workbook: Workbook, rows: StockBalancesExportRow[]): void {
     return;
   }
   const columns = COLUMN_HEADERS.map((name) => ({ name, filterButton: true }));
-  const tableRows = rows.map((r) => [r.no, r.itemCode, r.itemName, r.warehouse, r.qtyOnHand]);
+  const tableRows = rows.map((r) => [
+    r.no,
+    r.itemCode,
+    r.itemName,
+    r.warehouse,
+    r.totalQty,
+    r.reservedQty,
+    r.availableQty,
+    r.outgoingQty,
+    r.incomingQty,
+  ]);
   sheet.addTable({
     name: sanitizeTableName(TABLE_NAME_BASE),
     ref: "A1",
@@ -58,7 +86,21 @@ function addSheet(workbook: Workbook, rows: StockBalancesExportRow[]): void {
     rows: tableRows,
   });
   for (let c = 0; c < COLUMN_HEADERS.length; c++) {
-    const valueLengths = rows.map((r) => cellLen([r.no, r.itemCode, r.itemName, r.warehouse, r.qtyOnHand][c]));
+    const valueLengths = rows.map((r) =>
+      cellLen(
+        [
+          r.no,
+          r.itemCode,
+          r.itemName,
+          r.warehouse,
+          r.totalQty,
+          r.reservedQty,
+          r.availableQty,
+          r.outgoingQty,
+          r.incomingQty,
+        ][c],
+      ),
+    );
     const b = WIDTH_BOUNDS[c] ?? { min: DEFAULT_MIN, max: DEFAULT_MAX };
     sheet.getColumn(c + 1).width = columnWidth(COLUMN_HEADERS[c].length, valueLengths, b.min, b.max);
   }

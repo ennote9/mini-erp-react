@@ -3,6 +3,7 @@
  * Repository-backed data, search, empty states, dark theme. Plain text columns only.
  */
 import { useMemo, useState, useRef, useCallback } from "react";
+import type { RowClassParams } from "ag-grid-community";
 import { useSearchParams } from "react-router-dom";
 import { AgGridReact } from "ag-grid-react";
 import type { ColDef, SelectionChangedEvent } from "ag-grid-community";
@@ -24,6 +25,11 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Button } from "@/components/ui/button";
 import { ChevronDown, FileSpreadsheet, File, FolderOpen, X } from "lucide-react";
 import { buildStockBalancesListXlsxBuffer, type StockBalancesExportRow } from "../stockBalancesListExport";
+import {
+  buildOutgoingRemainingByWarehouseItem,
+  buildIncomingRemainingByWarehouseItem,
+  computeOperationalFieldsForBalance,
+} from "../../../shared/stockBalancesOperationalMetrics";
 import { save } from "@tauri-apps/plugin-dialog";
 import { invoke } from "@tauri-apps/api/core";
 import { revealItemInDir } from "@tauri-apps/plugin-opener";
@@ -32,6 +38,10 @@ type RowData = StockBalance & {
   itemCode: string;
   itemName: string;
   warehouseName: string;
+  reservedQty: number;
+  availableQty: number;
+  outgoingQty: number;
+  incomingQty: number;
 };
 
 function filterBySearch(rows: RowData[], query: string): RowData[] {
@@ -56,7 +66,11 @@ function buildExportRowsFromBalances(rows: RowData[]): StockBalancesExportRow[] 
     itemCode: r.itemCode,
     itemName: r.itemName,
     warehouse: r.warehouseName,
-    qtyOnHand: r.qtyOnHand,
+    totalQty: r.qtyOnHand,
+    reservedQty: r.reservedQty,
+    availableQty: r.availableQty,
+    outgoingQty: r.outgoingQty,
+    incomingQty: r.incomingQty,
   }));
 }
 
@@ -80,17 +94,32 @@ export function StockBalancesListPage() {
   }, []);
 
   const rowsWithNames = useMemo(() => {
+    const outgoing = buildOutgoingRemainingByWarehouseItem();
+    const incoming = buildIncomingRemainingByWarehouseItem();
     const list = stockBalanceRepository.list();
     return list.map((b) => {
       const item = itemRepository.getById(b.itemId);
       const warehouse = warehouseRepository.getById(b.warehouseId);
+      const op = computeOperationalFieldsForBalance(b, outgoing, incoming);
       return {
         ...b,
         itemCode: item?.code ?? b.itemId,
         itemName: item?.name ?? b.itemId,
         warehouseName: warehouse?.name ?? b.warehouseId,
+        reservedQty: op.reservedQty,
+        availableQty: op.availableQty,
+        outgoingQty: op.outgoingQty,
+        incomingQty: op.incomingQty,
       };
     });
+  }, []);
+
+  const getRowClass = useCallback((params: RowClassParams<RowData>) => {
+    const d = params.data;
+    if (!d) return "";
+    const tight =
+      d.availableQty < 0 || (d.outgoingQty > 0 && d.availableQty < d.outgoingQty);
+    return tight ? "stock-balances-row--tight-availability" : "";
   }, []);
 
   const filteredRows = useMemo(() => {
@@ -191,29 +220,49 @@ export function StockBalancesListPage() {
     return "Try changing the search or warehouse filter.";
   }, [hasFilter, warehouseFilterId, searchQuery]);
 
+  const qtyCol = (
+    field: keyof RowData,
+    headerName: string,
+    width: number,
+  ): ColDef<RowData> => ({
+    field,
+    headerName,
+    width,
+    minWidth: width - 8,
+    maxWidth: width + 24,
+    sortable: true,
+    type: "numericColumn",
+    cellClass: "tabular-nums",
+    valueFormatter: (p) =>
+      typeof p.value === "number" && !Number.isNaN(p.value) ? String(p.value) : "—",
+  });
+
   const columnDefs = useMemo<ColDef<RowData>[]>(
     () => [
       agGridRowNumberColDef,
       {
         field: "itemCode",
         headerName: "Item Code",
-        width: 130,
+        width: 118,
+        minWidth: 100,
       },
       {
         field: "itemName",
         headerName: "Item Name",
-        minWidth: 160,
+        flex: 1,
+        minWidth: 140,
       },
       {
         field: "warehouseName",
         headerName: "Warehouse",
-        minWidth: 140,
+        minWidth: 120,
+        width: 140,
       },
-      {
-        field: "qtyOnHand",
-        headerName: "Qty On Hand",
-        width: 120,
-      },
+      qtyCol("qtyOnHand", "Total quantity", 112),
+      qtyCol("reservedQty", "Reserved", 96),
+      qtyCol("availableQty", "Available", 100),
+      qtyCol("outgoingQty", "Outgoing", 96),
+      qtyCol("incomingQty", "Incoming", 96),
     ],
     [],
   );
@@ -363,6 +412,7 @@ export function StockBalancesListPage() {
             rowSelection={{ mode: "multiRow", checkboxes: true, headerCheckbox: true, enableClickSelection: true }}
             selectionColumnDef={agGridSelectionColumnDef}
             getRowId={(params) => params.data.id}
+            getRowClass={getRowClass}
             onSelectionChanged={onSelectionChanged}
           />
         </AgGridContainer>

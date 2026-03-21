@@ -2,6 +2,7 @@ import type { Issue } from "../../shared/issues";
 import { actionIssue, actionWarning } from "../../shared/issues";
 import { shipmentRepository } from "./repository";
 import { salesOrderRepository } from "../sales-orders/repository";
+import { stockReservationRepository } from "../stock-reservations/repository";
 import { warehouseRepository } from "../warehouses/repository";
 import { itemRepository } from "../items/repository";
 import { stockMovementRepository } from "../stock-movements/repository";
@@ -25,6 +26,7 @@ import {
   computeSalesOrderFulfillment,
   getSalesOrderOrderedQtyByItemId,
 } from "../../shared/planningFulfillment";
+import { reconcileSalesOrderReservations } from "../../shared/soReservationReconcile";
 
 export type PostResult = { success: true } | { success: false; issues: Issue[] };
 export type CancelDocumentResult =
@@ -60,6 +62,18 @@ export function validateShipmentFull(shipmentId: string): Issue[] {
       issues.push(actionIssue("Related sales order is required."));
     } else if (so.status !== "confirmed") {
       issues.push(actionIssue("Related sales order must be confirmed before posting."));
+    } else {
+      reconcileSalesOrderReservations(soIdTrimmed, {
+        reason: "shipment_validation",
+        emitAudit: false,
+      });
+      const sowh = normalizeTrim(so.warehouseId);
+      const shwh = normalizeTrim(shipment.warehouseId);
+      if (sowh !== "" && shwh !== "" && sowh !== shwh) {
+        issues.push(
+          actionIssue("Shipment warehouse must match the related sales order warehouse."),
+        );
+      }
     }
   }
 
@@ -135,6 +149,27 @@ export function validateShipmentFull(shipmentId: string): Issue[] {
             );
           }
         }
+
+        for (const line of lines) {
+          const itemIdTrimmed = normalizeTrim(line.itemId);
+          if (itemIdTrimmed === "") continue;
+          const q = parseDocumentLineQty(line.qty);
+          if (q === null || q <= 0) continue;
+          const reserved = stockReservationRepository.sumActiveQtyForSalesOrderItem(
+            soIdForMatch,
+            itemIdTrimmed,
+            shipment.warehouseId,
+          );
+          if (reserved < q) {
+            const item = itemRepository.getById(itemIdTrimmed);
+            const code = item?.code ?? itemIdTrimmed;
+            issues.push(
+              actionIssue(
+                `Item ${code}: insufficient reserved quantity to post (${reserved} reserved, ${q} required). Use Allocate stock on the related sales order.`,
+              ),
+            );
+          }
+        }
       }
 
       for (const line of lines) {
@@ -175,6 +210,45 @@ export function post(shipmentId: string): PostResult {
   const lines = shipmentRepository.listLines(shipmentId);
   const now = new Date().toISOString();
 
+  let totalReservationConsumed = 0;
+  for (const line of lines) {
+    const q = parseDocumentLineQty(line.qty) ?? 0;
+    if (q <= 0) continue;
+    const ok = stockReservationRepository.tryConsumeActiveForSalesOrderItem(
+      shipment.salesOrderId,
+      line.itemId,
+      q,
+      shipment.warehouseId,
+    );
+    if (!ok) {
+      return {
+        success: false,
+        issues: [
+          actionIssue(
+            "Could not consume stock reservations. Refresh and try again, or re-allocate on the sales order.",
+          ),
+        ],
+      };
+    }
+    totalReservationConsumed += q;
+  }
+
+  if (totalReservationConsumed > 0) {
+    const soDoc = salesOrderRepository.getById(shipment.salesOrderId);
+    appendAuditEvent({
+      entityType: "sales_order",
+      entityId: shipment.salesOrderId,
+      eventType: "reservation_consumed",
+      actor: AUDIT_ACTOR_LOCAL_USER,
+      payload: {
+        documentNumber: soDoc?.number ?? "",
+        consumedQty: totalReservationConsumed,
+        shipmentId,
+        shipmentNumber: shipment.number,
+      },
+    });
+  }
+
   for (const line of lines) {
     stockMovementRepository.create({
       datetime: now,
@@ -201,9 +275,13 @@ export function post(shipmentId: string): PostResult {
   const prevStatus = shipment.status;
   shipmentRepository.update(shipmentId, { status: "posted" });
   const soFulfillment = computeSalesOrderFulfillment(shipment.salesOrderId);
+  const nextSoStatus = soFulfillment.state === "complete" ? "closed" : "confirmed";
   salesOrderRepository.update(shipment.salesOrderId, {
-    status: soFulfillment.state === "complete" ? "closed" : "confirmed",
+    status: nextSoStatus,
   });
+  if (nextSoStatus === "closed") {
+    reconcileSalesOrderReservations(shipment.salesOrderId, { reason: "sales_order_closed" });
+  }
   appendAuditEvent({
     entityType: "shipment",
     entityId: shipmentId,
@@ -321,6 +399,8 @@ export function reverseDocument(
   });
 
   salesOrderRepository.update(shipment.salesOrderId, { status: "confirmed" });
+
+  reconcileSalesOrderReservations(shipment.salesOrderId, { reason: "shipment_reversal" });
 
   appendAuditEvent({
     entityType: "shipment",

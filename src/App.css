@@ -642,6 +642,11 @@ body,
   cursor: pointer;
 }
 
+/* Stock balances: subtle left accent when available < 0 or available < open outgoing demand */
+.list-page__content > .stock-balances-grid.ag-theme-quartz-dark .ag-row.stock-balances-row--tight-availability .ag-cell:first-child {
+  box-shadow: inset 2px 0 0 0 hsl(32 50% 44% / 0.5);
+}
+
 /* Active/Inactive as plain text only (no pill) — scoped to grid cells */
 .list-page__content .ag-theme-quartz-dark .ag-cell .status-plain-text {
   font-size: inherit;

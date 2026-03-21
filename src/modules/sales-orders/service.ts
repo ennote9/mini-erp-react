@@ -36,7 +36,16 @@ import {
   computeSalesOrderFulfillment,
   isSalesOrderShipmentFulfillmentComplete,
 } from "../../shared/planningFulfillment";
+import { stockReservationRepository } from "../stock-reservations/repository";
+import { stockBalanceRepository } from "../stock-balances/repository";
+import { reconcileSalesOrderReservations } from "../../shared/soReservationReconcile";
 import type { SalesOrder } from "./model";
+
+export { reconcileSalesOrderReservations };
+export type {
+  ReconcileSalesOrderReservationsReason,
+  ReconcileSalesOrderReservationsResult,
+} from "../../shared/soReservationReconcile";
 
 export type ConfirmResult = { success: true } | { success: false; error: string };
 export type CancelDocumentResult =
@@ -62,6 +71,10 @@ export type SaveDraftInput = {
 };
 export type SaveDraftResult =
   | { success: true; id: string }
+  | { success: false; error: string };
+
+export type AllocateStockResult =
+  | { success: true; linesTouched: number }
   | { success: false; error: string };
 
 function validateSaveDraft(data: SaveDraftInput): string | null {
@@ -202,6 +215,7 @@ export function saveDraft(
       newLinesFromDb: newLines,
       itemCode: itemCodeForAudit,
     });
+    reconcileSalesOrderReservations(existingId, { reason: "save_draft" });
     return { success: true, id: existingId };
   }
   const created = salesOrderRepository.create(header, lines);
@@ -259,6 +273,7 @@ export function confirm(soId: string): ConfirmResult {
   if (err) return { success: false, error: err };
   const so = salesOrderRepository.getById(soId)!;
   salesOrderRepository.update(soId, { status: "confirmed" });
+  reconcileSalesOrderReservations(soId, { reason: "confirm" });
   appendAuditEvent({
     entityType: "sales_order",
     entityId: soId,
@@ -271,6 +286,60 @@ export function confirm(soId: string): ConfirmResult {
     },
   });
   return { success: true };
+}
+
+export function allocateStock(soId: string): AllocateStockResult {
+  const so = salesOrderRepository.getById(soId);
+  if (!so) return { success: false, error: "Sales order not found." };
+  if (so.status !== "confirmed") {
+    return { success: false, error: "Only confirmed sales orders can allocate stock." };
+  }
+  const warehouseId = normalizeTrim(so.warehouseId);
+  if (warehouseId === "") return { success: false, error: "Warehouse is required." };
+
+  reconcileSalesOrderReservations(soId, { reason: "allocate_stock" });
+
+  const fulfillment = computeSalesOrderFulfillment(soId);
+  let linesTouched = 0;
+
+  for (const line of fulfillment.lines) {
+    const R = stockReservationRepository.getActiveQtyForSalesOrderLine(soId, line.lineId);
+    if (line.remainingQty <= 0) {
+      if (R > 0) linesTouched++;
+      stockReservationRepository.upsertActiveForSalesOrderLine({
+        salesOrderId: soId,
+        salesOrderLineId: line.lineId,
+        warehouseId,
+        itemId: line.itemId,
+        qty: 0,
+      });
+      continue;
+    }
+    const T = stockReservationRepository.sumActiveQtyForWarehouseItem(warehouseId, line.itemId);
+    const onHand =
+      stockBalanceRepository.getByItemAndWarehouse(line.itemId, warehouseId)?.qtyOnHand ?? 0;
+    const cap = Math.min(line.remainingQty, Math.max(0, onHand - (T - R)));
+    if (cap !== R) linesTouched++;
+    stockReservationRepository.upsertActiveForSalesOrderLine({
+      salesOrderId: soId,
+      salesOrderLineId: line.lineId,
+      warehouseId,
+      itemId: line.itemId,
+      qty: cap,
+    });
+  }
+
+  appendAuditEvent({
+    entityType: "sales_order",
+    entityId: soId,
+    eventType: "stock_allocated",
+    actor: AUDIT_ACTOR_LOCAL_USER,
+    payload: {
+      documentNumber: so.number,
+      linesTouched,
+    },
+  });
+  return { success: true, linesTouched };
 }
 
 export function cancelDocument(
@@ -289,6 +358,7 @@ export function cancelDocument(
   const code = input.cancelReasonCode as CancelDocumentReasonCode;
   const comment = normalizeCancelReasonComment(input.cancelReasonComment);
   const prevStatus = so.status;
+  const reservationsReleased = stockReservationRepository.releaseAllActiveForSalesOrder(soId);
   salesOrderRepository.update(soId, {
     status: "cancelled",
     cancelReasonCode: code,
@@ -307,6 +377,19 @@ export function cancelDocument(
       cancelReasonComment: comment ?? null,
     },
   });
+  if (reservationsReleased > 0) {
+    appendAuditEvent({
+      entityType: "sales_order",
+      entityId: soId,
+      eventType: "reservation_released",
+      actor: AUDIT_ACTOR_LOCAL_USER,
+      payload: {
+        documentNumber: so.number,
+        reservationsReleased,
+        reason: "sales_order_cancelled",
+      },
+    });
+  }
   return { success: true };
 }
 
@@ -365,4 +448,6 @@ export const salesOrderService = {
   cancelDocument,
   createShipment,
   saveDraft,
+  allocateStock,
+  reconcileSalesOrderReservations,
 };

@@ -11,6 +11,10 @@ const LABELS: Record<AuditEventType, string> = {
   document_posted: "Posted",
   document_cancelled: "Cancelled",
   document_reversed: "Reversed",
+  stock_allocated: "Stock allocated",
+  reservation_released: "Reservations released",
+  reservation_reconciled: "Reservations reconciled",
+  reservation_consumed: "Reservation consumed",
   line_added: "Line added",
   line_removed: "Line removed",
   line_qty_changed: "Quantity changed",
@@ -47,6 +51,26 @@ export function auditEventSummary(payload: Record<string, unknown>): string {
 
   if (typeof payload.movementLineCount === "number") {
     parts.push(`${payload.movementLineCount} movement line(s)`);
+  }
+
+  if (typeof payload.linesTouched === "number") {
+    parts.push(`${payload.linesTouched} line(s) updated`);
+  }
+
+  if (typeof payload.reservationsReleased === "number") {
+    parts.push(`${payload.reservationsReleased} released`);
+  }
+
+  if (typeof payload.releasedRows === "number") {
+    parts.push(`${payload.releasedRows} row(s) released`);
+  }
+
+  if (typeof payload.shrunkLines === "number" && payload.shrunkLines > 0) {
+    parts.push(`${payload.shrunkLines} line(s) shrunk`);
+  }
+
+  if (typeof payload.consumedQty === "number") {
+    parts.push(`consumed ${payload.consumedQty}`);
   }
 
   if (typeof payload.itemCode === "string" || typeof payload.itemId === "string") {
