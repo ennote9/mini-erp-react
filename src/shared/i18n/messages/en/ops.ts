@@ -178,6 +178,14 @@ export const opsEn = {
       searchAria: "Search warehouses",
       searchPlaceholder: "Search",
     },
+    carriers: {
+      emptyFiltered: "No carriers match current search or filters",
+      emptyDefault: "No carriers yet",
+      hintFilter: "Try changing the search or filter.",
+      hintCreate: "Create a carrier for future shipment logistics.",
+      searchAria: "Search carriers",
+      searchPlaceholder: "Search",
+    },
     purchaseOrders: {
       emptyFiltered: "No purchase orders match current search or filters",
       emptyDefault: "No purchase orders yet",
@@ -252,15 +260,19 @@ export const opsEn = {
         "No shipments include this item on any line. Try clearing the item filter.",
       hintSoOnly: "No shipments for this sales order. Try clearing the SO filter.",
       hintUrlFilters:
-        "Try changing the search, status filter, or URL filters (customer, warehouse, item, SO).",
+        "Try changing the search, status filter, or URL filters (customer, warehouse, carrier, item, SO).",
       hintSearchStatusWarehouse:
-        "Try changing the search, status filter, or warehouse filter.",
+        "Try changing the search, status filter, warehouse filter, or carrier filter.",
+      hintCarrierOnly:
+        "No shipments for this carrier. Try clearing the carrier filter.",
       searchAria: "Search shipments",
-      searchPlaceholder: "Search",
+      searchPlaceholder: "Number, order, carrier, tracking…",
       filterWarehouseAria: "Warehouse filter active",
+      filterCarrierAria: "Carrier filter active",
       filterItemAria: "Item filter active",
       filterCustomerAria: "Customer filter active",
       filterSalesOrderAria: "Sales order filter active",
+      openTracking: "Open tracking",
     },
   },
   stockMovements: {

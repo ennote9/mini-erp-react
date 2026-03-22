@@ -213,4 +213,30 @@ export const kkMasterPages: MessageTree = {
     colPurchaseOrder: "Сатып алу тапсырысы",
     colSalesOrder: "Сату тапсырысы",
   },
+  carrier: {
+    notFound: "Тасымалдаушы табылмады.",
+    titleNew: "Жаңа тасымалдаушы",
+    titleWithCode: "Тасымалдаушы {{code}}",
+    backToListAria: "Тасымалдаушылар тізіміне оралу",
+    listBreadcrumb: "Тасымалдаушылар",
+    detailsDescription: "Код, атауы, түрі, байланыс және күйі.",
+    codePlaceholder: "мысалы CDEK",
+    namePlaceholder: "Тасымалдаушы атауы",
+    logisticsSectionTitle: "Бақылау және қызмет (міндетті емес)",
+    logisticsSectionDescription:
+      "Келешек жөнелтулер үшін: URL үлгісінде {{trackingNumber}} орнын қолдануға болады.",
+    trackingUrlPlaceholder: "https://example.com/track?no={{trackingNumber}}",
+    serviceLevelPlaceholder: "мысалы Стандарт, Экспресс",
+    addressSectionTitle: "Мекенжай",
+    addressSectionDescription: "Ел, қала және көше.",
+    futureShipmentsHint:
+      "Тасымалдаушылар мұнда тек анықтамалық; жөнелтуге байлауды кейін қосуға болады.",
+    types: {
+      courier: "Курьерлік қызмет",
+      postal: "Пошта",
+      transport_company: "Көлік компаниясы",
+      own_delivery: "Өз жеткізуі",
+      marketplace_logistics: "Маркетплейс логистикасы",
+    },
+  },
 };

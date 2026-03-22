@@ -31,6 +31,8 @@ export const kkIssuesMessages: MessageTree = {
     paymentTermsNegative: "Төлем мерзімі теріс болмауы керек.",
     paymentTermsDaysForm:
       "Төлем мерзімі — күн саны бүтін сан ≥ 0 немесе бос қалдырыңыз.",
+    carrierTypeRequired: "Тасымалдаушы түрі міндетті.",
+    carrierTypeInvalid: "Жарамды тасымалдаушы түрін таңдаңыз.",
   },
   document: {
     supplierRequired: "Жеткізуші міндетті.",
@@ -106,6 +108,8 @@ export const kkIssuesMessages: MessageTree = {
     reservationConsumeFailed:
       "Резервтерді жою мүмкін болмады. Жаңартыңыз немесе сату тапсырысында қайта резервтеңіз.",
     onlyDraftCancel: "Тек жоба жөнелтулерін болдырмауға болады.",
+    onlyDraftEdit: "Тек жоба жөнелтулерін өңдеуге болады.",
+    invalidCarrierReference: "Таңдалған тасымалдаушы жарамсыз.",
     alreadyReversed: "Бұл жөнелту қазірдің өзінде кері қайтарылған.",
     onlyPostedReverse: "Тек жүргізілген жөнелтулерді кері қайтаруға болады.",
     noLinesReverse: "Жолдар жоқ; кері қайтару мүмкін емес.",
@@ -127,6 +131,8 @@ export const kkIssuesMessages: MessageTree = {
     supplierDuplicate: "Мұндай кодты жеткізуші бар.",
     customerDuplicate: "Мұндай кодты клиент бар.",
     warehouseDuplicate: "Мұндай кодты қойма бар.",
+    carrierDuplicate: "Мұндай кодты тасымалдаушы бар.",
+    carrierNotFound: "Тасымалдаушы табылмады.",
     itemDuplicate: "Мұндай кодты тауар бар.",
     brandNotFound: "Бренд табылмады.",
     categoryNotFound: "Санат табылмады.",

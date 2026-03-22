@@ -4,6 +4,7 @@ import { shipmentRepository } from "./repository";
 import { salesOrderRepository } from "../sales-orders/repository";
 import { stockReservationRepository } from "../stock-reservations/repository";
 import { warehouseRepository } from "../warehouses/repository";
+import { carrierRepository } from "../carriers/repository";
 import { itemRepository } from "../items/repository";
 import { stockMovementRepository } from "../stock-movements/repository";
 import { stockBalanceRepository } from "../stock-balances/repository";
@@ -114,6 +115,18 @@ export function validateShipmentFull(shipmentId: string): Issue[] {
       issues.push(
         actionIssue("Selected warehouse is inactive.", {
           key: "issues.shipment.warehouseInactive",
+        }),
+      );
+    }
+  }
+
+  const carrierIdTrimmed = normalizeTrim(shipment.carrierId ?? "");
+  if (carrierIdTrimmed !== "") {
+    const carrier = carrierRepository.getById(carrierIdTrimmed);
+    if (!carrier) {
+      issues.push(
+        actionIssue("Selected carrier is not valid.", {
+          key: "issues.shipment.invalidCarrierReference",
         }),
       );
     }
@@ -506,8 +519,45 @@ export function reverseDocument(
   return { success: true };
 }
 
+export type UpdateShipmentDraftLogisticsInput = {
+  carrierId?: string;
+  trackingNumber?: string;
+};
+
+export type UpdateShipmentDraftLogisticsResult =
+  | { success: true }
+  | { success: false; error: string };
+
+/**
+ * Phase-1: persist optional carrier + tracking on draft shipments only.
+ */
+export function updateShipmentDraftLogistics(
+  shipmentId: string,
+  input: UpdateShipmentDraftLogisticsInput,
+): UpdateShipmentDraftLogisticsResult {
+  const shipment = shipmentRepository.getById(shipmentId);
+  if (!shipment) return { success: false, error: "Shipment not found." };
+  if (shipment.status !== "draft") {
+    return { success: false, error: "Only draft shipments can be edited." };
+  }
+
+  const carrierRaw = input.carrierId != null ? normalizeTrim(input.carrierId) : "";
+  const carrierId = carrierRaw === "" ? undefined : carrierRaw;
+  if (carrierId !== undefined) {
+    const c = carrierRepository.getById(carrierId);
+    if (!c) return { success: false, error: "Selected carrier is not valid." };
+  }
+
+  const trRaw = input.trackingNumber != null ? normalizeTrim(input.trackingNumber) : "";
+  const trackingNumber = trRaw === "" ? undefined : trRaw;
+
+  shipmentRepository.update(shipmentId, { carrierId, trackingNumber });
+  return { success: true };
+}
+
 export const shipmentService = {
   post,
   cancelDocument,
   reverseDocument,
+  updateShipmentDraftLogistics,
 };

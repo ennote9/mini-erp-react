@@ -212,4 +212,30 @@ export const ruMasterPages: MessageTree = {
     colPurchaseOrder: "Заказ поставщику",
     colSalesOrder: "Заказ клиента",
   },
+  carrier: {
+    notFound: "Перевозчик не найден.",
+    titleNew: "Новый перевозчик",
+    titleWithCode: "Перевозчик {{code}}",
+    backToListAria: "Назад к списку перевозчиков",
+    listBreadcrumb: "Перевозчики",
+    detailsDescription: "Код, наименование, тип, контакты и статус перевозчика.",
+    codePlaceholder: "напр. CDEK",
+    namePlaceholder: "Наименование перевозчика",
+    logisticsSectionTitle: "Трекинг и услуга (необязательно)",
+    logisticsSectionDescription:
+      "Для будущих отгрузок: в шаблоне URL можно использовать {{trackingNumber}}.",
+    trackingUrlPlaceholder: "https://example.com/track?no={{trackingNumber}}",
+    serviceLevelPlaceholder: "напр. Стандарт, Экспресс",
+    addressSectionTitle: "Адрес",
+    addressSectionDescription: "Страна, город и улица.",
+    futureShipmentsHint:
+      "Перевозчики здесь только в НСИ; привязку к отгрузкам можно добавить позже.",
+    types: {
+      courier: "Курьерская служба",
+      postal: "Почта",
+      transport_company: "Транспортная компания",
+      own_delivery: "Собственная доставка",
+      marketplace_logistics: "Логистика маркетплейса",
+    },
+  },
 };

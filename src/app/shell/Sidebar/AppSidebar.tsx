@@ -11,6 +11,7 @@ import {
   ShoppingCart,
   Tag,
   Truck,
+  Route,
   User,
   Users,
   Warehouse,
@@ -51,6 +52,7 @@ const nav: ReadonlyArray<{ groupKey: string; links: readonly NavLinkItem[] }> = 
       { labelKey: "shell.nav.suppliers", to: "/suppliers", icon: Truck },
       { labelKey: "shell.nav.customers", to: "/customers", icon: Users },
       { labelKey: "shell.nav.warehouses", to: "/warehouses", icon: Warehouse },
+      { labelKey: "shell.nav.carriers", to: "/carriers", icon: Route },
     ],
   },
   {

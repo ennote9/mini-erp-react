@@ -17,6 +17,7 @@ import {
   NAME_MIN_LENGTH,
   UOM_MAX_LENGTH,
 } from "./validation";
+import { isCarrierTypeId } from "../modules/carriers/model";
 
 export type ItemFormHealthInput = {
   code: string;
@@ -353,6 +354,92 @@ export function getWarehouseFormHealth(input: WarehouseFormHealthInput): { issue
       ? "issues.master.phoneDigit"
       : "issues.master.phoneFormat";
     issues.push(fieldIssue("error", "phone", phoneErr, { key }));
+  }
+  return { issues };
+}
+
+export type CarrierFormHealthInput = {
+  code: string;
+  name: string;
+  carrierType: string;
+  phone: string;
+  email: string;
+  paymentTermsDays: string;
+};
+
+export function getCarrierFormHealth(input: CarrierFormHealthInput): { issues: Issue[] } {
+  const issues: Issue[] = [];
+  const codeErr = validateRequired(input.code, "Code");
+  if (codeErr)
+    issues.push(
+      fieldIssue("error", "code", codeErr, { key: "issues.master.codeRequired" }),
+    );
+  const nameErr = validateRequired(input.name, "Name");
+  if (nameErr)
+    issues.push(
+      fieldIssue("error", "name", nameErr, { key: "issues.master.nameRequired" }),
+    );
+  else {
+    const t = normalizeTrim(input.name);
+    if (t.length > 0 && t.length < NAME_MIN_LENGTH)
+      issues.push(
+        fieldIssue(
+          "error",
+          "name",
+          `Name must be at least ${NAME_MIN_LENGTH} characters.`,
+          {
+            key: "issues.master.nameMinLength",
+            params: { min: NAME_MIN_LENGTH },
+          },
+        ),
+      );
+  }
+  const ct = normalizeTrim(input.carrierType);
+  if (ct === "")
+    issues.push(
+      fieldIssue("error", "carrierType", "Carrier type is required.", {
+        key: "issues.master.carrierTypeRequired",
+      }),
+    );
+  else if (!isCarrierTypeId(ct))
+    issues.push(
+      fieldIssue("error", "carrierType", "Select a valid carrier type.", {
+        key: "issues.master.carrierTypeInvalid",
+      }),
+    );
+  const phoneErr = validatePhone(input.phone);
+  if (phoneErr) {
+    const key = phoneErr.includes("digit")
+      ? "issues.master.phoneDigit"
+      : "issues.master.phoneFormat";
+    issues.push(fieldIssue("error", "phone", phoneErr, { key }));
+  }
+  const emailErr = validateEmail(input.email);
+  if (emailErr)
+    issues.push(
+      fieldIssue("error", "email", emailErr, { key: "issues.master.emailInvalid" }),
+    );
+  const pt = input.paymentTermsDays.trim();
+  if (pt !== "") {
+    const n = Number(pt);
+    if (Number.isNaN(n))
+      issues.push(
+        fieldIssue(
+          "error",
+          "paymentTermsDays",
+          "Payment terms must be a valid number.",
+          { key: "issues.master.paymentTermsInvalid" },
+        ),
+      );
+    else if (n < 0)
+      issues.push(
+        fieldIssue(
+          "error",
+          "paymentTermsDays",
+          "Payment terms cannot be negative.",
+          { key: "issues.master.paymentTermsNegative" },
+        ),
+      );
   }
   return { issues };
 }

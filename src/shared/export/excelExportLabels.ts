@@ -31,5 +31,5 @@ export type ShipmentExcelLabels = {
   linesSheetName: string;
   documentSheetName: string;
   shipmentLineHeaders: readonly [string, string, string, string, string, string, string];
-  shipmentDocumentLabels: readonly [string, string, string, string, string];
+  shipmentDocumentLabels: readonly [string, string, string, string, string, string, string];
 };

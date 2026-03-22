@@ -91,6 +91,8 @@ export function shipmentExcelExportLabels(t: TFunction): ShipmentExcelLabels {
       t("exportExcel.doc.labelDate"),
       t("exportExcel.doc.labelRelatedSalesOrder"),
       t("exportExcel.doc.labelWarehouse"),
+      t("exportExcel.doc.labelCarrier"),
+      t("exportExcel.doc.labelTrackingNumber"),
       t("exportExcel.doc.labelComment"),
     ] as ShipmentExcelLabels["shipmentDocumentLabels"],
   };

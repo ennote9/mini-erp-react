@@ -37,6 +37,21 @@ export function warehousesListExcelLabels(t: TFunction): ExcelListSheetLabels {
   };
 }
 
+export function carriersListExcelLabels(t: TFunction): ExcelListSheetLabels {
+  return {
+    sheetName: t("exportExcel.list.carriers"),
+    headers: [
+      t("exportExcel.list.colNo"),
+      t("exportExcel.list.colCode"),
+      t("exportExcel.list.colName"),
+      t("exportExcel.list.colCarrierType"),
+      t("exportExcel.list.colPhone"),
+      t("exportExcel.list.colEmail"),
+      t("exportExcel.list.colActive"),
+    ],
+  };
+}
+
 export function suppliersListExcelLabels(t: TFunction): ExcelListSheetLabels {
   return {
     sheetName: t("exportExcel.list.suppliers"),
@@ -133,6 +148,8 @@ export function shipmentsListExcelLabels(t: TFunction): ExcelListSheetLabels {
       t("exportExcel.list.colDate"),
       t("exportExcel.list.colSalesOrder"),
       t("exportExcel.list.colWarehouse"),
+      t("exportExcel.list.colCarrier"),
+      t("exportExcel.list.colTrackingNumber"),
       t("exportExcel.list.colStatus"),
     ],
   };

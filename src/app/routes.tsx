@@ -7,6 +7,7 @@ import { CategoriesListPage, CategoryPage } from "../modules/categories";
 import { SuppliersListPage, SupplierPage } from "../modules/suppliers";
 import { CustomersListPage, CustomerPage } from "../modules/customers";
 import { WarehousesListPage, WarehousePage } from "../modules/warehouses";
+import { CarriersListPage, CarrierPage } from "../modules/carriers";
 import {
   PurchaseOrdersListPage,
   PurchaseOrderPage,
@@ -42,6 +43,8 @@ export function AppRoutes() {
         <Route path="customers/:id" element={<CustomerPage />} />
         <Route path="warehouses" element={<WarehousesListPage />} />
         <Route path="warehouses/:id" element={<WarehousePage />} />
+        <Route path="carriers" element={<CarriersListPage />} />
+        <Route path="carriers/:id" element={<CarrierPage />} />
         <Route path="purchase-orders" element={<PurchaseOrdersListPage />} />
         <Route path="purchase-orders/:id" element={<PurchaseOrderPage />} />
         <Route path="receipts" element={<ReceiptsListPage />} />

@@ -31,6 +31,8 @@ export const ruIssuesMessages: MessageTree = {
     paymentTermsNegative: "Срок оплаты не может быть отрицательным.",
     paymentTermsDaysForm:
       "Срок оплаты — целое число дней ≥ 0 или оставьте поле пустым.",
+    carrierTypeRequired: "Тип перевозчика обязателен.",
+    carrierTypeInvalid: "Выберите допустимый тип перевозчика.",
   },
   document: {
     supplierRequired: "Поставщик обязателен.",
@@ -106,6 +108,8 @@ export const ruIssuesMessages: MessageTree = {
     reservationConsumeFailed:
       "Не удалось списать резервы. Обновите документ или выполните резервирование в заказе клиента снова.",
     onlyDraftCancel: "Отменять можно только черновики отгрузок.",
+    onlyDraftEdit: "Редактировать можно только черновики отгрузок.",
+    invalidCarrierReference: "Выбранный перевозчик недействителен.",
     alreadyReversed: "Эта отгрузка уже сторнирована.",
     onlyPostedReverse: "Сторнировать можно только проведённые отгрузки.",
     noLinesReverse: "Нет строк отгрузки; сторно невозможно.",
@@ -127,6 +131,8 @@ export const ruIssuesMessages: MessageTree = {
     supplierDuplicate: "Поставщик с таким кодом уже существует.",
     customerDuplicate: "Клиент с таким кодом уже существует.",
     warehouseDuplicate: "Склад с таким кодом уже существует.",
+    carrierDuplicate: "Перевозчик с таким кодом уже существует.",
+    carrierNotFound: "Перевозчик не найден.",
     itemDuplicate: "Позиция с таким кодом уже существует.",
     brandNotFound: "Бренд не найден.",
     categoryNotFound: "Категория не найдена.",

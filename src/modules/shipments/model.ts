@@ -18,6 +18,10 @@ export interface Shipment {
   /** Set when status is `reversed` (posted shipment was reversed). */
   reversalReasonCode?: ReversalDocumentReasonCode;
   reversalReasonComment?: string;
+  /** Optional delivery partner (Carriers master data). */
+  carrierId?: string;
+  /** Optional tracking / waybill reference (trimmed; empty not stored). */
+  trackingNumber?: string;
 }
 
 /**

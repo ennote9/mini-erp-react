@@ -15,6 +15,7 @@ import {
   Truck,
   Users,
   Warehouse,
+  Route,
 } from "lucide-react";
 import { useTranslation } from "@/shared/i18n";
 
@@ -26,6 +27,7 @@ const PAGE_TITLES: Record<string, string> = {
   "/suppliers": "routes.suppliers",
   "/customers": "routes.customers",
   "/warehouses": "routes.warehouses",
+  "/carriers": "routes.carriers",
   "/purchase-orders": "routes.purchaseOrders",
   "/receipts": "routes.receipts",
   "/sales-orders": "routes.salesOrders",
@@ -42,6 +44,7 @@ function getPageTitleKey(pathname: string): string {
   if (pathname.match(/^\/suppliers\/[^/]+$/)) return "routes.supplier";
   if (pathname.match(/^\/customers\/[^/]+$/)) return "routes.customer";
   if (pathname.match(/^\/warehouses\/[^/]+$/)) return "routes.warehouse";
+  if (pathname.match(/^\/carriers\/[^/]+$/)) return "routes.carrier";
   if (pathname.match(/^\/purchase-orders\/[^/]+$/)) return "routes.purchaseOrder";
   if (pathname.match(/^\/receipts\/[^/]+$/)) return "routes.receipt";
   if (pathname.match(/^\/sales-orders\/[^/]+$/)) return "routes.salesOrder";
@@ -63,6 +66,7 @@ function getPageIcon(
     return Users;
   if (pathname === "/warehouses" || pathname.match(/^\/warehouses\/[^/]+$/))
     return Warehouse;
+  if (pathname === "/carriers" || pathname.match(/^\/carriers\/[^/]+$/)) return Route;
   if (
     pathname === "/purchase-orders" ||
     pathname.match(/^\/purchase-orders\/[^/]+$/)

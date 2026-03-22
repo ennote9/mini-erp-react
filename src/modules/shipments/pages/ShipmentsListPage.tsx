@@ -5,7 +5,9 @@ import type { ColDef, ICellRendererParams, SelectionChangedEvent } from "ag-grid
 import { shipmentRepository } from "../repository";
 import { salesOrderRepository } from "../../sales-orders/repository";
 import { warehouseRepository } from "../../warehouses/repository";
+import { carrierRepository } from "../../carriers/repository";
 import type { Shipment } from "../model";
+import { buildShipmentListRowExtras } from "../shipmentListRowExtras";
 import type { FactualDocumentStatus } from "../../../shared/domain";
 import { ListPageLayout } from "../../../shared/ui/list/ListPageLayout";
 import { EmptyState } from "../../../shared/ui/feedback/EmptyState";
@@ -40,16 +42,26 @@ type StatusFilter = "all" | FactualDocumentStatus;
 type RowData = Shipment & {
   salesOrderNumber: string;
   warehouseName: string;
+  carrierLabel: string;
+  carrierExport: string;
+  trackingLabel: string;
+  trackingExport: string;
+  carrierSearchBlob: string;
+  trackingRaw: string;
+  trackingUrl: string | null;
 };
 
 function filterBySearch(rows: RowData[], query: string): RowData[] {
   const q = query.trim().toLowerCase();
   if (!q) return rows;
-  return rows.filter(
-    (r) =>
-      r.number.toLowerCase().includes(q) ||
-      r.salesOrderNumber.toLowerCase().includes(q),
-  );
+  return rows.filter((r) => {
+    if (r.number.toLowerCase().includes(q)) return true;
+    if (r.salesOrderNumber.toLowerCase().includes(q)) return true;
+    if (r.warehouseName.toLowerCase().includes(q)) return true;
+    if (r.carrierSearchBlob.includes(q)) return true;
+    if (r.trackingRaw.toLowerCase().includes(q)) return true;
+    return false;
+  });
 }
 
 function filterByStatus(rows: RowData[], statusFilter: StatusFilter): RowData[] {
@@ -60,6 +72,11 @@ function filterByStatus(rows: RowData[], statusFilter: StatusFilter): RowData[] 
 function filterByWarehouseId(rows: RowData[], warehouseId: string | null): RowData[] {
   if (warehouseId == null) return rows;
   return rows.filter((r) => r.warehouseId === warehouseId);
+}
+
+function filterByCarrierId(rows: RowData[], carrierId: string | null): RowData[] {
+  if (carrierId == null) return rows;
+  return rows.filter((r) => (r.carrierId?.trim() ?? "") === carrierId);
 }
 
 function StatusCellRenderer(params: ICellRendererParams<RowData>) {
@@ -75,8 +92,35 @@ function buildExportRowsFromShipments(rows: RowData[]): ShipmentsExportRow[] {
     date: r.date ?? "",
     salesOrder: r.salesOrderNumber ?? "",
     warehouse: r.warehouseName ?? "",
+    carrier: r.carrierExport ?? "",
+    trackingNumber: r.trackingExport ?? "",
     status: r.status ?? "",
   }));
+}
+
+function TrackingListCellRenderer(params: ICellRendererParams<RowData>) {
+  const { t } = useTranslation();
+  const data = params.data;
+  if (!data) return null;
+  return (
+    <div className="flex items-center gap-2 min-w-0 w-full">
+      <span className="truncate min-w-0" title={data.trackingRaw || undefined}>
+        {data.trackingLabel}
+      </span>
+      {data.trackingUrl ? (
+        <a
+          href={data.trackingUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="shrink-0 text-xs text-primary underline-offset-4 hover:underline whitespace-nowrap"
+          onClick={(e) => e.stopPropagation()}
+          onAuxClick={(e) => e.stopPropagation()}
+        >
+          {t("ops.list.shipments.openTracking")}
+        </a>
+      ) : null}
+    </div>
+  );
 }
 
 export function ShipmentsListPage() {
@@ -86,8 +130,15 @@ export function ShipmentsListPage() {
   const warehouseFilterId = useMemo(() => {
     const raw = searchParams.get("warehouseId");
     if (raw == null || raw === "") return null;
-    const t = raw.trim();
-    return t === "" ? null : t;
+    const w = raw.trim();
+    return w === "" ? null : w;
+  }, [searchParams]);
+
+  const carrierFilterId = useMemo(() => {
+    const raw = searchParams.get("carrierId");
+    if (raw == null || raw === "") return null;
+    const c = raw.trim();
+    return c === "" ? null : c;
   }, [searchParams]);
 
   const [searchQuery, setSearchQuery] = useState("");
@@ -105,28 +156,34 @@ export function ShipmentsListPage() {
 
   const rowsWithNames = useMemo(() => {
     const list = shipmentRepository.list();
+    const emDash = t("domain.audit.summary.emDash");
+    const unknownCarrier = t("doc.shipment.unknownCarrier");
     return list.map((s) => {
       const so = salesOrderRepository.getById(s.salesOrderId);
       const warehouse = warehouseRepository.getById(s.warehouseId);
+      const x = buildShipmentListRowExtras(s, { emDash, unknownCarrier });
       return {
         ...s,
         salesOrderNumber: so?.number ?? s.salesOrderId,
         warehouseName: warehouse?.name ?? s.warehouseId,
+        ...x,
       };
     });
-  }, []);
+  }, [t, locale]);
 
   const filteredRows = useMemo(() => {
     const bySearch = filterBySearch(rowsWithNames, searchQuery);
     const byWarehouse = filterByWarehouseId(bySearch, warehouseFilterId);
-    return filterByStatus(byWarehouse, statusFilter);
-  }, [rowsWithNames, searchQuery, statusFilter, warehouseFilterId]);
+    const byCarrier = filterByCarrierId(byWarehouse, carrierFilterId);
+    return filterByStatus(byCarrier, statusFilter);
+  }, [rowsWithNames, searchQuery, statusFilter, warehouseFilterId, carrierFilterId]);
 
   const isEmpty = filteredRows.length === 0;
   const hasFilter =
     statusFilter !== "all" ||
     searchQuery.trim() !== "" ||
-    warehouseFilterId != null;
+    warehouseFilterId != null ||
+    carrierFilterId != null;
 
   const warehouseFilterLabel = useMemo((): string => {
     if (warehouseFilterId == null) return "";
@@ -135,9 +192,22 @@ export function ShipmentsListPage() {
     return warehouseFilterId;
   }, [warehouseFilterId]);
 
+  const carrierFilterLabel = useMemo((): string => {
+    if (carrierFilterId == null) return "";
+    const c = carrierRepository.getById(carrierFilterId);
+    if (c) return c.name || c.code || carrierFilterId;
+    return carrierFilterId;
+  }, [carrierFilterId]);
+
   const clearWarehouseFilter = useCallback(() => {
     const next = new URLSearchParams(searchParams);
     next.delete("warehouseId");
+    setSearchParams(next, { replace: true });
+  }, [searchParams, setSearchParams]);
+
+  const clearCarrierFilter = useCallback(() => {
+    const next = new URLSearchParams(searchParams);
+    next.delete("carrierId");
     setSearchParams(next, { replace: true });
   }, [searchParams, setSearchParams]);
 
@@ -214,11 +284,32 @@ export function ShipmentsListPage() {
     if (!hasFilter) {
       return t("ops.list.shipments.hintCreate");
     }
-    if (warehouseFilterId != null && statusFilter === "all" && searchQuery.trim() === "") {
+    if (
+      carrierFilterId != null &&
+      warehouseFilterId == null &&
+      statusFilter === "all" &&
+      searchQuery.trim() === ""
+    ) {
+      return t("ops.list.shipments.hintCarrierOnly");
+    }
+    if (
+      warehouseFilterId != null &&
+      carrierFilterId == null &&
+      statusFilter === "all" &&
+      searchQuery.trim() === ""
+    ) {
       return t("ops.list.shipments.hintWarehouseOnly");
     }
     return t("ops.list.shipments.hintSearchStatusWarehouse");
-  }, [hasFilter, warehouseFilterId, statusFilter, searchQuery, t, locale]);
+  }, [
+    hasFilter,
+    warehouseFilterId,
+    carrierFilterId,
+    statusFilter,
+    searchQuery,
+    t,
+    locale,
+  ]);
 
   const statusOptions = useMemo(
     (): { value: StatusFilter; label: string }[] => [
@@ -253,6 +344,20 @@ export function ShipmentsListPage() {
         field: "warehouseName",
         headerName: t("doc.columns.warehouse"),
         minWidth: 160,
+      },
+      {
+        field: "carrierLabel",
+        headerName: t("doc.shipment.carrier"),
+        minWidth: 140,
+        maxWidth: 220,
+        valueFormatter: (p) => String(p.value ?? ""),
+      },
+      {
+        field: "trackingLabel",
+        headerName: t("doc.shipment.trackingNumber"),
+        minWidth: 160,
+        flex: 1,
+        cellRenderer: TrackingListCellRenderer,
       },
       {
         field: "status",
@@ -293,7 +398,7 @@ export function ShipmentsListPage() {
             aria-label={t("ops.list.shipments.searchAria")}
             resultCount={filteredRows.length}
           />
-          <div className="flex flex-row items-center gap-2 shrink-0 ml-auto">
+          <div className="flex flex-row items-center gap-2 shrink-0 ml-auto flex-wrap justify-end">
             {warehouseFilterId != null && (
               <div
                 className="flex h-8 max-w-[min(100%,18rem)] items-center gap-1.5 rounded-md border border-input bg-background px-2 text-xs shrink-0"
@@ -313,6 +418,30 @@ export function ShipmentsListPage() {
                   size="sm"
                   className="h-7 px-1.5 text-xs shrink-0 text-muted-foreground hover:text-foreground"
                   onClick={clearWarehouseFilter}
+                >
+                  {t("doc.list.clear")}
+                </Button>
+              </div>
+            )}
+            {carrierFilterId != null && (
+              <div
+                className="flex h-8 max-w-[min(100%,18rem)] items-center gap-1.5 rounded-md border border-input bg-background px-2 text-xs shrink-0"
+                role="status"
+                aria-label={t("ops.list.shipments.filterCarrierAria")}
+              >
+                <span className="text-muted-foreground whitespace-nowrap shrink-0">{t("doc.shipment.carrier")}</span>
+                <span
+                  className="truncate font-medium text-foreground/90 min-w-0"
+                  title={carrierFilterLabel}
+                >
+                  {carrierFilterLabel}
+                </span>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="h-7 px-1.5 text-xs shrink-0 text-muted-foreground hover:text-foreground"
+                  onClick={clearCarrierFilter}
                 >
                   {t("doc.list.clear")}
                 </Button>

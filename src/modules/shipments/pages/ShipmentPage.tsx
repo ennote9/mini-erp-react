@@ -1,9 +1,17 @@
 import { useParams } from "react-router-dom";
-import { useMemo, useState, useCallback } from "react";
+import { useMemo, useState, useCallback, useEffect } from "react";
 import { AgGridReact } from "ag-grid-react";
 import type { ColDef, SelectionChangedEvent } from "ag-grid-community";
 import { shipmentRepository } from "../repository";
-import { post, cancelDocument, reverseDocument, validateShipmentFull } from "../service";
+import {
+  post,
+  cancelDocument,
+  reverseDocument,
+  validateShipmentFull,
+  updateShipmentDraftLogistics,
+} from "../service";
+import { carrierRepository } from "../../carriers/repository";
+import { buildCarrierTrackingUrl, translateCarrierType } from "../../carriers";
 import { salesOrderRepository } from "../../sales-orders/repository";
 import { warehouseRepository } from "../../warehouses/repository";
 import { itemRepository } from "../../items/repository";
@@ -22,6 +30,8 @@ import {
 } from "../../../shared/issues";
 import { AgGridContainer } from "../../../shared/ui/ag-grid/AgGridContainer";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { cn } from "@/lib/utils";
 import {
   Card,
   CardContent,
@@ -160,6 +170,9 @@ export function ShipmentPage() {
   const [exportOpen, setExportOpen] = useState(false);
   const [cancelReasonDialogOpen, setCancelReasonDialogOpen] = useState(false);
   const [reverseReasonDialogOpen, setReverseReasonDialogOpen] = useState(false);
+  const [draftCarrierId, setDraftCarrierId] = useState("");
+  const [draftTracking, setDraftTracking] = useState("");
+  const [logisticsIssues, setLogisticsIssues] = useState<Issue[]>([]);
   const doc = useMemo(
     () => (id ? shipmentRepository.getById(id) : undefined),
     [id, refresh],
@@ -168,6 +181,13 @@ export function ShipmentPage() {
     () => (id ? shipmentRepository.listLines(id) : []),
     [id, refresh],
   );
+
+  useEffect(() => {
+    if (!id || !doc) return;
+    setDraftCarrierId(doc.carrierId ?? "");
+    setDraftTracking(doc.trackingNumber ?? "");
+    setLogisticsIssues([]);
+  }, [id, doc?.id, doc?.carrierId, doc?.trackingNumber, refresh]);
   const salesOrderNumber = useMemo(
     () =>
       doc
@@ -201,6 +221,45 @@ export function ShipmentPage() {
   const isDraft = doc?.status === "draft";
   const isPosted = doc?.status === "posted";
   const isReversed = doc?.status === "reversed";
+
+  const carrierSelectOptions = useMemo(() => {
+    const all = carrierRepository.list();
+    const active = all
+      .filter((c) => c.isActive)
+      .sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: "base" }));
+    const currentId = doc?.carrierId;
+    if (!currentId) return active;
+    const current = all.find((c) => c.id === currentId);
+    if (current && !current.isActive && !active.some((c) => c.id === currentId)) {
+      return [current, ...active];
+    }
+    return active;
+  }, [doc?.carrierId, refresh]);
+
+  const carrierSummaryLabel = useMemo(() => {
+    if (!doc?.carrierId) return emDash;
+    const c = carrierRepository.getById(doc.carrierId);
+    if (!c) return t("doc.shipment.unknownCarrier");
+    const inactive = !c.isActive ? ` (${t("doc.shipment.inactiveCarrierTag")})` : "";
+    return `${c.name}${inactive}`;
+  }, [doc?.carrierId, emDash, t, locale]);
+
+  const trackingSummaryDisplay = useMemo(() => {
+    const v = doc?.trackingNumber?.trim();
+    return v ? v : emDash;
+  }, [doc?.trackingNumber, emDash]);
+
+  const trackingUrlReadOnly = useMemo(() => {
+    if (!doc || doc.status === "draft") return null;
+    const c = doc.carrierId ? carrierRepository.getById(doc.carrierId) : undefined;
+    return buildCarrierTrackingUrl(c?.trackingUrlTemplate, doc.trackingNumber);
+  }, [doc?.id, doc?.status, doc?.carrierId, doc?.trackingNumber, refresh]);
+
+  const logisticsDirty =
+    !!doc &&
+    isDraft &&
+    (draftCarrierId !== (doc.carrierId ?? "") ||
+      draftTracking !== (doc.trackingNumber ?? ""));
 
   const onLinesSelectionChanged = useCallback((e: SelectionChangedEvent<LineWithItem>) => {
     const ids = e.api.getSelectedRows().map((r) => r.id);
@@ -259,11 +318,19 @@ export function ShipmentPage() {
 
   const handleExportMain = useCallback(() => {
     const rows = getExportRowsAll();
+    const carrierForExport = doc!.carrierId
+      ? carrierRepository.getById(doc!.carrierId)
+      : undefined;
+    const tr = doc!.trackingNumber?.trim() ?? "";
     const summary: ShipmentDocumentSummary = {
       number: doc!.number,
       date: doc!.date,
       salesOrder: salesOrderNumber,
       warehouse: warehouseName,
+      carrier:
+        carrierForExport?.name ??
+        (doc!.carrierId ? t("doc.shipment.unknownCarrier") : ""),
+      trackingNumber: tr,
       comment: doc!.comment ?? "",
     };
     runExportWithSaveAs(`${shipmentNumberForFile}_document.xlsx`, () =>
@@ -277,6 +344,7 @@ export function ShipmentPage() {
     getExportRowsAll,
     runExportWithSaveAs,
     shipmentExcelLabels,
+    t,
   ]);
 
   const handleExportSelected = useCallback(() => {
@@ -435,6 +503,102 @@ export function ShipmentPage() {
               <dt className="doc-summary__term">{t("doc.columns.warehouse")}</dt>
               <dd className="doc-summary__value">{warehouseName}</dd>
             </div>
+            {isDraft ? (
+              <>
+                <div className="doc-summary__row">
+                  <dt className="doc-summary__term">{t("doc.shipment.carrier")}</dt>
+                  <dd className="doc-summary__value min-w-0">
+                    <select
+                      className={cn(
+                        "flex h-10 w-full max-w-md rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground",
+                      )}
+                      value={draftCarrierId}
+                      onChange={(e) => {
+                        setDraftCarrierId(e.target.value);
+                        setLogisticsIssues([]);
+                      }}
+                      aria-label={t("doc.shipment.carrier")}
+                    >
+                      <option value="">{t("doc.shipment.carrierNotSet")}</option>
+                      {carrierSelectOptions.map((c) => (
+                        <option key={c.id} value={c.id}>
+                          {c.name} · {translateCarrierType(t, c.carrierType)}
+                        </option>
+                      ))}
+                    </select>
+                  </dd>
+                </div>
+                <div className="doc-summary__row">
+                  <dt className="doc-summary__term">{t("doc.shipment.trackingNumber")}</dt>
+                  <dd className="doc-summary__value min-w-0">
+                    <Input
+                      className="max-w-md"
+                      value={draftTracking}
+                      onChange={(e) => {
+                        setDraftTracking(e.target.value);
+                        setLogisticsIssues([]);
+                      }}
+                      placeholder={t("doc.shipment.trackingPlaceholder")}
+                      autoComplete="off"
+                      aria-label={t("doc.shipment.trackingNumber")}
+                    />
+                  </dd>
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="doc-summary__row">
+                  <dt className="doc-summary__term">{t("doc.shipment.carrier")}</dt>
+                  <dd className="doc-summary__value">{carrierSummaryLabel}</dd>
+                </div>
+                <div className="doc-summary__row">
+                  <dt className="doc-summary__term">{t("doc.shipment.trackingNumber")}</dt>
+                  <dd className="doc-summary__value flex flex-wrap items-center gap-x-2 gap-y-1">
+                    <span>{trackingSummaryDisplay}</span>
+                    {trackingUrlReadOnly ? (
+                      <a
+                        href={trackingUrlReadOnly}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-sm text-primary underline-offset-4 hover:underline shrink-0"
+                      >
+                        {t("doc.shipment.openTracking")}
+                      </a>
+                    ) : null}
+                  </dd>
+                </div>
+              </>
+            )}
+            {isDraft && logisticsIssues.length > 0 ? (
+              <div className="pt-2 not-prose">
+                <DocumentIssueStrip issues={logisticsIssues} />
+              </div>
+            ) : null}
+            {isDraft ? (
+              <div className="flex justify-end pt-3 mt-1 border-t border-border/50">
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="secondary"
+                  disabled={!logisticsDirty}
+                  onClick={() => {
+                    if (!id) return;
+                    const result = updateShipmentDraftLogistics(id, {
+                      carrierId: draftCarrierId,
+                      trackingNumber: draftTracking,
+                    });
+                    if (result.success) {
+                      setLogisticsIssues([]);
+                      setRefresh((r) => r + 1);
+                    } else {
+                      setLogisticsIssues([actionIssueFromServiceMessage(result.error)]);
+                    }
+                  }}
+                >
+                  {t("doc.shipment.saveLogistics")}
+                </Button>
+              </div>
+            ) : null}
             {doc.comment != null && doc.comment !== "" && (
               <div className="doc-summary__row">
                 <dt className="doc-summary__term">{t("doc.columns.comment")}</dt>

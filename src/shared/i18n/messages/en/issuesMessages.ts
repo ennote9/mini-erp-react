@@ -30,6 +30,8 @@ export const issuesMessagesEn: MessageTree = {
     paymentTermsNegative: "Payment terms cannot be negative.",
     paymentTermsDaysForm:
       "Payment terms must be a whole number of days ≥ 0, or leave empty.",
+    carrierTypeRequired: "Carrier type is required.",
+    carrierTypeInvalid: "Select a valid carrier type.",
   },
   document: {
     supplierRequired: "Supplier is required.",
@@ -105,6 +107,8 @@ export const issuesMessagesEn: MessageTree = {
     reservationConsumeFailed:
       "Could not consume stock reservations. Refresh and try again, or re-allocate on the sales order.",
     onlyDraftCancel: "Only draft shipments can be cancelled.",
+    onlyDraftEdit: "Only draft shipments can be edited.",
+    invalidCarrierReference: "Selected carrier is not valid.",
     alreadyReversed: "This shipment is already reversed.",
     onlyPostedReverse: "Only posted shipments can be reversed.",
     noLinesReverse: "Shipment has no lines; cannot reverse.",
@@ -127,6 +131,8 @@ export const issuesMessagesEn: MessageTree = {
     supplierDuplicate: "A supplier with this code already exists.",
     customerDuplicate: "A customer with this code already exists.",
     warehouseDuplicate: "A warehouse with this code already exists.",
+    carrierDuplicate: "A carrier with this code already exists.",
+    carrierNotFound: "Carrier not found.",
     itemDuplicate: "An item with this code already exists.",
     brandNotFound: "Brand not found.",
     categoryNotFound: "Category not found.",

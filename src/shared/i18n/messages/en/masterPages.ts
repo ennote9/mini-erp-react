@@ -209,4 +209,30 @@ export const masterPagesEn = {
     colPurchaseOrder: "Purchase order",
     colSalesOrder: "Sales order",
   },
+  carrier: {
+    notFound: "Carrier not found.",
+    titleNew: "New carrier",
+    titleWithCode: "Carrier {{code}}",
+    backToListAria: "Back to carriers",
+    listBreadcrumb: "Carriers",
+    detailsDescription: "Code, name, type, contact and status for this carrier.",
+    codePlaceholder: "e.g. CDEK",
+    namePlaceholder: "Carrier name",
+    logisticsSectionTitle: "Tracking & service (optional)",
+    logisticsSectionDescription:
+      "For future shipment links: URL template may include {{trackingNumber}} as a placeholder.",
+    trackingUrlPlaceholder: "https://example.com/track?no={{trackingNumber}}",
+    serviceLevelPlaceholder: "e.g. Standard, Express",
+    addressSectionTitle: "Address",
+    addressSectionDescription: "Country, city and street.",
+    futureShipmentsHint:
+      "Carriers are master data only here; shipment assignment can be added later.",
+    types: {
+      courier: "Courier",
+      postal: "Postal",
+      transport_company: "Transport company",
+      own_delivery: "Own delivery",
+      marketplace_logistics: "Marketplace logistics",
+    },
+  },
 } as const;

@@ -34,6 +34,13 @@ function asOptionalString(v: unknown): string | undefined {
   return typeof v === "string" ? v : undefined;
 }
 
+/** Trim; empty string becomes undefined (phase-1 logistics fields). */
+function asOptionalTrimmedString(v: unknown): string | undefined {
+  if (typeof v !== "string") return undefined;
+  const t = v.trim();
+  return t === "" ? undefined : t;
+}
+
 function isFactualStatus(v: unknown): v is FactualDocumentStatus {
   return v === "draft" || v === "posted" || v === "cancelled";
 }
@@ -113,6 +120,8 @@ function normalizeShipmentRecord(raw: unknown): ShipmentPersistRecord | null {
         ? rec.reversalReasonCode
         : undefined,
     reversalReasonComment: asOptionalString(rec.reversalReasonComment),
+    carrierId: asOptionalTrimmedString(rec.carrierId),
+    trackingNumber: asOptionalTrimmedString(rec.trackingNumber),
     lines,
   };
 }

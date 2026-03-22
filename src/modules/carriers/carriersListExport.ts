@@ -1,18 +1,17 @@
 import type { Workbook } from "exceljs";
 import type { ExcelListSheetLabels } from "../../shared/export/excelExportLabels";
 
-export type ShipmentsExportRow = {
+export type CarriersExportRow = {
   no: number;
-  number: string;
-  date: string;
-  salesOrder: string;
-  warehouse: string;
-  carrier: string;
-  trackingNumber: string;
-  status: string;
+  code: string;
+  name: string;
+  carrierType: string;
+  phone: string;
+  email: string;
+  active: string;
 };
 
-const TABLE_NAME_BASE = "ShipmentsTable";
+const TABLE_NAME_BASE = "CarriersTable";
 const WIDTH_PADDING = 1.5;
 const DEFAULT_MIN = 8;
 const DEFAULT_MAX = 50;
@@ -36,15 +35,14 @@ function sanitizeTableName(name: string): string {
 const WIDTH_BOUNDS = [
   { min: 4, max: 6 },
   { min: 8, max: 24 },
-  { min: 10, max: 14 },
-  { min: 8, max: 42 },
-  { min: 8, max: 28 },
-  { min: 10, max: 32 },
-  { min: 10, max: 24 },
-  { min: 8, max: 14 },
+  { min: 10, max: 42 },
+  { min: 12, max: 36 },
+  { min: 8, max: 24 },
+  { min: 10, max: 42 },
+  { min: 6, max: 10 },
 ];
 
-function addSheet(workbook: Workbook, rows: ShipmentsExportRow[], labels: ExcelListSheetLabels): void {
+function addSheet(workbook: Workbook, rows: CarriersExportRow[], labels: ExcelListSheetLabels): void {
   const COLUMN_HEADERS = labels.headers;
   const sheet = workbook.addWorksheet(labels.sheetName, { views: [{ state: "frozen" as const, ySplit: 1 }] });
   if (rows.length === 0) {
@@ -54,7 +52,15 @@ function addSheet(workbook: Workbook, rows: ShipmentsExportRow[], labels: ExcelL
     return;
   }
   const columns = COLUMN_HEADERS.map((name) => ({ name, filterButton: true }));
-  const tableRows = rows.map((r) => [r.no, r.number, r.date, r.salesOrder, r.warehouse, r.status]);
+  const tableRows = rows.map((r) => [
+    r.no,
+    r.code,
+    r.name,
+    r.carrierType,
+    r.phone,
+    r.email,
+    r.active,
+  ]);
   sheet.addTable({
     name: sanitizeTableName(TABLE_NAME_BASE),
     ref: "A1",
@@ -65,17 +71,15 @@ function addSheet(workbook: Workbook, rows: ShipmentsExportRow[], labels: ExcelL
   });
   for (let c = 0; c < COLUMN_HEADERS.length; c++) {
     const valueLengths = rows.map((r) =>
-      cellLen(
-        [r.no, r.number, r.date, r.salesOrder, r.warehouse, r.carrier, r.trackingNumber, r.status][c],
-      ),
+      cellLen([r.no, r.code, r.name, r.carrierType, r.phone, r.email, r.active][c]),
     );
     const b = WIDTH_BOUNDS[c] ?? { min: DEFAULT_MIN, max: DEFAULT_MAX };
     sheet.getColumn(c + 1).width = columnWidth(COLUMN_HEADERS[c].length, valueLengths, b.min, b.max);
   }
 }
 
-export async function buildShipmentsListXlsxBuffer(
-  rows: ShipmentsExportRow[],
+export async function buildCarriersListXlsxBuffer(
+  rows: CarriersExportRow[],
   labels: ExcelListSheetLabels,
 ): Promise<ArrayBuffer> {
   const ExcelJS = await import("exceljs");
