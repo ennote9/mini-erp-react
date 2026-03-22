@@ -119,6 +119,19 @@ export const masterPagesEn = {
     namePlaceholder: "Brand name",
     detailsDescription: "Code, name and status for this brand.",
     codePlaceholderAlt: "e.g. ACME",
+    relatedStockBalancesTitle: "Stock by warehouse",
+    relatedStockBalancesHint:
+      "Aggregated on-hand and operational quantities for all items of this brand. Open the list for the full grid.",
+    relatedStockBalancesSummaryAria: "Brand stock by warehouse summary",
+    openAllStockBalances: "Open stock balances",
+    emptyRelatedStockBalances: "No stock balances found for this brand yet.",
+    openStockBalancesListRowAria: "Open stock balances filtered by this brand, warehouse {{warehouse}}",
+    relatedStockMovementsTitle: "Recent stock movements",
+    relatedStockMovementsHint:
+      "Latest {{limit}} movements for items of this brand. Open the list for the full history.",
+    openAllStockMovements: "Open stock movements",
+    emptyRelatedStockMovements: "No stock movements found for this brand yet.",
+    openStockMovementsListRowAria: "Open stock movements filtered by this brand",
   },
   category: {
     notFound: "Category not found.",
@@ -131,6 +144,20 @@ export const masterPagesEn = {
     namePlaceholder: "Category name",
     detailsDescription: "Code, name and status for this category.",
     codePlaceholderAlt: "e.g. COMPONENTS",
+    relatedStockBalancesTitle: "Stock by warehouse",
+    relatedStockBalancesHint:
+      "Aggregated on-hand and operational quantities for all items in this category. Open the list for the full grid.",
+    relatedStockBalancesSummaryAria: "Category stock by warehouse summary",
+    openAllStockBalances: "Open stock balances",
+    emptyRelatedStockBalances: "No stock balances found for this category yet.",
+    openStockBalancesListRowAria:
+      "Open stock balances filtered by this category, warehouse {{warehouse}}",
+    relatedStockMovementsTitle: "Recent stock movements",
+    relatedStockMovementsHint:
+      "Latest {{limit}} movements for items in this category. Open the list for the full history.",
+    openAllStockMovements: "Open stock movements",
+    emptyRelatedStockMovements: "No stock movements found for this category yet.",
+    openStockMovementsListRowAria: "Open stock movements filtered by this category",
   },
   supplier: {
     notFound: "Supplier not found.",

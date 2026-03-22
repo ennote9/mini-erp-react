@@ -7,6 +7,8 @@ import { AgGridReact } from "ag-grid-react";
 import type { ColDef, ICellRendererParams, SelectionChangedEvent } from "ag-grid-community";
 import { stockMovementRepository } from "../repository";
 import { itemRepository } from "../../items/repository";
+import { brandRepository } from "../../brands/repository";
+import { categoryRepository } from "../../categories/repository";
 import { warehouseRepository } from "../../warehouses/repository";
 import { receiptRepository } from "../../receipts/repository";
 import { shipmentRepository } from "../../shipments/repository";
@@ -34,6 +36,7 @@ import { revealItemInDir } from "@tauri-apps/plugin-opener";
 import type { TFunction } from "../../../shared/i18n/resolve";
 import { useTranslation } from "@/shared/i18n/context";
 import { stockMovementsListExcelLabels } from "@/shared/i18n/excelListExportLabels";
+import { normalizeTrim } from "../../../shared/validation";
 
 type RowData = StockMovement & {
   itemCode: string;
@@ -130,6 +133,24 @@ function filterByItemId(rows: RowData[], itemId: string | null): RowData[] {
   return rows.filter((r) => r.itemId === itemId);
 }
 
+function filterByBrandId(rows: RowData[], brandId: string | null): RowData[] {
+  if (brandId == null) return rows;
+  const want = normalizeTrim(brandId);
+  return rows.filter((r) => {
+    const it = itemRepository.getById(r.itemId);
+    return normalizeTrim(it?.brandId ?? "") === want;
+  });
+}
+
+function filterByCategoryId(rows: RowData[], categoryId: string | null): RowData[] {
+  if (categoryId == null) return rows;
+  const want = normalizeTrim(categoryId);
+  return rows.filter((r) => {
+    const it = itemRepository.getById(r.itemId);
+    return normalizeTrim(it?.categoryId ?? "") === want;
+  });
+}
+
 function buildExportRowsFromMovements(
   rows: RowData[],
   movementTypeLabel: (code: string) => string,
@@ -156,6 +177,18 @@ export function StockMovementsListPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const itemFilterId = useMemo(() => {
     const raw = searchParams.get("itemId");
+    if (raw == null || raw === "") return null;
+    const trimmed = raw.trim();
+    return trimmed === "" ? null : trimmed;
+  }, [searchParams]);
+  const brandFilterId = useMemo(() => {
+    const raw = searchParams.get("brandId");
+    if (raw == null || raw === "") return null;
+    const trimmed = raw.trim();
+    return trimmed === "" ? null : trimmed;
+  }, [searchParams]);
+  const categoryFilterId = useMemo(() => {
+    const raw = searchParams.get("categoryId");
     if (raw == null || raw === "") return null;
     const trimmed = raw.trim();
     return trimmed === "" ? null : trimmed;
@@ -214,13 +247,47 @@ export function StockMovementsListPage() {
   }, [t, locale]);
 
   const filteredRows = useMemo(() => {
-    const byItem = filterByItemId(rowsWithNames, itemFilterId);
+    const byBrand = filterByBrandId(rowsWithNames, brandFilterId);
+    const byCategory = filterByCategoryId(byBrand, categoryFilterId);
+    const byItem = filterByItemId(byCategory, itemFilterId);
     const byWarehouse = filterByWarehouseId(byItem, warehouseFilterId);
     return filterBySearch(byWarehouse, searchQuery);
-  }, [rowsWithNames, itemFilterId, warehouseFilterId, searchQuery]);
+  }, [
+    rowsWithNames,
+    brandFilterId,
+    categoryFilterId,
+    itemFilterId,
+    warehouseFilterId,
+    searchQuery,
+  ]);
 
   const isEmpty = filteredRows.length === 0;
-  const hasFilter = searchQuery.trim() !== "" || warehouseFilterId != null || itemFilterId != null;
+  const hasFilter =
+    searchQuery.trim() !== "" ||
+    warehouseFilterId != null ||
+    itemFilterId != null ||
+    brandFilterId != null ||
+    categoryFilterId != null;
+
+  const brandFilterLabel = useMemo((): string => {
+    if (brandFilterId == null) return "";
+    const b = brandRepository.getById(brandFilterId);
+    if (b) {
+      const name = b.name?.trim() ? b.name : "";
+      return name ? `${b.code} — ${b.name}` : b.code;
+    }
+    return brandFilterId;
+  }, [brandFilterId]);
+
+  const categoryFilterLabel = useMemo((): string => {
+    if (categoryFilterId == null) return "";
+    const c = categoryRepository.getById(categoryFilterId);
+    if (c) {
+      const name = c.name?.trim() ? c.name : "";
+      return name ? `${c.code} — ${c.name}` : c.code;
+    }
+    return categoryFilterId;
+  }, [categoryFilterId]);
 
   const itemFilterLabel = useMemo((): string => {
     if (itemFilterId == null) return "";
@@ -248,6 +315,18 @@ export function StockMovementsListPage() {
   const clearItemFilter = useCallback(() => {
     const next = new URLSearchParams(searchParams);
     next.delete("itemId");
+    setSearchParams(next, { replace: true });
+  }, [searchParams, setSearchParams]);
+
+  const clearBrandFilter = useCallback(() => {
+    const next = new URLSearchParams(searchParams);
+    next.delete("brandId");
+    setSearchParams(next, { replace: true });
+  }, [searchParams, setSearchParams]);
+
+  const clearCategoryFilter = useCallback(() => {
+    const next = new URLSearchParams(searchParams);
+    next.delete("categoryId");
     setSearchParams(next, { replace: true });
   }, [searchParams, setSearchParams]);
 
@@ -324,14 +403,53 @@ export function StockMovementsListPage() {
     if (!hasFilter) {
       return t("ops.stockMovements.empty.hintPosted");
     }
-    if (itemFilterId != null && searchQuery.trim() === "" && warehouseFilterId == null) {
+    const noSearch = searchQuery.trim() === "";
+    const onlyBrand =
+      brandFilterId != null &&
+      categoryFilterId == null &&
+      itemFilterId == null &&
+      warehouseFilterId == null &&
+      noSearch;
+    if (onlyBrand) {
+      return t("ops.stockMovements.empty.hintBrandOnly");
+    }
+    const onlyCategory =
+      categoryFilterId != null &&
+      brandFilterId == null &&
+      itemFilterId == null &&
+      warehouseFilterId == null &&
+      noSearch;
+    if (onlyCategory) {
+      return t("ops.stockMovements.empty.hintCategoryOnly");
+    }
+    if (
+      itemFilterId != null &&
+      noSearch &&
+      warehouseFilterId == null &&
+      brandFilterId == null &&
+      categoryFilterId == null
+    ) {
       return t("ops.stockMovements.empty.hintItemOnly");
     }
-    if (warehouseFilterId != null && searchQuery.trim() === "" && itemFilterId == null) {
+    if (
+      warehouseFilterId != null &&
+      noSearch &&
+      itemFilterId == null &&
+      brandFilterId == null &&
+      categoryFilterId == null
+    ) {
       return t("ops.stockMovements.empty.hintWarehouseOnly");
     }
     return t("ops.stockMovements.empty.hintGeneral");
-  }, [hasFilter, itemFilterId, warehouseFilterId, searchQuery, t]);
+  }, [
+    hasFilter,
+    brandFilterId,
+    categoryFilterId,
+    itemFilterId,
+    warehouseFilterId,
+    searchQuery,
+    t,
+  ]);
 
   const columnDefs = useMemo<ColDef<RowData>[]>(
     () => [
@@ -400,6 +518,58 @@ export function StockMovementsListPage() {
             resultCount={filteredRows.length}
           />
           <div className="flex flex-row items-center gap-2 shrink-0 ml-auto">
+            {brandFilterId != null && (
+              <div
+                className="flex h-8 max-w-[min(100%,18rem)] items-center gap-1.5 rounded-md border border-input bg-background px-2 text-xs shrink-0"
+                role="status"
+                aria-label={t("ops.stockMovements.brandFilterAria")}
+              >
+                <span className="text-muted-foreground whitespace-nowrap shrink-0">
+                  {t("ops.stockMovements.brandFilterPrefix")}
+                </span>
+                <span
+                  className="truncate font-medium text-foreground/90 min-w-0"
+                  title={brandFilterLabel}
+                >
+                  {brandFilterLabel}
+                </span>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="h-7 px-1.5 text-xs shrink-0 text-muted-foreground hover:text-foreground"
+                  onClick={clearBrandFilter}
+                >
+                  {t("doc.list.clear")}
+                </Button>
+              </div>
+            )}
+            {categoryFilterId != null && (
+              <div
+                className="flex h-8 max-w-[min(100%,18rem)] items-center gap-1.5 rounded-md border border-input bg-background px-2 text-xs shrink-0"
+                role="status"
+                aria-label={t("ops.stockMovements.categoryFilterAria")}
+              >
+                <span className="text-muted-foreground whitespace-nowrap shrink-0">
+                  {t("ops.stockMovements.categoryFilterPrefix")}
+                </span>
+                <span
+                  className="truncate font-medium text-foreground/90 min-w-0"
+                  title={categoryFilterLabel}
+                >
+                  {categoryFilterLabel}
+                </span>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="h-7 px-1.5 text-xs shrink-0 text-muted-foreground hover:text-foreground"
+                  onClick={clearCategoryFilter}
+                >
+                  {t("doc.list.clear")}
+                </Button>
+              </div>
+            )}
             {itemFilterId != null && (
               <div
                 className="flex h-8 max-w-[min(100%,18rem)] items-center gap-1.5 rounded-md border border-input bg-background px-2 text-xs shrink-0"

@@ -285,13 +285,20 @@ export const opsEn = {
   stockMovements: {
     itemFilterAria: "Item filter active",
     itemFilterPrefix: "Item",
+    brandFilterAria: "Brand filter active",
+    brandFilterPrefix: "Brand",
+    categoryFilterAria: "Category filter active",
+    categoryFilterPrefix: "Category",
     empty: {
       titleFiltered: "No stock movements match current search or filters",
       titleDefault: "No stock movements yet",
       hintPosted: "Movements will appear after posting receipts and shipments.",
       hintWarehouseOnly: "No stock movements for this warehouse. Try clearing the warehouse filter.",
       hintItemOnly: "No stock movements for this item. Try clearing the item filter.",
-      hintGeneral: "Try changing the search, warehouse filter, or item filter.",
+      hintBrandOnly: "No stock movements for this brand. Try clearing the brand filter.",
+      hintCategoryOnly: "No stock movements for this category. Try clearing the category filter.",
+      hintGeneral:
+        "Try changing the search, warehouse, item, brand, or category filter.",
     },
     searchAria: "Search stock movements",
     searchPlaceholder: "Search",
@@ -316,6 +323,10 @@ export const opsEn = {
     warehouseFilterAria: "Warehouse filter active",
     itemFilterAria: "Item filter active",
     itemFilterPrefix: "Item",
+    brandFilterAria: "Brand filter active",
+    brandFilterPrefix: "Brand",
+    categoryFilterAria: "Category filter active",
+    categoryFilterPrefix: "Category",
     empty: {
       titleFiltered: "No stock balances match current search or filters",
       titleDefault: "No stock balances yet",
@@ -324,8 +335,10 @@ export const opsEn = {
         "No rows match this quick filter. Try All or another filter.",
       hintWarehouseOnly: "No stock balances for this warehouse. Try clearing the warehouse filter.",
       hintItemOnly: "No stock balances for this item. Try clearing the item filter.",
+      hintBrandOnly: "No stock balances for this brand. Try clearing the brand filter.",
+      hintCategoryOnly: "No stock balances for this category. Try clearing the category filter.",
       hintGeneral:
-        "Try changing the search, quick filter, warehouse filter, or item filter.",
+        "Try changing the search, quick filter, warehouse, item, brand, or category filter.",
     },
     quick: {
       all: { label: "All", aria: "Show all rows" },

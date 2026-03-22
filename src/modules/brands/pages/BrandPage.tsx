@@ -1,5 +1,5 @@
 import { useParams, useNavigate } from "react-router-dom";
-import { useMemo, useState, useEffect } from "react";
+import { useMemo, useState, useEffect, useCallback, useSyncExternalStore } from "react";
 import { brandRepository } from "../repository";
 import { saveBrand } from "../service";
 import { itemRepository } from "../../items/repository";
@@ -31,6 +31,40 @@ import { getBrandFormHealth } from "../../../shared/masterDataHealth";
 import { DocumentIssueStrip } from "../../../shared/ui/feedback/DocumentIssueStrip";
 import { Save, X } from "lucide-react";
 import { useTranslation } from "@/shared/i18n/context";
+import {
+  getInventoryDisplayRevision,
+  subscribeInventoryDisplayRevision,
+} from "@/shared/inventoryDisplayRevision";
+import {
+  buildAggregatedWarehouseBalancesForItemIds,
+  buildRecentScopedMovementsForItemIds,
+} from "@/shared/masterInventoryByItemScope";
+import {
+  ITEM_RECENT_MOVEMENTS_LIMIT,
+  summarizeItemPageBalances,
+} from "../../items/itemInventoryRelated";
+
+const DATE_TIME_FORMAT: Intl.DateTimeFormatOptions = {
+  day: "2-digit",
+  month: "short",
+  year: "numeric",
+  hour: "2-digit",
+  minute: "2-digit",
+};
+
+function formatBrandPageDateTime(iso: string | null | undefined): string {
+  if (iso == null) return "";
+  const d = new Date(iso);
+  return Number.isNaN(d.getTime()) ? String(iso) : d.toLocaleString(undefined, DATE_TIME_FORMAT);
+}
+
+function formatQtyCell(n: number): string {
+  return Number.isInteger(n) ? String(n) : n.toFixed(2);
+}
+
+function formatQtyDeltaCell(v: number): string {
+  return v > 0 ? `+${formatQtyCell(v)}` : formatQtyCell(v);
+}
 
 type FormState = {
   code: string;
@@ -62,13 +96,19 @@ function RelatedItemsImagesCell({ item }: { item: Item }) {
 }
 
 export function BrandPage() {
-  const { t } = useTranslation();
+  const { t, locale } = useTranslation();
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const isNew = id === "new";
   const brand = useMemo(
     () => (id && !isNew ? brandRepository.getById(id) : undefined),
     [id, isNew],
+  );
+
+  const inventoryDisplayRevision = useSyncExternalStore(
+    subscribeInventoryDisplayRevision,
+    getInventoryDisplayRevision,
+    getInventoryDisplayRevision,
   );
 
   const relatedItems = useMemo(() => {
@@ -78,13 +118,56 @@ export function BrandPage() {
       .filter((item) => item.brandId === brand.id)
       .slice()
       .sort((a, b) => a.code.localeCompare(b.code, undefined, { sensitivity: "base" }));
-  }, [brand?.id]);
+  }, [brand?.id, inventoryDisplayRevision]);
 
   const relatedSummary = useMemo(() => {
     const total = relatedItems.length;
     const active = relatedItems.filter((x) => x.isActive).length;
     return { total, active, inactive: total - active };
   }, [relatedItems]);
+
+  const itemIdsForInventory = useMemo(
+    () => new Set(relatedItems.map((i) => i.id)),
+    [relatedItems],
+  );
+
+  const brandBalanceRows = useMemo(
+    () => buildAggregatedWarehouseBalancesForItemIds(itemIdsForInventory),
+    [itemIdsForInventory, inventoryDisplayRevision],
+  );
+
+  const brandBalanceSummary = useMemo(
+    () => summarizeItemPageBalances(brandBalanceRows),
+    [brandBalanceRows],
+  );
+
+  const brandMovementRows = useMemo(
+    () =>
+      buildRecentScopedMovementsForItemIds(
+        itemIdsForInventory,
+        t,
+        ITEM_RECENT_MOVEMENTS_LIMIT,
+      ),
+    [itemIdsForInventory, t, locale, inventoryDisplayRevision],
+  );
+
+  const movementTypeLabel = useCallback(
+    (code: string) => {
+      const translated = t(`ops.stockMovements.types.${code}`);
+      return translated === code ? code : translated;
+    },
+    [t],
+  );
+
+  const openStockBalancesForBrand = useCallback(() => {
+    if (!brand?.id) return;
+    navigate(`/stock-balances?brandId=${encodeURIComponent(brand.id)}`);
+  }, [brand?.id, navigate]);
+
+  const openStockMovementsForBrand = useCallback(() => {
+    if (!brand?.id) return;
+    navigate(`/stock-movements?brandId=${encodeURIComponent(brand.id)}`);
+  }, [brand?.id, navigate]);
 
   const [form, setForm] = useState<FormState>(defaultForm);
   const [actionIssues, setActionIssues] = useState<Issue[]>([]);
@@ -266,6 +349,7 @@ export function BrandPage() {
       </Card>
 
       {!isNew && brand ? (
+        <>
         <Card className="mt-4 w-full max-w-4xl min-w-0 border-0 shadow-none">
           <CardHeader className="p-2 pb-0.5 space-y-0">
             <div className="flex flex-wrap items-start justify-between gap-2 gap-y-1.5">
@@ -373,6 +457,216 @@ export function BrandPage() {
             )}
           </CardContent>
         </Card>
+
+        <Card className="mt-4 w-full max-w-4xl min-w-0 border-0 shadow-none">
+          <CardHeader className="p-2 pb-0.5 space-y-0">
+            <div className="flex flex-wrap items-start justify-between gap-2 gap-y-1.5">
+              <div className="min-w-0 space-y-0.5 flex-1">
+                <CardTitle className="text-[0.9rem] font-semibold tracking-tight">
+                  {t("master.brand.relatedStockBalancesTitle")}
+                </CardTitle>
+                <CardDescription className="text-xs leading-snug">
+                  {t("master.brand.relatedStockBalancesHint")}
+                </CardDescription>
+              </div>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="h-7 shrink-0 px-2.5 text-xs"
+                onClick={openStockBalancesForBrand}
+              >
+                {t("master.brand.openAllStockBalances")}
+              </Button>
+            </div>
+          </CardHeader>
+          <CardContent className="p-2 pt-1 space-y-2">
+            <div
+              className="flex flex-wrap gap-1.5"
+              aria-label={t("master.brand.relatedStockBalancesSummaryAria")}
+            >
+              <span className="inline-flex items-baseline gap-1 rounded border border-border/50 bg-muted/25 px-2 py-0.5 text-[11px] tabular-nums leading-none">
+                <span className="text-muted-foreground">{t("master.item.chipWarehouses")}</span>
+                <span className="font-medium text-foreground/90">{brandBalanceSummary.warehouseCount}</span>
+              </span>
+              <span className="inline-flex items-baseline gap-1 rounded border border-border/50 bg-muted/25 px-2 py-0.5 text-[11px] tabular-nums leading-none">
+                <span className="text-muted-foreground">{t("master.item.chipTotalOnHand")}</span>
+                <span className="font-medium text-foreground/90">
+                  {formatQtyCell(brandBalanceSummary.totalOnHand)}
+                </span>
+              </span>
+              <span className="inline-flex items-baseline gap-1 rounded border border-border/50 bg-muted/25 px-2 py-0.5 text-[11px] tabular-nums leading-none">
+                <span className="text-muted-foreground">{t("master.item.chipTotalReserved")}</span>
+                <span className="font-medium text-foreground/90">
+                  {formatQtyCell(brandBalanceSummary.totalReserved)}
+                </span>
+              </span>
+              <span className="inline-flex items-baseline gap-1 rounded border border-border/50 bg-muted/25 px-2 py-0.5 text-[11px] tabular-nums leading-none">
+                <span className="text-muted-foreground">{t("master.item.chipTotalAvailable")}</span>
+                <span className="font-medium text-foreground/90">
+                  {formatQtyCell(brandBalanceSummary.totalAvailable)}
+                </span>
+              </span>
+              <span className="inline-flex items-baseline gap-1 rounded border border-border/50 bg-muted/25 px-2 py-0.5 text-[11px] tabular-nums leading-none">
+                <span className="text-muted-foreground">{t("master.item.chipTotalOutgoing")}</span>
+                <span className="font-medium text-foreground/90">
+                  {formatQtyCell(brandBalanceSummary.totalOutgoing)}
+                </span>
+              </span>
+              <span className="inline-flex items-baseline gap-1 rounded border border-border/50 bg-muted/25 px-2 py-0.5 text-[11px] tabular-nums leading-none">
+                <span className="text-muted-foreground">{t("master.item.chipTotalIncoming")}</span>
+                <span className="font-medium text-foreground/90">
+                  {formatQtyCell(brandBalanceSummary.totalIncoming)}
+                </span>
+              </span>
+            </div>
+            {brandBalanceRows.length === 0 ? (
+              <p className="text-sm text-muted-foreground py-3 m-0">
+                {t("master.brand.emptyRelatedStockBalances")}
+              </p>
+            ) : (
+              <div className="min-w-0 overflow-x-auto rounded-md border border-border/60">
+                <table className="list-table text-sm">
+                  <thead>
+                    <tr>
+                      <th className="min-w-[120px]">{t("doc.columns.warehouse")}</th>
+                      <th className="w-24 text-right whitespace-nowrap tabular-nums">
+                        {t("doc.columns.total")}
+                      </th>
+                      <th className="w-24 text-right whitespace-nowrap tabular-nums">
+                        {t("doc.columns.reserved")}
+                      </th>
+                      <th className="w-24 text-right whitespace-nowrap tabular-nums">
+                        {t("doc.columns.available")}
+                      </th>
+                      <th className="w-24 text-right whitespace-nowrap tabular-nums">
+                        {t("doc.columns.outgoing")}
+                      </th>
+                      <th className="w-24 text-right whitespace-nowrap tabular-nums">
+                        {t("doc.columns.incoming")}
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {brandBalanceRows.map((row) => (
+                      <tr
+                        key={row.warehouseId}
+                        className="list-table__row list-table__row--clickable"
+                        onClick={openStockBalancesForBrand}
+                        role="button"
+                        tabIndex={0}
+                        aria-label={t("master.brand.openStockBalancesListRowAria", {
+                          warehouse: row.warehouseName,
+                        })}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter" || e.key === " ") {
+                            e.preventDefault();
+                            openStockBalancesForBrand();
+                          }
+                        }}
+                      >
+                        <td className="truncate max-w-[14rem]" title={row.warehouseName}>
+                          {row.warehouseName}
+                        </td>
+                        <td className="text-right tabular-nums">{formatQtyCell(row.qtyOnHand)}</td>
+                        <td className="text-right tabular-nums">{formatQtyCell(row.reservedQty)}</td>
+                        <td className="text-right tabular-nums">{formatQtyCell(row.availableQty)}</td>
+                        <td className="text-right tabular-nums">{formatQtyCell(row.outgoingQty)}</td>
+                        <td className="text-right tabular-nums">{formatQtyCell(row.incomingQty)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card className="mt-4 w-full max-w-4xl min-w-0 border-0 shadow-none">
+          <CardHeader className="p-2 pb-0.5 space-y-0">
+            <div className="flex flex-wrap items-start justify-between gap-2 gap-y-1.5">
+              <div className="min-w-0 space-y-0.5 flex-1">
+                <CardTitle className="text-[0.9rem] font-semibold tracking-tight">
+                  {t("master.brand.relatedStockMovementsTitle")}
+                </CardTitle>
+                <CardDescription className="text-xs leading-snug">
+                  {t("master.brand.relatedStockMovementsHint", {
+                    limit: ITEM_RECENT_MOVEMENTS_LIMIT,
+                  })}
+                </CardDescription>
+              </div>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="h-7 shrink-0 px-2.5 text-xs"
+                onClick={openStockMovementsForBrand}
+              >
+                {t("master.brand.openAllStockMovements")}
+              </Button>
+            </div>
+          </CardHeader>
+          <CardContent className="p-2 pt-1 space-y-2">
+            {brandMovementRows.length === 0 ? (
+              <p className="text-sm text-muted-foreground py-3 m-0">
+                {t("master.brand.emptyRelatedStockMovements")}
+              </p>
+            ) : (
+              <div className="min-w-0 overflow-x-auto rounded-md border border-border/60">
+                <table className="list-table text-sm">
+                  <thead>
+                    <tr>
+                      <th className="min-w-[140px]">{t("doc.columns.dateTime")}</th>
+                      <th className="list-table__cell--code">{t("doc.columns.itemCode")}</th>
+                      <th className="min-w-[120px]">{t("doc.columns.itemName")}</th>
+                      <th className="min-w-[100px]">{t("doc.columns.movementType")}</th>
+                      <th className="min-w-[120px]">{t("doc.columns.warehouse")}</th>
+                      <th className="w-28 text-right whitespace-nowrap tabular-nums">
+                        {t("doc.columns.qtyDelta")}
+                      </th>
+                      <th className="min-w-[140px]">{t("doc.columns.sourceDocument")}</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {brandMovementRows.map((row) => (
+                      <tr
+                        key={row.id}
+                        className="list-table__row list-table__row--clickable"
+                        onClick={openStockMovementsForBrand}
+                        role="button"
+                        tabIndex={0}
+                        aria-label={t("master.brand.openStockMovementsListRowAria")}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter" || e.key === " ") {
+                            e.preventDefault();
+                            openStockMovementsForBrand();
+                          }
+                        }}
+                      >
+                        <td className="whitespace-nowrap tabular-nums">
+                          {formatBrandPageDateTime(row.datetime)}
+                        </td>
+                        <td className="list-table__cell--code font-mono text-xs">{row.itemCode}</td>
+                        <td className="truncate max-w-[12rem]" title={row.itemName}>
+                          {row.itemName}
+                        </td>
+                        <td>{movementTypeLabel(row.movementTypeCode)}</td>
+                        <td className="truncate max-w-[14rem]" title={row.warehouseName}>
+                          {row.warehouseName}
+                        </td>
+                        <td className="text-right tabular-nums">{formatQtyDeltaCell(row.qtyDelta)}</td>
+                        <td className="truncate max-w-[16rem]" title={row.sourceDocumentLabel}>
+                          {row.sourceDocumentLabel}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+        </>
       ) : null}
     </div>
   );

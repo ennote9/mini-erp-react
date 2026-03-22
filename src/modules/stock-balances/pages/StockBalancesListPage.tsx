@@ -9,6 +9,8 @@ import { AgGridReact } from "ag-grid-react";
 import type { ColDef, SelectionChangedEvent } from "ag-grid-community";
 import { stockBalanceRepository } from "../repository";
 import { itemRepository } from "../../items/repository";
+import { brandRepository } from "../../brands/repository";
+import { categoryRepository } from "../../categories/repository";
 import { warehouseRepository } from "../../warehouses/repository";
 import type { StockBalance } from "../model";
 import { ListPageLayout } from "../../../shared/ui/list/ListPageLayout";
@@ -43,6 +45,7 @@ import { revealItemInDir } from "@tauri-apps/plugin-opener";
 import { StockBalanceRowDrillDown } from "../components/StockBalanceRowDrillDown";
 import { useSettings } from "../../../shared/settings/SettingsContext";
 import { getEffectiveWorkspaceFeatureEnabled } from "../../../shared/workspace";
+import { normalizeTrim } from "../../../shared/validation";
 
 type RowData = StockBalance & {
   itemCode: string;
@@ -90,6 +93,24 @@ function filterByWarehouseId(rows: RowData[], warehouseId: string | null): RowDa
 function filterByItemId(rows: RowData[], itemId: string | null): RowData[] {
   if (itemId == null) return rows;
   return rows.filter((r) => r.itemId === itemId);
+}
+
+function filterByBrandId(rows: RowData[], brandId: string | null): RowData[] {
+  if (brandId == null) return rows;
+  const want = normalizeTrim(brandId);
+  return rows.filter((r) => {
+    const it = itemRepository.getById(r.itemId);
+    return normalizeTrim(it?.brandId ?? "") === want;
+  });
+}
+
+function filterByCategoryId(rows: RowData[], categoryId: string | null): RowData[] {
+  if (categoryId == null) return rows;
+  const want = normalizeTrim(categoryId);
+  return rows.filter((r) => {
+    const it = itemRepository.getById(r.itemId);
+    return normalizeTrim(it?.categoryId ?? "") === want;
+  });
 }
 
 function filterByQuickFilter(rows: RowData[], f: StockBalanceQuickFilter): RowData[] {
@@ -197,6 +218,18 @@ export function StockBalancesListPage() {
     const trimmed = raw.trim();
     return trimmed === "" ? null : trimmed;
   }, [searchParams]);
+  const brandFilterId = useMemo(() => {
+    const raw = searchParams.get("brandId");
+    if (raw == null || raw === "") return null;
+    const trimmed = raw.trim();
+    return trimmed === "" ? null : trimmed;
+  }, [searchParams]);
+  const categoryFilterId = useMemo(() => {
+    const raw = searchParams.get("categoryId");
+    if (raw == null || raw === "") return null;
+    const trimmed = raw.trim();
+    return trimmed === "" ? null : trimmed;
+  }, [searchParams]);
   const warehouseFilterId = useMemo(() => {
     const raw = searchParams.get("warehouseId");
     if (raw == null || raw === "") return null;
@@ -250,10 +283,21 @@ export function StockBalancesListPage() {
     return "";
   }, []);
 
-  /** Base slice: item URL filter → warehouse URL filter (counts and search use this). */
+  /**
+   * Base slice (counts + search + quick filters):
+   * brandId → categoryId → itemId → warehouseId
+   */
+  const rowsAfterBrand = useMemo(
+    () => filterByBrandId(rowsWithNames, brandFilterId),
+    [rowsWithNames, brandFilterId],
+  );
+  const rowsAfterCategory = useMemo(
+    () => filterByCategoryId(rowsAfterBrand, categoryFilterId),
+    [rowsAfterBrand, categoryFilterId],
+  );
   const rowsAfterItem = useMemo(
-    () => filterByItemId(rowsWithNames, itemFilterId),
-    [rowsWithNames, itemFilterId],
+    () => filterByItemId(rowsAfterCategory, itemFilterId),
+    [rowsAfterCategory, itemFilterId],
   );
   const rowsAfterWarehouse = useMemo(
     () => filterByWarehouseId(rowsAfterItem, warehouseFilterId),
@@ -326,7 +370,29 @@ export function StockBalancesListPage() {
     searchQuery.trim() !== "" ||
     warehouseFilterId != null ||
     itemFilterId != null ||
+    brandFilterId != null ||
+    categoryFilterId != null ||
     quickFilter !== "all";
+
+  const brandFilterLabel = useMemo((): string => {
+    if (brandFilterId == null) return "";
+    const b = brandRepository.getById(brandFilterId);
+    if (b) {
+      const name = b.name?.trim() ? b.name : "";
+      return name ? `${b.code} — ${b.name}` : b.code;
+    }
+    return brandFilterId;
+  }, [brandFilterId]);
+
+  const categoryFilterLabel = useMemo((): string => {
+    if (categoryFilterId == null) return "";
+    const c = categoryRepository.getById(categoryFilterId);
+    if (c) {
+      const name = c.name?.trim() ? c.name : "";
+      return name ? `${c.code} — ${c.name}` : c.code;
+    }
+    return categoryFilterId;
+  }, [categoryFilterId]);
 
   const itemFilterLabel = useMemo((): string => {
     if (itemFilterId == null) return "";
@@ -354,6 +420,18 @@ export function StockBalancesListPage() {
   const clearItemFilter = useCallback(() => {
     const next = new URLSearchParams(searchParams);
     next.delete("itemId");
+    setSearchParams(next, { replace: true });
+  }, [searchParams, setSearchParams]);
+
+  const clearBrandFilter = useCallback(() => {
+    const next = new URLSearchParams(searchParams);
+    next.delete("brandId");
+    setSearchParams(next, { replace: true });
+  }, [searchParams, setSearchParams]);
+
+  const clearCategoryFilter = useCallback(() => {
+    const next = new URLSearchParams(searchParams);
+    next.delete("categoryId");
     setSearchParams(next, { replace: true });
   }, [searchParams, setSearchParams]);
 
@@ -430,32 +508,53 @@ export function StockBalancesListPage() {
     if (!hasFilter) {
       return t("ops.stockBalances.empty.hintPosted");
     }
-    if (
-      itemFilterId != null &&
-      searchQuery.trim() === "" &&
-      warehouseFilterId == null &&
-      quickFilter === "all"
-    ) {
+    const noSearch = searchQuery.trim() === "";
+    const noUrlExcept = (
+      brand: boolean,
+      category: boolean,
+      item: boolean,
+      warehouse: boolean,
+    ) =>
+      (brand ? brandFilterId != null : brandFilterId == null) &&
+      (category ? categoryFilterId != null : categoryFilterId == null) &&
+      (item ? itemFilterId != null : itemFilterId == null) &&
+      (warehouse ? warehouseFilterId != null : warehouseFilterId == null) &&
+      quickFilter === "all" &&
+      noSearch;
+
+    if (noUrlExcept(true, false, false, false)) {
+      return t("ops.stockBalances.empty.hintBrandOnly");
+    }
+    if (noUrlExcept(false, true, false, false)) {
+      return t("ops.stockBalances.empty.hintCategoryOnly");
+    }
+    if (noUrlExcept(false, false, true, false)) {
       return t("ops.stockBalances.empty.hintItemOnly");
     }
     if (
       quickFilter !== "all" &&
-      searchQuery.trim() === "" &&
-      warehouseFilterId == null &&
-      itemFilterId == null
+      noSearch &&
+      brandFilterId == null &&
+      categoryFilterId == null &&
+      itemFilterId == null &&
+      warehouseFilterId == null
     ) {
       return t("ops.stockBalances.empty.hintQuickOnly");
     }
-    if (
-      warehouseFilterId != null &&
-      searchQuery.trim() === "" &&
-      quickFilter === "all" &&
-      itemFilterId == null
-    ) {
+    if (noUrlExcept(false, false, false, true)) {
       return t("ops.stockBalances.empty.hintWarehouseOnly");
     }
     return t("ops.stockBalances.empty.hintGeneral");
-  }, [hasFilter, itemFilterId, warehouseFilterId, searchQuery, quickFilter, t]);
+  }, [
+    hasFilter,
+    brandFilterId,
+    categoryFilterId,
+    itemFilterId,
+    warehouseFilterId,
+    searchQuery,
+    quickFilter,
+    t,
+  ]);
 
   const qtyCol = (
     field: keyof RowData,
@@ -571,6 +670,58 @@ export function StockBalancesListPage() {
             resultCount={filteredRows.length}
           />
           <div className="flex flex-row items-center gap-2 shrink-0 ml-auto">
+            {brandFilterId != null && (
+              <div
+                className="flex h-8 max-w-[min(100%,18rem)] items-center gap-1.5 rounded-md border border-input bg-background px-2 text-xs shrink-0"
+                role="status"
+                aria-label={t("ops.stockBalances.brandFilterAria")}
+              >
+                <span className="text-muted-foreground whitespace-nowrap shrink-0">
+                  {t("ops.stockBalances.brandFilterPrefix")}
+                </span>
+                <span
+                  className="truncate font-medium text-foreground/90 min-w-0"
+                  title={brandFilterLabel}
+                >
+                  {brandFilterLabel}
+                </span>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="h-7 px-1.5 text-xs shrink-0 text-muted-foreground hover:text-foreground"
+                  onClick={clearBrandFilter}
+                >
+                  {t("doc.list.clear")}
+                </Button>
+              </div>
+            )}
+            {categoryFilterId != null && (
+              <div
+                className="flex h-8 max-w-[min(100%,18rem)] items-center gap-1.5 rounded-md border border-input bg-background px-2 text-xs shrink-0"
+                role="status"
+                aria-label={t("ops.stockBalances.categoryFilterAria")}
+              >
+                <span className="text-muted-foreground whitespace-nowrap shrink-0">
+                  {t("ops.stockBalances.categoryFilterPrefix")}
+                </span>
+                <span
+                  className="truncate font-medium text-foreground/90 min-w-0"
+                  title={categoryFilterLabel}
+                >
+                  {categoryFilterLabel}
+                </span>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="h-7 px-1.5 text-xs shrink-0 text-muted-foreground hover:text-foreground"
+                  onClick={clearCategoryFilter}
+                >
+                  {t("doc.list.clear")}
+                </Button>
+              </div>
+            )}
             {itemFilterId != null && (
               <div
                 className="flex h-8 max-w-[min(100%,18rem)] items-center gap-1.5 rounded-md border border-input bg-background px-2 text-xs shrink-0"

@@ -280,13 +280,19 @@ export const kkOps: MessageTree = {
   stockMovements: {
     itemFilterAria: "Тауар сүзгісі белсенді",
     itemFilterPrefix: "Тауар",
+    brandFilterAria: "Бренд сүзгісі белсенді",
+    brandFilterPrefix: "Бренд",
+    categoryFilterAria: "Санат сүзгісі белсенді",
+    categoryFilterPrefix: "Санат",
     empty: {
       titleFiltered: "Ағымдағы іздеу немесе сүзгілер бойынша қозғалыстар жоқ",
       titleDefault: "Қозғалыстар әлі жоқ",
       hintPosted: "Түсімдер мен жөнелтулер жүргізілгеннен кейін қозғалыстар пайда болады.",
       hintWarehouseOnly: "Бұл қойма бойынша қозғалыс жоқ. Қойма сүзгісін алып тастаңыз.",
       hintItemOnly: "Бұл тауар бойынша қозғалыс жоқ. Тауар сүзгісін алып тастаңыз.",
-      hintGeneral: "Іздеу, қойма немесе тауар сүзгісін өзгертіңіз.",
+      hintBrandOnly: "Бұл бренд бойынша қозғалыс жоқ. Бренд сүзгісін алып тастаңыз.",
+      hintCategoryOnly: "Бұл санат бойынша қозғалыс жоқ. Санат сүзгісін алып тастаңыз.",
+      hintGeneral: "Іздеу немесе қойма, тауар, бренд, санат сүзгісін өзгертіңіз.",
     },
     searchAria: "Қозғалыстарды іздеу",
     searchPlaceholder: "Іздеу",
@@ -311,6 +317,10 @@ export const kkOps: MessageTree = {
     warehouseFilterAria: "Қойма сүзгісі белсенді",
     itemFilterAria: "Тауар сүзгісі белсенді",
     itemFilterPrefix: "Тауар",
+    brandFilterAria: "Бренд сүзгісі белсенді",
+    brandFilterPrefix: "Бренд",
+    categoryFilterAria: "Санат сүзгісі белсенді",
+    categoryFilterPrefix: "Санат",
     empty: {
       titleFiltered: "Ағымдағы іздеу немесе сүзгілер бойынша қалдықтар жоқ",
       titleDefault: "Қалдықтар әлі жоқ",
@@ -318,7 +328,10 @@ export const kkOps: MessageTree = {
       hintQuickOnly: "Бұл жылдам сүзгі бойынша жолдар жоқ. «Барлығын» немесе басқа сүзгіні қолданыңыз.",
       hintWarehouseOnly: "Бұл қойма бойынша қалдық жоқ. Қойма сүзгісін алып тастаңыз.",
       hintItemOnly: "Бұл тауар бойынша қалдық жоқ. Тауар сүзгісін алып тастаңыз.",
-      hintGeneral: "Іздеу, жылдам сүзгі, қойма немесе тауар сүзгісін өзгертіңіз.",
+      hintBrandOnly: "Бұл бренд бойынша қалдық жоқ. Бренд сүзгісін алып тастаңыз.",
+      hintCategoryOnly: "Бұл санат бойынша қалдық жоқ. Санат сүзгісін алып тастаңыз.",
+      hintGeneral:
+        "Іздеу, жылдам сүзгі немесе қойма, тауар, бренд, санат сүзгісін өзгертіңіз.",
     },
     quick: {
       all: { label: "Барлығы", aria: "Барлық жолдарды көрсету" },

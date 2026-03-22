@@ -122,6 +122,20 @@ export const ruMasterPages: MessageTree = {
     namePlaceholder: "Наименование бренда",
     detailsDescription: "Код, наименование и статус бренда.",
     codePlaceholderAlt: "напр. ACME",
+    relatedStockBalancesTitle: "Остатки по складам",
+    relatedStockBalancesHint:
+      "Суммарные фактические и операционные количества по всем позициям бренда. Откройте список для полной таблицы.",
+    relatedStockBalancesSummaryAria: "Сводка остатков бренда по складам",
+    openAllStockBalances: "Открыть остатки",
+    emptyRelatedStockBalances: "По этому бренду остатков пока нет.",
+    openStockBalancesListRowAria:
+      "Открыть остатки с фильтром по бренду, склад {{warehouse}}",
+    relatedStockMovementsTitle: "Последние движения",
+    relatedStockMovementsHint:
+      "Последние {{limit}} движений по позициям бренда. Откройте список для полной истории.",
+    openAllStockMovements: "Открыть движения",
+    emptyRelatedStockMovements: "По этому бренду движений пока нет.",
+    openStockMovementsListRowAria: "Открыть движения с фильтром по бренду",
   },
   category: {
     notFound: "Категория не найдена.",
@@ -134,6 +148,20 @@ export const ruMasterPages: MessageTree = {
     namePlaceholder: "Наименование категории",
     detailsDescription: "Код, наименование и статус категории.",
     codePlaceholderAlt: "напр. COMPONENTS",
+    relatedStockBalancesTitle: "Остатки по складам",
+    relatedStockBalancesHint:
+      "Суммарные фактические и операционные количества по всем позициям категории. Откройте список для полной таблицы.",
+    relatedStockBalancesSummaryAria: "Сводка остатков категории по складам",
+    openAllStockBalances: "Открыть остатки",
+    emptyRelatedStockBalances: "По этой категории остатков пока нет.",
+    openStockBalancesListRowAria:
+      "Открыть остатки с фильтром по категории, склад {{warehouse}}",
+    relatedStockMovementsTitle: "Последние движения",
+    relatedStockMovementsHint:
+      "Последние {{limit}} движений по позициям категории. Откройте список для полной истории.",
+    openAllStockMovements: "Открыть движения",
+    emptyRelatedStockMovements: "По этой категории движений пока нет.",
+    openStockMovementsListRowAria: "Открыть движения с фильтром по категории",
   },
   supplier: {
     notFound: "Поставщик не найден.",

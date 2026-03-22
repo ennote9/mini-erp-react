@@ -279,13 +279,20 @@ export const ruOps: MessageTree = {
   stockMovements: {
     itemFilterAria: "Активен фильтр по номенклатуре",
     itemFilterPrefix: "Номенклатура",
+    brandFilterAria: "Активен фильтр по бренду",
+    brandFilterPrefix: "Бренд",
+    categoryFilterAria: "Активен фильтр по категории",
+    categoryFilterPrefix: "Категория",
     empty: {
       titleFiltered: "Нет движений по текущему поиску или фильтрам",
       titleDefault: "Движений пока нет",
       hintPosted: "Движения появятся после проведения поступлений и отгрузок.",
       hintWarehouseOnly: "Нет движений по этому складу. Снимите фильтр по складу.",
       hintItemOnly: "Нет движений по этой номенклатуре. Снимите фильтр по номенклатуре.",
-      hintGeneral: "Измените поиск, фильтр по складу или фильтр по номенклатуре.",
+      hintBrandOnly: "Нет движений по этому бренду. Снимите фильтр по бренду.",
+      hintCategoryOnly: "Нет движений по этой категории. Снимите фильтр по категории.",
+      hintGeneral:
+        "Измените поиск или фильтры по складу, номенклатуре, бренду или категории.",
     },
     searchAria: "Поиск движений",
     searchPlaceholder: "Поиск",
@@ -310,6 +317,10 @@ export const ruOps: MessageTree = {
     warehouseFilterAria: "Активен фильтр по складу",
     itemFilterAria: "Активен фильтр по номенклатуре",
     itemFilterPrefix: "Номенклатура",
+    brandFilterAria: "Активен фильтр по бренду",
+    brandFilterPrefix: "Бренд",
+    categoryFilterAria: "Активен фильтр по категории",
+    categoryFilterPrefix: "Категория",
     empty: {
       titleFiltered: "Нет остатков по текущему поиску или фильтрам",
       titleDefault: "Остатков пока нет",
@@ -317,8 +328,10 @@ export const ruOps: MessageTree = {
       hintQuickOnly: "Нет строк по этому быстрому фильтру. Попробуйте «Все» или другой фильтр.",
       hintWarehouseOnly: "Нет остатков по этому складу. Снимите фильтр по складу.",
       hintItemOnly: "Нет остатков по этой номенклатуре. Снимите фильтр по номенклатуре.",
+      hintBrandOnly: "Нет остатков по этому бренду. Снимите фильтр по бренду.",
+      hintCategoryOnly: "Нет остатков по этой категории. Снимите фильтр по категории.",
       hintGeneral:
-        "Измените поиск, быстрый фильтр, фильтр по складу или фильтр по номенклатуре.",
+        "Измените поиск, быстрый фильтр или фильтры по складу, номенклатуре, бренду или категории.",
     },
     quick: {
       all: { label: "Все", aria: "Показать все строки" },

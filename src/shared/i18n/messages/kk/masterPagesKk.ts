@@ -123,6 +123,20 @@ export const kkMasterPages: MessageTree = {
     namePlaceholder: "Бренд атауы",
     detailsDescription: "Код, атауы және күйі.",
     codePlaceholderAlt: "мысалы ACME",
+    relatedStockBalancesTitle: "Қоймалар бойынша қалдық",
+    relatedStockBalancesHint:
+      "Брендтегі барлық тауарлар үшін жинақталған фактілік және операциялық сандар. Толық тізім үшін тізімді ашыңыз.",
+    relatedStockBalancesSummaryAria: "Бренд бойынша қойма қалдығы қорытындысы",
+    openAllStockBalances: "Қалдықтарды ашу",
+    emptyRelatedStockBalances: "Бұл бренд бойынша қалдық әлі жоқ.",
+    openStockBalancesListRowAria:
+      "Осы бренд бойынша сүзілген қалдықтарды ашу, қойма {{warehouse}}",
+    relatedStockMovementsTitle: "Соңғы қозғалыстар",
+    relatedStockMovementsHint:
+      "Бренд тауарлары бойынша соңғы {{limit}} қозғалыс. Толық тарих үшін тізімді ашыңыз.",
+    openAllStockMovements: "Қозғалыстарды ашу",
+    emptyRelatedStockMovements: "Бұл бренд бойынша қозғалыс әлі жоқ.",
+    openStockMovementsListRowAria: "Осы бренд бойынша сүзілген қозғалыстарды ашу",
   },
   category: {
     notFound: "Санат табылмады.",
@@ -135,6 +149,20 @@ export const kkMasterPages: MessageTree = {
     namePlaceholder: "Санат атауы",
     detailsDescription: "Код, атауы және күйі.",
     codePlaceholderAlt: "мысалы COMPONENTS",
+    relatedStockBalancesTitle: "Қоймалар бойынша қалдық",
+    relatedStockBalancesHint:
+      "Осы санаттағы барлық тауарлар үшін жинақталған фактілік және операциялық сандар. Толық тізім үшін тізімді ашыңыз.",
+    relatedStockBalancesSummaryAria: "Санат бойынша қойма қалдығы қорытындысы",
+    openAllStockBalances: "Қалдықтарды ашу",
+    emptyRelatedStockBalances: "Бұл санат бойынша қалдық әлі жоқ.",
+    openStockBalancesListRowAria:
+      "Осы санат бойынша сүзілген қалдықтарды ашу, қойма {{warehouse}}",
+    relatedStockMovementsTitle: "Соңғы қозғалыстар",
+    relatedStockMovementsHint:
+      "Санат тауарлары бойынша соңғы {{limit}} қозғалыс. Толық тарих үшін тізімді ашыңыз.",
+    openAllStockMovements: "Қозғалыстарды ашу",
+    emptyRelatedStockMovements: "Бұл санат бойынша қозғалыс әлі жоқ.",
+    openStockMovementsListRowAria: "Осы санат бойынша сүзілген қозғалыстарды ашу",
   },
   supplier: {
     notFound: "Жеткізуші табылмады.",
