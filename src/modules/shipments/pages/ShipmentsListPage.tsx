@@ -7,7 +7,10 @@ import { salesOrderRepository } from "../../sales-orders/repository";
 import { warehouseRepository } from "../../warehouses/repository";
 import { carrierRepository } from "../../carriers/repository";
 import type { Shipment } from "../model";
-import { buildShipmentListRowExtras } from "../shipmentListRowExtras";
+import {
+  buildShipmentListRowExtras,
+  type ShipmentListRowExtras,
+} from "../shipmentListRowExtras";
 import type { FactualDocumentStatus } from "../../../shared/domain";
 import { ListPageLayout } from "../../../shared/ui/list/ListPageLayout";
 import { EmptyState } from "../../../shared/ui/feedback/EmptyState";
@@ -42,14 +45,7 @@ type StatusFilter = "all" | FactualDocumentStatus;
 type RowData = Shipment & {
   salesOrderNumber: string;
   warehouseName: string;
-  carrierLabel: string;
-  carrierExport: string;
-  trackingLabel: string;
-  trackingExport: string;
-  carrierSearchBlob: string;
-  trackingRaw: string;
-  trackingUrl: string | null;
-};
+} & ShipmentListRowExtras;
 
 function filterBySearch(rows: RowData[], query: string): RowData[] {
   const q = query.trim().toLowerCase();
@@ -60,6 +56,7 @@ function filterBySearch(rows: RowData[], query: string): RowData[] {
     if (r.warehouseName.toLowerCase().includes(q)) return true;
     if (r.carrierSearchBlob.includes(q)) return true;
     if (r.trackingRaw.toLowerCase().includes(q)) return true;
+    if (r.deliveryMetaSearchBlob.includes(q)) return true;
     return false;
   });
 }
@@ -94,6 +91,10 @@ function buildExportRowsFromShipments(rows: RowData[]): ShipmentsExportRow[] {
     warehouse: r.warehouseName ?? "",
     carrier: r.carrierExport ?? "",
     trackingNumber: r.trackingExport ?? "",
+    recipient: r.recipientExport ?? "",
+    recipientPhone: r.recipientPhoneExport ?? "",
+    deliveryAddress: r.deliveryAddressExport ?? "",
+    deliveryComment: r.deliveryCommentExport ?? "",
     status: r.status ?? "",
   }));
 }
@@ -358,6 +359,31 @@ export function ShipmentsListPage() {
         minWidth: 160,
         flex: 1,
         cellRenderer: TrackingListCellRenderer,
+      },
+      {
+        field: "recipientLabel",
+        headerName: t("doc.shipment.recipientName"),
+        minWidth: 130,
+        maxWidth: 200,
+        valueFormatter: (p) => String(p.value ?? ""),
+      },
+      {
+        field: "recipientPhoneLabel",
+        headerName: t("doc.shipment.recipientPhone"),
+        minWidth: 120,
+        maxWidth: 160,
+        valueFormatter: (p) => String(p.value ?? ""),
+      },
+      {
+        field: "deliveryAddressPreview",
+        headerName: t("doc.shipment.deliveryAddress"),
+        minWidth: 120,
+        maxWidth: 200,
+        valueFormatter: (p) => String(p.value ?? ""),
+        tooltipValueGetter: (p) => {
+          const full = p.data?.deliveryAddressFull ?? "";
+          return full.trim() === "" ? undefined : full;
+        },
       },
       {
         field: "status",

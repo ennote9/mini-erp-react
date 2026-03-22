@@ -125,6 +125,11 @@ function filterByWarehouseId(rows: RowData[], warehouseId: string | null): RowDa
   return rows.filter((r) => r.warehouseId === warehouseId);
 }
 
+function filterByItemId(rows: RowData[], itemId: string | null): RowData[] {
+  if (itemId == null) return rows;
+  return rows.filter((r) => r.itemId === itemId);
+}
+
 function buildExportRowsFromMovements(
   rows: RowData[],
   movementTypeLabel: (code: string) => string,
@@ -149,6 +154,12 @@ function buildExportRowsFromMovements(
 export function StockMovementsListPage() {
   const { t, locale } = useTranslation();
   const [searchParams, setSearchParams] = useSearchParams();
+  const itemFilterId = useMemo(() => {
+    const raw = searchParams.get("itemId");
+    if (raw == null || raw === "") return null;
+    const trimmed = raw.trim();
+    return trimmed === "" ? null : trimmed;
+  }, [searchParams]);
   const warehouseFilterId = useMemo(() => {
     const raw = searchParams.get("warehouseId");
     if (raw == null || raw === "") return null;
@@ -203,12 +214,23 @@ export function StockMovementsListPage() {
   }, [t, locale]);
 
   const filteredRows = useMemo(() => {
-    const bySearch = filterBySearch(rowsWithNames, searchQuery);
-    return filterByWarehouseId(bySearch, warehouseFilterId);
-  }, [rowsWithNames, searchQuery, warehouseFilterId]);
+    const byItem = filterByItemId(rowsWithNames, itemFilterId);
+    const byWarehouse = filterByWarehouseId(byItem, warehouseFilterId);
+    return filterBySearch(byWarehouse, searchQuery);
+  }, [rowsWithNames, itemFilterId, warehouseFilterId, searchQuery]);
 
   const isEmpty = filteredRows.length === 0;
-  const hasFilter = searchQuery.trim() !== "" || warehouseFilterId != null;
+  const hasFilter = searchQuery.trim() !== "" || warehouseFilterId != null || itemFilterId != null;
+
+  const itemFilterLabel = useMemo((): string => {
+    if (itemFilterId == null) return "";
+    const it = itemRepository.getById(itemFilterId);
+    if (it) {
+      const name = it.name?.trim() ? it.name : "";
+      return name ? `${it.code} — ${it.name}` : it.code;
+    }
+    return itemFilterId;
+  }, [itemFilterId]);
 
   const warehouseFilterLabel = useMemo((): string => {
     if (warehouseFilterId == null) return "";
@@ -220,6 +242,12 @@ export function StockMovementsListPage() {
   const clearWarehouseFilter = useCallback(() => {
     const next = new URLSearchParams(searchParams);
     next.delete("warehouseId");
+    setSearchParams(next, { replace: true });
+  }, [searchParams, setSearchParams]);
+
+  const clearItemFilter = useCallback(() => {
+    const next = new URLSearchParams(searchParams);
+    next.delete("itemId");
     setSearchParams(next, { replace: true });
   }, [searchParams, setSearchParams]);
 
@@ -296,11 +324,14 @@ export function StockMovementsListPage() {
     if (!hasFilter) {
       return t("ops.stockMovements.empty.hintPosted");
     }
-    if (warehouseFilterId != null && searchQuery.trim() === "") {
+    if (itemFilterId != null && searchQuery.trim() === "" && warehouseFilterId == null) {
+      return t("ops.stockMovements.empty.hintItemOnly");
+    }
+    if (warehouseFilterId != null && searchQuery.trim() === "" && itemFilterId == null) {
       return t("ops.stockMovements.empty.hintWarehouseOnly");
     }
     return t("ops.stockMovements.empty.hintGeneral");
-  }, [hasFilter, warehouseFilterId, searchQuery, t]);
+  }, [hasFilter, itemFilterId, warehouseFilterId, searchQuery, t]);
 
   const columnDefs = useMemo<ColDef<RowData>[]>(
     () => [
@@ -369,6 +400,32 @@ export function StockMovementsListPage() {
             resultCount={filteredRows.length}
           />
           <div className="flex flex-row items-center gap-2 shrink-0 ml-auto">
+            {itemFilterId != null && (
+              <div
+                className="flex h-8 max-w-[min(100%,18rem)] items-center gap-1.5 rounded-md border border-input bg-background px-2 text-xs shrink-0"
+                role="status"
+                aria-label={t("ops.stockMovements.itemFilterAria")}
+              >
+                <span className="text-muted-foreground whitespace-nowrap shrink-0">
+                  {t("ops.stockMovements.itemFilterPrefix")}
+                </span>
+                <span
+                  className="truncate font-medium text-foreground/90 min-w-0"
+                  title={itemFilterLabel}
+                >
+                  {itemFilterLabel}
+                </span>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="h-7 px-1.5 text-xs shrink-0 text-muted-foreground hover:text-foreground"
+                  onClick={clearItemFilter}
+                >
+                  {t("doc.list.clear")}
+                </Button>
+              </div>
+            )}
             {warehouseFilterId != null && (
               <div
                 className="flex h-8 max-w-[min(100%,18rem)] items-center gap-1.5 rounded-md border border-input bg-background px-2 text-xs shrink-0"

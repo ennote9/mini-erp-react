@@ -91,6 +91,26 @@ export const kkMasterPages: MessageTree = {
       bytesKb: "{{n}} КБ",
       bytesMb: "{{n}} МБ",
     },
+    relatedStockBalancesTitle: "Қоймалар бойынша қалдық",
+    relatedStockBalancesHint:
+      "Қойма бойынша фактілік және операциялық сандар. Толық тізім мен сүзгілер үшін тізімді ашыңыз.",
+    relatedStockBalancesSummaryAria: "Қоймалар бойынша қалдық қорытындысы",
+    chipWarehouses: "Қоймалар",
+    chipTotalOnHand: "Қолда бар",
+    chipTotalReserved: "Резервте",
+    chipTotalAvailable: "Қолжетімді",
+    chipTotalOutgoing: "Шығыс",
+    chipTotalIncoming: "Кіріс",
+    openAllStockBalances: "Қалдықтарды ашу",
+    emptyRelatedStockBalances: "Бұл тауар бойынша қалдық жоқ.",
+    openStockBalancesListRowAria:
+      "Осы тауар бойынша сүзілген қалдықтарды ашу, қойма {{warehouse}}",
+    relatedStockMovementsTitle: "Соңғы қозғалыстар",
+    relatedStockMovementsHint:
+      "Тауар бойынша соңғы {{limit}} қозғалыс. Толық тарих үшін тізімді ашыңыз.",
+    openAllStockMovements: "Қозғалыстарды ашу",
+    emptyRelatedStockMovements: "Бұл тауар бойынша қозғалыс жоқ.",
+    openStockMovementsListRowAria: "Осы тауар бойынша сүзілген қозғалыстарды ашу",
   },
   brand: {
     notFound: "Бренд табылмады.",
@@ -156,6 +176,21 @@ export const kkMasterPages: MessageTree = {
     country: "Ел",
     billingAddress: "Есепшот мекенжайы",
     shippingAddress: "Жеткізу мекенжайы",
+    deliveryDefaultsSection: "Әдепкі жеткізу (сату тапсырыстары)",
+    deliveryDefaultsHint:
+      "Сату тапсырысында осы клиентті таңдағанда толтырылады; әр тапсырыста өзгертуге болады.",
+    defaultRecipientName: "Әдепкі алушы аты",
+    defaultRecipientNamePlaceholder: "мысалы жеткізу нүктесіндегі байланыс",
+    defaultRecipientPhone: "Әдепкі алушы телефоны",
+    defaultRecipientPhonePlaceholder: "мысалы +7 700 000 00 00",
+    defaultDeliveryAddress: "Әдепкі жеткізу мекенжайы",
+    defaultDeliveryAddressPlaceholder: "Көше, қала, индекс…",
+    defaultDeliveryComment: "Әдепкі жеткізу нұсқаулары",
+    defaultDeliveryCommentPlaceholder: "Домофон коды, уақыт терезесі…",
+    preferredCarrier: "Негізгі тасымалдаушы",
+    preferredCarrierPlaceholder: "Таңдалмаған",
+    preferredCarrierHint:
+      "Бұл клиенттің сату тапсырыстарынан жөнелту жасағанда әдепкі тасымалдаушы ретінде қолданылады.",
     relatedSalesOrdersTitle: "Байланысты сату тапсырыстары",
     relatedSalesOrdersHint:
       "Байланысты сату құжаттары. Тек оқу; жолды ашыңыз.",
@@ -229,8 +264,34 @@ export const kkMasterPages: MessageTree = {
     serviceLevelPlaceholder: "мысалы Стандарт, Экспресс",
     addressSectionTitle: "Мекенжай",
     addressSectionDescription: "Ел, қала және көше.",
+    hubHint:
+      "Төменде: осыны негізгі тасымалдаушы ретінде таңдаған клиенттер және id бойынша сілтемелі тапсырыс пен жөнелтулер.",
     futureShipmentsHint:
       "Тасымалдаушылар мұнда тек анықтамалық; жөнелтуге байлауды кейін қосуға болады.",
+    relatedCustomersTitle: "Байланысты клиенттер",
+    relatedCustomersHint:
+      "Осы тасымалдаушыны негізгі ретінде таңдаған клиенттер. Тек оқу; жолды ашыңыз.",
+    openAllCustomers: "Барлық клиенттерді ашу",
+    relatedCustomersSummaryAria: "Байланысты клиенттер қорытындысы",
+    customersChip: "Клиенттер",
+    emptyRelatedCustomers: "Бұл тасымалдаушыны негізгі ретінде таңдаған клиент жоқ.",
+    openCustomerAria: "Клиентті ашу {{code}}",
+    relatedSalesOrdersTitle: "Байланысты сату тапсырыстары",
+    relatedSalesOrdersHint:
+      "Құжатта осы тасымалдаушы бар тапсырыстар. Тек оқу; жолды ашыңыз.",
+    openAllSalesOrders: "Барлық сату тапсырыстарын ашу",
+    relatedSoSummaryAria: "Байланысты тапсырыстар қорытындысы",
+    ordersChip: "Тапсырыстар",
+    emptyRelatedSo: "Бұл тасымалдаушымен сату тапсырыстары әлі жоқ.",
+    openSalesOrderAria: "Сату тапсырысын ашу {{number}}",
+    relatedShipmentsTitle: "Байланысты жөнелтулер",
+    relatedShipmentsHint:
+      "Осы тасымалдаушымен жөнелтулер. Тек оқу; жолды ашыңыз.",
+    openAllShipments: "Барлық жөнелтулерді ашу",
+    relatedShipmentsSummaryAria: "Байланысты жөнелтулер қорытындысы",
+    shipmentsChip: "Жөнелтулер",
+    emptyRelatedShipments: "Бұл тасымалдаушымен жөнелтулер әлі жоқ.",
+    openShipmentAria: "Жөнелтуді ашу {{number}}",
     types: {
       courier: "Курьерлік қызмет",
       postal: "Пошта",

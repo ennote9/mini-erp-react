@@ -21,6 +21,12 @@ function asOptionalString(v: unknown): string | undefined {
   return typeof v === "string" ? v : undefined;
 }
 
+function asOptionalTrimmedString(v: unknown): string | undefined {
+  if (typeof v !== "string") return undefined;
+  const t = v.trim();
+  return t === "" ? undefined : t;
+}
+
 function asOptionalNumber(v: unknown): number | undefined {
   return typeof v === "number" && Number.isFinite(v) ? v : undefined;
 }
@@ -51,6 +57,11 @@ function normalizeCustomer(raw: unknown): Customer | null {
     city: asOptionalString(rec.city),
     country: asOptionalString(rec.country),
     paymentTermsDays: asOptionalNumber(rec.paymentTermsDays),
+    preferredCarrierId: asOptionalTrimmedString(rec.preferredCarrierId),
+    defaultRecipientName: asOptionalTrimmedString(rec.defaultRecipientName),
+    defaultRecipientPhone: asOptionalTrimmedString(rec.defaultRecipientPhone),
+    defaultDeliveryAddress: asOptionalTrimmedString(rec.defaultDeliveryAddress),
+    defaultDeliveryComment: asOptionalTrimmedString(rec.defaultDeliveryComment),
   };
 }
 

@@ -9,6 +9,7 @@ import {
   writeDocumentPayload,
 } from "../../shared/documentPersistence";
 import { registerPersistenceFlush } from "../../shared/persistenceCoordinator";
+import { bumpInventoryDisplayRevision } from "../../shared/inventoryDisplayRevision";
 import {
   isCancelDocumentReasonCode,
   zeroPriceReasonCodeForStore,
@@ -187,6 +188,7 @@ export async function flushPendingPurchaseOrderPersist(): Promise<void> {
 }
 
 function schedulePersist(): void {
+  bumpInventoryDisplayRevision();
   persistDepth++;
   persistChain = persistChain
     .then(async () => {

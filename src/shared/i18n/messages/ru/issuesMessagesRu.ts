@@ -33,6 +33,7 @@ export const ruIssuesMessages: MessageTree = {
       "Срок оплаты — целое число дней ≥ 0 или оставьте поле пустым.",
     carrierTypeRequired: "Тип перевозчика обязателен.",
     carrierTypeInvalid: "Выберите допустимый тип перевозчика.",
+    preferredCarrierInvalid: "Предпочтительный перевозчик недействителен.",
   },
   document: {
     supplierRequired: "Поставщик обязателен.",

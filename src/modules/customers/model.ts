@@ -17,4 +17,11 @@ export interface Customer {
   city?: string;
   country?: string;
   paymentTermsDays?: number;
+  /** Optional default carrier for shipments created for this customer's sales orders. */
+  preferredCarrierId?: string;
+  /** Default delivery details for new/edited sales orders when customer is selected (trimmed; empty not stored). */
+  defaultRecipientName?: string;
+  defaultRecipientPhone?: string;
+  defaultDeliveryAddress?: string;
+  defaultDeliveryComment?: string;
 }

@@ -32,6 +32,7 @@ export const issuesMessagesEn: MessageTree = {
       "Payment terms must be a whole number of days ≥ 0, or leave empty.",
     carrierTypeRequired: "Carrier type is required.",
     carrierTypeInvalid: "Select a valid carrier type.",
+    preferredCarrierInvalid: "Preferred carrier is not valid.",
   },
   document: {
     supplierRequired: "Supplier is required.",

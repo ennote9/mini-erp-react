@@ -90,6 +90,26 @@ export const ruMasterPages: MessageTree = {
       bytesKb: "{{n}} КБ",
       bytesMb: "{{n}} МБ",
     },
+    relatedStockBalancesTitle: "Остатки по складам",
+    relatedStockBalancesHint:
+      "Фактические и операционные количества по складам. Откройте список для полной таблицы и фильтров.",
+    relatedStockBalancesSummaryAria: "Сводка остатков по складам",
+    chipWarehouses: "Склады",
+    chipTotalOnHand: "На складе",
+    chipTotalReserved: "Резерв",
+    chipTotalAvailable: "Доступно",
+    chipTotalOutgoing: "Исходящий",
+    chipTotalIncoming: "Входящий",
+    openAllStockBalances: "Открыть остатки",
+    emptyRelatedStockBalances: "По этой номенклатуре остатков нет.",
+    openStockBalancesListRowAria:
+      "Открыть остатки с фильтром по номенклатуре, склад {{warehouse}}",
+    relatedStockMovementsTitle: "Последние движения",
+    relatedStockMovementsHint:
+      "Последние {{limit}} движений по номенклатуре. Откройте список для полной истории.",
+    openAllStockMovements: "Открыть движения",
+    emptyRelatedStockMovements: "По этой номенклатуре движений нет.",
+    openStockMovementsListRowAria: "Открыть движения с фильтром по номенклатуре",
   },
   brand: {
     notFound: "Бренд не найден.",
@@ -155,6 +175,21 @@ export const ruMasterPages: MessageTree = {
     country: "Страна",
     billingAddress: "Адрес для выставления счетов",
     shippingAddress: "Адрес доставки",
+    deliveryDefaultsSection: "Доставка по умолчанию (заказы клиентов)",
+    deliveryDefaultsHint:
+      "Подставляется в заказ клиента при выборе этого клиента; в каждом заказе можно изменить.",
+    defaultRecipientName: "Получатель по умолчанию",
+    defaultRecipientNamePlaceholder: "напр. контакт на точке доставки",
+    defaultRecipientPhone: "Телефон получателя по умолчанию",
+    defaultRecipientPhonePlaceholder: "напр. +7 495 000-00-00",
+    defaultDeliveryAddress: "Адрес доставки по умолчанию",
+    defaultDeliveryAddressPlaceholder: "Улица, город, индекс…",
+    defaultDeliveryComment: "Инструкции по доставке по умолчанию",
+    defaultDeliveryCommentPlaceholder: "Код домофона, время…",
+    preferredCarrier: "Предпочтительный перевозчик",
+    preferredCarrierPlaceholder: "Не выбран",
+    preferredCarrierHint:
+      "Подставляется по умолчанию при создании отгрузки из заказов клиента этого контрагента.",
     relatedSalesOrdersTitle: "Связанные заказы клиентов",
     relatedSalesOrdersHint:
       "Связанные документы продаж. Только просмотр; откройте строку для деталей.",
@@ -228,8 +263,34 @@ export const ruMasterPages: MessageTree = {
     serviceLevelPlaceholder: "напр. Стандарт, Экспресс",
     addressSectionTitle: "Адрес",
     addressSectionDescription: "Страна, город и улица.",
+    hubHint:
+      "Ниже: клиенты с этим перевозчиком как предпочитаемым, а также заказы клиентов и отгрузки по id.",
     futureShipmentsHint:
       "Перевозчики здесь только в НСИ; привязку к отгрузкам можно добавить позже.",
+    relatedCustomersTitle: "Связанные клиенты",
+    relatedCustomersHint:
+      "Клиенты с этим перевозчиком как предпочитаемым. Только просмотр; откройте строку.",
+    openAllCustomers: "Открыть всех клиентов",
+    relatedCustomersSummaryAria: "Сводка по связанным клиентам",
+    customersChip: "Клиенты",
+    emptyRelatedCustomers: "Пока нет клиентов с этим предпочитаемым перевозчиком.",
+    openCustomerAria: "Открыть клиента {{code}}",
+    relatedSalesOrdersTitle: "Связанные заказы клиентов",
+    relatedSalesOrdersHint:
+      "Заказы с этим перевозчиком в документе. Только просмотр; откройте строку.",
+    openAllSalesOrders: "Открыть все заказы клиентов",
+    relatedSoSummaryAria: "Сводка по связанным заказам клиентов",
+    ordersChip: "Заказы",
+    emptyRelatedSo: "Пока нет заказов клиентов с этим перевозчиком.",
+    openSalesOrderAria: "Открыть заказ клиента {{number}}",
+    relatedShipmentsTitle: "Связанные отгрузки",
+    relatedShipmentsHint:
+      "Отгрузки с этим перевозчиком. Только просмотр; откройте строку.",
+    openAllShipments: "Открыть все отгрузки",
+    relatedShipmentsSummaryAria: "Сводка по связанным отгрузкам",
+    shipmentsChip: "Отгрузки",
+    emptyRelatedShipments: "Пока нет отгрузок с этим перевозчиком.",
+    openShipmentAria: "Открыть отгрузку {{number}}",
     types: {
       courier: "Курьерская служба",
       postal: "Почта",

@@ -16,8 +16,14 @@ import { ReceiptsListPage, ReceiptPage } from "../modules/receipts";
 import {
   SalesOrdersListPage,
   SalesOrderPage,
+  SalesOrderCustomerDocumentPage,
 } from "../modules/sales-orders";
-import { ShipmentsListPage, ShipmentPage } from "../modules/shipments";
+import {
+  ShipmentsListPage,
+  ShipmentPage,
+  ShipmentDeliverySheetPage,
+  ShipmentCustomerDocumentPage,
+} from "../modules/shipments";
 import { StockBalancesListPage } from "../modules/stock-balances";
 import { StockMovementsListPage } from "../modules/stock-movements";
 import { SettingsPage } from "../modules/settings";
@@ -50,8 +56,11 @@ export function AppRoutes() {
         <Route path="receipts" element={<ReceiptsListPage />} />
         <Route path="receipts/:id" element={<ReceiptPage />} />
         <Route path="sales-orders" element={<SalesOrdersListPage />} />
+        <Route path="sales-orders/:id/customer-document" element={<SalesOrderCustomerDocumentPage />} />
         <Route path="sales-orders/:id" element={<SalesOrderPage />} />
         <Route path="shipments" element={<ShipmentsListPage />} />
+        <Route path="shipments/:id/delivery-sheet" element={<ShipmentDeliverySheetPage />} />
+        <Route path="shipments/:id/customer-document" element={<ShipmentCustomerDocumentPage />} />
         <Route path="shipments/:id" element={<ShipmentPage />} />
         <Route path="stock-balances" element={<StockBalancesListPage />} />
         <Route path="stock-movements" element={<StockMovementsListPage />} />

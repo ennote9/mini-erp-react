@@ -42,7 +42,7 @@ function asOptionalTrimmedString(v: unknown): string | undefined {
 }
 
 function isFactualStatus(v: unknown): v is FactualDocumentStatus {
-  return v === "draft" || v === "posted" || v === "cancelled";
+  return v === "draft" || v === "posted" || v === "cancelled" || v === "reversed";
 }
 
 function computeNextNumericId(records: Array<{ id: string }>): number {
@@ -122,6 +122,10 @@ function normalizeShipmentRecord(raw: unknown): ShipmentPersistRecord | null {
     reversalReasonComment: asOptionalString(rec.reversalReasonComment),
     carrierId: asOptionalTrimmedString(rec.carrierId),
     trackingNumber: asOptionalTrimmedString(rec.trackingNumber),
+    recipientName: asOptionalTrimmedString(rec.recipientName),
+    recipientPhone: asOptionalTrimmedString(rec.recipientPhone),
+    deliveryAddress: asOptionalTrimmedString(rec.deliveryAddress),
+    deliveryComment: asOptionalTrimmedString(rec.deliveryComment),
     lines,
   };
 }

@@ -1419,3 +1419,57 @@ input[type="date"]::-webkit-calendar-picker-indicator {
   height: 2rem;
 }
 
+/*
+ * WebView2 PrintToPdf / window.print():
+ * Do NOT hide [data-slot="sidebar-wrapper"] — it wraps BOTH the nav sidebar and <main data-slot="sidebar-inset">
+ * (the workspace). Hiding it removes all document content from PDF output (blank page + headers only).
+ */
+@media print {
+  /* Shell chrome only (not the wrapper that contains the main column). */
+  [data-slot="sidebar"],
+  [data-slot="sidebar-gap"],
+  [data-slot="sidebar-container"],
+  [data-slot="sidebar-trigger"],
+  [data-slot="sidebar-rail"],
+  header.app-topbar {
+    display: none !important;
+  }
+
+  /* Break flex + svh + overflow so the main column can expand for print/PDF. */
+  [data-slot="sidebar-wrapper"] {
+    display: block !important;
+    height: auto !important;
+    max-height: none !important;
+    min-height: 0 !important;
+    overflow: visible !important;
+  }
+
+  [data-slot="sidebar-inset"],
+  .app-workspace {
+    display: block !important;
+    height: auto !important;
+    min-height: 0 !important;
+    max-height: none !important;
+    overflow: visible !important;
+    flex: none !important;
+    border: none !important;
+    box-shadow: none !important;
+    margin: 0 !important;
+  }
+
+  .app-page-content {
+    padding: 0 !important;
+    overflow: visible !important;
+    display: block !important;
+    flex: none !important;
+    min-height: 0 !important;
+  }
+
+  /* Default readable print colors where Tailwind print: variants are absent. */
+  body,
+  #root {
+    color: #000 !important;
+    background: #fff !important;
+  }
+}
+

@@ -1,4 +1,8 @@
 // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
+
+#[cfg(windows)]
+mod pdf_export_windows;
+
 #[tauri::command]
 fn greet(name: &str) -> String {
     format!("Hello, {}! You've been greeted from Rust!", name)
@@ -41,13 +45,34 @@ fn open_export_file(path: String) -> Result<(), String> {
     }
 }
 
+/// Writes the **entire main webview** to a PDF using the platform webview engine (WebView2 on Windows).
+/// `@media print` CSS should hide app chrome so only document content is included.
+#[tauri::command]
+async fn webview_print_to_pdf(app: tauri::AppHandle, path: String) -> Result<(), String> {
+    #[cfg(windows)]
+    {
+        pdf_export_windows::print_main_webview_to_pdf(app, path).await
+    }
+    #[cfg(not(windows))]
+    {
+        let _ = app;
+        let _ = path;
+        Err("NATIVE_PDF_UNSUPPORTED".to_string())
+    }
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_opener::init())
-        .invoke_handler(tauri::generate_handler![greet, write_export_file, open_export_file])
+        .invoke_handler(tauri::generate_handler![
+            greet,
+            write_export_file,
+            open_export_file,
+            webview_print_to_pdf
+        ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }

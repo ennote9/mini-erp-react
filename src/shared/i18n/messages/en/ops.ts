@@ -167,8 +167,12 @@ export const opsEn = {
       emptyDefault: "No customers yet",
       hintFilter: "Try changing the search or filter.",
       hintCreate: "Create your first customer for sales.",
+      hintPreferredCarrierOnly:
+        "No customers with this preferred carrier. Try clearing the preferred carrier filter.",
       searchAria: "Search customers",
       searchPlaceholder: "Search",
+      filterPreferredCarrierAria: "Preferred carrier filter active",
+      preferredCarrierChipLabel: "Preferred carrier",
     },
     warehouses: {
       emptyFiltered: "No warehouses match current search or filters",
@@ -217,10 +221,13 @@ export const opsEn = {
       hintItemOnly:
         "No sales orders include this item on any line. Try clearing the item filter.",
       hintUrlFilters:
-        "Try changing the search, status filter, or URL filters (customer, warehouse, item).",
+        "Try changing the search, status filter, or URL filters (customer, warehouse, carrier, item).",
+      hintCarrierOnly:
+        "No sales orders for this carrier. Try clearing the carrier filter.",
       searchAria: "Search sales orders",
-      searchPlaceholder: "Search",
+      searchPlaceholder: "Number, customer, warehouse, carrier, recipient…",
       filterWarehouseAria: "Warehouse filter active",
+      filterCarrierAria: "Carrier filter active",
       filterItemAria: "Item filter active",
       filterCustomerAria: "Customer filter active",
     },
@@ -266,7 +273,7 @@ export const opsEn = {
       hintCarrierOnly:
         "No shipments for this carrier. Try clearing the carrier filter.",
       searchAria: "Search shipments",
-      searchPlaceholder: "Number, order, carrier, tracking…",
+      searchPlaceholder: "Number, order, carrier, tracking, recipient, address…",
       filterWarehouseAria: "Warehouse filter active",
       filterCarrierAria: "Carrier filter active",
       filterItemAria: "Item filter active",
@@ -276,12 +283,15 @@ export const opsEn = {
     },
   },
   stockMovements: {
+    itemFilterAria: "Item filter active",
+    itemFilterPrefix: "Item",
     empty: {
       titleFiltered: "No stock movements match current search or filters",
       titleDefault: "No stock movements yet",
       hintPosted: "Movements will appear after posting receipts and shipments.",
       hintWarehouseOnly: "No stock movements for this warehouse. Try clearing the warehouse filter.",
-      hintGeneral: "Try changing the search or warehouse filter.",
+      hintItemOnly: "No stock movements for this item. Try clearing the item filter.",
+      hintGeneral: "Try changing the search, warehouse filter, or item filter.",
     },
     searchAria: "Search stock movements",
     searchPlaceholder: "Search",
@@ -304,6 +314,8 @@ export const opsEn = {
     searchAria: "Search stock balances",
     searchPlaceholder: "Search",
     warehouseFilterAria: "Warehouse filter active",
+    itemFilterAria: "Item filter active",
+    itemFilterPrefix: "Item",
     empty: {
       titleFiltered: "No stock balances match current search or filters",
       titleDefault: "No stock balances yet",
@@ -311,7 +323,9 @@ export const opsEn = {
       hintQuickOnly:
         "No rows match this quick filter. Try All or another filter.",
       hintWarehouseOnly: "No stock balances for this warehouse. Try clearing the warehouse filter.",
-      hintGeneral: "Try changing the search, quick filter, or warehouse filter.",
+      hintItemOnly: "No stock balances for this item. Try clearing the item filter.",
+      hintGeneral:
+        "Try changing the search, quick filter, warehouse filter, or item filter.",
     },
     quick: {
       all: { label: "All", aria: "Show all rows" },

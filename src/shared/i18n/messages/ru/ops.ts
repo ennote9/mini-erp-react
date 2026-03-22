@@ -168,8 +168,12 @@ export const ruOps: MessageTree = {
       emptyDefault: "Клиентов пока нет",
       hintFilter: "Измените поиск или фильтр.",
       hintCreate: "Создайте первого клиента для продаж.",
+      hintPreferredCarrierOnly:
+        "Нет клиентов с этим предпочитаемым перевозчиком. Снимите фильтр по перевозчику.",
       searchAria: "Поиск клиентов",
       searchPlaceholder: "Поиск",
+      filterPreferredCarrierAria: "Активен фильтр по предпочитаемому перевозчику",
+      preferredCarrierChipLabel: "Предпочитаемый перевозчик",
     },
     warehouses: {
       emptyFiltered: "Нет складов по текущему поиску или фильтрам",
@@ -215,10 +219,13 @@ export const ruOps: MessageTree = {
       hintItemOnly:
         "Ни один заказ не содержит эту позицию в строках. Снимите фильтр по номенклатуре.",
       hintUrlFilters:
-        "Измените поиск, фильтр статуса или URL-фильтры (клиент, склад, номенклатура).",
+        "Измените поиск, фильтр статуса или URL-фильтры (клиент, склад, перевозчик, номенклатура).",
+      hintCarrierOnly:
+        "Нет заказов по этому перевозчику. Снимите фильтр по перевозчику.",
       searchAria: "Поиск заказов клиентов",
-      searchPlaceholder: "Поиск",
+      searchPlaceholder: "Номер, клиент, склад, перевозчик, получатель…",
       filterWarehouseAria: "Активен фильтр по складу",
+      filterCarrierAria: "Активен фильтр по перевозчику",
       filterItemAria: "Активен фильтр по номенклатуре",
       filterCustomerAria: "Активен фильтр по клиенту",
     },
@@ -260,7 +267,7 @@ export const ruOps: MessageTree = {
       hintCarrierOnly:
         "Нет отгрузок по этому перевозчику. Снимите фильтр по перевозчику.",
       searchAria: "Поиск отгрузок",
-      searchPlaceholder: "Номер, заказ, перевозчик, трек…",
+      searchPlaceholder: "Номер, заказ, перевозчик, трек, получатель, адрес…",
       filterWarehouseAria: "Активен фильтр по складу",
       filterCarrierAria: "Активен фильтр по перевозчику",
       filterItemAria: "Активен фильтр по номенклатуре",
@@ -270,12 +277,15 @@ export const ruOps: MessageTree = {
     },
   },
   stockMovements: {
+    itemFilterAria: "Активен фильтр по номенклатуре",
+    itemFilterPrefix: "Номенклатура",
     empty: {
       titleFiltered: "Нет движений по текущему поиску или фильтрам",
       titleDefault: "Движений пока нет",
       hintPosted: "Движения появятся после проведения поступлений и отгрузок.",
       hintWarehouseOnly: "Нет движений по этому складу. Снимите фильтр по складу.",
-      hintGeneral: "Измените поиск или фильтр по складу.",
+      hintItemOnly: "Нет движений по этой номенклатуре. Снимите фильтр по номенклатуре.",
+      hintGeneral: "Измените поиск, фильтр по складу или фильтр по номенклатуре.",
     },
     searchAria: "Поиск движений",
     searchPlaceholder: "Поиск",
@@ -298,13 +308,17 @@ export const ruOps: MessageTree = {
     searchAria: "Поиск остатков",
     searchPlaceholder: "Поиск",
     warehouseFilterAria: "Активен фильтр по складу",
+    itemFilterAria: "Активен фильтр по номенклатуре",
+    itemFilterPrefix: "Номенклатура",
     empty: {
       titleFiltered: "Нет остатков по текущему поиску или фильтрам",
       titleDefault: "Остатков пока нет",
       hintPosted: "Остатки появятся после проведения поступлений и отгрузок.",
       hintQuickOnly: "Нет строк по этому быстрому фильтру. Попробуйте «Все» или другой фильтр.",
       hintWarehouseOnly: "Нет остатков по этому складу. Снимите фильтр по складу.",
-      hintGeneral: "Измените поиск, быстрый фильтр или фильтр по складу.",
+      hintItemOnly: "Нет остатков по этой номенклатуре. Снимите фильтр по номенклатуре.",
+      hintGeneral:
+        "Измените поиск, быстрый фильтр, фильтр по складу или фильтр по номенклатуре.",
     },
     quick: {
       all: { label: "Все", aria: "Показать все строки" },

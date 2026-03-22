@@ -1,0 +1,162 @@
+/**
+ * Printable customer documents (preliminary SO / final shipment).
+ * Same shell strategy as shipment delivery sheet: white page, hide app chrome.
+ */
+@media print {
+  @page {
+    margin: 14mm 12mm;
+    size: auto;
+  }
+
+  html:has(body.customer-document-print-context),
+  body.customer-document-print-context,
+  body.customer-document-print-context #root {
+    background: #fff !important;
+    background-color: #fff !important;
+  }
+
+  body.customer-document-print-context {
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
+  }
+
+  body.customer-document-print-context [data-slot="sidebar-wrapper"] {
+    background: #fff !important;
+    background-color: #fff !important;
+    height: auto !important;
+    min-height: 0 !important;
+    max-height: none !important;
+    overflow: visible !important;
+  }
+
+  body.customer-document-print-context [data-slot="sidebar-inset"] {
+    background: #fff !important;
+    background-color: #fff !important;
+    border: none !important;
+    box-shadow: none !important;
+    margin: 0 !important;
+    border-radius: 0 !important;
+  }
+
+  body.customer-document-print-context .app-workspace {
+    background: #fff !important;
+    background-color: #fff !important;
+    min-height: 0 !important;
+  }
+
+  body.customer-document-print-context [data-slot="sidebar"] {
+    display: none !important;
+  }
+
+  body.customer-document-print-context [data-slot="sidebar-gap"] {
+    display: none !important;
+    width: 0 !important;
+    min-width: 0 !important;
+  }
+
+  body.customer-document-print-context .app-workspace > :first-child {
+    display: none !important;
+  }
+
+  body.customer-document-print-context .customer-doc__toolbar {
+    display: none !important;
+  }
+
+  body.customer-document-print-context .app-page-content {
+    padding: 0 !important;
+    background: #fff !important;
+    background-color: #fff !important;
+  }
+
+  body.customer-document-print-context .customer-doc {
+    max-width: none !important;
+    width: 100% !important;
+    font-size: 11pt;
+    line-height: 1.42;
+    color: #000 !important;
+    background: #fff !important;
+  }
+
+  body.customer-document-print-context .customer-doc__table thead {
+    display: table-header-group;
+  }
+
+  body.customer-document-print-context .customer-doc__table tbody tr {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  body.customer-document-print-context .customer-doc__th {
+    padding: 6px 8px;
+    font-size: 9.5pt;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    border-bottom: 2px solid #111 !important;
+    background: #e4e4e4 !important;
+    color: #000 !important;
+  }
+
+  body.customer-document-print-context .customer-doc__th--numeric {
+    text-align: right;
+  }
+
+  body.customer-document-print-context .customer-doc__td {
+    padding: 5px 8px;
+    border-bottom: 1px solid #c4c4c4 !important;
+    color: #000 !important;
+    vertical-align: top;
+  }
+
+  body.customer-document-print-context .customer-doc__td--numeric {
+    text-align: right;
+    white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+  }
+
+  body.customer-document-print-context .customer-doc__meta {
+    break-inside: avoid;
+    page-break-inside: avoid;
+    margin-top: 5mm !important;
+    font-size: 9.5pt !important;
+    color: #555 !important;
+    border-top: 1px solid #c8c8c8 !important;
+    padding-top: 0.35rem !important;
+  }
+}
+
+/* Screen + print shared table */
+.customer-doc__th {
+  border-bottom: 2px solid hsl(var(--border));
+  background-color: hsl(var(--muted) / 0.65);
+  padding: 0.45rem 0.65rem;
+  text-align: left;
+  font-weight: 700;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: hsl(var(--foreground));
+  vertical-align: bottom;
+}
+
+.customer-doc__th--numeric {
+  text-align: right;
+  white-space: nowrap;
+}
+
+.customer-doc__td {
+  border-bottom: 1px solid hsl(var(--border) / 0.85);
+  padding: 0.45rem 0.65rem;
+  vertical-align: top;
+  line-height: 1.45;
+}
+
+.customer-doc__td--numeric {
+  text-align: right;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.customer-doc__tr:last-child .customer-doc__td {
+  border-bottom: none;
+}

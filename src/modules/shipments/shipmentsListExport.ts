@@ -9,6 +9,10 @@ export type ShipmentsExportRow = {
   warehouse: string;
   carrier: string;
   trackingNumber: string;
+  recipient: string;
+  recipientPhone: string;
+  deliveryAddress: string;
+  deliveryComment: string;
   status: string;
 };
 
@@ -40,7 +44,10 @@ const WIDTH_BOUNDS = [
   { min: 8, max: 42 },
   { min: 8, max: 28 },
   { min: 10, max: 32 },
-  { min: 10, max: 24 },
+  { min: 10, max: 28 },
+  { min: 10, max: 18 },
+  { min: 10, max: 36 },
+  { min: 10, max: 36 },
   { min: 8, max: 14 },
 ];
 
@@ -54,7 +61,20 @@ function addSheet(workbook: Workbook, rows: ShipmentsExportRow[], labels: ExcelL
     return;
   }
   const columns = COLUMN_HEADERS.map((name) => ({ name, filterButton: true }));
-  const tableRows = rows.map((r) => [r.no, r.number, r.date, r.salesOrder, r.warehouse, r.status]);
+  const tableRows = rows.map((r) => [
+    r.no,
+    r.number,
+    r.date,
+    r.salesOrder,
+    r.warehouse,
+    r.carrier,
+    r.trackingNumber,
+    r.recipient,
+    r.recipientPhone,
+    r.deliveryAddress,
+    r.deliveryComment,
+    r.status,
+  ]);
   sheet.addTable({
     name: sanitizeTableName(TABLE_NAME_BASE),
     ref: "A1",
@@ -66,7 +86,20 @@ function addSheet(workbook: Workbook, rows: ShipmentsExportRow[], labels: ExcelL
   for (let c = 0; c < COLUMN_HEADERS.length; c++) {
     const valueLengths = rows.map((r) =>
       cellLen(
-        [r.no, r.number, r.date, r.salesOrder, r.warehouse, r.carrier, r.trackingNumber, r.status][c],
+        [
+          r.no,
+          r.number,
+          r.date,
+          r.salesOrder,
+          r.warehouse,
+          r.carrier,
+          r.trackingNumber,
+          r.recipient,
+          r.recipientPhone,
+          r.deliveryAddress,
+          r.deliveryComment,
+          r.status,
+        ][c],
       ),
     );
     const b = WIDTH_BOUNDS[c] ?? { min: DEFAULT_MIN, max: DEFAULT_MAX };

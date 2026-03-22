@@ -120,6 +120,9 @@ export function salesOrdersListExcelLabels(t: TFunction): ExcelListSheetLabels {
       t("exportExcel.list.colDate"),
       t("exportExcel.list.colCustomer"),
       t("exportExcel.list.colWarehouse"),
+      t("exportExcel.list.colCarrier"),
+      t("exportExcel.list.colRecipient"),
+      t("exportExcel.list.colRecipientPhone"),
       t("exportExcel.list.colStatus"),
     ],
   };
@@ -150,6 +153,10 @@ export function shipmentsListExcelLabels(t: TFunction): ExcelListSheetLabels {
       t("exportExcel.list.colWarehouse"),
       t("exportExcel.list.colCarrier"),
       t("exportExcel.list.colTrackingNumber"),
+      t("exportExcel.list.colRecipient"),
+      t("exportExcel.list.colRecipientPhone"),
+      t("exportExcel.list.colDeliveryAddress"),
+      t("exportExcel.list.colDeliveryComment"),
       t("exportExcel.list.colStatus"),
     ],
   };

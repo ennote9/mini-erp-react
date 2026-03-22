@@ -18,6 +18,10 @@ export type ShipmentDocumentSummary = {
   warehouse: string;
   carrier: string;
   trackingNumber: string;
+  recipientName: string;
+  recipientPhone: string;
+  deliveryAddress: string;
+  deliveryComment: string;
   comment: string;
 };
 
@@ -120,7 +124,7 @@ export async function buildLinesXlsxBuffer(
   return workbook.xlsx.writeBuffer();
 }
 
-const DOC_SUMMARY_ROWS = 7;
+const DOC_SUMMARY_ROWS = 11;
 
 const THIN_BORDER = { style: "thin" as const };
 const BLOCK_BORDER = {
@@ -192,7 +196,11 @@ export async function buildDocumentXlsxBuffer(
   docSheet.addRow([L[3], summary.warehouse]);
   docSheet.addRow([L[4], summary.carrier]);
   docSheet.addRow([L[5], summary.trackingNumber]);
-  docSheet.addRow([L[6], summary.comment]);
+  docSheet.addRow([L[6], summary.recipientName]);
+  docSheet.addRow([L[7], summary.recipientPhone]);
+  docSheet.addRow([L[8], summary.deliveryAddress]);
+  docSheet.addRow([L[9], summary.deliveryComment]);
+  docSheet.addRow([L[10], summary.comment]);
   applyDocumentSheetColumnWidths(docSheet, summary, L);
   formatDocumentSummaryBlock(docSheet, summary);
   addLinesSheetWithTable(workbook, lineRows, labels.linesSheetName, labels.shipmentLineHeaders);

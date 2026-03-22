@@ -4,6 +4,7 @@ import { AgGridReact } from "ag-grid-react";
 import type { ColDef, ICellRendererParams, SelectionChangedEvent } from "ag-grid-community";
 import { salesOrderRepository } from "../repository";
 import { customerRepository } from "../../customers/repository";
+import { carrierRepository } from "../../carriers/repository";
 import { warehouseRepository } from "../../warehouses/repository";
 import { itemRepository } from "../../items/repository";
 import { normalizeDateForSO } from "../dateUtils";
@@ -42,16 +43,27 @@ type StatusFilter = "all" | PlanningDocumentStatus;
 type RowData = SalesOrder & {
   customerName: string;
   warehouseName: string;
+  carrierLabel: string;
+  carrierExport: string;
+  carrierSearchBlob: string;
+  recipientLabel: string;
+  recipientPhoneLabel: string;
+  recipientExport: string;
+  recipientPhoneExport: string;
+  recipientSearchBlob: string;
 };
 
 function filterBySearch(rows: RowData[], query: string): RowData[] {
   const q = query.trim().toLowerCase();
   if (!q) return rows;
-  return rows.filter(
-    (r) =>
-      r.number.toLowerCase().includes(q) ||
-      r.customerName.toLowerCase().includes(q),
-  );
+  return rows.filter((r) => {
+    if (r.number.toLowerCase().includes(q)) return true;
+    if (r.customerName.toLowerCase().includes(q)) return true;
+    if (r.warehouseName.toLowerCase().includes(q)) return true;
+    if (r.carrierSearchBlob.includes(q)) return true;
+    if (r.recipientSearchBlob.includes(q)) return true;
+    return false;
+  });
 }
 
 function filterByStatus(
@@ -70,6 +82,11 @@ function filterByCustomerId(rows: RowData[], customerId: string | null): RowData
 function filterByWarehouseId(rows: RowData[], warehouseId: string | null): RowData[] {
   if (warehouseId == null) return rows;
   return rows.filter((r) => r.warehouseId === warehouseId);
+}
+
+function filterByCarrierId(rows: RowData[], carrierId: string | null): RowData[] {
+  if (carrierId == null) return rows;
+  return rows.filter((r) => (r.carrierId?.trim() ?? "") === carrierId);
 }
 
 /** When `allowIds` is null, no item filter is applied. */
@@ -98,6 +115,9 @@ function buildExportRowsFromSO(rows: RowData[]): SalesOrdersExportRow[] {
     date: normalizeDateForSO(r.date),
     customer: r.customerName ?? "",
     warehouse: r.warehouseName ?? "",
+    carrier: r.carrierExport ?? "",
+    recipient: r.recipientExport ?? "",
+    recipientPhone: r.recipientPhoneExport ?? "",
     status: r.status ?? "",
   }));
 }
@@ -108,6 +128,7 @@ export function SalesOrdersListPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const customerFilterId = useMemo(() => parseQueryId(searchParams, "customerId"), [searchParams]);
   const warehouseFilterId = useMemo(() => parseQueryId(searchParams, "warehouseId"), [searchParams]);
+  const carrierFilterId = useMemo(() => parseQueryId(searchParams, "carrierId"), [searchParams]);
   const itemFilterId = useMemo(() => parseQueryId(searchParams, "itemId"), [searchParams]);
 
   const salesOrderIdsContainingItem = useMemo(() => {
@@ -140,21 +161,57 @@ export function SalesOrdersListPage() {
 
   const rowsWithNames = useMemo(() => {
     const list = salesOrderRepository.list();
+    const emDash = t("domain.audit.summary.emDash");
+    const unknownCarrier = t("doc.shipment.unknownCarrier");
     return list.map((so) => {
       const customer = customerRepository.getById(so.customerId);
       const warehouse = warehouseRepository.getById(so.warehouseId);
+      const cid = so.carrierId?.trim() ?? "";
+      let carrierLabel: string;
+      let carrierExport: string;
+      let carrierSearchBlob: string;
+      if (cid === "") {
+        carrierLabel = emDash;
+        carrierExport = "";
+        carrierSearchBlob = "";
+      } else {
+        const car = carrierRepository.getById(cid);
+        if (!car) {
+          carrierLabel = unknownCarrier;
+          carrierExport = unknownCarrier;
+          carrierSearchBlob = `${unknownCarrier} ${cid}`.toLowerCase();
+        } else {
+          carrierLabel = car.name;
+          carrierExport = car.name;
+          carrierSearchBlob = [car.name, car.code, cid].filter(Boolean).join(" ").toLowerCase();
+        }
+      }
+      const recName = so.recipientName?.trim() ?? "";
+      const recPhone = so.recipientPhone?.trim() ?? "";
+      const recipientLabel = recName === "" ? emDash : recName;
+      const recipientPhoneLabel = recPhone === "" ? emDash : recPhone;
+      const recipientSearchBlob = [recName, recPhone].filter(Boolean).join(" ").toLowerCase();
       return {
         ...so,
         customerName: customer?.name ?? so.customerId,
         warehouseName: warehouse?.name ?? so.warehouseId,
+        carrierLabel,
+        carrierExport,
+        carrierSearchBlob,
+        recipientLabel,
+        recipientPhoneLabel,
+        recipientExport: recName,
+        recipientPhoneExport: recPhone,
+        recipientSearchBlob,
       };
     });
-  }, []);
+  }, [t, locale]);
 
   const filteredRows = useMemo(() => {
     let next = filterBySearch(rowsWithNames, searchQuery);
     next = filterByCustomerId(next, customerFilterId);
     next = filterByWarehouseId(next, warehouseFilterId);
+    next = filterByCarrierId(next, carrierFilterId);
     next = filterByDocumentIdSet(next, salesOrderIdsContainingItem);
     return filterByStatus(next, statusFilter);
   }, [
@@ -163,6 +220,7 @@ export function SalesOrdersListPage() {
     statusFilter,
     customerFilterId,
     warehouseFilterId,
+    carrierFilterId,
     salesOrderIdsContainingItem,
   ]);
 
@@ -172,6 +230,7 @@ export function SalesOrdersListPage() {
     searchQuery.trim() !== "" ||
     customerFilterId != null ||
     warehouseFilterId != null ||
+    carrierFilterId != null ||
     itemFilterId != null;
 
   const customerFilterLabel = useMemo((): string => {
@@ -205,6 +264,19 @@ export function SalesOrdersListPage() {
     if (w) return w.name || w.code || warehouseFilterId;
     return warehouseFilterId;
   }, [warehouseFilterId]);
+
+  const carrierFilterLabel = useMemo((): string => {
+    if (carrierFilterId == null) return "";
+    const c = carrierRepository.getById(carrierFilterId);
+    if (c) return c.name || c.code || carrierFilterId;
+    return carrierFilterId;
+  }, [carrierFilterId]);
+
+  const clearCarrierFilter = useCallback(() => {
+    const next = new URLSearchParams(searchParams);
+    next.delete("carrierId");
+    setSearchParams(next, { replace: true });
+  }, [searchParams, setSearchParams]);
 
   const emDash = t("domain.audit.summary.emDash");
 
@@ -297,6 +369,7 @@ export function SalesOrdersListPage() {
       customerFilterId != null &&
       warehouseFilterId == null &&
       itemFilterId == null &&
+      carrierFilterId == null &&
       statusFilter === "all" &&
       searchQuery.trim() === ""
     ) {
@@ -306,6 +379,7 @@ export function SalesOrdersListPage() {
       warehouseFilterId != null &&
       itemFilterId == null &&
       customerFilterId == null &&
+      carrierFilterId == null &&
       statusFilter === "all" &&
       searchQuery.trim() === ""
     ) {
@@ -315,16 +389,28 @@ export function SalesOrdersListPage() {
       itemFilterId != null &&
       warehouseFilterId == null &&
       customerFilterId == null &&
+      carrierFilterId == null &&
       statusFilter === "all" &&
       searchQuery.trim() === ""
     ) {
       return t("ops.list.salesOrders.hintItemOnly");
+    }
+    if (
+      carrierFilterId != null &&
+      customerFilterId == null &&
+      warehouseFilterId == null &&
+      itemFilterId == null &&
+      statusFilter === "all" &&
+      searchQuery.trim() === ""
+    ) {
+      return t("ops.list.salesOrders.hintCarrierOnly");
     }
     return t("ops.list.salesOrders.hintUrlFilters");
   }, [
     hasFilter,
     customerFilterId,
     warehouseFilterId,
+    carrierFilterId,
     itemFilterId,
     statusFilter,
     searchQuery,
@@ -366,6 +452,27 @@ export function SalesOrdersListPage() {
         field: "warehouseName",
         headerName: t("doc.columns.warehouse"),
         minWidth: 160,
+      },
+      {
+        field: "carrierLabel",
+        headerName: t("doc.so.carrier"),
+        minWidth: 140,
+        maxWidth: 220,
+        valueFormatter: (p) => String(p.value ?? ""),
+      },
+      {
+        field: "recipientLabel",
+        headerName: t("doc.shipment.recipientName"),
+        minWidth: 130,
+        maxWidth: 200,
+        valueFormatter: (p) => String(p.value ?? ""),
+      },
+      {
+        field: "recipientPhoneLabel",
+        headerName: t("doc.shipment.recipientPhone"),
+        minWidth: 120,
+        maxWidth: 160,
+        valueFormatter: (p) => String(p.value ?? ""),
       },
       {
         field: "status",
@@ -426,6 +533,30 @@ export function SalesOrdersListPage() {
                   size="sm"
                   className="h-7 px-1.5 text-xs shrink-0 text-muted-foreground hover:text-foreground"
                   onClick={clearWarehouseFilter}
+                >
+                  {t("doc.list.clear")}
+                </Button>
+              </div>
+            )}
+            {carrierFilterId != null && (
+              <div
+                className="flex h-8 max-w-[min(100%,18rem)] items-center gap-1.5 rounded-md border border-input bg-background px-2 text-xs shrink-0"
+                role="status"
+                aria-label={t("ops.list.salesOrders.filterCarrierAria")}
+              >
+                <span className="text-muted-foreground whitespace-nowrap shrink-0">{t("doc.so.carrier")}</span>
+                <span
+                  className="truncate font-medium text-foreground/90 min-w-0"
+                  title={carrierFilterLabel}
+                >
+                  {carrierFilterLabel}
+                </span>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="h-7 px-1.5 text-xs shrink-0 text-muted-foreground hover:text-foreground"
+                  onClick={clearCarrierFilter}
                 >
                   {t("doc.list.clear")}
                 </Button>

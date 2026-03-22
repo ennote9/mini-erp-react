@@ -1,6 +1,7 @@
 import { salesOrderRepository } from "./repository";
 import { shipmentRepository } from "../shipments/repository";
 import { customerRepository } from "../customers/repository";
+import { carrierRepository } from "../carriers/repository";
 import { warehouseRepository } from "../warehouses/repository";
 import { itemRepository } from "../items/repository";
 import { normalizeDateForSO, validateDateForSO } from "./dateUtils";
@@ -11,7 +12,7 @@ import {
   validatePlanningLineUnitPrices,
   validatePlanningLinesZeroPriceReasons,
 } from "../../shared/documentValidation";
-import { normalizeTrim } from "../../shared/validation";
+import { normalizeTrim, validatePhone } from "../../shared/validation";
 import { parseCommercialUnitPrice } from "../../shared/commercialMoney";
 import {
   computePlanningDueDate,
@@ -60,6 +61,12 @@ export type SaveDraftInput = {
   date: string;
   customerId: string;
   warehouseId: string;
+  /** Empty / whitespace normalized to undefined on save. */
+  carrierId?: string;
+  recipientName?: string;
+  recipientPhone?: string;
+  deliveryAddress?: string;
+  deliveryComment?: string;
   paymentTermsDays?: string;
   comment?: string;
   lines: Array<{
@@ -98,6 +105,8 @@ function validateSaveDraft(data: SaveDraftInput): string | null {
   if (zpErr) return zpErr;
   const termsErr = validatePaymentTermsDaysForm(data.paymentTermsDays);
   if (termsErr) return termsErr;
+  const phoneErr = validatePhone(data.recipientPhone);
+  if (phoneErr) return phoneErr;
   return null;
 }
 
@@ -146,6 +155,11 @@ function soHeaderFlat(so: SalesOrder) {
     date: so.date,
     customerId: so.customerId,
     warehouseId: so.warehouseId,
+    carrierId: so.carrierId ?? "",
+    recipientName: so.recipientName ?? "",
+    recipientPhone: so.recipientPhone ?? "",
+    deliveryAddress: so.deliveryAddress ?? "",
+    deliveryComment: so.deliveryComment ?? "",
     comment: so.comment ?? "",
     paymentTermsDays: so.paymentTermsDays ?? null,
     dueDate: so.dueDate ?? null,
@@ -169,6 +183,22 @@ export function saveDraft(
   if (lines === null)
     return { success: false, error: "Each line must have a valid unit price (number ≥ 0)." };
 
+  const carrierRaw = data.carrierId != null ? normalizeTrim(data.carrierId) : "";
+  const carrierId = carrierRaw === "" ? undefined : carrierRaw;
+
+  const recipientNameRaw = data.recipientName != null ? normalizeTrim(data.recipientName) : "";
+  const recipientName = recipientNameRaw === "" ? undefined : recipientNameRaw;
+
+  const recipientPhoneRaw = data.recipientPhone != null ? normalizeTrim(data.recipientPhone) : "";
+  const recipientPhone = recipientPhoneRaw === "" ? undefined : recipientPhoneRaw;
+
+  const deliveryAddressRaw = data.deliveryAddress != null ? normalizeTrim(data.deliveryAddress) : "";
+  const deliveryAddress = deliveryAddressRaw === "" ? undefined : deliveryAddressRaw;
+
+  const deliveryCommentRaw =
+    data.deliveryComment != null ? normalizeTrim(data.deliveryComment) : "";
+  const deliveryComment = deliveryCommentRaw === "" ? undefined : deliveryCommentRaw;
+
   const header = {
     date,
     customerId,
@@ -177,6 +207,11 @@ export function saveDraft(
     comment: comment ?? "",
     paymentTermsDays,
     dueDate,
+    carrierId,
+    recipientName,
+    recipientPhone,
+    deliveryAddress,
+    deliveryComment,
   };
   if (existingId) {
     const so = salesOrderRepository.getById(existingId);
@@ -193,7 +228,19 @@ export function saveDraft(
     const changedFields = planningHeaderChangedFields(
       beforeHeader as unknown as Record<string, unknown>,
       afterHeader as unknown as Record<string, unknown>,
-      ["date", "customerId", "warehouseId", "comment", "paymentTermsDays", "dueDate"],
+      [
+        "date",
+        "customerId",
+        "warehouseId",
+        "carrierId",
+        "recipientName",
+        "recipientPhone",
+        "deliveryAddress",
+        "deliveryComment",
+        "comment",
+        "paymentTermsDays",
+        "dueDate",
+      ],
     );
     if (changedFields.length > 0) {
       appendAuditEvent({
@@ -260,6 +307,12 @@ function validateConfirm(soId: string): string | null {
   const warehouse = warehouseRepository.getById(so.warehouseId);
   if (!warehouse?.isActive) return "Selected warehouse is inactive.";
 
+  const soCarrierTrim = normalizeTrim(so.carrierId ?? "");
+  if (soCarrierTrim !== "") {
+    const car = carrierRepository.getById(soCarrierTrim);
+    if (!car) return "Selected carrier is not valid.";
+  }
+
   const lines = salesOrderRepository.listLines(soId);
   const lineErr = validateDocumentLines(lines, itemRepository);
   if (lineErr) return lineErr;
@@ -267,6 +320,8 @@ function validateConfirm(soId: string): string | null {
   if (priceErr) return priceErr;
   const zpErr = validatePlanningLinesZeroPriceReasons(lines);
   if (zpErr) return zpErr;
+  const phoneErr = validatePhone(so.recipientPhone);
+  if (phoneErr) return phoneErr;
   return null;
 }
 
@@ -456,12 +511,58 @@ export function createShipment(soId: string): CreateShipmentResult {
       error: "Nothing remaining to ship for this sales order.",
     };
   }
+
+  let defaultCarrierId: string | undefined;
+  const soCarrierTrim = normalizeTrim(so.carrierId ?? "");
+  if (soCarrierTrim !== "") {
+    const soCar = carrierRepository.getById(soCarrierTrim);
+    if (soCar) {
+      defaultCarrierId = soCar.id;
+    } else if (import.meta.env.DEV) {
+      console.warn(
+        "[createShipment] sales order carrier id not found, falling back to customer preferred:",
+        soCarrierTrim,
+      );
+    }
+  }
+  if (defaultCarrierId === undefined) {
+    const custId = normalizeTrim(so.customerId);
+    if (custId !== "") {
+      const customer = customerRepository.getById(custId);
+      const pref = customer?.preferredCarrierId?.trim() ?? "";
+      if (pref !== "") {
+        const carrier = carrierRepository.getById(pref);
+        if (carrier) {
+          defaultCarrierId = carrier.id;
+        } else if (import.meta.env.DEV) {
+          console.warn(
+            "[createShipment] customer preferred carrier id not found, skipping default:",
+            pref,
+          );
+        }
+      }
+    }
+  }
+
   const shipment = shipmentRepository.create(
     {
       date: so.date,
       salesOrderId: soId,
       warehouseId: so.warehouseId,
       status: "draft",
+      ...(defaultCarrierId !== undefined ? { carrierId: defaultCarrierId } : {}),
+      ...(so.recipientName !== undefined && so.recipientName !== ""
+        ? { recipientName: so.recipientName }
+        : {}),
+      ...(so.recipientPhone !== undefined && so.recipientPhone !== ""
+        ? { recipientPhone: so.recipientPhone }
+        : {}),
+      ...(so.deliveryAddress !== undefined && so.deliveryAddress !== ""
+        ? { deliveryAddress: so.deliveryAddress }
+        : {}),
+      ...(so.deliveryComment !== undefined && so.deliveryComment !== ""
+        ? { deliveryComment: so.deliveryComment }
+        : {}),
     },
     shipmentLines,
   );

@@ -19,6 +19,10 @@ export type SoDocumentSummary = {
   customer: string;
   warehouse: string;
   comment: string;
+  recipientName?: string;
+  recipientPhone?: string;
+  deliveryAddress?: string;
+  deliveryComment?: string;
   totalQty: number;
   totalAmount: number;
 };
@@ -132,8 +136,6 @@ export async function buildLinesXlsxBuffer(
   return workbook.xlsx.writeBuffer();
 }
 
-const DOC_SUMMARY_ROWS = 8;
-
 const THIN_BORDER = { style: "thin" as const };
 const BLOCK_BORDER = {
   top: THIN_BORDER,
@@ -147,8 +149,9 @@ function formatDocumentSummaryBlock(
     getRow: (row: number) => { getCell: (col: number) => { font?: unknown; border?: unknown; alignment?: unknown; fill?: unknown; numFmt?: string; value?: unknown } };
   },
   summary: SoDocumentSummary,
+  rowCount: number,
 ): void {
-  for (let r = 1; r <= DOC_SUMMARY_ROWS; r++) {
+  for (let r = 1; r <= rowCount; r++) {
     const row = sheet.getRow(r);
     const cellA = row.getCell(1);
     const cellB = row.getCell(2);
@@ -159,7 +162,7 @@ function formatDocumentSummaryBlock(
     cellB.alignment = { vertical: "middle" };
   }
   const lightFill = { type: "pattern" as const, pattern: "solid" as const, fgColor: { argb: "FFF2F2F2" } };
-  for (let r = 1; r <= DOC_SUMMARY_ROWS; r++) {
+  for (let r = 1; r <= rowCount; r++) {
     sheet.getRow(r).getCell(1).fill = lightFill;
   }
   const dateCell = sheet.getRow(2).getCell(2);
@@ -168,30 +171,40 @@ function formatDocumentSummaryBlock(
     (dateCell as { value?: unknown }).value = new Date(dateParsed);
   }
   dateCell.numFmt = "yyyy-mm-dd";
-  sheet.getRow(7).getCell(2).numFmt = "0";
-  sheet.getRow(8).getCell(2).numFmt = "#,##0.00";
+  sheet.getRow(rowCount - 1).getCell(2).numFmt = "0";
+  sheet.getRow(rowCount).getCell(2).numFmt = "#,##0.00";
 }
 
 function applyDocumentSheetColumnWidths(
   sheet: { getColumn: (col: number) => { width?: number } },
-  summary: SoDocumentSummary,
   docLabels: readonly string[],
+  summaryValues: readonly unknown[],
 ): void {
   const labelLengths = docLabels.map((s) => s.length);
-  const valueLengths = [
-    cellDisplayLength(summary.number),
-    cellDisplayLength(summary.date),
-    cellDisplayLength(summary.status),
-    cellDisplayLength(summary.customer),
-    cellDisplayLength(summary.warehouse),
-    cellDisplayLength(summary.comment),
-    cellDisplayLength(summary.totalQty),
-    cellDisplayLength(summary.totalAmount),
-  ];
+  const valueLengths = summaryValues.map((v) => cellDisplayLength(v));
   const labelW = columnWidthFromLengths(Math.max(...labelLengths), labelLengths, 10, 18);
   const valueW = columnWidthFromLengths(0, valueLengths, 10, 40);
   sheet.getColumn(1).width = labelW;
   sheet.getColumn(2).width = valueW;
+}
+
+function soDocumentSummaryRowValues(
+  summary: SoDocumentSummary,
+): unknown[] {
+  return [
+    summary.number,
+    summary.date,
+    summary.status,
+    summary.customer,
+    summary.warehouse,
+    summary.recipientName ?? "",
+    summary.recipientPhone ?? "",
+    summary.deliveryAddress ?? "",
+    summary.deliveryComment ?? "",
+    summary.comment,
+    summary.totalQty,
+    summary.totalAmount,
+  ];
 }
 
 export async function buildDocumentXlsxBuffer(
@@ -203,16 +216,17 @@ export async function buildDocumentXlsxBuffer(
   const workbook = new ExcelJS.Workbook();
   const docSheet = workbook.addWorksheet(labels.documentSheetName);
   const L = labels.planningDocumentLabels;
-  docSheet.addRow([L[0], summary.number]);
-  docSheet.addRow([L[1], summary.date]);
-  docSheet.addRow([L[2], summary.status]);
-  docSheet.addRow([L[3], summary.customer]);
-  docSheet.addRow([L[4], summary.warehouse]);
-  docSheet.addRow([L[5], summary.comment]);
-  docSheet.addRow([L[6], summary.totalQty]);
-  docSheet.addRow([L[7], summary.totalAmount]);
-  applyDocumentSheetColumnWidths(docSheet, summary, L);
-  formatDocumentSummaryBlock(docSheet, summary);
+  const values = soDocumentSummaryRowValues(summary);
+  if (L.length !== values.length) {
+    throw new Error(
+      `[soExport] planningDocumentLabels length ${L.length} does not match summary row count ${values.length}.`,
+    );
+  }
+  for (let i = 0; i < L.length; i++) {
+    docSheet.addRow([L[i], values[i]]);
+  }
+  applyDocumentSheetColumnWidths(docSheet, L, values);
+  formatDocumentSummaryBlock(docSheet, summary, L.length);
   addLinesSheetWithTable(workbook, lineRows, labels.linesSheetName, labels.planningLineHeaders);
   return workbook.xlsx.writeBuffer();
 }

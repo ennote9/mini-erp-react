@@ -18,6 +18,13 @@ export interface SalesOrder {
   comment?: string;
   cancelReasonCode?: string;
   cancelReasonComment?: string;
+  /** Optional carrier for shipments; defaults from customer preferred carrier, overridable per order. */
+  carrierId?: string;
+  /** Optional delivery details; defaults onto new shipments when created (editable on shipment). */
+  recipientName?: string;
+  recipientPhone?: string;
+  deliveryAddress?: string;
+  deliveryComment?: string;
 }
 
 /**

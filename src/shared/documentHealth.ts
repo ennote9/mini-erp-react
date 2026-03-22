@@ -7,9 +7,10 @@
 
 import type { Issue } from "./issues";
 import { fieldIssue } from "./issues";
-import { normalizeTrim } from "./validation";
+import { normalizeTrim, validatePhone } from "./validation";
 import { parseDocumentLineQty } from "./documentValidation";
 import { itemRepository } from "../modules/items/repository";
+import { carrierRepository } from "../modules/carriers/repository";
 import { lineAmountMoney, roundMoney } from "./commercialMoney";
 import { validatePaymentTermsDaysForm } from "./planningCommercialDates";
 import { isZeroPriceLineReasonCode } from "./reasonCodes";
@@ -254,6 +255,8 @@ export function getPurchaseOrderHealth(input: PurchaseOrderHealthInput): Documen
 export type SalesOrderHealthInput = {
   customerId: string;
   warehouseId: string;
+  carrierId?: string;
+  recipientPhone?: string;
   paymentTermsDays?: string;
   lines: LineFormRow[];
 };
@@ -278,11 +281,32 @@ export function getSalesOrderHealth(input: SalesOrderHealthInput): DocumentHealt
     );
   }
 
+  const carrierTrim = normalizeTrim(input.carrierId ?? "");
+  if (carrierTrim !== "" && !carrierRepository.getById(carrierTrim)) {
+    issues.push(
+      fieldIssue("error", "carrierId", "Selected carrier is not valid.", {
+        key: "issues.shipment.invalidCarrierReference",
+      }),
+    );
+  }
+
   const termsErrSo = validatePaymentTermsDaysForm(input.paymentTermsDays);
   if (termsErrSo) {
     issues.push(
       fieldIssue("error", "paymentTermsDays", termsErrSo, {
         key: "issues.master.paymentTermsDaysForm",
+      }),
+    );
+  }
+
+  const phoneErrSo = validatePhone(input.recipientPhone);
+  if (phoneErrSo) {
+    issues.push(
+      fieldIssue("error", "recipientPhone", phoneErrSo, {
+        key:
+          phoneErrSo === "Phone must contain at least one digit."
+            ? "issues.master.phoneDigit"
+            : "issues.master.phoneFormat",
       }),
     );
   }

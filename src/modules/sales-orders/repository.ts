@@ -9,6 +9,7 @@ import {
   writeDocumentPayload,
 } from "../../shared/documentPersistence";
 import { registerPersistenceFlush } from "../../shared/persistenceCoordinator";
+import { bumpInventoryDisplayRevision } from "../../shared/inventoryDisplayRevision";
 import {
   isCancelDocumentReasonCode,
   zeroPriceReasonCodeForStore,
@@ -45,6 +46,12 @@ type SalesOrderPersistRecord = SalesOrder & {
 
 function asOptionalString(v: unknown): string | undefined {
   return typeof v === "string" ? v : undefined;
+}
+
+function asOptionalTrimmedString(v: unknown): string | undefined {
+  if (typeof v !== "string") return undefined;
+  const t = v.trim();
+  return t === "" ? undefined : t;
 }
 
 function asOptionalPaymentTermsDays(v: unknown): number | undefined {
@@ -137,6 +144,11 @@ function normalizeSORecord(raw: unknown): SalesOrderPersistRecord | null {
         ? rec.cancelReasonCode
         : undefined,
     cancelReasonComment: asOptionalString(rec.cancelReasonComment),
+    carrierId: asOptionalTrimmedString(rec.carrierId),
+    recipientName: asOptionalTrimmedString(rec.recipientName),
+    recipientPhone: asOptionalTrimmedString(rec.recipientPhone),
+    deliveryAddress: asOptionalTrimmedString(rec.deliveryAddress),
+    deliveryComment: asOptionalTrimmedString(rec.deliveryComment),
     lines,
   };
 }
@@ -186,6 +198,7 @@ export async function flushPendingSalesOrderPersist(): Promise<void> {
 }
 
 function schedulePersist(): void {
+  bumpInventoryDisplayRevision();
   persistDepth++;
   persistChain = persistChain
     .then(async () => {

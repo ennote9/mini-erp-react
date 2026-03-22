@@ -1,9 +1,10 @@
 import React, { useMemo, useState, useRef, useCallback } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { AgGridReact } from "ag-grid-react";
 import type { ColDef, ICellRendererParams, SelectionChangedEvent } from "ag-grid-community";
 import { customerRepository } from "../repository";
 import type { Customer } from "../model";
+import { carrierRepository } from "../../carriers/repository";
 import { ListPageLayout } from "../../../shared/ui/list/ListPageLayout";
 import { EmptyState } from "../../../shared/ui/feedback/EmptyState";
 import {
@@ -32,6 +33,26 @@ import { useTranslation } from "@/shared/i18n/context";
 import { customersListExcelLabels } from "@/shared/i18n/excelListExportLabels";
 
 type ActiveFilter = "all" | "active" | "inactive";
+
+function parseQueryId(searchParams: URLSearchParams, key: string): string | null {
+  const raw = searchParams.get(key);
+  if (raw == null) return null;
+  const trimmed = raw.trim();
+  return trimmed === "" ? null : trimmed;
+}
+
+function filterByPreferredCarrierId(list: Customer[], carrierId: string | null): Customer[] {
+  if (carrierId == null) return list;
+  return list.filter((c) => (c.preferredCarrierId?.trim() ?? "") === carrierId);
+}
+
+function filterCustomersBySearch(list: Customer[], query: string): Customer[] {
+  const q = query.trim().toLowerCase();
+  if (!q) return list;
+  return list.filter(
+    (x) => x.code.toLowerCase().includes(q) || x.name.toLowerCase().includes(q),
+  );
+}
 
 function applyActiveFilter(
   list: Customer[],
@@ -71,6 +92,11 @@ function buildExportRowsFromCustomers(
 export function CustomersListPage() {
   const { t, locale } = useTranslation();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const preferredCarrierFilterId = useMemo(
+    () => parseQueryId(searchParams, "preferredCarrierId"),
+    [searchParams],
+  );
   const [searchQuery, setSearchQuery] = useState("");
   const [activeFilter, setActiveFilter] = useState<ActiveFilter>("all");
   const [exportSuccess, setExportSuccess] = useState<{ path: string; filename: string } | null>(null);
@@ -85,12 +111,28 @@ export function CustomersListPage() {
   }, []);
 
   const filteredRows = useMemo(() => {
-    const searched = customerRepository.search(searchQuery);
-    return applyActiveFilter(searched, activeFilter);
-  }, [searchQuery, activeFilter]);
+    let next = customerRepository.list();
+    next = filterByPreferredCarrierId(next, preferredCarrierFilterId);
+    next = filterCustomersBySearch(next, searchQuery);
+    return applyActiveFilter(next, activeFilter);
+  }, [searchQuery, activeFilter, preferredCarrierFilterId]);
 
   const isEmpty = filteredRows.length === 0;
-  const hasFilter = activeFilter !== "all" || searchQuery.trim() !== "";
+  const hasFilter =
+    activeFilter !== "all" || searchQuery.trim() !== "" || preferredCarrierFilterId != null;
+
+  const preferredCarrierFilterLabel = useMemo((): string => {
+    if (preferredCarrierFilterId == null) return "";
+    const c = carrierRepository.getById(preferredCarrierFilterId);
+    if (c) return c.name || c.code || preferredCarrierFilterId;
+    return preferredCarrierFilterId;
+  }, [preferredCarrierFilterId]);
+
+  const clearPreferredCarrierFilter = useCallback(() => {
+    const next = new URLSearchParams(searchParams);
+    next.delete("preferredCarrierId");
+    setSearchParams(next, { replace: true });
+  }, [searchParams, setSearchParams]);
 
   const getExportRowsCurrentView = useCallback((): CustomersExportRow[] => {
     const api = gridRef.current?.api;
@@ -161,7 +203,17 @@ export function CustomersListPage() {
   const exportSelectedDisabled = selectedCount === 0;
 
   const emptyTitle = hasFilter ? t("ops.list.customers.emptyFiltered") : t("ops.list.customers.emptyDefault");
-  const emptyHint = hasFilter ? t("ops.list.customers.hintFilter") : t("ops.list.customers.hintCreate");
+  const emptyHint = useMemo(() => {
+    if (!hasFilter) return t("ops.list.customers.hintCreate");
+    if (
+      preferredCarrierFilterId != null &&
+      activeFilter === "all" &&
+      searchQuery.trim() === ""
+    ) {
+      return t("ops.list.customers.hintPreferredCarrierOnly");
+    }
+    return t("ops.list.customers.hintFilter");
+  }, [hasFilter, preferredCarrierFilterId, activeFilter, searchQuery, t]);
 
   const emDash = t("domain.audit.summary.emDash");
 
@@ -255,7 +307,33 @@ export function CustomersListPage() {
             aria-label={t("ops.list.customers.searchAria")}
             resultCount={filteredRows.length}
           />
-          <div className="flex flex-row items-center gap-2 shrink-0 ml-auto">
+          <div className="flex flex-row flex-wrap items-center gap-2 shrink-0 ml-auto justify-end">
+            {preferredCarrierFilterId != null && (
+              <div
+                className="flex h-8 max-w-[min(100%,18rem)] items-center gap-1.5 rounded-md border border-input bg-background px-2 text-xs shrink-0"
+                role="status"
+                aria-label={t("ops.list.customers.filterPreferredCarrierAria")}
+              >
+                <span className="text-muted-foreground whitespace-nowrap shrink-0">
+                  {t("ops.list.customers.preferredCarrierChipLabel")}
+                </span>
+                <span
+                  className="truncate font-medium text-foreground/90 min-w-0"
+                  title={preferredCarrierFilterLabel}
+                >
+                  {preferredCarrierFilterLabel}
+                </span>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="h-7 px-1.5 text-xs shrink-0 text-muted-foreground hover:text-foreground"
+                  onClick={clearPreferredCarrierFilter}
+                >
+                  {t("doc.list.clear")}
+                </Button>
+              </div>
+            )}
             {exportSuccess && (
               <div className="h-8 w-max flex items-center gap-1.5 rounded-md border border-input bg-background px-2 text-sm shrink-0">
                 <span className="text-muted-foreground text-xs">{t("doc.list.exportCompleted")}</span>

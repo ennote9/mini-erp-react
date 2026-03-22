@@ -4,6 +4,8 @@ import { customerRepository } from "../repository";
 import { saveCustomer } from "../service";
 import { salesOrderRepository } from "../../sales-orders/repository";
 import { warehouseRepository } from "../../warehouses/repository";
+import { carrierRepository } from "../../carriers/repository";
+import { translateCarrierType } from "../../carriers";
 import { StatusBadge } from "../../../shared/ui/feedback/StatusBadge";
 import { Breadcrumb } from "../../../shared/ui/object/Breadcrumb";
 import { BackButton } from "../../../shared/ui/list/BackButton";
@@ -31,6 +33,7 @@ import { getCustomerFormHealth } from "../../../shared/masterDataHealth";
 import { DocumentIssueStrip } from "../../../shared/ui/feedback/DocumentIssueStrip";
 import { Save, X } from "lucide-react";
 import { useTranslation } from "@/shared/i18n/context";
+import { cn } from "@/lib/utils";
 
 type FormState = {
   code: string;
@@ -46,6 +49,11 @@ type FormState = {
   city: string;
   country: string;
   paymentTermsDays: string;
+  preferredCarrierId: string;
+  defaultRecipientName: string;
+  defaultRecipientPhone: string;
+  defaultDeliveryAddress: string;
+  defaultDeliveryComment: string;
 };
 
 function defaultForm(): FormState {
@@ -63,11 +71,16 @@ function defaultForm(): FormState {
     city: "",
     country: "",
     paymentTermsDays: "",
+    preferredCarrierId: "",
+    defaultRecipientName: "",
+    defaultRecipientPhone: "",
+    defaultDeliveryAddress: "",
+    defaultDeliveryComment: "",
   };
 }
 
 export function CustomerPage() {
-  const { t } = useTranslation();
+  const { t, locale } = useTranslation();
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const isNew = id === "new";
@@ -116,6 +129,20 @@ export function CustomerPage() {
   const [form, setForm] = useState<FormState>(defaultForm);
   const [actionIssues, setActionIssues] = useState<Issue[]>([]);
 
+  const carrierSelectOptions = useMemo(() => {
+    const all = carrierRepository.list();
+    const active = all
+      .filter((c) => c.isActive)
+      .sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: "base" }));
+    const sel = form.preferredCarrierId.trim();
+    if (!sel) return active;
+    const current = all.find((c) => c.id === sel);
+    if (current && !current.isActive && !active.some((c) => c.id === sel)) {
+      return [current, ...active];
+    }
+    return active;
+  }, [form.preferredCarrierId, locale]);
+
   const health = useMemo(
     () =>
       getCustomerFormHealth({
@@ -124,13 +151,28 @@ export function CustomerPage() {
         phone: form.phone,
         email: form.email,
         paymentTermsDays: form.paymentTermsDays,
+        defaultRecipientPhone: form.defaultRecipientPhone,
       }),
-    [form.code, form.name, form.phone, form.email, form.paymentTermsDays],
+    [
+      form.code,
+      form.name,
+      form.phone,
+      form.email,
+      form.paymentTermsDays,
+      form.defaultRecipientPhone,
+    ],
   );
 
   useEffect(() => {
     setActionIssues([]);
-  }, [form.code, form.name, form.phone, form.email, form.paymentTermsDays]);
+  }, [
+    form.code,
+    form.name,
+    form.phone,
+    form.email,
+    form.paymentTermsDays,
+    form.defaultRecipientPhone,
+  ]);
 
   const combinedIssues = useMemo(
     () => combineIssues(health.issues, actionIssues),
@@ -157,9 +199,36 @@ export function CustomerPage() {
         city: customer.city ?? "",
         country: customer.country ?? "",
         paymentTermsDays: customer.paymentTermsDays !== undefined ? String(customer.paymentTermsDays) : "",
+        preferredCarrierId: customer.preferredCarrierId ?? "",
+        defaultRecipientName: customer.defaultRecipientName ?? "",
+        defaultRecipientPhone: customer.defaultRecipientPhone ?? "",
+        defaultDeliveryAddress: customer.defaultDeliveryAddress ?? "",
+        defaultDeliveryComment: customer.defaultDeliveryComment ?? "",
       });
     }
-  }, [id, isNew, customer?.id, customer?.code, customer?.name, customer?.isActive, customer?.phone, customer?.email, customer?.comment, customer?.contactPerson, customer?.taxId, customer?.billingAddress, customer?.shippingAddress, customer?.city, customer?.country, customer?.paymentTermsDays]);
+  }, [
+    id,
+    isNew,
+    customer?.id,
+    customer?.code,
+    customer?.name,
+    customer?.isActive,
+    customer?.phone,
+    customer?.email,
+    customer?.comment,
+    customer?.contactPerson,
+    customer?.taxId,
+    customer?.billingAddress,
+    customer?.shippingAddress,
+    customer?.city,
+    customer?.country,
+    customer?.paymentTermsDays,
+    customer?.preferredCarrierId,
+    customer?.defaultRecipientName,
+    customer?.defaultRecipientPhone,
+    customer?.defaultDeliveryAddress,
+    customer?.defaultDeliveryComment,
+  ]);
 
   const parsePaymentTerms = (s: string): number | undefined => {
     const trimmed = s.trim();
@@ -185,6 +254,11 @@ export function CustomerPage() {
         city: form.city || undefined,
         country: form.country || undefined,
         paymentTermsDays: parsePaymentTerms(form.paymentTermsDays),
+        preferredCarrierId: form.preferredCarrierId.trim() || undefined,
+        defaultRecipientName: form.defaultRecipientName || undefined,
+        defaultRecipientPhone: form.defaultRecipientPhone || undefined,
+        defaultDeliveryAddress: form.defaultDeliveryAddress || undefined,
+        defaultDeliveryComment: form.defaultDeliveryComment || undefined,
       },
       isNew ? undefined : id ?? undefined,
     );
@@ -329,6 +403,90 @@ export function CustomerPage() {
                 placeholder={t("common.optional")}
                 className="h-8 text-sm"
               />
+            </div>
+            <div className="flex flex-col gap-0.5 sm:col-span-2">
+              <p className="text-xs font-medium text-foreground m-0">{t("master.customer.deliveryDefaultsSection")}</p>
+              <p className="text-xs text-muted-foreground m-0 leading-snug">
+                {t("master.customer.deliveryDefaultsHint")}
+              </p>
+            </div>
+            <div className="flex flex-col gap-0.5">
+              <Label htmlFor="customer-defaultRecipientName" className="text-sm">
+                {t("master.customer.defaultRecipientName")}
+              </Label>
+              <Input
+                id="customer-defaultRecipientName"
+                type="text"
+                value={form.defaultRecipientName}
+                onChange={(e) => setForm((f) => ({ ...f, defaultRecipientName: e.target.value }))}
+                placeholder={t("master.customer.defaultRecipientNamePlaceholder")}
+                className="h-8 text-sm"
+                autoComplete="name"
+              />
+            </div>
+            <div className="flex flex-col gap-0.5">
+              <Label htmlFor="customer-defaultRecipientPhone" className="text-sm">
+                {t("master.customer.defaultRecipientPhone")}
+              </Label>
+              <Input
+                id="customer-defaultRecipientPhone"
+                type="text"
+                value={form.defaultRecipientPhone}
+                onChange={(e) => setForm((f) => ({ ...f, defaultRecipientPhone: e.target.value }))}
+                placeholder={t("master.customer.defaultRecipientPhonePlaceholder")}
+                className="h-8 text-sm"
+                autoComplete="tel"
+              />
+            </div>
+            <div className="flex flex-col gap-0.5 sm:col-span-2">
+              <Label htmlFor="customer-defaultDeliveryAddress" className="text-sm">
+                {t("master.customer.defaultDeliveryAddress")}
+              </Label>
+              <Textarea
+                id="customer-defaultDeliveryAddress"
+                value={form.defaultDeliveryAddress}
+                onChange={(e) => setForm((f) => ({ ...f, defaultDeliveryAddress: e.target.value }))}
+                placeholder={t("master.customer.defaultDeliveryAddressPlaceholder")}
+                rows={2}
+                className="resize-y min-h-[2.5rem] text-sm"
+              />
+            </div>
+            <div className="flex flex-col gap-0.5 sm:col-span-2">
+              <Label htmlFor="customer-defaultDeliveryComment" className="text-sm">
+                {t("master.customer.defaultDeliveryComment")}
+              </Label>
+              <Textarea
+                id="customer-defaultDeliveryComment"
+                value={form.defaultDeliveryComment}
+                onChange={(e) => setForm((f) => ({ ...f, defaultDeliveryComment: e.target.value }))}
+                placeholder={t("master.customer.defaultDeliveryCommentPlaceholder")}
+                rows={2}
+                className="resize-y min-h-[2.5rem] text-sm"
+              />
+            </div>
+            <div className="flex flex-col gap-0.5 sm:col-span-2">
+              <Label htmlFor="customer-preferredCarrier" className="text-sm">
+                {t("master.customer.preferredCarrier")}
+              </Label>
+              <select
+                id="customer-preferredCarrier"
+                className={cn(
+                  "flex h-8 w-full max-w-md rounded-md border border-input bg-background px-3 py-1 text-sm text-foreground",
+                )}
+                value={form.preferredCarrierId}
+                onChange={(e) => setForm((f) => ({ ...f, preferredCarrierId: e.target.value }))}
+                aria-label={t("master.customer.preferredCarrier")}
+              >
+                <option value="">{t("master.customer.preferredCarrierPlaceholder")}</option>
+                {carrierSelectOptions.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.name} · {translateCarrierType(t, c.carrierType)}
+                  </option>
+                ))}
+              </select>
+              <p className="text-xs text-muted-foreground m-0 leading-snug">
+                {t("master.customer.preferredCarrierHint")}
+              </p>
             </div>
             <div className="flex flex-col gap-0.5">
               <Label htmlFor="customer-city" className="text-sm">{t("doc.columns.city")}</Label>

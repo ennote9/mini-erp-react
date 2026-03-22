@@ -87,6 +87,11 @@ function filterByWarehouseId(rows: RowData[], warehouseId: string | null): RowDa
   return rows.filter((r) => r.warehouseId === warehouseId);
 }
 
+function filterByItemId(rows: RowData[], itemId: string | null): RowData[] {
+  if (itemId == null) return rows;
+  return rows.filter((r) => r.itemId === itemId);
+}
+
 function filterByQuickFilter(rows: RowData[], f: StockBalanceQuickFilter): RowData[] {
   if (f === "all") return rows;
   if (f === "shortage") return rows.filter((r) => r.deficitQty > 0);
@@ -186,6 +191,12 @@ export function StockBalancesListPage() {
   );
 
   const [searchParams, setSearchParams] = useSearchParams();
+  const itemFilterId = useMemo(() => {
+    const raw = searchParams.get("itemId");
+    if (raw == null || raw === "") return null;
+    const trimmed = raw.trim();
+    return trimmed === "" ? null : trimmed;
+  }, [searchParams]);
   const warehouseFilterId = useMemo(() => {
     const raw = searchParams.get("warehouseId");
     if (raw == null || raw === "") return null;
@@ -239,10 +250,14 @@ export function StockBalancesListPage() {
     return "";
   }, []);
 
-  /** Base slice after warehouse URL filter (counts and search use this). */
+  /** Base slice: item URL filter → warehouse URL filter (counts and search use this). */
+  const rowsAfterItem = useMemo(
+    () => filterByItemId(rowsWithNames, itemFilterId),
+    [rowsWithNames, itemFilterId],
+  );
   const rowsAfterWarehouse = useMemo(
-    () => filterByWarehouseId(rowsWithNames, warehouseFilterId),
-    [rowsWithNames, warehouseFilterId],
+    () => filterByWarehouseId(rowsAfterItem, warehouseFilterId),
+    [rowsAfterItem, warehouseFilterId],
   );
 
   const quickFilterCounts = useMemo((): Record<StockBalanceQuickFilter, number> => {
@@ -308,7 +323,20 @@ export function StockBalancesListPage() {
     if (!open) setDetailRow(null);
   }, []);
   const hasFilter =
-    searchQuery.trim() !== "" || warehouseFilterId != null || quickFilter !== "all";
+    searchQuery.trim() !== "" ||
+    warehouseFilterId != null ||
+    itemFilterId != null ||
+    quickFilter !== "all";
+
+  const itemFilterLabel = useMemo((): string => {
+    if (itemFilterId == null) return "";
+    const it = itemRepository.getById(itemFilterId);
+    if (it) {
+      const name = it.name?.trim() ? it.name : "";
+      return name ? `${it.code} — ${it.name}` : it.code;
+    }
+    return itemFilterId;
+  }, [itemFilterId]);
 
   const warehouseFilterLabel = useMemo((): string => {
     if (warehouseFilterId == null) return "";
@@ -320,6 +348,12 @@ export function StockBalancesListPage() {
   const clearWarehouseFilter = useCallback(() => {
     const next = new URLSearchParams(searchParams);
     next.delete("warehouseId");
+    setSearchParams(next, { replace: true });
+  }, [searchParams, setSearchParams]);
+
+  const clearItemFilter = useCallback(() => {
+    const next = new URLSearchParams(searchParams);
+    next.delete("itemId");
     setSearchParams(next, { replace: true });
   }, [searchParams, setSearchParams]);
 
@@ -396,14 +430,32 @@ export function StockBalancesListPage() {
     if (!hasFilter) {
       return t("ops.stockBalances.empty.hintPosted");
     }
-    if (quickFilter !== "all" && searchQuery.trim() === "" && warehouseFilterId == null) {
+    if (
+      itemFilterId != null &&
+      searchQuery.trim() === "" &&
+      warehouseFilterId == null &&
+      quickFilter === "all"
+    ) {
+      return t("ops.stockBalances.empty.hintItemOnly");
+    }
+    if (
+      quickFilter !== "all" &&
+      searchQuery.trim() === "" &&
+      warehouseFilterId == null &&
+      itemFilterId == null
+    ) {
       return t("ops.stockBalances.empty.hintQuickOnly");
     }
-    if (warehouseFilterId != null && searchQuery.trim() === "" && quickFilter === "all") {
+    if (
+      warehouseFilterId != null &&
+      searchQuery.trim() === "" &&
+      quickFilter === "all" &&
+      itemFilterId == null
+    ) {
       return t("ops.stockBalances.empty.hintWarehouseOnly");
     }
     return t("ops.stockBalances.empty.hintGeneral");
-  }, [hasFilter, warehouseFilterId, searchQuery, quickFilter, t]);
+  }, [hasFilter, itemFilterId, warehouseFilterId, searchQuery, quickFilter, t]);
 
   const qtyCol = (
     field: keyof RowData,
@@ -519,6 +571,32 @@ export function StockBalancesListPage() {
             resultCount={filteredRows.length}
           />
           <div className="flex flex-row items-center gap-2 shrink-0 ml-auto">
+            {itemFilterId != null && (
+              <div
+                className="flex h-8 max-w-[min(100%,18rem)] items-center gap-1.5 rounded-md border border-input bg-background px-2 text-xs shrink-0"
+                role="status"
+                aria-label={t("ops.stockBalances.itemFilterAria")}
+              >
+                <span className="text-muted-foreground whitespace-nowrap shrink-0">
+                  {t("ops.stockBalances.itemFilterPrefix")}
+                </span>
+                <span
+                  className="truncate font-medium text-foreground/90 min-w-0"
+                  title={itemFilterLabel}
+                >
+                  {itemFilterLabel}
+                </span>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="h-7 px-1.5 text-xs shrink-0 text-muted-foreground hover:text-foreground"
+                  onClick={clearItemFilter}
+                >
+                  {t("doc.list.clear")}
+                </Button>
+              </div>
+            )}
             {warehouseFilterId != null && (
               <div
                 className="flex h-8 max-w-[min(100%,18rem)] items-center gap-1.5 rounded-md border border-input bg-background px-2 text-xs shrink-0"

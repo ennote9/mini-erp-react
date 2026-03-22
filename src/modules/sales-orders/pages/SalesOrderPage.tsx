@@ -5,6 +5,8 @@ import type { ColDef, SelectionChangedEvent } from "ag-grid-community";
 import { salesOrderRepository } from "../repository";
 import { allocateStock, confirm, cancelDocument, createShipment, saveDraft } from "../service";
 import { customerRepository } from "../../customers/repository";
+import { carrierRepository } from "../../carriers/repository";
+import { translateCarrierType } from "../../carriers";
 import { warehouseRepository } from "../../warehouses/repository";
 import { itemRepository } from "../../items/repository";
 import { brandRepository } from "../../brands/repository";
@@ -18,6 +20,7 @@ import { Button } from "@/components/ui/button";
 import { DatePickerField } from "@/components/ui/date-picker-field";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { SelectField } from "@/components/ui/select-field";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -75,8 +78,10 @@ import {
   type CancelDocumentReasonPayload,
 } from "../../../shared/ui/object/CancelDocumentReasonDialog";
 import { DocumentEventLogSection } from "../../../shared/ui/object/DocumentEventLogSection";
+import { DocumentPrintActionsMenu } from "../../../shared/ui/object/DocumentPrintActionsMenu";
 import { useSettings } from "../../../shared/settings/SettingsContext";
 import { useTranslation } from "@/shared/i18n/context";
+import { cn } from "@/lib/utils";
 import type { TFunction } from "@/shared/i18n/resolve";
 import { planningSalesOrderExportLabels } from "@/shared/i18n/excelPlanningExportLabels";
 import { translateZeroPriceReason, translateCancelReason } from "@/shared/i18n/reasonLabels";
@@ -115,6 +120,11 @@ type FormState = {
   date: string;
   customerId: string;
   warehouseId: string;
+  carrierId: string;
+  recipientName: string;
+  recipientPhone: string;
+  deliveryAddress: string;
+  deliveryComment: string;
   paymentTermsDays: string;
   comment: string;
   lines: LineFormRow[];
@@ -125,6 +135,11 @@ function defaultForm(): FormState {
     date: todayYYYYMMDD(),
     customerId: "",
     warehouseId: "",
+    carrierId: "",
+    recipientName: "",
+    recipientPhone: "",
+    deliveryAddress: "",
+    deliveryComment: "",
     paymentTermsDays: "",
     comment: "",
     lines: [],
@@ -551,6 +566,16 @@ export function SalesOrderPage() {
     [id, isNew, refresh],
   );
 
+  const canOpenPreliminaryCustomerDoc = useMemo(
+    () => Boolean(!isNew && id && doc && doc.status !== "cancelled" && lines.length > 0),
+    [isNew, id, doc, lines.length],
+  );
+
+  const salesOrderPrintMenuItems = useMemo(() => {
+    if (!id || !canOpenPreliminaryCustomerDoc) return [];
+    return [{ to: `/sales-orders/${id}/customer-document`, label: t("doc.customerDocument.preliminaryTitle") }];
+  }, [id, canOpenPreliminaryCustomerDoc, t, locale]);
+
   const nextLineIdRef = useRef(0);
   const [form, setForm] = useState<FormState>(() => defaultForm());
   const [editingLineId, setEditingLineId] = useState<number | null>(null);
@@ -591,7 +616,17 @@ export function SalesOrderPage() {
 
   useEffect(() => {
     setActionIssues([]);
-  }, [form.customerId, form.warehouseId, form.paymentTermsDays, form.lines]);
+  }, [
+    form.customerId,
+    form.warehouseId,
+    form.carrierId,
+    form.recipientName,
+    form.recipientPhone,
+    form.deliveryAddress,
+    form.deliveryComment,
+    form.paymentTermsDays,
+    form.lines,
+  ]);
 
   useEffect(() => {
     if (isNew) {
@@ -626,6 +661,11 @@ export function SalesOrderPage() {
         date: normalizeDateForSO(doc.date),
         customerId: doc.customerId,
         warehouseId: doc.warehouseId,
+        carrierId: doc.carrierId ?? "",
+        recipientName: doc.recipientName ?? "",
+        recipientPhone: doc.recipientPhone ?? "",
+        deliveryAddress: doc.deliveryAddress ?? "",
+        deliveryComment: doc.deliveryComment ?? "",
         paymentTermsDays:
           doc.paymentTermsDays !== undefined && Number.isInteger(doc.paymentTermsDays)
             ? String(doc.paymentTermsDays)
@@ -648,6 +688,11 @@ export function SalesOrderPage() {
     doc?.date,
     doc?.customerId,
     doc?.warehouseId,
+    doc?.carrierId,
+    doc?.recipientName,
+    doc?.recipientPhone,
+    doc?.deliveryAddress,
+    doc?.deliveryComment,
     doc?.paymentTermsDays,
     doc?.comment,
     refresh,
@@ -667,6 +712,13 @@ export function SalesOrderPage() {
         : "",
     [doc],
   );
+  const emDashSummary = t("domain.audit.summary.emDash");
+  const carrierReadOnlyLabel = useMemo(() => {
+    if (!doc?.carrierId?.trim()) return emDashSummary;
+    const c = carrierRepository.getById(doc.carrierId.trim());
+    if (!c) return t("doc.shipment.unknownCarrier");
+    return c.name;
+  }, [doc?.carrierId, emDashSummary, t, locale]);
   const linesWithItem = useMemo<LineWithItem[]>(() => {
     return lines.map((line) => {
       const item = itemRepository.getById(line.itemId);
@@ -704,21 +756,54 @@ export function SalesOrderPage() {
 
   useEffect(() => {
     if (!isEditable) return;
-    const cid = form.customerId;
+    const cid = form.customerId.trim();
     if (prevCustomerIdRef.current === null) {
       prevCustomerIdRef.current = cid;
       return;
     }
     if (prevCustomerIdRef.current === cid) return;
     prevCustomerIdRef.current = cid;
-    const cust = customerRepository.getById(cid);
+
+    const cust = cid ? customerRepository.getById(cid) : undefined;
     const d = cust?.paymentTermsDays;
+    const paymentTermsDays =
+      d !== undefined && Number.isFinite(d) && Number.isInteger(d) && d >= 0 ? String(d) : "";
+
+    let carrierId = "";
+    if (cust && cid) {
+      const p = cust.preferredCarrierId?.trim() ?? "";
+      if (p !== "" && carrierRepository.getById(p)) carrierId = p;
+    }
+
+    const recipientName = cust?.defaultRecipientName ?? "";
+    const recipientPhone = cust?.defaultRecipientPhone ?? "";
+    const deliveryAddress = cust?.defaultDeliveryAddress ?? "";
+    const deliveryComment = cust?.defaultDeliveryComment ?? "";
+
     setForm((f) => ({
       ...f,
-      paymentTermsDays:
-        d !== undefined && Number.isFinite(d) && Number.isInteger(d) && d >= 0 ? String(d) : "",
+      paymentTermsDays,
+      carrierId,
+      recipientName,
+      recipientPhone,
+      deliveryAddress,
+      deliveryComment,
     }));
   }, [form.customerId, isEditable]);
+
+  const carrierSelectOptions = useMemo(() => {
+    const all = carrierRepository.list();
+    const active = all
+      .filter((c) => c.isActive)
+      .sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: "base" }));
+    const sel = form.carrierId.trim();
+    if (!sel) return active;
+    const current = all.find((c) => c.id === sel);
+    if (current && !current.isActive && !active.some((c) => c.id === sel)) {
+      return [current, ...active];
+    }
+    return active;
+  }, [form.carrierId, locale]);
 
   const computedDueDateDisplay = useMemo(() => {
     const d = computePlanningDueDate(
@@ -791,6 +876,11 @@ export function SalesOrderPage() {
         date: normalizeDateForSO(form.date),
         customerId: form.customerId,
         warehouseId: form.warehouseId,
+        carrierId: form.carrierId.trim() || undefined,
+        recipientName: form.recipientName || undefined,
+        recipientPhone: form.recipientPhone || undefined,
+        deliveryAddress: form.deliveryAddress || undefined,
+        deliveryComment: form.deliveryComment || undefined,
         paymentTermsDays: form.paymentTermsDays,
         comment: form.comment || undefined,
         lines: linesToSave,
@@ -1060,10 +1150,19 @@ export function SalesOrderPage() {
       getSalesOrderHealth({
         customerId: form.customerId,
         warehouseId: form.warehouseId,
+        carrierId: form.carrierId,
+        recipientPhone: form.recipientPhone,
         paymentTermsDays: form.paymentTermsDays,
         lines: form.lines,
       }),
-    [form.customerId, form.warehouseId, form.paymentTermsDays, form.lines],
+    [
+      form.customerId,
+      form.warehouseId,
+      form.carrierId,
+      form.recipientPhone,
+      form.paymentTermsDays,
+      form.lines,
+    ],
   );
 
   const handleCancelDocumentConfirm = (payload: CancelDocumentReasonPayload) => {
@@ -1204,6 +1303,10 @@ export function SalesOrderPage() {
       customer: customerName,
       warehouse: warehouseName,
       comment: isEditable ? form.comment : doc?.comment ?? "",
+      recipientName: isEditable ? form.recipientName.trim() || undefined : doc?.recipientName,
+      recipientPhone: isEditable ? form.recipientPhone.trim() || undefined : doc?.recipientPhone,
+      deliveryAddress: isEditable ? form.deliveryAddress.trim() || undefined : doc?.deliveryAddress,
+      deliveryComment: isEditable ? form.deliveryComment.trim() || undefined : doc?.deliveryComment,
       totalQty: isEditable ? totals.totalQty : readonlyTotals.totalQty,
       totalAmount: isEditable ? totals.totalAmount : readonlyTotals.totalAmount,
     };
@@ -1218,9 +1321,17 @@ export function SalesOrderPage() {
     isEditable,
     form.date,
     form.comment,
+    form.recipientName,
+    form.recipientPhone,
+    form.deliveryAddress,
+    form.deliveryComment,
     doc?.date,
     doc?.status,
     doc?.comment,
+    doc?.recipientName,
+    doc?.recipientPhone,
+    doc?.deliveryAddress,
+    doc?.deliveryComment,
     customerName,
     warehouseName,
     totals.totalQty,
@@ -1425,6 +1536,87 @@ export function SalesOrderPage() {
                     }))}
                     placeholder={t("doc.page.selectWarehouse")}
                     className="w-full min-w-0"
+                  />
+                </div>
+                <div className="col-span-2 flex min-w-0 w-full max-w-[min(100%,36rem)] flex-col gap-0.5">
+                  <Label htmlFor="so-carrier" className="text-sm">
+                    {t("doc.so.carrier")}
+                  </Label>
+                  <select
+                    id="so-carrier"
+                    className={cn(
+                      "flex h-8 w-full max-w-md rounded-md border border-input bg-background px-3 py-1 text-sm text-foreground",
+                    )}
+                    value={form.carrierId}
+                    onChange={(e) => setForm((f) => ({ ...f, carrierId: e.target.value }))}
+                    aria-label={t("doc.so.carrier")}
+                  >
+                    <option value="">{t("doc.shipment.carrierNotSet")}</option>
+                    {carrierSelectOptions.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.name} · {translateCarrierType(t, c.carrierType)}
+                      </option>
+                    ))}
+                  </select>
+                  <p className="text-xs text-muted-foreground m-0 leading-snug">
+                    {t("doc.so.carrierHint")}
+                  </p>
+                </div>
+                <div className="col-span-2 flex min-w-0 w-full max-w-[min(100%,36rem)] flex-col gap-0.5">
+                  <p className="text-xs text-muted-foreground m-0 leading-snug">{t("doc.so.deliveryHint")}</p>
+                </div>
+                <div className="flex min-w-0 w-full flex-col gap-0.5">
+                  <Label htmlFor="so-recipient-name" className="text-sm">
+                    {t("doc.shipment.recipientName")}
+                  </Label>
+                  <Input
+                    id="so-recipient-name"
+                    type="text"
+                    value={form.recipientName}
+                    onChange={(e) => setForm((f) => ({ ...f, recipientName: e.target.value }))}
+                    placeholder={t("doc.shipment.recipientNamePlaceholder")}
+                    className="h-8 text-sm"
+                    autoComplete="name"
+                  />
+                </div>
+                <div className="flex min-w-0 w-full flex-col gap-0.5">
+                  <Label htmlFor="so-recipient-phone" className="text-sm">
+                    {t("doc.shipment.recipientPhone")}
+                  </Label>
+                  <Input
+                    id="so-recipient-phone"
+                    type="text"
+                    value={form.recipientPhone}
+                    onChange={(e) => setForm((f) => ({ ...f, recipientPhone: e.target.value }))}
+                    placeholder={t("doc.shipment.recipientPhonePlaceholder")}
+                    className="h-8 text-sm"
+                    autoComplete="tel"
+                  />
+                </div>
+                <div className="col-span-2 flex min-w-0 w-full max-w-[min(100%,36rem)] flex-col gap-0.5">
+                  <Label htmlFor="so-delivery-address" className="text-sm">
+                    {t("doc.shipment.deliveryAddress")}
+                  </Label>
+                  <Textarea
+                    id="so-delivery-address"
+                    value={form.deliveryAddress}
+                    onChange={(e) => setForm((f) => ({ ...f, deliveryAddress: e.target.value }))}
+                    placeholder={t("doc.shipment.deliveryAddressPlaceholder")}
+                    rows={2}
+                    className="min-h-[2.5rem] resize-y text-sm"
+                  />
+                </div>
+                <div className="col-span-2 flex min-w-0 w-full max-w-[min(100%,36rem)] flex-col gap-0.5">
+                  <Label htmlFor="so-delivery-comment" className="text-sm">
+                    {t("doc.shipment.deliveryComment")}
+                  </Label>
+                  <Textarea
+                    id="so-delivery-comment"
+                    value={form.deliveryComment}
+                    onChange={(e) => setForm((f) => ({ ...f, deliveryComment: e.target.value }))}
+                    placeholder={t("doc.shipment.deliveryCommentPlaceholder")}
+                    rows={2}
+                    className="min-h-[2.5rem] resize-y text-sm"
                   />
                 </div>
                 <div className="flex min-w-0 w-full flex-col gap-0.5">
@@ -1715,7 +1907,12 @@ export function SalesOrderPage() {
                   </div>
                 </CardContent>
               </Card>
-                <div className="flex flex-row items-center gap-2 shrink-0">
+                <div className="flex flex-row flex-wrap items-center justify-end gap-2 shrink-0">
+                  <DocumentPrintActionsMenu
+                    items={salesOrderPrintMenuItems}
+                    triggerLabel={t("doc.page.print")}
+                    aria-label={t("doc.page.printMenuAria")}
+                  />
                   {exportSuccess && (
                     <div className="h-8 w-max flex items-center gap-1.5 rounded-md border border-input bg-background px-2 text-sm shrink-0">
                       <span className="text-muted-foreground text-xs">{t("doc.list.exportCompleted")}</span>
@@ -1878,6 +2075,42 @@ export function SalesOrderPage() {
                   <dd className="doc-summary__value">{warehouseName}</dd>
                 </div>
                 <div className="doc-summary__row">
+                  <dt className="doc-summary__term">{t("doc.so.carrier")}</dt>
+                  <dd className="doc-summary__value">{carrierReadOnlyLabel}</dd>
+                </div>
+                <div className="doc-summary__row">
+                  <dt className="doc-summary__term">{t("doc.shipment.recipientName")}</dt>
+                  <dd className="doc-summary__value">
+                    {doc!.recipientName?.trim()
+                      ? doc!.recipientName.trim()
+                      : emDashSummary}
+                  </dd>
+                </div>
+                <div className="doc-summary__row">
+                  <dt className="doc-summary__term">{t("doc.shipment.recipientPhone")}</dt>
+                  <dd className="doc-summary__value">
+                    {doc!.recipientPhone?.trim()
+                      ? doc!.recipientPhone.trim()
+                      : emDashSummary}
+                  </dd>
+                </div>
+                <div className="doc-summary__row">
+                  <dt className="doc-summary__term">{t("doc.shipment.deliveryAddress")}</dt>
+                  <dd className="doc-summary__value whitespace-pre-wrap">
+                    {doc!.deliveryAddress?.trim()
+                      ? doc!.deliveryAddress.trim()
+                      : emDashSummary}
+                  </dd>
+                </div>
+                <div className="doc-summary__row">
+                  <dt className="doc-summary__term">{t("doc.shipment.deliveryComment")}</dt>
+                  <dd className="doc-summary__value whitespace-pre-wrap">
+                    {doc!.deliveryComment?.trim()
+                      ? doc!.deliveryComment.trim()
+                      : emDashSummary}
+                  </dd>
+                </div>
+                <div className="doc-summary__row">
                   <dt className="doc-summary__term">{t("doc.summary.paymentTerms")}</dt>
                   <dd className="doc-summary__value">
                     {doc!.paymentTermsDays !== undefined
@@ -1972,7 +2205,12 @@ export function SalesOrderPage() {
                 </div>
               </div>
             ) : null}
-            <div className="flex flex-row items-center justify-end gap-2 w-full mb-1.5">
+            <div className="flex flex-row flex-wrap items-center justify-end gap-2 w-full mb-1.5">
+              <DocumentPrintActionsMenu
+                items={salesOrderPrintMenuItems}
+                triggerLabel={t("doc.page.print")}
+                aria-label={t("doc.page.printMenuAria")}
+              />
               {exportSuccess && (
                 <div className="h-8 w-max flex items-center gap-1.5 rounded-md border border-input bg-background px-2 text-sm shrink-0">
                   <span className="text-muted-foreground text-xs">{t("doc.list.exportCompleted")}</span>

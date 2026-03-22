@@ -28,7 +28,7 @@ export function planningPurchaseOrderExportLabels(t: TFunction): PlanningDocumen
       t("exportExcel.doc.labelComment"),
       t("exportExcel.doc.labelTotalQty"),
       t("exportExcel.doc.labelTotalAmount"),
-    ] as PlanningDocumentExcelLabels["planningDocumentLabels"],
+    ],
   };
 }
 
@@ -38,15 +38,19 @@ export function planningSalesOrderExportLabels(t: TFunction): PlanningDocumentEx
   return {
     ...base,
     planningDocumentLabels: [
-      L[0],
-      L[1],
-      L[2],
+      L[0]!,
+      L[1]!,
+      L[2]!,
       t("exportExcel.doc.labelCustomer"),
-      L[4],
-      L[5],
-      L[6],
-      L[7],
-    ] as PlanningDocumentExcelLabels["planningDocumentLabels"],
+      L[4]!,
+      t("exportExcel.doc.labelRecipientName"),
+      t("exportExcel.doc.labelRecipientPhone"),
+      t("exportExcel.doc.labelDeliveryAddress"),
+      t("exportExcel.doc.labelDeliveryComment"),
+      L[5]!,
+      L[6]!,
+      L[7]!,
+    ],
   };
 }
 
@@ -93,6 +97,10 @@ export function shipmentExcelExportLabels(t: TFunction): ShipmentExcelLabels {
       t("exportExcel.doc.labelWarehouse"),
       t("exportExcel.doc.labelCarrier"),
       t("exportExcel.doc.labelTrackingNumber"),
+      t("exportExcel.doc.labelRecipientName"),
+      t("exportExcel.doc.labelRecipientPhone"),
+      t("exportExcel.doc.labelDeliveryAddress"),
+      t("exportExcel.doc.labelDeliveryComment"),
       t("exportExcel.doc.labelComment"),
     ] as ShipmentExcelLabels["shipmentDocumentLabels"],
   };

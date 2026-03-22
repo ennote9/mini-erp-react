@@ -6,6 +6,7 @@ import {
   writeInventoryPayload,
 } from "../../shared/inventoryPersistence";
 import { registerPersistenceFlush } from "../../shared/persistenceCoordinator";
+import { bumpInventoryDisplayRevision } from "../../shared/inventoryDisplayRevision";
 
 export type CreateStockMovementInput = Omit<StockMovement, "id">;
 
@@ -94,6 +95,7 @@ export async function flushPendingStockMovementPersist(): Promise<void> {
 }
 
 function schedulePersist(): void {
+  bumpInventoryDisplayRevision();
   persistDepth++;
   persistChain = persistChain
     .then(async () => {

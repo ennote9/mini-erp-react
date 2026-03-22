@@ -47,7 +47,13 @@ function getPageTitleKey(pathname: string): string {
   if (pathname.match(/^\/carriers\/[^/]+$/)) return "routes.carrier";
   if (pathname.match(/^\/purchase-orders\/[^/]+$/)) return "routes.purchaseOrder";
   if (pathname.match(/^\/receipts\/[^/]+$/)) return "routes.receipt";
+  if (pathname.match(/^\/sales-orders\/[^/]+\/customer-document$/))
+    return "routes.salesOrderCustomerDocument";
   if (pathname.match(/^\/sales-orders\/[^/]+$/)) return "routes.salesOrder";
+  if (pathname.match(/^\/shipments\/[^/]+\/delivery-sheet$/))
+    return "routes.shipmentDeliverySheet";
+  if (pathname.match(/^\/shipments\/[^/]+\/customer-document$/))
+    return "routes.shipmentCustomerDocument";
   if (pathname.match(/^\/shipments\/[^/]+$/)) return "routes.shipment";
   return PAGE_TITLES[pathname] ?? "routes.fallback";
 }
@@ -74,9 +80,18 @@ function getPageIcon(
     return ShoppingCart;
   if (pathname === "/receipts" || pathname.match(/^\/receipts\/[^/]+$/))
     return Receipt;
-  if (pathname === "/sales-orders" || pathname.match(/^\/sales-orders\/[^/]+$/))
+  if (
+    pathname === "/sales-orders" ||
+    pathname.match(/^\/sales-orders\/[^/]+$/) ||
+    pathname.match(/^\/sales-orders\/[^/]+\/customer-document$/)
+  )
     return ShoppingBag;
-  if (pathname === "/shipments" || pathname.match(/^\/shipments\/[^/]+$/))
+  if (
+    pathname === "/shipments" ||
+    pathname.match(/^\/shipments\/[^/]+$/) ||
+    pathname.match(/^\/shipments\/[^/]+\/delivery-sheet$/) ||
+    pathname.match(/^\/shipments\/[^/]+\/customer-document$/)
+  )
     return PackageCheck;
   if (pathname === "/stock-balances") return Scale;
   if (pathname === "/stock-movements") return ArrowLeftRight;

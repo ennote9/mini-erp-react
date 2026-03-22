@@ -1,4 +1,5 @@
 import { customerRepository } from "./repository";
+import { carrierRepository } from "../carriers/repository";
 import {
   validateRequired,
   validatePhone,
@@ -22,6 +23,12 @@ export type SaveCustomerInput = {
   city?: string;
   country?: string;
   paymentTermsDays?: number;
+  /** Empty / whitespace normalized away in saveCustomer. */
+  preferredCarrierId?: string;
+  defaultRecipientName?: string;
+  defaultRecipientPhone?: string;
+  defaultDeliveryAddress?: string;
+  defaultDeliveryComment?: string;
 };
 export type SaveCustomerResult =
   | { success: true; id: string }
@@ -52,11 +59,20 @@ function validateSaveCustomer(
 
   const phoneErr = validatePhone(data.phone);
   if (phoneErr) return phoneErr;
+  const defaultPhoneErr = validatePhone(data.defaultRecipientPhone);
+  if (defaultPhoneErr) return defaultPhoneErr;
   const emailErr = validateEmail(data.email);
   if (emailErr) return emailErr;
 
   const paymentErr = validatePaymentTermsDays(data.paymentTermsDays);
   if (paymentErr) return paymentErr;
+
+  const prefRaw =
+    data.preferredCarrierId != null ? normalizeTrim(data.preferredCarrierId) : "";
+  if (prefRaw !== "") {
+    const carrier = carrierRepository.getById(prefRaw);
+    if (!carrier) return "Preferred carrier is not valid.";
+  }
 
   const codeNormalized = normalizeCode(data.code);
   const duplicate = customerRepository.list().find(
@@ -87,6 +103,28 @@ export function saveCustomer(
   const paymentTermsDays =
     data.paymentTermsDays !== undefined ? Number(data.paymentTermsDays) : undefined;
 
+  const preferredCarrierId =
+    data.preferredCarrierId != null && normalizeTrim(data.preferredCarrierId) !== ""
+      ? normalizeTrim(data.preferredCarrierId)
+      : undefined;
+
+  const defaultRecipientName =
+    data.defaultRecipientName != null && normalizeTrim(data.defaultRecipientName) !== ""
+      ? normalizeTrim(data.defaultRecipientName)
+      : undefined;
+  const defaultRecipientPhone =
+    data.defaultRecipientPhone != null && normalizeTrim(data.defaultRecipientPhone) !== ""
+      ? normalizeTrim(data.defaultRecipientPhone)
+      : undefined;
+  const defaultDeliveryAddress =
+    data.defaultDeliveryAddress != null && normalizeTrim(data.defaultDeliveryAddress) !== ""
+      ? normalizeTrim(data.defaultDeliveryAddress)
+      : undefined;
+  const defaultDeliveryComment =
+    data.defaultDeliveryComment != null && normalizeTrim(data.defaultDeliveryComment) !== ""
+      ? normalizeTrim(data.defaultDeliveryComment)
+      : undefined;
+
   const patch = {
     code,
     name,
@@ -101,6 +139,11 @@ export function saveCustomer(
     city,
     country,
     paymentTermsDays,
+    preferredCarrierId,
+    defaultRecipientName,
+    defaultRecipientPhone,
+    defaultDeliveryAddress,
+    defaultDeliveryComment,
   };
 
   if (existingId) {

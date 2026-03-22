@@ -31,6 +31,8 @@ import {
 import { AgGridContainer } from "../../../shared/ui/ag-grid/AgGridContainer";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 import {
   Card,
@@ -64,6 +66,7 @@ import {
   type ReverseDocumentReasonPayload,
 } from "../../../shared/ui/object/ReverseDocumentReasonDialog";
 import { DocumentEventLogSection } from "../../../shared/ui/object/DocumentEventLogSection";
+import { DocumentPrintActionsMenu } from "../../../shared/ui/object/DocumentPrintActionsMenu";
 import { useSettings } from "../../../shared/settings/SettingsContext";
 import { getEffectiveWorkspaceFeatureEnabled } from "../../../shared/workspace";
 import {
@@ -172,6 +175,10 @@ export function ShipmentPage() {
   const [reverseReasonDialogOpen, setReverseReasonDialogOpen] = useState(false);
   const [draftCarrierId, setDraftCarrierId] = useState("");
   const [draftTracking, setDraftTracking] = useState("");
+  const [draftRecipientName, setDraftRecipientName] = useState("");
+  const [draftRecipientPhone, setDraftRecipientPhone] = useState("");
+  const [draftDeliveryAddress, setDraftDeliveryAddress] = useState("");
+  const [draftDeliveryComment, setDraftDeliveryComment] = useState("");
   const [logisticsIssues, setLogisticsIssues] = useState<Issue[]>([]);
   const doc = useMemo(
     () => (id ? shipmentRepository.getById(id) : undefined),
@@ -182,12 +189,42 @@ export function ShipmentPage() {
     [id, refresh],
   );
 
+  const canOpenFinalCustomerDocument = useMemo(
+    () => Boolean(id && doc?.status === "posted"),
+    [id, doc?.status],
+  );
+
+  const shipmentPrintMenuItems = useMemo(() => {
+    if (!id) return [];
+    const rows: { to: string; label: string }[] = [
+      { to: `/shipments/${id}/delivery-sheet`, label: t("doc.shipment.deliverySheetOpen") },
+    ];
+    if (canOpenFinalCustomerDocument) {
+      rows.push({ to: `/shipments/${id}/customer-document`, label: t("doc.customerDocument.finalTitle") });
+    }
+    return rows;
+  }, [id, canOpenFinalCustomerDocument, t, locale]);
+
   useEffect(() => {
     if (!id || !doc) return;
     setDraftCarrierId(doc.carrierId ?? "");
     setDraftTracking(doc.trackingNumber ?? "");
+    setDraftRecipientName(doc.recipientName ?? "");
+    setDraftRecipientPhone(doc.recipientPhone ?? "");
+    setDraftDeliveryAddress(doc.deliveryAddress ?? "");
+    setDraftDeliveryComment(doc.deliveryComment ?? "");
     setLogisticsIssues([]);
-  }, [id, doc?.id, doc?.carrierId, doc?.trackingNumber, refresh]);
+  }, [
+    id,
+    doc?.id,
+    doc?.carrierId,
+    doc?.trackingNumber,
+    doc?.recipientName,
+    doc?.recipientPhone,
+    doc?.deliveryAddress,
+    doc?.deliveryComment,
+    refresh,
+  ]);
   const salesOrderNumber = useMemo(
     () =>
       doc
@@ -249,6 +286,26 @@ export function ShipmentPage() {
     return v ? v : emDash;
   }, [doc?.trackingNumber, emDash]);
 
+  const recipientNameSummaryDisplay = useMemo(() => {
+    const v = doc?.recipientName?.trim();
+    return v ? v : emDash;
+  }, [doc?.recipientName, emDash]);
+
+  const recipientPhoneSummaryDisplay = useMemo(() => {
+    const v = doc?.recipientPhone?.trim();
+    return v ? v : emDash;
+  }, [doc?.recipientPhone, emDash]);
+
+  const deliveryAddressSummaryDisplay = useMemo(() => {
+    const v = doc?.deliveryAddress?.trim();
+    return v ? v : emDash;
+  }, [doc?.deliveryAddress, emDash]);
+
+  const deliveryCommentSummaryDisplay = useMemo(() => {
+    const v = doc?.deliveryComment?.trim();
+    return v ? v : emDash;
+  }, [doc?.deliveryComment, emDash]);
+
   const trackingUrlReadOnly = useMemo(() => {
     if (!doc || doc.status === "draft") return null;
     const c = doc.carrierId ? carrierRepository.getById(doc.carrierId) : undefined;
@@ -259,7 +316,11 @@ export function ShipmentPage() {
     !!doc &&
     isDraft &&
     (draftCarrierId !== (doc.carrierId ?? "") ||
-      draftTracking !== (doc.trackingNumber ?? ""));
+      draftTracking !== (doc.trackingNumber ?? "") ||
+      draftRecipientName !== (doc.recipientName ?? "") ||
+      draftRecipientPhone !== (doc.recipientPhone ?? "") ||
+      draftDeliveryAddress !== (doc.deliveryAddress ?? "") ||
+      draftDeliveryComment !== (doc.deliveryComment ?? ""));
 
   const onLinesSelectionChanged = useCallback((e: SelectionChangedEvent<LineWithItem>) => {
     const ids = e.api.getSelectedRows().map((r) => r.id);
@@ -331,6 +392,10 @@ export function ShipmentPage() {
         carrierForExport?.name ??
         (doc!.carrierId ? t("doc.shipment.unknownCarrier") : ""),
       trackingNumber: tr,
+      recipientName: doc!.recipientName?.trim() ?? "",
+      recipientPhone: doc!.recipientPhone?.trim() ?? "",
+      deliveryAddress: doc!.deliveryAddress?.trim() ?? "",
+      deliveryComment: doc!.deliveryComment?.trim() ?? "",
       comment: doc!.comment ?? "",
     };
     runExportWithSaveAs(`${shipmentNumberForFile}_document.xlsx`, () =>
@@ -544,6 +609,87 @@ export function ShipmentPage() {
                     />
                   </dd>
                 </div>
+                <div className="doc-summary__row">
+                  <dt className="doc-summary__term">{t("doc.shipment.recipientName")}</dt>
+                  <dd className="doc-summary__value min-w-0">
+                    <Label htmlFor="shipment-recipient-name" className="sr-only">
+                      {t("doc.shipment.recipientName")}
+                    </Label>
+                    <Input
+                      id="shipment-recipient-name"
+                      className="max-w-md"
+                      value={draftRecipientName}
+                      onChange={(e) => {
+                        setDraftRecipientName(e.target.value);
+                        setLogisticsIssues([]);
+                      }}
+                      placeholder={t("doc.shipment.recipientNamePlaceholder")}
+                      autoComplete="name"
+                      aria-label={t("doc.shipment.recipientName")}
+                    />
+                  </dd>
+                </div>
+                <div className="doc-summary__row">
+                  <dt className="doc-summary__term">{t("doc.shipment.recipientPhone")}</dt>
+                  <dd className="doc-summary__value min-w-0">
+                    <Label htmlFor="shipment-recipient-phone" className="sr-only">
+                      {t("doc.shipment.recipientPhone")}
+                    </Label>
+                    <Input
+                      id="shipment-recipient-phone"
+                      className="max-w-md"
+                      type="tel"
+                      value={draftRecipientPhone}
+                      onChange={(e) => {
+                        setDraftRecipientPhone(e.target.value);
+                        setLogisticsIssues([]);
+                      }}
+                      placeholder={t("doc.shipment.recipientPhonePlaceholder")}
+                      autoComplete="tel"
+                      aria-label={t("doc.shipment.recipientPhone")}
+                    />
+                  </dd>
+                </div>
+                <div className="doc-summary__row">
+                  <dt className="doc-summary__term">{t("doc.shipment.deliveryAddress")}</dt>
+                  <dd className="doc-summary__value min-w-0">
+                    <Label htmlFor="shipment-delivery-address" className="sr-only">
+                      {t("doc.shipment.deliveryAddress")}
+                    </Label>
+                    <Textarea
+                      id="shipment-delivery-address"
+                      className="max-w-md min-h-[4rem] resize-y text-sm"
+                      value={draftDeliveryAddress}
+                      onChange={(e) => {
+                        setDraftDeliveryAddress(e.target.value);
+                        setLogisticsIssues([]);
+                      }}
+                      placeholder={t("doc.shipment.deliveryAddressPlaceholder")}
+                      rows={2}
+                      aria-label={t("doc.shipment.deliveryAddress")}
+                    />
+                  </dd>
+                </div>
+                <div className="doc-summary__row">
+                  <dt className="doc-summary__term">{t("doc.shipment.deliveryComment")}</dt>
+                  <dd className="doc-summary__value min-w-0">
+                    <Label htmlFor="shipment-delivery-comment" className="sr-only">
+                      {t("doc.shipment.deliveryComment")}
+                    </Label>
+                    <Textarea
+                      id="shipment-delivery-comment"
+                      className="max-w-md min-h-[4rem] resize-y text-sm"
+                      value={draftDeliveryComment}
+                      onChange={(e) => {
+                        setDraftDeliveryComment(e.target.value);
+                        setLogisticsIssues([]);
+                      }}
+                      placeholder={t("doc.shipment.deliveryCommentPlaceholder")}
+                      rows={2}
+                      aria-label={t("doc.shipment.deliveryComment")}
+                    />
+                  </dd>
+                </div>
               </>
             ) : (
               <>
@@ -567,6 +713,26 @@ export function ShipmentPage() {
                     ) : null}
                   </dd>
                 </div>
+                <div className="doc-summary__row">
+                  <dt className="doc-summary__term">{t("doc.shipment.recipientName")}</dt>
+                  <dd className="doc-summary__value">{recipientNameSummaryDisplay}</dd>
+                </div>
+                <div className="doc-summary__row">
+                  <dt className="doc-summary__term">{t("doc.shipment.recipientPhone")}</dt>
+                  <dd className="doc-summary__value">{recipientPhoneSummaryDisplay}</dd>
+                </div>
+                <div className="doc-summary__row">
+                  <dt className="doc-summary__term">{t("doc.shipment.deliveryAddress")}</dt>
+                  <dd className="doc-summary__value whitespace-pre-wrap break-words">
+                    {deliveryAddressSummaryDisplay}
+                  </dd>
+                </div>
+                <div className="doc-summary__row">
+                  <dt className="doc-summary__term">{t("doc.shipment.deliveryComment")}</dt>
+                  <dd className="doc-summary__value whitespace-pre-wrap break-words">
+                    {deliveryCommentSummaryDisplay}
+                  </dd>
+                </div>
               </>
             )}
             {isDraft && logisticsIssues.length > 0 ? (
@@ -586,6 +752,10 @@ export function ShipmentPage() {
                     const result = updateShipmentDraftLogistics(id, {
                       carrierId: draftCarrierId,
                       trackingNumber: draftTracking,
+                      recipientName: draftRecipientName,
+                      recipientPhone: draftRecipientPhone,
+                      deliveryAddress: draftDeliveryAddress,
+                      deliveryComment: draftDeliveryComment,
                     });
                     if (result.success) {
                       setLogisticsIssues([]);
@@ -642,7 +812,12 @@ export function ShipmentPage() {
       </Card>
       <div className="doc-lines mt-6">
         <h3 className="doc-lines__title">{t("doc.page.lines")}</h3>
-        <div className="flex flex-row items-center justify-end gap-2 w-full mb-1.5">
+        <div className="flex flex-row flex-wrap items-center justify-end gap-2 w-full mb-1.5">
+          <DocumentPrintActionsMenu
+            items={shipmentPrintMenuItems}
+            triggerLabel={t("doc.page.print")}
+            aria-label={t("doc.page.printMenuAria")}
+          />
           {exportSuccess && (
             <div className="h-8 w-max flex items-center gap-1.5 rounded-md border border-input bg-background px-2 text-sm shrink-0">
               <span className="text-muted-foreground text-xs">{t("doc.list.exportCompleted")}</span>

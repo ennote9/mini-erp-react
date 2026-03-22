@@ -5,6 +5,7 @@ import {
   writeInventoryPayload,
 } from "../../shared/inventoryPersistence";
 import { registerPersistenceFlush } from "../../shared/persistenceCoordinator";
+import { bumpInventoryDisplayRevision } from "../../shared/inventoryDisplayRevision";
 import { normalizeTrim } from "../../shared/validation";
 
 const PERSIST_PATH = getInventoryFilePath("stock-reservations.json");
@@ -77,6 +78,7 @@ export async function flushPendingStockReservationPersist(): Promise<void> {
 }
 
 function schedulePersist(): void {
+  bumpInventoryDisplayRevision();
   persistDepth++;
   persistChain = persistChain
     .then(async () => {

@@ -9,7 +9,7 @@ import { itemRepository } from "../items/repository";
 import { stockMovementRepository } from "../stock-movements/repository";
 import { stockBalanceRepository } from "../stock-balances/repository";
 import { parseDocumentLineQty } from "../../shared/documentValidation";
-import { normalizeTrim } from "../../shared/validation";
+import { normalizeTrim, validatePhone } from "../../shared/validation";
 import {
   resolveCancelDocumentReasonForService,
   resolveReversalDocumentReasonForService,
@@ -522,6 +522,10 @@ export function reverseDocument(
 export type UpdateShipmentDraftLogisticsInput = {
   carrierId?: string;
   trackingNumber?: string;
+  recipientName?: string;
+  recipientPhone?: string;
+  deliveryAddress?: string;
+  deliveryComment?: string;
 };
 
 export type UpdateShipmentDraftLogisticsResult =
@@ -551,7 +555,33 @@ export function updateShipmentDraftLogistics(
   const trRaw = input.trackingNumber != null ? normalizeTrim(input.trackingNumber) : "";
   const trackingNumber = trRaw === "" ? undefined : trRaw;
 
-  shipmentRepository.update(shipmentId, { carrierId, trackingNumber });
+  const nameRaw = input.recipientName != null ? normalizeTrim(input.recipientName) : "";
+  const recipientName = nameRaw === "" ? undefined : nameRaw;
+
+  const phoneErr = validatePhone(
+    input.recipientPhone != null ? normalizeTrim(input.recipientPhone) : undefined,
+  );
+  if (phoneErr) {
+    return { success: false, error: phoneErr };
+  }
+  const phoneRaw = input.recipientPhone != null ? normalizeTrim(input.recipientPhone) : "";
+  const recipientPhone = phoneRaw === "" ? undefined : phoneRaw;
+
+  const addrRaw = input.deliveryAddress != null ? normalizeTrim(input.deliveryAddress) : "";
+  const deliveryAddress = addrRaw === "" ? undefined : addrRaw;
+
+  const delCommentRaw =
+    input.deliveryComment != null ? normalizeTrim(input.deliveryComment) : "";
+  const deliveryComment = delCommentRaw === "" ? undefined : delCommentRaw;
+
+  shipmentRepository.update(shipmentId, {
+    carrierId,
+    trackingNumber,
+    recipientName,
+    recipientPhone,
+    deliveryAddress,
+    deliveryComment,
+  });
   return { success: true };
 }
 

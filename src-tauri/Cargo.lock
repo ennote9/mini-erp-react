@@ -2067,6 +2067,8 @@ dependencies = [
  "tauri-plugin-dialog",
  "tauri-plugin-fs",
  "tauri-plugin-opener",
+ "webview2-com",
+ "windows",
 ]
 
 [[package]]

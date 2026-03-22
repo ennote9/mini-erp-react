@@ -14,8 +14,8 @@ export type PlanningDocumentExcelLabels = {
   documentSheetName: string;
   /** PO/SO Lines grid — 8 columns */
   planningLineHeaders: readonly [string, string, string, string, string, string, string, string];
-  /** Left column on Document sheet — Number … Total amount */
-  planningDocumentLabels: readonly [string, string, string, string, string, string, string, string];
+  /** Left column on Document sheet — Number … Total amount (8 rows for PO; SO document export uses 12). */
+  planningDocumentLabels: readonly string[];
 };
 
 export type ReceiptExcelLabels = {
@@ -31,5 +31,17 @@ export type ShipmentExcelLabels = {
   linesSheetName: string;
   documentSheetName: string;
   shipmentLineHeaders: readonly [string, string, string, string, string, string, string];
-  shipmentDocumentLabels: readonly [string, string, string, string, string, string, string];
+  shipmentDocumentLabels: readonly [
+    string,
+    string,
+    string,
+    string,
+    string,
+    string,
+    string,
+    string,
+    string,
+    string,
+    string,
+  ];
 };

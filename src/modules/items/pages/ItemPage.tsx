@@ -1,5 +1,5 @@
 import { useParams, useNavigate } from "react-router-dom";
-import { useMemo, useState, useEffect } from "react";
+import { useMemo, useState, useEffect, useCallback, useSyncExternalStore } from "react";
 import { itemRepository } from "../repository";
 import { brandRepository } from "../../brands/repository";
 import { categoryRepository } from "../../categories/repository";
@@ -30,8 +30,40 @@ import {
 import { getItemFormHealth } from "../../../shared/masterDataHealth";
 import { DocumentIssueStrip } from "../../../shared/ui/feedback/DocumentIssueStrip";
 import { ItemImagesCard } from "../components/ItemImagesCard";
+import {
+  buildItemPageBalanceRows,
+  buildRecentItemPageMovements,
+  ITEM_RECENT_MOVEMENTS_LIMIT,
+  summarizeItemPageBalances,
+} from "../itemInventoryRelated";
 import { Save, X } from "lucide-react";
 import { useTranslation } from "@/shared/i18n/context";
+import {
+  getInventoryDisplayRevision,
+  subscribeInventoryDisplayRevision,
+} from "@/shared/inventoryDisplayRevision";
+
+const DATE_TIME_FORMAT: Intl.DateTimeFormatOptions = {
+  day: "2-digit",
+  month: "short",
+  year: "numeric",
+  hour: "2-digit",
+  minute: "2-digit",
+};
+
+function formatItemPageDateTime(iso: string | null | undefined): string {
+  if (iso == null) return "";
+  const d = new Date(iso);
+  return Number.isNaN(d.getTime()) ? String(iso) : d.toLocaleString(undefined, DATE_TIME_FORMAT);
+}
+
+function formatQtyCell(n: number): string {
+  return Number.isInteger(n) ? String(n) : n.toFixed(2);
+}
+
+function formatQtyDeltaCell(v: number): string {
+  return v > 0 ? `+${formatQtyCell(v)}` : formatQtyCell(v);
+}
 
 type FormState = {
   code: string;
@@ -62,7 +94,7 @@ function defaultForm(): FormState {
 }
 
 export function ItemPage() {
-  const { t } = useTranslation();
+  const { t, locale } = useTranslation();
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const isNew = id === "new";
@@ -202,6 +234,50 @@ export function ItemPage() {
 
   const inactiveSuffix = t("master.item.inactiveSuffix");
   const selectDash = t("master.common.selectEmpty");
+
+  const itemRecordId = !isNew && id ? id : null;
+
+  const inventoryDisplayRevision = useSyncExternalStore(
+    subscribeInventoryDisplayRevision,
+    getInventoryDisplayRevision,
+    getInventoryDisplayRevision,
+  );
+
+  const itemBalanceRows = useMemo(
+    () => (itemRecordId ? buildItemPageBalanceRows(itemRecordId) : []),
+    [itemRecordId, inventoryDisplayRevision],
+  );
+
+  const itemBalanceSummary = useMemo(
+    () => summarizeItemPageBalances(itemBalanceRows),
+    [itemBalanceRows],
+  );
+
+  const itemMovementRows = useMemo(
+    () =>
+      itemRecordId
+        ? buildRecentItemPageMovements(itemRecordId, t, ITEM_RECENT_MOVEMENTS_LIMIT)
+        : [],
+    [itemRecordId, t, locale, inventoryDisplayRevision],
+  );
+
+  const movementTypeLabel = useCallback(
+    (code: string) => {
+      const translated = t(`ops.stockMovements.types.${code}`);
+      return translated === code ? code : translated;
+    },
+    [t],
+  );
+
+  const openStockBalancesForItem = useCallback(() => {
+    if (!itemRecordId) return;
+    navigate(`/stock-balances?itemId=${encodeURIComponent(itemRecordId)}`);
+  }, [itemRecordId, navigate]);
+
+  const openStockMovementsForItem = useCallback(() => {
+    if (!itemRecordId) return;
+    navigate(`/stock-movements?itemId=${encodeURIComponent(itemRecordId)}`);
+  }, [itemRecordId, navigate]);
 
   return (
     <div className="doc-page">
@@ -392,6 +468,212 @@ export function ItemPage() {
         images={item?.images ?? []}
         onImagesChanged={() => setImagesRevision((n) => n + 1)}
       />
+      {itemRecordId ? (
+        <>
+          <Card className="mt-4 w-full max-w-4xl min-w-0 border-0 shadow-none">
+            <CardHeader className="p-2 pb-0.5 space-y-0">
+              <div className="flex flex-wrap items-start justify-between gap-2 gap-y-1.5">
+                <div className="min-w-0 space-y-0.5 flex-1">
+                  <CardTitle className="text-[0.9rem] font-semibold tracking-tight">
+                    {t("master.item.relatedStockBalancesTitle")}
+                  </CardTitle>
+                  <CardDescription className="text-xs leading-snug">
+                    {t("master.item.relatedStockBalancesHint")}
+                  </CardDescription>
+                </div>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="h-7 shrink-0 px-2.5 text-xs"
+                  onClick={openStockBalancesForItem}
+                >
+                  {t("master.item.openAllStockBalances")}
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent className="p-2 pt-1 space-y-2">
+              <div
+                className="flex flex-wrap gap-1.5"
+                aria-label={t("master.item.relatedStockBalancesSummaryAria")}
+              >
+                <span className="inline-flex items-baseline gap-1 rounded border border-border/50 bg-muted/25 px-2 py-0.5 text-[11px] tabular-nums leading-none">
+                  <span className="text-muted-foreground">{t("master.item.chipWarehouses")}</span>
+                  <span className="font-medium text-foreground/90">{itemBalanceSummary.warehouseCount}</span>
+                </span>
+                <span className="inline-flex items-baseline gap-1 rounded border border-border/50 bg-muted/25 px-2 py-0.5 text-[11px] tabular-nums leading-none">
+                  <span className="text-muted-foreground">{t("master.item.chipTotalOnHand")}</span>
+                  <span className="font-medium text-foreground/90">
+                    {formatQtyCell(itemBalanceSummary.totalOnHand)}
+                  </span>
+                </span>
+                <span className="inline-flex items-baseline gap-1 rounded border border-border/50 bg-muted/25 px-2 py-0.5 text-[11px] tabular-nums leading-none">
+                  <span className="text-muted-foreground">{t("master.item.chipTotalReserved")}</span>
+                  <span className="font-medium text-foreground/90">
+                    {formatQtyCell(itemBalanceSummary.totalReserved)}
+                  </span>
+                </span>
+                <span className="inline-flex items-baseline gap-1 rounded border border-border/50 bg-muted/25 px-2 py-0.5 text-[11px] tabular-nums leading-none">
+                  <span className="text-muted-foreground">{t("master.item.chipTotalAvailable")}</span>
+                  <span className="font-medium text-foreground/90">
+                    {formatQtyCell(itemBalanceSummary.totalAvailable)}
+                  </span>
+                </span>
+                <span className="inline-flex items-baseline gap-1 rounded border border-border/50 bg-muted/25 px-2 py-0.5 text-[11px] tabular-nums leading-none">
+                  <span className="text-muted-foreground">{t("master.item.chipTotalOutgoing")}</span>
+                  <span className="font-medium text-foreground/90">
+                    {formatQtyCell(itemBalanceSummary.totalOutgoing)}
+                  </span>
+                </span>
+                <span className="inline-flex items-baseline gap-1 rounded border border-border/50 bg-muted/25 px-2 py-0.5 text-[11px] tabular-nums leading-none">
+                  <span className="text-muted-foreground">{t("master.item.chipTotalIncoming")}</span>
+                  <span className="font-medium text-foreground/90">
+                    {formatQtyCell(itemBalanceSummary.totalIncoming)}
+                  </span>
+                </span>
+              </div>
+              {itemBalanceRows.length === 0 ? (
+                <p className="text-sm text-muted-foreground py-3 m-0">
+                  {t("master.item.emptyRelatedStockBalances")}
+                </p>
+              ) : (
+                <div className="min-w-0 overflow-x-auto rounded-md border border-border/60">
+                  <table className="list-table text-sm">
+                    <thead>
+                      <tr>
+                        <th className="min-w-[120px]">{t("doc.columns.warehouse")}</th>
+                        <th className="w-24 text-right whitespace-nowrap tabular-nums">
+                          {t("doc.columns.total")}
+                        </th>
+                        <th className="w-24 text-right whitespace-nowrap tabular-nums">
+                          {t("doc.columns.reserved")}
+                        </th>
+                        <th className="w-24 text-right whitespace-nowrap tabular-nums">
+                          {t("doc.columns.available")}
+                        </th>
+                        <th className="w-24 text-right whitespace-nowrap tabular-nums">
+                          {t("doc.columns.outgoing")}
+                        </th>
+                        <th className="w-24 text-right whitespace-nowrap tabular-nums">
+                          {t("doc.columns.incoming")}
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {itemBalanceRows.map((row) => (
+                        <tr
+                          key={row.warehouseId}
+                          className="list-table__row list-table__row--clickable"
+                          onClick={openStockBalancesForItem}
+                          role="button"
+                          tabIndex={0}
+                          aria-label={t("master.item.openStockBalancesListRowAria", {
+                            warehouse: row.warehouseName,
+                          })}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter" || e.key === " ") {
+                              e.preventDefault();
+                              openStockBalancesForItem();
+                            }
+                          }}
+                        >
+                          <td className="truncate max-w-[14rem]" title={row.warehouseName}>
+                            {row.warehouseName}
+                          </td>
+                          <td className="text-right tabular-nums">{formatQtyCell(row.qtyOnHand)}</td>
+                          <td className="text-right tabular-nums">{formatQtyCell(row.reservedQty)}</td>
+                          <td className="text-right tabular-nums">{formatQtyCell(row.availableQty)}</td>
+                          <td className="text-right tabular-nums">{formatQtyCell(row.outgoingQty)}</td>
+                          <td className="text-right tabular-nums">{formatQtyCell(row.incomingQty)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          <Card className="mt-4 w-full max-w-4xl min-w-0 border-0 shadow-none">
+            <CardHeader className="p-2 pb-0.5 space-y-0">
+              <div className="flex flex-wrap items-start justify-between gap-2 gap-y-1.5">
+                <div className="min-w-0 space-y-0.5 flex-1">
+                  <CardTitle className="text-[0.9rem] font-semibold tracking-tight">
+                    {t("master.item.relatedStockMovementsTitle")}
+                  </CardTitle>
+                  <CardDescription className="text-xs leading-snug">
+                    {t("master.item.relatedStockMovementsHint", {
+                      limit: ITEM_RECENT_MOVEMENTS_LIMIT,
+                    })}
+                  </CardDescription>
+                </div>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="h-7 shrink-0 px-2.5 text-xs"
+                  onClick={openStockMovementsForItem}
+                >
+                  {t("master.item.openAllStockMovements")}
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent className="p-2 pt-1 space-y-2">
+              {itemMovementRows.length === 0 ? (
+                <p className="text-sm text-muted-foreground py-3 m-0">
+                  {t("master.item.emptyRelatedStockMovements")}
+                </p>
+              ) : (
+                <div className="min-w-0 overflow-x-auto rounded-md border border-border/60">
+                  <table className="list-table text-sm">
+                    <thead>
+                      <tr>
+                        <th className="min-w-[140px]">{t("doc.columns.dateTime")}</th>
+                        <th className="min-w-[100px]">{t("doc.columns.movementType")}</th>
+                        <th className="min-w-[120px]">{t("doc.columns.warehouse")}</th>
+                        <th className="w-28 text-right whitespace-nowrap tabular-nums">
+                          {t("doc.columns.qtyDelta")}
+                        </th>
+                        <th className="min-w-[160px]">{t("doc.columns.sourceDocument")}</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {itemMovementRows.map((row) => (
+                        <tr
+                          key={row.id}
+                          className="list-table__row list-table__row--clickable"
+                          onClick={openStockMovementsForItem}
+                          role="button"
+                          tabIndex={0}
+                          aria-label={t("master.item.openStockMovementsListRowAria")}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter" || e.key === " ") {
+                              e.preventDefault();
+                              openStockMovementsForItem();
+                            }
+                          }}
+                        >
+                          <td className="whitespace-nowrap tabular-nums">
+                            {formatItemPageDateTime(row.datetime)}
+                          </td>
+                          <td>{movementTypeLabel(row.movementTypeCode)}</td>
+                          <td className="truncate max-w-[14rem]" title={row.warehouseName}>
+                            {row.warehouseName}
+                          </td>
+                          <td className="text-right tabular-nums">{formatQtyDeltaCell(row.qtyDelta)}</td>
+                          <td className="truncate max-w-[18rem]" title={row.sourceDocumentLabel}>
+                            {row.sourceDocumentLabel}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </>
+      ) : null}
       </div>
     </div>
   );

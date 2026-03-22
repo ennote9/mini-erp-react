@@ -33,6 +33,7 @@ export const kkIssuesMessages: MessageTree = {
       "Төлем мерзімі — күн саны бүтін сан ≥ 0 немесе бос қалдырыңыз.",
     carrierTypeRequired: "Тасымалдаушы түрі міндетті.",
     carrierTypeInvalid: "Жарамды тасымалдаушы түрін таңдаңыз.",
+    preferredCarrierInvalid: "Негізгі тасымалдаушы жарамсыз.",
   },
   document: {
     supplierRequired: "Жеткізуші міндетті.",

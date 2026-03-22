@@ -78,6 +78,7 @@ const EXACT: Record<string, I18n> = {
   "A carrier with this code already exists.": { key: "issues.save.carrierDuplicate" },
   "Carrier not found.": { key: "issues.save.carrierNotFound" },
   "Select a valid carrier type.": { key: "issues.master.carrierTypeInvalid" },
+  "Preferred carrier is not valid.": { key: "issues.master.preferredCarrierInvalid" },
   "Item not found.": { key: "issues.save.itemNotFound" },
   "Selected brand not found.": { key: "issues.save.brandSelectNotFound" },
   "Selected brand is not active.": { key: "issues.save.brandInactive" },
