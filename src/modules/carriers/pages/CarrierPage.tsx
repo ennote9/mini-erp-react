@@ -1,5 +1,5 @@
 import { useParams, useNavigate } from "react-router-dom";
-import { useMemo, useState, useEffect } from "react";
+import { useMemo, useState, useEffect, useSyncExternalStore } from "react";
 import { carrierRepository } from "../repository";
 import { saveCarrier } from "../service";
 import { CARRIER_TYPE_IDS } from "../model";
@@ -34,6 +34,10 @@ import { getCarrierFormHealth } from "../../../shared/masterDataHealth";
 import { DocumentIssueStrip } from "../../../shared/ui/feedback/DocumentIssueStrip";
 import { Save, X } from "lucide-react";
 import { useTranslation } from "@/shared/i18n/context";
+import {
+  getAppReadModelRevision,
+  subscribeAppReadModelRevision,
+} from "@/shared/appReadModelRevision";
 
 type FormState = {
   code: string;
@@ -83,6 +87,12 @@ export function CarrierPage() {
     [id, isNew],
   );
 
+  const appReadModelRevision = useSyncExternalStore(
+    subscribeAppReadModelRevision,
+    getAppReadModelRevision,
+    getAppReadModelRevision,
+  );
+
   const relatedSalesOrderRows = useMemo(() => {
     if (!carrier?.id) return [];
     const cid = carrier.id;
@@ -110,7 +120,7 @@ export function CarrierPage() {
         totalAmount,
       };
     });
-  }, [carrier?.id]);
+  }, [carrier?.id, appReadModelRevision]);
 
   const relatedSoSummary = useMemo(() => {
     const rows = relatedSalesOrderRows;
@@ -147,7 +157,7 @@ export function CarrierPage() {
         trackingDisplay: tr && tr.length > 0 ? tr : null,
       };
     });
-  }, [carrier?.id]);
+  }, [carrier?.id, appReadModelRevision]);
 
   const relatedShipmentSummary = useMemo(() => {
     const rows = relatedShipmentRows;
@@ -168,7 +178,7 @@ export function CarrierPage() {
       .filter((c) => (c.preferredCarrierId?.trim() ?? "") === cid)
       .slice()
       .sort((a, b) => a.code.localeCompare(b.code, undefined, { numeric: true }));
-  }, [carrier?.id]);
+  }, [carrier?.id, appReadModelRevision]);
 
   const relatedCustomerSummary = useMemo(() => {
     const rows = relatedCustomerRows;

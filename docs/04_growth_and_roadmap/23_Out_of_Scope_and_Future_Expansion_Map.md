@@ -6,7 +6,9 @@
 
     ## Purpose
 
-This document maps future growth without polluting MVP scope.
+This document maps **future** growth without polluting MVP scope.
+
+> **Note (2026-03-22):** the **current** codebase already includes several items once listed here as “later” (e.g. reversal, reservations, printable docs, settings, i18n). For **what exists today**, use **`01_product_core/08_Current_Product_State.md`**. This roadmap file is **aspirational**, not a checklist of missing work.
 
 ## Product evolution layers
 

@@ -1,5 +1,5 @@
 import { useParams, useNavigate } from "react-router-dom";
-import { useMemo, useState, useEffect } from "react";
+import { useMemo, useState, useEffect, useSyncExternalStore } from "react";
 import { supplierRepository } from "../repository";
 import { saveSupplier } from "../service";
 import { purchaseOrderRepository } from "../../purchase-orders/repository";
@@ -31,6 +31,10 @@ import { getSupplierFormHealth } from "../../../shared/masterDataHealth";
 import { DocumentIssueStrip } from "../../../shared/ui/feedback/DocumentIssueStrip";
 import { Save, X } from "lucide-react";
 import { useTranslation } from "@/shared/i18n/context";
+import {
+  getAppReadModelRevision,
+  subscribeAppReadModelRevision,
+} from "@/shared/appReadModelRevision";
 
 type FormState = {
   code: string;
@@ -74,6 +78,12 @@ export function SupplierPage() {
     [id, isNew],
   );
 
+  const appReadModelRevision = useSyncExternalStore(
+    subscribeAppReadModelRevision,
+    getAppReadModelRevision,
+    getAppReadModelRevision,
+  );
+
   const relatedPurchaseOrderRows = useMemo(() => {
     if (!supplier?.id) return [];
     const pos = purchaseOrderRepository
@@ -98,7 +108,7 @@ export function SupplierPage() {
         totalAmount,
       };
     });
-  }, [supplier?.id]);
+  }, [supplier?.id, appReadModelRevision]);
 
   const relatedPoSummary = useMemo(() => {
     const rows = relatedPurchaseOrderRows;

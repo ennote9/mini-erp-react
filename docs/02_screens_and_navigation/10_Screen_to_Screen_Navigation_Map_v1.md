@@ -31,6 +31,17 @@ Primary entry points:
 - Sidebar -> Items
 - Items list -> row click -> Item page
 - Items list -> New -> New Item page
+- Item page -> navigate to filtered **Stock Balances** / **Stock Movements** (item scope) via in-page actions
+
+### Brands
+- Sidebar -> Brands *(when visible for workspace)*
+- Brands list -> Brand page
+- Brand page -> Stock Balances / Movements with brand filter (when offered)
+
+### Categories
+- Sidebar -> Categories *(when visible for workspace)*
+- Categories list -> Category page
+- Category page -> Stock Balances / Movements with category filter (when offered)
 
 ### Suppliers
 - Sidebar -> Suppliers
@@ -46,6 +57,16 @@ Primary entry points:
 - Sidebar -> Warehouses
 - Warehouses list -> row click -> Warehouse page
 - Warehouses list -> New -> New Warehouse page
+
+### Carriers
+- Sidebar -> Carriers
+- Carriers list -> Carrier page
+- Carrier page -> related Customers / Sales Orders / Shipments rows *(operational drill-down)*
+
+## Settings
+
+- Sidebar footer -> Settings
+- Settings -> switch sections (workspace profile, general, documents, inventory, commercial, data & audit) per workspace mode
 
 ## Purchase navigation
 
@@ -75,25 +96,31 @@ Primary entry points:
 
 ### Sales Order page
 - Draft -> save / confirm / cancel
-- Confirmed -> Create Shipment
+- Confirmed -> Create Shipment *(may require reservations first — settings)*
 - Confirmed SO -> Create Shipment -> Shipment page
+- Sales Order -> **Preliminary customer document** (dedicated route: `/sales-orders/:id/customer-document`)
 
 ### Shipments
 - Sidebar -> Shipments
 - Shipments list -> row click -> Shipment page
 - no New button in Shipments list
 
+### Shipment page
+- Shipment -> **Delivery sheet** (`/shipments/:id/delivery-sheet`)
+- Shipment -> **Final customer document** (`/shipments/:id/customer-document`) — content for **posted** shipments in customer-facing view
+
 ## Inventory navigation
 
 ### Stock Balances
 - Sidebar -> Stock Balances
 - Dashboard stock block -> Stock Balances
-- no detail page in MVP
+- Master / item pages may open balances with **query filters** (e.g. `?itemId=`, `?brandId=`, `?categoryId=`, `?warehouseId=`)
 
 ### Stock Movements
-- Sidebar -> Stock Movements
+- Sidebar -> Stock Movements *(if visible for workspace)*
 - Dashboard latest movements block -> Stock Movements
 - Source Document link -> Receipt page or Shipment page
+- Query filters same family as stock balances
 
 ## Forbidden navigation paths
 
@@ -104,6 +131,10 @@ Not allowed in MVP:
 - Create Shipment from Draft Sales Order
 - Post directly from list pages
 - Edit non-editable documents through alternative routes
+
+Additional guardrails in current app (examples):
+- Second draft receipt/shipment for same planning doc may be blocked by **settings**
+- Create shipment may be blocked until lines are **fully reserved** (Advanced setting)
 
 ## Main end-to-end route
 

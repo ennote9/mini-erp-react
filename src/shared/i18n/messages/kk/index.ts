@@ -195,15 +195,15 @@ export const kkMessages: MessageTree = {
       },
       general: {
         title: "Жалпы",
-        description: "Көрініс, пішімдер және ыстық пернелер.",
+        description: "Тіл, тақырып, ыстық пернелер және пішімдер (кейбір пішімдер әлі тек сақталады).",
       },
       documents: {
         title: "Құжаттар",
-        description: "Жоспарлық және фактілік құжаттар.",
+        description: "Жоспарлық және фактілік құжат ережелері, себептер және көрініс.",
       },
       inventory: {
         title: "Қорлар",
-        description: "Резервтеу және бөлу.",
+        description: "Резервтер, жөнелту талаптары және сату тапсырысы өзгергенде тазалау.",
       },
       commercial: {
         title: "Сауда",
@@ -211,7 +211,7 @@ export const kkMessages: MessageTree = {
       },
       dataAudit: {
         title: "Деректер және аудит",
-        description: "Диагностика, журнал және дерек құралдары.",
+        description: "Диагностика және құрылғыда нақты не сақталатыны.",
       },
     },
     entries: kkSettingsEntriesFull,

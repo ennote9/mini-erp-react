@@ -5,6 +5,7 @@ import {
   writeMasterDataPayload,
 } from "@/shared/masterDataPersistence";
 import { registerPersistenceFlush } from "@/shared/persistenceCoordinator";
+import { bumpAppReadModelRevision } from "@/shared/appReadModelRevision";
 
 export type CreateBrandInput = Omit<Brand, "id">;
 export type UpdateBrandPatch = Partial<Omit<Brand, "id">>;
@@ -46,6 +47,7 @@ function buildSeedBrands(): Brand[] {
 }
 
 function schedulePersist(): void {
+  bumpAppReadModelRevision();
   persistDepth++;
   persistChain = persistChain
     .then(async () => {

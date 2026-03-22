@@ -8,58 +8,44 @@
 
 Dashboard is the high-level overview screen for the owner of a small business.
 
+> **Current implementation (2026-03-22):** blocks below match `src/modules/dashboard/` (see also `dashboardStats.ts`). Older MVP text implied master-data count cards and “latest PO/SO” tables; the **live** dashboard is **document- and inventory-centric** as described here.
+
 ## Dashboard goals
 - understand current system state quickly
 - see recent important activity
 - jump quickly into a module
 
-## Block structure
+## Block structure (implemented)
 
-### A. Summary Cards
-- Items count
-- Suppliers count
-- Customers count
-- Warehouses count
+### A. Document overview (four cards)
+- **Purchase orders** — totals by planning status: draft, confirmed, closed, cancelled
+- **Sales orders** — same breakdown
+- **Receipts** — factual breakdown: draft, posted, **reversed**, cancelled
+- **Shipments** — factual breakdown: draft, posted, **reversed**, cancelled
 
-### B. Stock Overview
-- Total items with stock
-- Total quantity on hand
+### B. Inventory overview (cards)
+- **Stock balances** — count of balance rows (link to list)
+- **Stock movements** — count of movement rows (link to list); card may be **hidden** in Lite workspace
+- **Items** — total items, active count, count with images (link to items list)
 
-### C. Latest Purchase Orders
-Columns:
-- Number
-- Date
-- Supplier
-- Status
+### C. Recent activity
+- **Recent receipts** — latest rows with PO number, warehouse, status (link into receipt)
+- **Recent shipments** — latest rows with SO number, warehouse, status (link into shipment)
 
-### D. Latest Sales Orders
-Columns:
-- Number
-- Date
-- Customer
-- Status
+### D. Quick navigation + signals
+- **Quick links** — shortcuts to major modules
+- **Signals** — operational hints (e.g. inactive items, items without images, counts of draft receipts/shipments)
 
-### E. Latest Stock Movements
-Columns:
-- Date/Time
-- Movement Type
-- Item
-- Qty Delta
-- Warehouse
-- Source Document
+## Freshness
 
-### F. Quick Navigation
-Links to:
-- Items
-- Suppliers
-- Customers
-- Warehouses
-- Purchase Orders
-- Receipts
-- Sales Orders
-- Shipments
-- Stock Balances
-- Stock Movements
+Aggregates and recent lists **re-subscribe** when local repositories persist changes (`appReadModelRevision` + `useSyncExternalStore`), so the dashboard is not stuck on first mount while the session is open.
+
+## Older MVP wording (deprecated for this screen)
+
+The following were **design ideas** in the original MVP dashboard spec and are **not** what the current UI renders:
+- simple count cards only for Items/Suppliers/Customers/Warehouses
+- “Latest PO” and “Latest SO” tables as the primary activity widgets
+- a large “latest stock movements” table on the dashboard *(movements remain available via sidebar and movement count card)*
 
 ## Empty dashboard rules
 - summary cards show zero

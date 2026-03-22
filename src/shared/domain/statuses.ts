@@ -1,6 +1,7 @@
 /**
- * Document and movement status types per docs/01_product_core/03_Statuses_and_Rules.md.
- * Internal values are lowercase. MVP only — no Partially Received, Reopened, Reversed, etc.
+ * Document and movement status types. Internal values are lowercase.
+ * Factual statuses include `reversed`; movement types include `*_reversal` for posted-document reversal.
+ * See docs/01_product_core/03_Statuses_and_Rules.md and 08_Current_Product_State.md.
  */
 
 /** Planning documents: Purchase Order, Sales Order. Internal values lowercase. */

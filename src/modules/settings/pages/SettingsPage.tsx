@@ -149,12 +149,8 @@ function getSettingValue(settings: AppSettings, entry: SettingRegistryEntry): un
       return settings.documents.singleDraftReceiptPerPurchaseOrder;
     case "documents.singleDraftShipmentPerSalesOrder":
       return settings.documents.singleDraftShipmentPerSalesOrder;
-    case "inventory.reservationsEnabled":
-      return settings.inventory.reservationsEnabled;
     case "inventory.requireReservationBeforeShipment":
       return settings.inventory.requireReservationBeforeShipment;
-    case "inventory.allocationMode":
-      return settings.inventory.allocationMode;
     case "inventory.releaseReservationsOnSalesOrderCancel":
       return settings.inventory.releaseReservationsOnSalesOrderCancel;
     case "inventory.releaseReservationsOnSalesOrderClose":
@@ -167,8 +163,6 @@ function getSettingValue(settings: AppSettings, entry: SettingRegistryEntry): un
       return settings.commercial.zeroPriceLinesRequireReason;
     case "commercial.partnerTermsOverwrite":
       return settings.commercial.partnerTermsOverwrite;
-    case "dataAudit.auditLogEnabled":
-      return settings.dataAudit.auditLogEnabled;
     case "dataAudit.showAppVersion":
       return settings.dataAudit.showAppVersion;
     default:
@@ -231,9 +225,6 @@ export function SettingsPage() {
         case "documents.singleDraftShipmentPerSalesOrder":
           patch({ documents: { singleDraftShipmentPerSalesOrder: checked } });
           break;
-        case "inventory.reservationsEnabled":
-          patch({ inventory: { reservationsEnabled: checked } });
-          break;
         case "inventory.requireReservationBeforeShipment":
           patch({ inventory: { requireReservationBeforeShipment: checked } });
           break;
@@ -248,9 +239,6 @@ export function SettingsPage() {
           break;
         case "commercial.zeroPriceLinesRequireReason":
           patch({ commercial: { zeroPriceLinesRequireReason: checked } });
-          break;
-        case "dataAudit.auditLogEnabled":
-          patch({ dataAudit: { auditLogEnabled: checked } });
           break;
         case "dataAudit.showAppVersion":
           patch({ dataAudit: { showAppVersion: checked } });
@@ -437,10 +425,7 @@ export function SettingsPage() {
                             label: t(`settings.options.${i18nKey}.${o.value}`),
                           }))}
                           placeholder={t("common.select")}
-                          disabled={
-                            entry.readiness === "informational" ||
-                            (entry.id === "inventory.allocationMode" && entry.options.length <= 1)
-                          }
+                          disabled={entry.readiness === "informational"}
                           aria-label={entryLabel}
                           className="w-[min(100%,280px)]"
                         />

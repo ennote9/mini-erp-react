@@ -196,15 +196,15 @@ export const ruMessages: MessageTree = {
       },
       general: {
         title: "Общие",
-        description: "Оформление, форматы и горячие клавиши.",
+        description: "Язык, тема, горячие клавиши и форматы (часть форматов пока только сохраняется).",
       },
       documents: {
         title: "Документы",
-        description: "Плановые и фактические документы.",
+        description: "Правила плановых и фактических документов, причины и видимость.",
       },
       inventory: {
         title: "Запасы",
-        description: "Резервирование и распределение.",
+        description: "Резервы, требования к отгрузке и очистка при изменении заказа клиента.",
       },
       commercial: {
         title: "Коммерция",
@@ -212,7 +212,7 @@ export const ruMessages: MessageTree = {
       },
       dataAudit: {
         title: "Данные и аудит",
-        description: "Диагностика, журнал и инструменты данных.",
+        description: "Диагностика и что реально хранится на устройстве.",
       },
     },
     entries: ruSettingsEntriesFull,

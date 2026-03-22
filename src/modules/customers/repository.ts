@@ -5,6 +5,7 @@ import {
   writeMasterDataPayload,
 } from "@/shared/masterDataPersistence";
 import { registerPersistenceFlush } from "@/shared/persistenceCoordinator";
+import { bumpAppReadModelRevision } from "@/shared/appReadModelRevision";
 
 export type CreateCustomerInput = Omit<Customer, "id">;
 export type UpdateCustomerPatch = Partial<Omit<Customer, "id">>;
@@ -70,6 +71,7 @@ function buildSeedCustomers(): Customer[] {
 }
 
 function schedulePersist(): void {
+  bumpAppReadModelRevision();
   persistDepth++;
   persistChain = persistChain
     .then(async () => {

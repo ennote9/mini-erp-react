@@ -195,3 +195,36 @@ Not included:
 - packing
 - reverse posting
 - reopen flow
+
+---
+
+## Additions in the current codebase (beyond original MVP text)
+
+### Reversal (posted factual documents)
+
+- **Posted Receipt** or **Posted Shipment** may be **fully reversed once**, with a recorded reason (configurable strictness in Settings).
+- Effect: compensating **stock movements**; factual document becomes **reversed**; linked **Sales Order** returns to **confirmed** after shipment reversal so the flow can be reworked.
+
+### Reservations and allocation (sales side)
+
+- **Stock reservations** are persisted and tied to sales order lines.
+- Users **allocate stock** from the Sales Order (manual allocation). Settings can require each open line to be **fully reserved** before **creating** a new shipment draft.
+- Reservation cleanup hooks exist for cancel/close/reconcile (some behavior marked **partial** in Settings registry — see `08_Current_Product_State.md`).
+
+### Shipment creation and remaining quantity
+
+- New shipment lines are built from **remaining open quantity** on the sales order (not only a 1:1 copy of the original SO lines in all cases). If nothing remains to ship, creation fails.
+
+### Logistics and customer documents
+
+- **Carrier** on SO defaults from **customer preferred carrier** when SO carrier is empty.
+- **Create shipment** copies SO carrier and delivery fields to the draft shipment; tracking is edited on the shipment.
+- **Preliminary customer document** — from **Sales Order** (print/PDF route).
+- **Final customer document** — from **Shipment**, only when shipment is **posted**.
+- **Delivery sheet** — internal printable/PDF from **Shipment** (any existing shipment record for handoff).
+
+### Commercial fields on planning documents
+
+- Purchase and sales order lines carry **unit price**; money rounding decimals are configurable. Zero-price lines may require a reason depending on settings.
+
+For routes and UI entry points, see `02_screens_and_navigation/10_Screen_to_Screen_Navigation_Map_v1.md` (updated) and `src/app/routes.tsx`.

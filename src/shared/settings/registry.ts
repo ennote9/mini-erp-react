@@ -11,15 +11,15 @@ export const SETTINGS_SECTION_META: Record<
   },
   general: {
     title: "General",
-    description: "Appearance, formats, and keyboard shortcuts.",
+    description: "Language, theme, shortcuts, and format preferences (some formats are save-only for now).",
   },
   documents: {
     title: "Documents",
-    description: "Planning and factual document behavior.",
+    description: "Planning and factual document rules, reasons, and visibility.",
   },
   inventory: {
     title: "Inventory",
-    description: "Stock allocation and reservations.",
+    description: "Reservations, shipment gating, and reservation cleanup on sales order changes.",
   },
   commercial: {
     title: "Commercial",
@@ -27,7 +27,7 @@ export const SETTINGS_SECTION_META: Record<
   },
   dataAudit: {
     title: "Data & audit",
-    description: "Diagnostics, audit trail, and data tools.",
+    description: "Diagnostics and what is (or is not) stored on this device.",
   },
 };
 
@@ -108,7 +108,7 @@ export const SETTINGS_REGISTRY: SettingRegistryEntry[] = [
     valueType: "boolean",
     label: "Block Confirm when planning has errors",
     description:
-      "Purchase order and sales order: disable Confirm while the document health strip shows blocking errors. Turning off allows Confirm from the header; the server still validates before confirming.",
+      "Purchase order and sales order: disable Confirm while the on-page health strip shows blocking errors. Turning off allows Confirm even when those errors show; the confirm action still runs its own validation (not identical to every health check).",
     readiness: "partial",
     minWorkspaceMode: "standard",
   },
@@ -118,7 +118,7 @@ export const SETTINGS_REGISTRY: SettingRegistryEntry[] = [
     valueType: "boolean",
     label: "Block Post when receipt/shipment has errors",
     description:
-      "Receipt and shipment: disable Post while full validation reports blocking errors (same checks as posting). Turning off allows attempting Post from the header; the server still rejects invalid posts.",
+      "Receipt and shipment: disable Post while validation reports blocking errors (same rules as posting). Turning off allows attempting Post from the header; invalid posts are still rejected.",
     readiness: "active",
     minWorkspaceMode: "standard",
   },
@@ -192,11 +192,12 @@ export const SETTINGS_REGISTRY: SettingRegistryEntry[] = [
   },
 
   {
-    id: "inventory.reservationsEnabled",
+    id: "inventory.stockReservationsInfo",
     section: "inventory",
-    valueType: "boolean",
-    label: "Reservations enabled",
-    description: "Stock reservations are part of the sales flow in this version; the feature cannot be turned off.",
+    valueType: "readonly",
+    label: "Stock reservations",
+    description:
+      "Reservations are always on: they tie soft holds to sales order lines and affect availability. There is no off switch in this version.",
     readiness: "informational",
     minWorkspaceMode: "advanced",
   },
@@ -211,13 +212,13 @@ export const SETTINGS_REGISTRY: SettingRegistryEntry[] = [
     minWorkspaceMode: "advanced",
   },
   {
-    id: "inventory.allocationMode",
+    id: "inventory.allocationManualInfo",
     section: "inventory",
-    valueType: "enum",
-    label: "Allocation mode",
-    description: "Stock is allocated manually via Allocate stock on the sales order. No automatic allocation mode exists yet.",
+    valueType: "readonly",
+    label: "Allocation",
+    description:
+      "Stock is allocated only from the sales order (Allocate stock). There is no automatic allocation mode yet.",
     readiness: "informational",
-    options: [{ value: "manual", label: "Manual" }],
     minWorkspaceMode: "advanced",
   },
   {
@@ -235,8 +236,8 @@ export const SETTINGS_REGISTRY: SettingRegistryEntry[] = [
     valueType: "boolean",
     label: "Release reservations when sales order closes",
     description:
-      "When on, posting a shipment that fully fulfills the order triggers reservation cleanup for the closed sales order. When off, that explicit cleanup is skipped (stale reservations are possible until another reconcile runs).",
-    readiness: "partial",
+      "When on, posting a shipment that fully fulfills the order and closes the sales order runs reservation cleanup for that order. When off, that cleanup is skipped (stale reservations may remain until another reconcile).",
+    readiness: "active",
     minWorkspaceMode: "advanced",
   },
   {
@@ -245,8 +246,8 @@ export const SETTINGS_REGISTRY: SettingRegistryEntry[] = [
     valueType: "boolean",
     label: "Reconcile reservations on save and confirm",
     description:
-      "When on, saving a draft sales order or confirming it runs reservation reconcile (trim stale or oversized reservations). Shipment validation and allocate-stock still reconcile regardless.",
-    readiness: "partial",
+      "When on, saving a draft sales order or confirming it reconciles reservations (drops stale or oversized holds). Allocate stock and shipment checks always reconcile as well.",
+    readiness: "active",
     minWorkspaceMode: "advanced",
   },
 
@@ -274,7 +275,8 @@ export const SETTINGS_REGISTRY: SettingRegistryEntry[] = [
     section: "commercial",
     valueType: "enum",
     label: "Partner terms vs document terms",
-    description: "Preference for future behavior. Document terms on the PO/SO remain authoritative today.",
+    description:
+      "Saved for a future rule. Today, payment terms and prices on the purchase order and sales order always win; changing this option does not change posting or validation.",
     readiness: "storedOnly",
     options: [
       { value: "document_wins", label: "Document terms win" },
@@ -303,11 +305,12 @@ export const SETTINGS_REGISTRY: SettingRegistryEntry[] = [
   },
 
   {
-    id: "dataAudit.auditLogEnabled",
+    id: "dataAudit.documentEventsInfo",
     section: "dataAudit",
-    valueType: "boolean",
-    label: "Audit log",
-    description: "Document events are always recorded in this version. Disabling the audit log is not available yet.",
+    valueType: "readonly",
+    label: "Document events",
+    description:
+      "Purchase order, sales order, receipt, and shipment actions are written to the local event log. This cannot be turned off in this version.",
     readiness: "informational",
     minWorkspaceMode: "standard",
   },

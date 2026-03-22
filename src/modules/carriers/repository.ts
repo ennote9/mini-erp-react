@@ -6,6 +6,7 @@ import {
   writeMasterDataPayload,
 } from "@/shared/masterDataPersistence";
 import { registerPersistenceFlush } from "@/shared/persistenceCoordinator";
+import { bumpAppReadModelRevision } from "@/shared/appReadModelRevision";
 
 export type CreateCarrierInput = Omit<Carrier, "id">;
 export type UpdateCarrierPatch = Partial<Omit<Carrier, "id">>;
@@ -74,6 +75,7 @@ function buildSeedCarriers(): Carrier[] {
 }
 
 function schedulePersist(): void {
+  bumpAppReadModelRevision();
   persistDepth++;
   persistChain = persistChain
     .then(async () => {

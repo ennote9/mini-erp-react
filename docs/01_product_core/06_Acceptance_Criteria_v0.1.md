@@ -4,6 +4,8 @@
     - Status: Baseline
     - Date: 2026-03-09
 
+    > **Historical.** The app may satisfy additional behaviors today; see **`08_Current_Product_State.md`** for the live product description.
+
     ## Purpose
 
 This document defines the acceptance gates for MVP v0.1.

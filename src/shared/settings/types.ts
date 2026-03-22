@@ -86,7 +86,7 @@ export type AppSettings = {
     singleDraftShipmentPerSalesOrder: boolean;
   };
   inventory: {
-    /** Stock reservations exist in the model; disabling the feature is not supported. */
+    /** Legacy field; always treated as true (normalized on load and patch). */
     reservationsEnabled: boolean;
     requireReservationBeforeShipment: boolean;
     allocationMode: AllocationModeId;
@@ -107,6 +107,7 @@ export type AppSettings = {
     partnerTermsOverwrite: PartnerTermsOverwriteId;
   };
   dataAudit: {
+    /** Legacy field; always treated as true (normalized on load and patch). */
     auditLogEnabled: boolean;
     showAppVersion: boolean;
   };

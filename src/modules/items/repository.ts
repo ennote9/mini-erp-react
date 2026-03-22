@@ -6,7 +6,7 @@ import {
   getItemsPersistenceDiagnostics,
 } from "./lib/itemsPersistence";
 import { registerPersistenceFlush } from "../../shared/persistenceCoordinator";
-import { bumpInventoryDisplayRevision } from "../../shared/inventoryDisplayRevision";
+import { bumpAppReadModelRevision } from "../../shared/appReadModelRevision";
 
 export type CreateItemInput = Omit<Item, "id" | "images"> & { images?: ItemImage[] };
 export type UpdateItemPatch = Partial<Omit<Item, "id">>;
@@ -44,7 +44,7 @@ export async function flushPendingItemsPersist(): Promise<void> {
 }
 
 function schedulePersist(): void {
-  bumpInventoryDisplayRevision();
+  bumpAppReadModelRevision();
   persistDepth++;
   persistChain = persistChain
     .then(async () => {

@@ -5,6 +5,7 @@ import {
   writeMasterDataPayload,
 } from "@/shared/masterDataPersistence";
 import { registerPersistenceFlush } from "@/shared/persistenceCoordinator";
+import { bumpAppReadModelRevision } from "@/shared/appReadModelRevision";
 
 export type CreateSupplierInput = Omit<Supplier, "id">;
 export type UpdateSupplierPatch = Partial<Omit<Supplier, "id">>;
@@ -58,6 +59,7 @@ function buildSeedSuppliers(): Supplier[] {
 }
 
 function schedulePersist(): void {
+  bumpAppReadModelRevision();
   persistDepth++;
   persistChain = persistChain
     .then(async () => {

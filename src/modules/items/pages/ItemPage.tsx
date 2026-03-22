@@ -39,9 +39,9 @@ import {
 import { Save, X } from "lucide-react";
 import { useTranslation } from "@/shared/i18n/context";
 import {
-  getInventoryDisplayRevision,
-  subscribeInventoryDisplayRevision,
-} from "@/shared/inventoryDisplayRevision";
+  getAppReadModelRevision,
+  subscribeAppReadModelRevision,
+} from "@/shared/appReadModelRevision";
 
 const DATE_TIME_FORMAT: Intl.DateTimeFormatOptions = {
   day: "2-digit",
@@ -237,15 +237,15 @@ export function ItemPage() {
 
   const itemRecordId = !isNew && id ? id : null;
 
-  const inventoryDisplayRevision = useSyncExternalStore(
-    subscribeInventoryDisplayRevision,
-    getInventoryDisplayRevision,
-    getInventoryDisplayRevision,
+  const appReadModelRevision = useSyncExternalStore(
+    subscribeAppReadModelRevision,
+    getAppReadModelRevision,
+    getAppReadModelRevision,
   );
 
   const itemBalanceRows = useMemo(
     () => (itemRecordId ? buildItemPageBalanceRows(itemRecordId) : []),
-    [itemRecordId, inventoryDisplayRevision],
+    [itemRecordId, appReadModelRevision],
   );
 
   const itemBalanceSummary = useMemo(
@@ -258,7 +258,7 @@ export function ItemPage() {
       itemRecordId
         ? buildRecentItemPageMovements(itemRecordId, t, ITEM_RECENT_MOVEMENTS_LIMIT)
         : [],
-    [itemRecordId, t, locale, inventoryDisplayRevision],
+    [itemRecordId, t, locale, appReadModelRevision],
   );
 
   const movementTypeLabel = useCallback(

@@ -6,6 +6,8 @@
 
     ## Purpose
 
+> **Historical scope freeze (MVP v0.1).** Implementation has **exceeded** this freeze in several areas (see **`08_Current_Product_State.md`**). This file remains as a record of the original boundaries.
+
 This document prevents uncontrolled scope expansion during implementation.
 
 ## MVP v0.1 includes

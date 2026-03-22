@@ -249,3 +249,37 @@ The MVP domain model does **not** include:
 - adjustments
 - approval objects
 - audit subsystem objects
+
+---
+
+## Appendix: domain extensions in the current codebase
+
+The following **exist in code today** even though they were not in the original MVP domain summary above. See **`08_Current_Product_State.md`** for workflow context.
+
+### Master data extensions
+
+- **Brand**, **Category** — item classification; items reference optional `brandId` / `categoryId`.
+- **Carrier** — logistics partner master data (type, contact, optional tracking URL template, payment terms, etc.).
+- **Customer** — extended with `preferredCarrierId`; default delivery fields (`defaultRecipientName`, `defaultRecipientPhone`, `defaultDeliveryAddress`, `defaultDeliveryComment`); extended address/tax/contact fields.
+- **Supplier** — extended commercial/contact/address fields as implemented on the Supplier page.
+- **Item** — optional images; purchase/sale prices; barcode; brand/category links.
+
+### Planning document extensions
+
+- **Purchase Order / Sales Order** — unit prices per line; commercial money rounding; zero-price reason codes where enforced; payment terms and derived due date on SO.
+- **Sales Order** — optional `carrierId`; optional delivery fields (`recipientName`, `recipientPhone`, `deliveryAddress`, `deliveryComment`) aligned with shipment logistics.
+
+### Factual document extensions
+
+- **Receipt / Shipment** — factual status may include **`reversed`** (after a single full reversal from **posted**). Reversal creates compensating **stock movements** (`receipt_reversal`, `shipment_reversal`).
+- **Shipment** — optional `carrierId`, `trackingNumber`, same delivery metadata fields as copied from the sales order at creation time.
+
+### Inventory subsystem (not in original MVP list)
+
+- **Stock reservation** — persisted records tied to sales flow; statuses such as active / consumed / released; used for allocation views, shipment gating (settings), and operational balance metrics.
+
+### Printable views (not separate persisted business entities)
+
+- **Sales order customer document** — generated from planning data (preliminary).
+- **Shipment customer document** — generated from posted shipment (final).
+- **Shipment delivery sheet** — operational printable from shipment record.

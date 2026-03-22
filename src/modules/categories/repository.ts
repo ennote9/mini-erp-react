@@ -5,6 +5,7 @@ import {
   writeMasterDataPayload,
 } from "@/shared/masterDataPersistence";
 import { registerPersistenceFlush } from "@/shared/persistenceCoordinator";
+import { bumpAppReadModelRevision } from "@/shared/appReadModelRevision";
 
 export type CreateCategoryInput = Omit<Category, "id">;
 export type UpdateCategoryPatch = Partial<Omit<Category, "id">>;
@@ -46,6 +47,7 @@ function buildSeedCategories(): Category[] {
 }
 
 function schedulePersist(): void {
+  bumpAppReadModelRevision();
   persistDepth++;
   persistChain = persistChain
     .then(async () => {

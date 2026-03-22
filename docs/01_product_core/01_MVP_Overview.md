@@ -6,6 +6,8 @@
 
     ## Purpose
 
+> **Historical (MVP v0.1 baseline).** The live app has grown beyond this page (reservations, reversal, carriers, printable docs, settings, i18n, etc.). For **current behavior**, read **`08_Current_Product_State.md`** and the code.
+
 This system is a **Mini ERP for a small business**. The first version is built to support a minimal but complete inventory and document flow:
 
 - create master data
@@ -79,6 +81,8 @@ The first version must make the following scenario fully workable:
 
 ## Out of scope for v0.1
 
+> Many items below were **out of scope for the original MVP freeze** but are **present in the current codebase** (e.g. reservations, reversal, commercial rounding). Treat this list as **historical intent**, not a description of today’s app.
+
 - bin/location management
 - reservation
 - allocation
@@ -102,10 +106,10 @@ The first version must make the following scenario fully workable:
 
 - One operational warehouse scenario in MVP logic
 - Warehouse is still modeled as an entity
-- No reservation logic
+- No reservation logic *(historical — reservations exist in current code)*
 - No partial receipt
 - No partial shipment
-- Posted documents are not reversible in MVP
+- Posted documents are not reversible in MVP *(historical — full reversal from posted exists in current code)*
 - Stock balance is not edited manually
 
 ## Success definition

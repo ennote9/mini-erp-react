@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, useSyncExternalStore } from "react";
 import { cn } from "@/lib/utils";
 import { useTranslation } from "@/shared/i18n";
 import { useSettings } from "@/shared/settings";
@@ -13,6 +13,10 @@ import {
   getRecentShipments,
   getDashboardSignals,
 } from "../dashboardStats";
+import {
+  getAppReadModelRevision,
+  subscribeAppReadModelRevision,
+} from "@/shared/appReadModelRevision";
 import {
   DocumentOverviewCard,
   InventoryOverviewCard,
@@ -31,14 +35,20 @@ export function DashboardPage() {
     "dashboardStockMovementsCard",
   );
 
-  const po = useMemo(() => getPurchaseOrderBreakdown(), []);
-  const so = useMemo(() => getSalesOrderBreakdown(), []);
-  const receipts = useMemo(() => getReceiptBreakdown(), []);
-  const shipments = useMemo(() => getShipmentBreakdown(), []);
-  const inventory = useMemo(() => getInventoryOverview(), []);
-  const recentReceipts = useMemo(() => getRecentReceipts(8), []);
-  const recentShipments = useMemo(() => getRecentShipments(8), []);
-  const signals = useMemo(() => getDashboardSignals(), []);
+  const appReadModelRevision = useSyncExternalStore(
+    subscribeAppReadModelRevision,
+    getAppReadModelRevision,
+    getAppReadModelRevision,
+  );
+
+  const po = useMemo(() => getPurchaseOrderBreakdown(), [appReadModelRevision]);
+  const so = useMemo(() => getSalesOrderBreakdown(), [appReadModelRevision]);
+  const receipts = useMemo(() => getReceiptBreakdown(), [appReadModelRevision]);
+  const shipments = useMemo(() => getShipmentBreakdown(), [appReadModelRevision]);
+  const inventory = useMemo(() => getInventoryOverview(), [appReadModelRevision]);
+  const recentReceipts = useMemo(() => getRecentReceipts(8), [appReadModelRevision]);
+  const recentShipments = useMemo(() => getRecentShipments(8), [appReadModelRevision]);
+  const signals = useMemo(() => getDashboardSignals(), [appReadModelRevision]);
 
   return (
     <div className="dashboard-page mx-auto max-w-[1600px] space-y-6 p-4 md:p-5" data-module="dashboard">

@@ -131,15 +131,15 @@ Meaning:
 - factual receipt completed and recorded in inventory
 
 Allowed:
-- view only
+- view
+- **reverse once** (full reversal — reason recorded; creates compensating movements)
 
 Not allowed:
-- edit
-- reverse posting
+- edit content
 - post again
 
 Stock impact:
-- yes, positive stock movements and balance update
+- yes, positive stock movements and balance update; reversal applies the inverse via `receipt_reversal` movements
 
 ### Cancelled
 Meaning:
@@ -155,14 +155,31 @@ Not allowed:
 Stock impact:
 - none
 
+### Reversed
+Meaning:
+- posted receipt was **fully reversed** once; document remains for audit
+
+Allowed:
+- view only
+
+Not allowed:
+- edit
+- post
+- reverse again
+
+Stock impact:
+- compensating movements restored available stock per implemented rules
+
 ### Allowed transitions
 - Draft -> Posted
 - Draft -> Cancelled
+- Posted -> Reversed (single reversal)
 
 ### Forbidden transitions
-- Posted -> any other status
-- Cancelled -> any other status
-- Posted -> Cancelled in MVP
+- Draft -> Reversed
+- Cancelled -> any non-terminal transition except view
+- Reversed -> any other status
+- Posted -> Cancelled *(use reversal, not cancel)*
 
 ## Sales Order
 
@@ -266,15 +283,15 @@ Meaning:
 - factual shipment completed and recorded in inventory
 
 Allowed:
-- view only
+- view
+- **reverse once** (full reversal — reason recorded; compensating movements; linked sales order returns to **confirmed** for rework per code)
 
 Not allowed:
-- edit
-- reverse posting
+- edit content
 - post again
 
 Stock impact:
-- yes, negative stock movements and balance update
+- yes, negative stock movements and balance update; reversal applies compensating `shipment_reversal` movements
 
 ### Cancelled
 Meaning:
@@ -290,14 +307,31 @@ Not allowed:
 Stock impact:
 - none
 
+### Reversed
+Meaning:
+- posted shipment was **fully reversed** once
+
+Allowed:
+- view only
+
+Not allowed:
+- edit
+- post
+- reverse again
+
+Stock impact:
+- compensating movements per reversal implementation; reservations reconciled
+
 ### Allowed transitions
 - Draft -> Posted
 - Draft -> Cancelled
+- Posted -> Reversed (single reversal)
 
 ### Forbidden transitions
-- Posted -> any other status
-- Cancelled -> any other status
-- Posted -> Cancelled in MVP
+- Draft -> Reversed
+- Cancelled -> active editing
+- Reversed -> any other status
+- Posted -> Cancelled *(use reversal, not cancel)*
 
 ## Global editing rules
 
@@ -312,8 +346,9 @@ Not editable:
 - Confirmed Sales Order
 - Closed Purchase Order
 - Closed Sales Order
-- Posted Receipt
-- Posted Shipment
+- Posted Receipt *(content locked; reversal is a separate action)*
+- Posted Shipment *(content locked; reversal is a separate action)*
+- Reversed Receipt / Shipment
 - Cancelled documents
 
 ## Global accounting rules
@@ -323,6 +358,7 @@ Not editable:
 3. Posted Receipt increases stock.
 4. Posted Shipment decreases stock.
 5. Closed is a completion state for planning documents, not a posting state.
+6. Full **reversal** from posted creates compensating movements and transitions factual document to **reversed** (single reversal per document in current rules).
 
 ## Source-document rules
 
@@ -336,16 +372,16 @@ Shipment may be created only if:
 - source Sales Order is Confirmed
 - no Posted Shipment already exists for that order
 
-## Explicitly excluded status concepts
+## Explicitly excluded or partial status concepts
 
-Not included in MVP:
-- Partially Received
-- Partially Shipped
-- Reopened
-- Reversed
+Still **not** modeled as first-class document statuses (examples):
+- Partially Received / Partially Shipped (as statuses)
+- Reopened planning documents
 - On Hold
-- Allocated
-- Picked
-- Packed
-- Approval statuses
-- Payment statuses
+- Picked / Packed / wave picking
+- Approval chains
+- Payment-settled statuses
+
+**Implemented today (was “excluded” in original MVP text):**
+- **Reversed** — terminal factual status after a single full reversal from **posted**.
+- **Reservations** — separate persisted records (not the same as a document status); see `08_Current_Product_State.md`.

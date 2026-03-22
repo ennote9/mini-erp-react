@@ -1,24 +1,9 @@
 /**
- * Bumped when persisted inventory-related stores change so UI (e.g. ItemPage
- * stock blocks) can resubscribe without polling. Synchronous on mutation.
+ * @deprecated Use `@/shared/appReadModelRevision` — same signal, clearer name.
+ * Compatibility re-exports only; prefer `subscribeAppReadModelRevision` / `getAppReadModelRevision` in new code.
  */
-let generation = 0;
-const listeners = new Set<() => void>();
-
-export function bumpInventoryDisplayRevision(): void {
-  generation += 1;
-  for (const l of listeners) {
-    l();
-  }
-}
-
-export function subscribeInventoryDisplayRevision(onStoreChange: () => void): () => void {
-  listeners.add(onStoreChange);
-  return () => {
-    listeners.delete(onStoreChange);
-  };
-}
-
-export function getInventoryDisplayRevision(): number {
-  return generation;
-}
+export {
+  bumpAppReadModelRevision as bumpInventoryDisplayRevision,
+  subscribeAppReadModelRevision as subscribeInventoryDisplayRevision,
+  getAppReadModelRevision as getInventoryDisplayRevision,
+} from "./appReadModelRevision";

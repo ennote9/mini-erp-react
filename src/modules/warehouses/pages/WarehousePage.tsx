@@ -1,5 +1,5 @@
 import { useParams, useNavigate } from "react-router-dom";
-import { useMemo, useState, useEffect } from "react";
+import { useMemo, useState, useEffect, useSyncExternalStore } from "react";
 import { warehouseRepository } from "../repository";
 import { saveWarehouse } from "../service";
 import { receiptRepository } from "../../receipts/repository";
@@ -35,6 +35,10 @@ import { getWarehouseFormHealth } from "../../../shared/masterDataHealth";
 import { DocumentIssueStrip } from "../../../shared/ui/feedback/DocumentIssueStrip";
 import { Save, X } from "lucide-react";
 import { useTranslation } from "@/shared/i18n/context";
+import {
+  getAppReadModelRevision,
+  subscribeAppReadModelRevision,
+} from "@/shared/appReadModelRevision";
 
 type FormState = {
   code: string;
@@ -74,6 +78,12 @@ export function WarehousePage() {
     [id, isNew],
   );
 
+  const appReadModelRevision = useSyncExternalStore(
+    subscribeAppReadModelRevision,
+    getAppReadModelRevision,
+    getAppReadModelRevision,
+  );
+
   const relatedReceiptRows = useMemo(() => {
     if (!warehouse?.id) return [];
     const rows = receiptRepository
@@ -94,7 +104,7 @@ export function WarehousePage() {
         lineCount: receiptRepository.listLines(r.id).length,
       };
     });
-  }, [warehouse?.id]);
+  }, [warehouse?.id, appReadModelRevision]);
 
   const relatedReceiptSummary = useMemo(() => {
     const rows = relatedReceiptRows;
@@ -126,7 +136,7 @@ export function WarehousePage() {
         lineCount: shipmentRepository.listLines(s.id).length,
       };
     });
-  }, [warehouse?.id]);
+  }, [warehouse?.id, appReadModelRevision]);
 
   const relatedShipmentSummary = useMemo(() => {
     const rows = relatedShipmentRows;
@@ -144,7 +154,7 @@ export function WarehousePage() {
     const balanceRows = stockBalanceRepository.list().filter((b) => b.warehouseId === wid).length;
     const movementRows = stockMovementRepository.list().filter((m) => m.warehouseId === wid).length;
     return { balanceRows, movementRows };
-  }, [warehouse?.id]);
+  }, [warehouse?.id, appReadModelRevision]);
 
   const [form, setForm] = useState<FormState>(defaultForm);
   const [actionIssues, setActionIssues] = useState<Issue[]>([]);

@@ -1,5 +1,5 @@
 import { useParams, useNavigate } from "react-router-dom";
-import { useMemo, useState, useEffect } from "react";
+import { useMemo, useState, useEffect, useSyncExternalStore } from "react";
 import { customerRepository } from "../repository";
 import { saveCustomer } from "../service";
 import { salesOrderRepository } from "../../sales-orders/repository";
@@ -34,6 +34,10 @@ import { DocumentIssueStrip } from "../../../shared/ui/feedback/DocumentIssueStr
 import { Save, X } from "lucide-react";
 import { useTranslation } from "@/shared/i18n/context";
 import { cn } from "@/lib/utils";
+import {
+  getAppReadModelRevision,
+  subscribeAppReadModelRevision,
+} from "@/shared/appReadModelRevision";
 
 type FormState = {
   code: string;
@@ -89,6 +93,12 @@ export function CustomerPage() {
     [id, isNew],
   );
 
+  const appReadModelRevision = useSyncExternalStore(
+    subscribeAppReadModelRevision,
+    getAppReadModelRevision,
+    getAppReadModelRevision,
+  );
+
   const relatedSalesOrderRows = useMemo(() => {
     if (!customer?.id) return [];
     const sos = salesOrderRepository
@@ -113,7 +123,7 @@ export function CustomerPage() {
         totalAmount,
       };
     });
-  }, [customer?.id]);
+  }, [customer?.id, appReadModelRevision]);
 
   const relatedSoSummary = useMemo(() => {
     const rows = relatedSalesOrderRows;

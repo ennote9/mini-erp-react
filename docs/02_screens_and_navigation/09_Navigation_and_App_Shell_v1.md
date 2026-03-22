@@ -42,9 +42,12 @@ Sidebar must support:
 
 ### Master Data
 - Items
+- Brands *(hidden in Lite workspace by default)*
+- Categories *(hidden in Lite workspace by default)*
 - Suppliers
 - Customers
 - Warehouses
+- Carriers
 
 ### Purchasing
 - Purchase Orders
@@ -122,4 +125,7 @@ Not included:
 - recent pages
 - global command palette
 - universal cross-module search
-- admin/settings mega sections
+
+Implemented beyond original MVP shell notes:
+- **Settings** area (single page with sections, not a “mega menu”)
+- **Workspace mode** shown in sidebar header (Lite / Standard / Advanced)

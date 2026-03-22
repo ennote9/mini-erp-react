@@ -38,15 +38,15 @@ export const settingsEn = {
     },
     general: {
       title: "General",
-      description: "Appearance, formats, and keyboard shortcuts.",
+      description: "Language, theme, shortcuts, and format preferences (some formats are save-only for now).",
     },
     documents: {
       title: "Documents",
-      description: "Planning and factual document behavior.",
+      description: "Planning and factual document rules, reasons, and visibility.",
     },
     inventory: {
       title: "Inventory",
-      description: "Stock allocation and reservations.",
+      description: "Reservations, shipment gating, and reservation cleanup on sales order changes.",
     },
     commercial: {
       title: "Commercial",
@@ -54,7 +54,7 @@ export const settingsEn = {
     },
     dataAudit: {
       title: "Data & audit",
-      description: "Diagnostics, audit trail, and data tools.",
+      description: "Diagnostics and what is (or is not) stored on this device.",
     },
   },
   entries: {
@@ -81,12 +81,12 @@ export const settingsEn = {
     documents__blockConfirmWhenPlanningHasBlockingErrors: {
       label: "Block Confirm when planning has errors",
       description:
-        "Purchase order and sales order: disable Confirm while the document health strip shows blocking errors. Turning off allows Confirm from the header; the server still validates before confirming.",
+        "Purchase order and sales order: disable Confirm while the on-page health strip shows blocking errors. Turning off allows Confirm even when those errors show; the confirm action still runs its own validation (not identical to every health check).",
     },
     documents__blockPostWhenFactualHasBlockingErrors: {
       label: "Block Post when receipt/shipment has errors",
       description:
-        "Receipt and shipment: disable Post while full validation reports blocking errors (same checks as posting). Turning off allows attempting Post from the header; the server still rejects invalid posts.",
+        "Receipt and shipment: disable Post while validation reports blocking errors (same rules as posting). Turning off allows attempting Post from the header; invalid posts are still rejected.",
     },
     documents__showDocumentEventLog: {
       label: "Show event log on document pages",
@@ -123,20 +123,20 @@ export const settingsEn = {
       description:
         "Posted receipts and shipments may be fully reversed once (reason recorded); draft or cancelled documents cannot be reversed. Not configurable in this version.",
     },
-    inventory__reservationsEnabled: {
-      label: "Reservations enabled",
+    inventory__stockReservationsInfo: {
+      label: "Stock reservations",
       description:
-        "Stock reservations are part of the sales flow in this version; the feature cannot be turned off.",
+        "Reservations are always on: they tie soft holds to sales order lines and affect availability. There is no off switch in this version.",
     },
     inventory__requireReservationBeforeShipment: {
       label: "Require reservation before new shipment",
       description:
         "When on, each open line must be fully reserved before creating a shipment draft. Uses the sales order warehouse.",
     },
-    inventory__allocationMode: {
-      label: "Allocation mode",
+    inventory__allocationManualInfo: {
+      label: "Allocation",
       description:
-        "Stock is allocated manually via Allocate stock on the sales order. No automatic allocation mode exists yet.",
+        "Stock is allocated only from the sales order (Allocate stock). There is no automatic allocation mode yet.",
     },
     inventory__releaseReservationsOnSalesOrderCancel: {
       label: "Release reservations when sales order is cancelled",
@@ -146,12 +146,12 @@ export const settingsEn = {
     inventory__releaseReservationsOnSalesOrderClose: {
       label: "Release reservations when sales order closes",
       description:
-        "When on, posting a shipment that fully fulfills the order triggers reservation cleanup for the closed sales order. When off, that explicit cleanup is skipped (stale reservations are possible until another reconcile runs).",
+        "When on, posting a shipment that fully fulfills the order and closes the sales order runs reservation cleanup for that order. When off, that cleanup is skipped (stale reservations may remain until another reconcile).",
     },
     inventory__reconcileReservationsOnSalesOrderSaveConfirm: {
       label: "Reconcile reservations on save and confirm",
       description:
-        "When on, saving a draft sales order or confirming it runs reservation reconcile (trim stale or oversized reservations). Shipment validation and allocate-stock still reconcile regardless.",
+        "When on, saving a draft sales order or confirming it reconciles reservations (drops stale or oversized holds). Allocate stock and shipment checks always reconcile as well.",
     },
     commercial__moneyDecimalPlaces: {
       label: "Money rounding (decimals)",
@@ -164,7 +164,8 @@ export const settingsEn = {
     },
     commercial__partnerTermsOverwrite: {
       label: "Partner terms vs document terms",
-      description: "Preference for future behavior. Document terms on the PO/SO remain authoritative today.",
+      description:
+        "Saved for a future rule. Today, payment terms and prices on the purchase order and sales order always win; changing this option does not change posting or validation.",
     },
     commercial__dueDateFromTermsInfo: {
       label: "Due date from document date + payment terms",
@@ -176,10 +177,10 @@ export const settingsEn = {
       description:
         "Draft purchase and sales orders allow entering and editing unit prices per line; posted factual documents follow their own rules.",
     },
-    dataAudit__auditLogEnabled: {
-      label: "Audit log",
+    dataAudit__documentEventsInfo: {
+      label: "Document events",
       description:
-        "Document events are always recorded in this version. Disabling the audit log is not available yet.",
+        "Purchase order, sales order, receipt, and shipment actions are written to the local event log. This cannot be turned off in this version.",
     },
     dataAudit__showAppVersion: {
       label: "Show build info on this page",
@@ -207,7 +208,6 @@ export const settingsEn = {
       commaDot: "1,234.56 (comma + dot)",
       dotComma: "1.234,56 (dot + comma)",
     },
-    inventory__allocationMode: { manual: "Manual" },
     commercial__partnerTermsOverwrite: {
       document_wins: "Document terms win",
       master_wins: "Partner master data wins",

@@ -6,6 +6,7 @@ import {
   writeDocumentPayload,
 } from "../../shared/documentPersistence";
 import { registerPersistenceFlush } from "../../shared/persistenceCoordinator";
+import { bumpAppReadModelRevision } from "../../shared/appReadModelRevision";
 import {
   isCancelDocumentReasonCode,
   isReversalDocumentReasonCode,
@@ -144,6 +145,7 @@ export async function flushPendingReceiptPersist(): Promise<void> {
 }
 
 function schedulePersist(): void {
+  bumpAppReadModelRevision();
   persistDepth++;
   persistChain = persistChain
     .then(async () => {

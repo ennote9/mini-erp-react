@@ -5,6 +5,7 @@ import {
   writeMasterDataPayload,
 } from "@/shared/masterDataPersistence";
 import { registerPersistenceFlush } from "@/shared/persistenceCoordinator";
+import { bumpAppReadModelRevision } from "@/shared/appReadModelRevision";
 
 export type CreateWarehouseInput = Omit<Warehouse, "id">;
 export type UpdateWarehousePatch = Partial<Omit<Warehouse, "id">>;
@@ -52,6 +53,7 @@ function buildSeedWarehouses(): Warehouse[] {
 }
 
 function schedulePersist(): void {
+  bumpAppReadModelRevision();
   persistDepth++;
   persistChain = persistChain
     .then(async () => {

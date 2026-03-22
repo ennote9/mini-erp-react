@@ -134,7 +134,8 @@ export function normalizeAppSettingsFromUnknown(raw: unknown): AppSettings {
         base.documents.singleDraftShipmentPerSalesOrder,
     },
     inventory: {
-      reservationsEnabled: asBool(i.reservationsEnabled) ?? base.inventory.reservationsEnabled,
+      /** Reservations are always part of the sales flow; persisted false is normalized away. */
+      reservationsEnabled: true,
       requireReservationBeforeShipment:
         asBool(i.requireReservationBeforeShipment) ?? base.inventory.requireReservationBeforeShipment,
       allocationMode: asAllocationModeId(i.allocationMode) ?? base.inventory.allocationMode,
@@ -158,7 +159,8 @@ export function normalizeAppSettingsFromUnknown(raw: unknown): AppSettings {
         asPartnerTermsOverwriteId(c.partnerTermsOverwrite) ?? base.commercial.partnerTermsOverwrite,
     },
     dataAudit: {
-      auditLogEnabled: asBool(a.auditLogEnabled) ?? base.dataAudit.auditLogEnabled,
+      /** Document audit events are always recorded; persisted false is normalized away. */
+      auditLogEnabled: true,
       showAppVersion: asBool(a.showAppVersion) ?? base.dataAudit.showAppVersion,
     },
   };
@@ -183,7 +185,11 @@ export function mergeAppSettingsPatch(
           : current.general.profileOverrides,
     },
     documents: { ...current.documents, ...patch.documents },
-    inventory: { ...current.inventory, ...patch.inventory },
+    inventory: {
+      ...current.inventory,
+      ...patch.inventory,
+      reservationsEnabled: true,
+    },
     commercial: {
       ...current.commercial,
       ...patch.commercial,
@@ -192,7 +198,11 @@ export function mergeAppSettingsPatch(
           ? clampMoneyDecimals(patch.commercial.moneyDecimalPlaces)
           : current.commercial.moneyDecimalPlaces,
     },
-    dataAudit: { ...current.dataAudit, ...patch.dataAudit },
+    dataAudit: {
+      ...current.dataAudit,
+      ...patch.dataAudit,
+      auditLogEnabled: true,
+    },
   };
 }
 

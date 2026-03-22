@@ -32,9 +32,9 @@ import { DocumentIssueStrip } from "../../../shared/ui/feedback/DocumentIssueStr
 import { Save, X } from "lucide-react";
 import { useTranslation } from "@/shared/i18n/context";
 import {
-  getInventoryDisplayRevision,
-  subscribeInventoryDisplayRevision,
-} from "@/shared/inventoryDisplayRevision";
+  getAppReadModelRevision,
+  subscribeAppReadModelRevision,
+} from "@/shared/appReadModelRevision";
 import {
   buildAggregatedWarehouseBalancesForItemIds,
   buildRecentScopedMovementsForItemIds,
@@ -105,10 +105,10 @@ export function CategoryPage() {
     [id, isNew],
   );
 
-  const inventoryDisplayRevision = useSyncExternalStore(
-    subscribeInventoryDisplayRevision,
-    getInventoryDisplayRevision,
-    getInventoryDisplayRevision,
+  const appReadModelRevision = useSyncExternalStore(
+    subscribeAppReadModelRevision,
+    getAppReadModelRevision,
+    getAppReadModelRevision,
   );
 
   const relatedItems = useMemo(() => {
@@ -118,7 +118,7 @@ export function CategoryPage() {
       .filter((item) => item.categoryId === category.id)
       .slice()
       .sort((a, b) => a.code.localeCompare(b.code, undefined, { sensitivity: "base" }));
-  }, [category?.id, inventoryDisplayRevision]);
+  }, [category?.id, appReadModelRevision]);
 
   const relatedSummary = useMemo(() => {
     const total = relatedItems.length;
@@ -133,7 +133,7 @@ export function CategoryPage() {
 
   const categoryBalanceRows = useMemo(
     () => buildAggregatedWarehouseBalancesForItemIds(itemIdsForInventory),
-    [itemIdsForInventory, inventoryDisplayRevision],
+    [itemIdsForInventory, appReadModelRevision],
   );
 
   const categoryBalanceSummary = useMemo(
@@ -148,7 +148,7 @@ export function CategoryPage() {
         t,
         ITEM_RECENT_MOVEMENTS_LIMIT,
       ),
-    [itemIdsForInventory, t, locale, inventoryDisplayRevision],
+    [itemIdsForInventory, t, locale, appReadModelRevision],
   );
 
   const movementTypeLabel = useCallback(
