@@ -49,6 +49,42 @@ export const opsEn = {
       "Rows: {{total}} | Valid: {{valid}} | Inactive: {{inactive}} | Not found: {{notFound}} | Invalid qty: {{badQty}} | Invalid format: {{badFmt}} | Header skipped: {{headerSkipped}} | Duplicates merged: {{merged}} | Extra columns ignored: {{extraCols}}",
     summaryExcel:
       "Rows: {{total}} | Valid: {{valid}} | Inactive: {{inactive}} | Not found: {{notFound}} | Invalid qty: {{badQty}} | Invalid format: {{badFmt}} | Duplicates merged: {{merged}}",
+    lineImport: {
+      dataSheetName: "Lines import",
+      instructionsSheetName: "Instructions",
+      headerItemCode: "Item code",
+      headerBarcode: "Barcode",
+      headerQty: "Qty",
+      headerUnitPrice: "Unit price",
+      instructionTitle: "How to use this template",
+      instruction1: "1) Fill rows on the first worksheet: {{sheetName}}.",
+      instruction2: "2) Use item codes that exist in your catalog.",
+      instruction3: "3) Quantity is required and must be greater than 0.",
+      instruction4: "4) Unit price is optional (defaults apply when empty).",
+      instruction5: "5) Example rows are samples. Replace them with real data before import.",
+      workbookNoWorksheets: "This Excel workbook has no worksheets.",
+      headerErrorIntro: "Import failed: the header row does not match the expected format.",
+      headerMissingQtyLine: "Missing required quantity column.",
+      headerMissingQtyExpected:
+        "Expected a quantity column (e.g. Qty or Quantity, or the template column title).",
+      headerMissingIdLine: "Missing required item identifier column.",
+      headerMissingIdExpected:
+        "Expected item code and/or barcode column (or the template column titles).",
+      headerDetectedBlank: "(row 1 appears blank)",
+      headerDetectedLine: "Detected headers (row 1): {{detected}}",
+      headerTipRow:
+        "Tip: the header row must be on row 1; each header should be in its own column.",
+      headerExample: "Example: {{code}} | {{qty}}",
+      headerExampleRow: "         {{sampleCode}} | {{sampleQty}}",
+      headerHintSplitLabels:
+        "Hint: one column appears to combine multiple labels. Split them into separate columns.",
+      headerHintQtyTypo:
+        "Hint: the quantity header may be misspelled. Use the template labels or Qty / Quantity.",
+      reasonMissingItemCodeBarcode: "Missing item code or barcode.",
+      reasonQtyMustBePositive: "Quantity must be a number greater than 0.",
+      reasonUnitPriceNumericNonNegative:
+        "Unit price must be numeric and greater than or equal to 0.",
+    },
   },
   stock: {
     coverage: {

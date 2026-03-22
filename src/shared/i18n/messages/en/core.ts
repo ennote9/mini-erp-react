@@ -48,6 +48,13 @@ export const coreEn = {
     account: "Account",
     signedIn: "Signed in",
     workspaceSuffix: "workspace",
+    a11y: {
+      toggleSidebar: "Toggle sidebar",
+      mobileSidebarTitle: "Navigation",
+      mobileSidebarDescription: "Opens the navigation menu on small screens.",
+      breadcrumbNav: "Breadcrumb",
+      more: "More",
+    },
     nav: {
       items: "Items",
       brands: "Brands",

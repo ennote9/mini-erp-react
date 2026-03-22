@@ -23,10 +23,18 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { actionIssue, combineIssues, getErrorAndWarningMessages, issueListContainsMessage, type Issue } from "../../../shared/issues";
+import {
+  actionIssueFromServiceMessage,
+  combineIssues,
+  hasErrors,
+  hasWarnings,
+  issueListContainsMessage,
+  type Issue,
+} from "../../../shared/issues";
 import { getWarehouseFormHealth } from "../../../shared/masterDataHealth";
 import { DocumentIssueStrip } from "../../../shared/ui/feedback/DocumentIssueStrip";
 import { Save, X } from "lucide-react";
+import { useTranslation } from "@/shared/i18n/context";
 
 type FormState = {
   code: string;
@@ -57,6 +65,7 @@ function defaultForm(): FormState {
 }
 
 export function WarehousePage() {
+  const { t } = useTranslation();
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const isNew = id === "new";
@@ -158,10 +167,6 @@ export function WarehousePage() {
     () => combineIssues(health.issues, actionIssues),
     [health.issues, actionIssues],
   );
-  const { errors: combinedErrors, warnings: combinedWarnings } = useMemo(
-    () => getErrorAndWarningMessages(combinedIssues),
-    [combinedIssues],
-  );
 
   useEffect(() => {
     if (isNew) {
@@ -204,7 +209,7 @@ export function WarehousePage() {
     if (result.success) {
       navigate("/warehouses");
     } else if (!issueListContainsMessage(health.issues, result.error)) {
-      setActionIssues([actionIssue(result.error)]);
+      setActionIssues([actionIssueFromServiceMessage(result.error)]);
     }
   };
 
@@ -215,7 +220,7 @@ export function WarehousePage() {
   if (!id) {
     return (
       <div className="doc-page doc-page--not-found">
-        <p>Warehouse not found.</p>
+        <p>{t("master.warehouse.notFound")}</p>
       </div>
     );
   }
@@ -223,23 +228,23 @@ export function WarehousePage() {
   if (!isNew && !warehouse) {
     return (
       <div className="doc-page doc-page--not-found">
-        <p>Warehouse not found.</p>
+        <p>{t("master.warehouse.notFound")}</p>
       </div>
     );
   }
 
   const breadcrumbItems = [
-    { label: "Master Data", to: "/warehouses" },
-    { label: "Warehouses", to: "/warehouses" },
-    { label: isNew ? "New" : warehouse!.code },
+    { label: t("master.breadcrumb.masterData"), to: "/warehouses" },
+    { label: t("master.warehouse.listBreadcrumb"), to: "/warehouses" },
+    { label: isNew ? t("master.common.newLabel") : warehouse!.code },
   ];
 
-  const displayTitle = isNew ? "New Warehouse" : `Warehouse ${warehouse!.code}`;
+  const displayTitle = isNew ? t("master.warehouse.titleNew") : t("master.warehouse.titleWithCode", { code: warehouse!.code });
 
   return (
     <div className="doc-page">
       <div className="doc-page__breadcrumb">
-        <BackButton to="/warehouses" aria-label="Back to Warehouses" />
+        <BackButton to="/warehouses" aria-label={t("master.warehouse.backToListAria")} />
         <Breadcrumb items={breadcrumbItems} />
       </div>
       <div className="doc-page__header">
@@ -248,17 +253,17 @@ export function WarehousePage() {
             <h2 className="doc-header__title">{displayTitle}</h2>
           </div>
           <div className="doc-header__right">
-            {(combinedErrors.length > 0 || combinedWarnings.length > 0) && (
-              <DocumentIssueStrip errors={combinedErrors} warnings={combinedWarnings} />
+            {(hasErrors(combinedIssues) || hasWarnings(combinedIssues)) && (
+              <DocumentIssueStrip issues={combinedIssues} />
             )}
             <div className="doc-header__actions">
               <Button type="button" onClick={handleSave}>
                 <Save aria-hidden />
-                Save
+                {t("common.save")}
               </Button>
               <Button type="button" variant="outline" onClick={handleCancel}>
                 <X aria-hidden />
-                Cancel
+                {t("common.cancel")}
               </Button>
             </div>
           </div>
@@ -266,41 +271,41 @@ export function WarehousePage() {
       </div>
       <Card className="mt-4 max-w-2xl border-0 shadow-none">
         <CardHeader className="p-2 pb-0.5">
-          <CardTitle className="text-[0.9rem] font-semibold">Details</CardTitle>
+          <CardTitle className="text-[0.9rem] font-semibold">{t("master.common.detailsTitle")}</CardTitle>
           <CardDescription className="text-xs">
-            Code, name and status for this warehouse.
+            {t("master.warehouse.detailsDescription")}
           </CardDescription>
         </CardHeader>
         <CardContent className="p-2 pt-1">
           <div className="grid gap-2 sm:grid-cols-2">
             <div className="flex flex-col gap-0.5 sm:col-span-2">
               <Label htmlFor="warehouse-code" className="text-sm">
-                Code <span className="text-destructive">*</span>
+                {t("doc.columns.code")} <span className="text-destructive">{t("doc.page.requiredStar")}</span>
               </Label>
               <Input
                 id="warehouse-code"
                 type="text"
                 value={form.code}
                 onChange={(e) => setForm((f) => ({ ...f, code: e.target.value }))}
-                placeholder="e.g. WH-001"
+                placeholder={t("master.warehouse.codePlaceholder")}
                 className="h-8 text-sm"
               />
             </div>
             <div className="flex flex-col gap-0.5 sm:col-span-2">
               <Label htmlFor="warehouse-name" className="text-sm">
-                Name <span className="text-destructive">*</span>
+                {t("doc.columns.name")} <span className="text-destructive">{t("doc.page.requiredStar")}</span>
               </Label>
               <Input
                 id="warehouse-name"
                 type="text"
                 value={form.name}
                 onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
-                placeholder="Warehouse name"
+                placeholder={t("master.warehouse.namePlaceholder")}
                 className="h-8 text-sm"
               />
             </div>
             <div className="flex flex-col gap-0.5">
-              <Label htmlFor="warehouse-type" className="text-sm">Type</Label>
+              <Label htmlFor="warehouse-type" className="text-sm">{t("master.warehouse.typeLabel")}</Label>
               <Input
                 id="warehouse-type"
                 type="text"
@@ -308,7 +313,7 @@ export function WarehousePage() {
                 onChange={(e) =>
                   setForm((f) => ({ ...f, warehouseType: e.target.value }))
                 }
-                placeholder="e.g. Main, Distribution"
+                placeholder={t("master.warehouse.warehouseTypePlaceholder")}
                 className="h-8 text-sm"
               />
             </div>
@@ -324,18 +329,18 @@ export function WarehousePage() {
                 htmlFor="warehouse-active"
                 className="cursor-pointer text-sm font-normal"
               >
-                Active
+                {t("ops.master.activeCell.active")}
               </Label>
             </div>
             <div className="flex flex-col gap-0.5 sm:col-span-2">
-              <Label htmlFor="warehouse-comment" className="text-sm">Comment</Label>
+              <Label htmlFor="warehouse-comment" className="text-sm">{t("doc.columns.comment")}</Label>
               <Textarea
                 id="warehouse-comment"
                 value={form.comment}
                 onChange={(e) =>
                   setForm((f) => ({ ...f, comment: e.target.value }))
                 }
-                placeholder="Optional"
+                placeholder={t("common.optional")}
                 rows={2}
                 className="resize-none min-h-[4.5rem] text-sm"
               />
@@ -345,15 +350,15 @@ export function WarehousePage() {
       </Card>
       <Card className="mt-4 max-w-2xl border-0 shadow-none">
         <CardHeader className="p-2 pb-0.5">
-          <CardTitle className="text-sm font-semibold">Address &amp; contact</CardTitle>
+          <CardTitle className="text-sm font-semibold">{t("master.warehouse.addressContactTitle")}</CardTitle>
           <CardDescription className="text-xs">
-            Address, city, country and contact details.
+            {t("master.warehouse.addressContactDescription")}
           </CardDescription>
         </CardHeader>
         <CardContent className="p-2 pt-1">
           <div className="grid gap-2 sm:grid-cols-2">
             <div className="flex flex-col gap-0.5 sm:col-span-2">
-              <Label htmlFor="warehouse-address" className="text-sm">Address</Label>
+              <Label htmlFor="warehouse-address" className="text-sm">{t("master.supplier.address")}</Label>
               <Input
                 id="warehouse-address"
                 type="text"
@@ -361,12 +366,12 @@ export function WarehousePage() {
                 onChange={(e) =>
                   setForm((f) => ({ ...f, address: e.target.value }))
                 }
-                placeholder="Street address"
+                placeholder={t("master.warehouse.streetPlaceholder")}
                 className="h-8 text-sm"
               />
             </div>
             <div className="flex flex-col gap-0.5">
-              <Label htmlFor="warehouse-city" className="text-sm">City</Label>
+              <Label htmlFor="warehouse-city" className="text-sm">{t("doc.columns.city")}</Label>
               <Input
                 id="warehouse-city"
                 type="text"
@@ -374,12 +379,12 @@ export function WarehousePage() {
                 onChange={(e) =>
                   setForm((f) => ({ ...f, city: e.target.value }))
                 }
-                placeholder="City"
+                placeholder={t("master.warehouse.cityPlaceholder")}
                 className="h-8 text-sm"
               />
             </div>
             <div className="flex flex-col gap-0.5">
-              <Label htmlFor="warehouse-country" className="text-sm">Country</Label>
+              <Label htmlFor="warehouse-country" className="text-sm">{t("master.supplier.country")}</Label>
               <Input
                 id="warehouse-country"
                 type="text"
@@ -387,12 +392,12 @@ export function WarehousePage() {
                 onChange={(e) =>
                   setForm((f) => ({ ...f, country: e.target.value }))
                 }
-                placeholder="Country"
+                placeholder={t("master.warehouse.countryPlaceholder")}
                 className="h-8 text-sm"
               />
             </div>
             <div className="flex flex-col gap-0.5 sm:col-span-2">
-              <Label htmlFor="warehouse-contact-person" className="text-sm">Contact person</Label>
+              <Label htmlFor="warehouse-contact-person" className="text-sm">{t("doc.columns.contactPerson")}</Label>
               <Input
                 id="warehouse-contact-person"
                 type="text"
@@ -400,12 +405,12 @@ export function WarehousePage() {
                 onChange={(e) =>
                   setForm((f) => ({ ...f, contactPerson: e.target.value }))
                 }
-                placeholder="Name"
+                placeholder={t("master.warehouse.contactNamePlaceholder")}
                 className="h-8 text-sm"
               />
             </div>
             <div className="flex flex-col gap-0.5 sm:col-span-2">
-              <Label htmlFor="warehouse-phone" className="text-sm">Phone</Label>
+              <Label htmlFor="warehouse-phone" className="text-sm">{t("doc.columns.phone")}</Label>
               <Input
                 id="warehouse-phone"
                 type="text"
@@ -413,7 +418,7 @@ export function WarehousePage() {
                 onChange={(e) =>
                   setForm((f) => ({ ...f, phone: e.target.value }))
                 }
-                placeholder="e.g. +1 312 555 0100"
+                placeholder={t("master.warehouse.phoneExamplePlaceholder")}
                 className="h-8 text-sm"
               />
             </div>
@@ -425,22 +430,22 @@ export function WarehousePage() {
         <>
           <Card className="mt-4 w-full max-w-4xl min-w-0 border-0 shadow-none">
             <CardHeader className="p-2 pb-0.5 space-y-0">
-              <CardTitle className="text-[0.9rem] font-semibold tracking-tight">Inventory</CardTitle>
+              <CardTitle className="text-[0.9rem] font-semibold tracking-tight">{t("master.warehouse.inventoryTitle")}</CardTitle>
               <CardDescription className="text-xs leading-snug">
-                View stock balances and stock movements for this warehouse.
+                {t("master.warehouse.inventoryHint")}
               </CardDescription>
             </CardHeader>
             <CardContent className="p-2 pt-1 space-y-2">
               <div
                 className="flex flex-wrap gap-1.5"
-                aria-label="Inventory summary for this warehouse"
+                aria-label={t("master.warehouse.inventorySummaryAria")}
               >
                 <span className="inline-flex items-baseline gap-1 rounded border border-border/50 bg-muted/25 px-2 py-0.5 text-[11px] tabular-nums leading-none">
-                  <span className="text-muted-foreground">Balance rows</span>
+                  <span className="text-muted-foreground">{t("master.warehouse.balanceRowsChip")}</span>
                   <span className="font-medium text-foreground/90">{inventoryCounts.balanceRows}</span>
                 </span>
                 <span className="inline-flex items-baseline gap-1 rounded border border-border/50 bg-muted/25 px-2 py-0.5 text-[11px] tabular-nums leading-none">
-                  <span className="text-muted-foreground">Movement rows</span>
+                  <span className="text-muted-foreground">{t("master.warehouse.movementRowsChip")}</span>
                   <span className="font-medium text-foreground/90">{inventoryCounts.movementRows}</span>
                 </span>
               </div>
@@ -454,7 +459,7 @@ export function WarehousePage() {
                     navigate(`/stock-balances?warehouseId=${encodeURIComponent(warehouse.id)}`)
                   }
                 >
-                  Open stock balances
+                  {t("master.warehouse.openStockBalances")}
                 </Button>
                 <Button
                   type="button"
@@ -465,7 +470,7 @@ export function WarehousePage() {
                     navigate(`/stock-movements?warehouseId=${encodeURIComponent(warehouse.id)}`)
                   }
                 >
-                  Open stock movements
+                  {t("master.warehouse.openStockMovements")}
                 </Button>
               </div>
             </CardContent>
@@ -476,10 +481,10 @@ export function WarehousePage() {
               <div className="flex flex-wrap items-start justify-between gap-2 gap-y-1.5">
                 <div className="min-w-0 space-y-0.5 flex-1">
                   <CardTitle className="text-[0.9rem] font-semibold tracking-tight">
-                    Related Receipts
+                    {t("master.warehouse.relatedReceiptsTitle")}
                   </CardTitle>
                   <CardDescription className="text-xs leading-snug">
-                    Incoming stock for this warehouse. Read-only; open a row for detail.
+                    {t("master.warehouse.relatedReceiptsHint")}
                   </CardDescription>
                 </div>
                 <Button
@@ -491,46 +496,46 @@ export function WarehousePage() {
                     navigate(`/receipts?warehouseId=${encodeURIComponent(warehouse.id)}`)
                   }
                 >
-                  Open all receipts
+                  {t("master.warehouse.openAllReceipts")}
                 </Button>
               </div>
             </CardHeader>
             <CardContent className="p-2 pt-1 space-y-2">
               <div
                 className="flex flex-wrap gap-1.5"
-                aria-label="Related receipts summary"
+                aria-label={t("master.warehouse.relatedReceiptsSummaryAria")}
               >
                 <span className="inline-flex items-baseline gap-1 rounded border border-border/50 bg-muted/25 px-2 py-0.5 text-[11px] tabular-nums leading-none">
-                  <span className="text-muted-foreground">Receipts</span>
+                  <span className="text-muted-foreground">{t("master.warehouse.receiptsChip")}</span>
                   <span className="font-medium text-foreground/90">{relatedReceiptSummary.total}</span>
                 </span>
                 <span className="inline-flex items-baseline gap-1 rounded border border-border/50 bg-muted/25 px-2 py-0.5 text-[11px] tabular-nums leading-none">
-                  <span className="text-muted-foreground">Draft</span>
+                  <span className="text-muted-foreground">{t("status.labels.draft")}</span>
                   <span className="font-medium text-foreground/90">{relatedReceiptSummary.draft}</span>
                 </span>
                 <span className="inline-flex items-baseline gap-1 rounded border border-border/50 bg-muted/25 px-2 py-0.5 text-[11px] tabular-nums leading-none">
-                  <span className="text-muted-foreground">Posted</span>
+                  <span className="text-muted-foreground">{t("status.labels.posted")}</span>
                   <span className="font-medium text-foreground/90">{relatedReceiptSummary.posted}</span>
                 </span>
                 <span className="inline-flex items-baseline gap-1 rounded border border-border/50 bg-muted/25 px-2 py-0.5 text-[11px] tabular-nums leading-none">
-                  <span className="text-muted-foreground">Cancelled</span>
+                  <span className="text-muted-foreground">{t("status.labels.cancelled")}</span>
                   <span className="font-medium text-foreground/90">{relatedReceiptSummary.cancelled}</span>
                 </span>
               </div>
               {relatedReceiptRows.length === 0 ? (
                 <p className="text-sm text-muted-foreground py-3 m-0">
-                  No receipts linked to this warehouse yet.
+                  {t("master.warehouse.emptyReceipts")}
                 </p>
               ) : (
                 <div className="min-w-0 overflow-x-auto rounded-md border border-border/60">
                   <table className="list-table text-sm">
                     <thead>
                       <tr>
-                        <th className="list-table__cell--code">Number</th>
-                        <th className="min-w-[100px]">Status</th>
-                        <th className="min-w-[140px]">Purchase order</th>
-                        <th className="w-14 text-right whitespace-nowrap tabular-nums">Lines</th>
-                        <th className="min-w-[100px] whitespace-nowrap">Date</th>
+                        <th className="list-table__cell--code">{t("doc.columns.number")}</th>
+                        <th className="min-w-[100px]">{t("doc.columns.status")}</th>
+                        <th className="min-w-[140px]">{t("master.warehouse.colPurchaseOrder")}</th>
+                        <th className="w-14 text-right whitespace-nowrap tabular-nums">{t("doc.page.lines")}</th>
+                        <th className="min-w-[100px] whitespace-nowrap">{t("doc.columns.date")}</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -541,7 +546,7 @@ export function WarehousePage() {
                           onClick={() => navigate(`/receipts/${r.id}`)}
                           role="button"
                           tabIndex={0}
-                          aria-label={`Open receipt ${r.number}`}
+                          aria-label={t("master.warehouse.openReceiptAria", { number: r.number })}
                           onKeyDown={(e) => {
                             if (e.key === "Enter" || e.key === " ") {
                               e.preventDefault();
@@ -572,10 +577,10 @@ export function WarehousePage() {
               <div className="flex flex-wrap items-start justify-between gap-2 gap-y-1.5">
                 <div className="min-w-0 space-y-0.5 flex-1">
                   <CardTitle className="text-[0.9rem] font-semibold tracking-tight">
-                    Related Shipments
+                    {t("master.warehouse.relatedShipmentsTitle")}
                   </CardTitle>
                   <CardDescription className="text-xs leading-snug">
-                    Outgoing stock from this warehouse. Read-only; open a row for detail.
+                    {t("master.warehouse.relatedShipmentsHint")}
                   </CardDescription>
                 </div>
                 <Button
@@ -587,46 +592,46 @@ export function WarehousePage() {
                     navigate(`/shipments?warehouseId=${encodeURIComponent(warehouse.id)}`)
                   }
                 >
-                  Open all shipments
+                  {t("master.warehouse.openAllShipments")}
                 </Button>
               </div>
             </CardHeader>
             <CardContent className="p-2 pt-1 space-y-2">
               <div
                 className="flex flex-wrap gap-1.5"
-                aria-label="Related shipments summary"
+                aria-label={t("master.warehouse.relatedShipmentsSummaryAria")}
               >
                 <span className="inline-flex items-baseline gap-1 rounded border border-border/50 bg-muted/25 px-2 py-0.5 text-[11px] tabular-nums leading-none">
-                  <span className="text-muted-foreground">Shipments</span>
+                  <span className="text-muted-foreground">{t("master.warehouse.shipmentsChip")}</span>
                   <span className="font-medium text-foreground/90">{relatedShipmentSummary.total}</span>
                 </span>
                 <span className="inline-flex items-baseline gap-1 rounded border border-border/50 bg-muted/25 px-2 py-0.5 text-[11px] tabular-nums leading-none">
-                  <span className="text-muted-foreground">Draft</span>
+                  <span className="text-muted-foreground">{t("status.labels.draft")}</span>
                   <span className="font-medium text-foreground/90">{relatedShipmentSummary.draft}</span>
                 </span>
                 <span className="inline-flex items-baseline gap-1 rounded border border-border/50 bg-muted/25 px-2 py-0.5 text-[11px] tabular-nums leading-none">
-                  <span className="text-muted-foreground">Posted</span>
+                  <span className="text-muted-foreground">{t("status.labels.posted")}</span>
                   <span className="font-medium text-foreground/90">{relatedShipmentSummary.posted}</span>
                 </span>
                 <span className="inline-flex items-baseline gap-1 rounded border border-border/50 bg-muted/25 px-2 py-0.5 text-[11px] tabular-nums leading-none">
-                  <span className="text-muted-foreground">Cancelled</span>
+                  <span className="text-muted-foreground">{t("status.labels.cancelled")}</span>
                   <span className="font-medium text-foreground/90">{relatedShipmentSummary.cancelled}</span>
                 </span>
               </div>
               {relatedShipmentRows.length === 0 ? (
                 <p className="text-sm text-muted-foreground py-3 m-0">
-                  No shipments linked to this warehouse yet.
+                  {t("master.warehouse.emptyShipments")}
                 </p>
               ) : (
                 <div className="min-w-0 overflow-x-auto rounded-md border border-border/60">
                   <table className="list-table text-sm">
                     <thead>
                       <tr>
-                        <th className="list-table__cell--code">Number</th>
-                        <th className="min-w-[100px]">Status</th>
-                        <th className="min-w-[140px]">Sales order</th>
-                        <th className="w-14 text-right whitespace-nowrap tabular-nums">Lines</th>
-                        <th className="min-w-[100px] whitespace-nowrap">Date</th>
+                        <th className="list-table__cell--code">{t("doc.columns.number")}</th>
+                        <th className="min-w-[100px]">{t("doc.columns.status")}</th>
+                        <th className="min-w-[140px]">{t("master.warehouse.colSalesOrder")}</th>
+                        <th className="w-14 text-right whitespace-nowrap tabular-nums">{t("doc.page.lines")}</th>
+                        <th className="min-w-[100px] whitespace-nowrap">{t("doc.columns.date")}</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -637,7 +642,7 @@ export function WarehousePage() {
                           onClick={() => navigate(`/shipments/${s.id}`)}
                           role="button"
                           tabIndex={0}
-                          aria-label={`Open shipment ${s.number}`}
+                          aria-label={t("master.warehouse.openShipmentAria", { number: s.number })}
                           onKeyDown={(e) => {
                             if (e.key === "Enter" || e.key === " ") {
                               e.preventDefault();

@@ -35,6 +35,7 @@ import { save } from "@tauri-apps/plugin-dialog";
 import { invoke } from "@tauri-apps/api/core";
 import { revealItemInDir } from "@tauri-apps/plugin-opener";
 import { useTranslation } from "@/shared/i18n/context";
+import { salesOrdersListExcelLabels } from "@/shared/i18n/excelListExportLabels";
 
 type StatusFilter = "all" | PlanningDocumentStatus;
 
@@ -240,7 +241,7 @@ export function SalesOrdersListPage() {
       try {
         const path = await save({
           defaultPath: defaultFilename,
-          filters: [{ name: "Excel", extensions: ["xlsx"] }],
+          filters: [{ name: t("doc.page.excelFilterName"), extensions: ["xlsx"] }],
         });
         if (path == null) return;
 
@@ -270,16 +271,18 @@ export function SalesOrdersListPage() {
     [t],
   );
 
+  const listExcelLabels = useMemo(() => salesOrdersListExcelLabels(t), [t, locale]);
+
   const handleExportCurrentView = useCallback(() => {
     const rows = getExportRowsCurrentView();
-    runExportWithSaveAs("sales-orders.xlsx", () => buildSalesOrdersListXlsxBuffer(rows));
-  }, [getExportRowsCurrentView, runExportWithSaveAs]);
+    runExportWithSaveAs("sales-orders.xlsx", () => buildSalesOrdersListXlsxBuffer(rows, listExcelLabels));
+  }, [getExportRowsCurrentView, listExcelLabels, runExportWithSaveAs]);
 
   const handleExportSelected = useCallback(() => {
     const rows = getExportRowsSelected();
     if (rows.length === 0) return;
-    runExportWithSaveAs("sales-orders-selected.xlsx", () => buildSalesOrdersListXlsxBuffer(rows));
-  }, [getExportRowsSelected, runExportWithSaveAs]);
+    runExportWithSaveAs("sales-orders-selected.xlsx", () => buildSalesOrdersListXlsxBuffer(rows, listExcelLabels));
+  }, [getExportRowsSelected, listExcelLabels, runExportWithSaveAs]);
 
   const exportSelectedDisabled = selectedCount === 0;
 

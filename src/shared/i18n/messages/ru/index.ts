@@ -1,5 +1,8 @@
 import type { MessageTree } from "../../resolve";
 import { ruOps } from "./ops";
+import { ruMasterPages } from "./masterPagesRu";
+import { ruIssuesMessages } from "./issuesMessagesRu";
+import { ruExportExcel } from "./exportExcelRu";
 import { ruSettingsEntriesFull, ruSettingsOptionsFull } from "./settingsRegistryRu";
 
 /** Russian UI overrides (missing keys inherit English). */
@@ -52,6 +55,13 @@ export const ruMessages: MessageTree = {
     account: "Учётная запись",
     signedIn: "Вход выполнен",
     workspaceSuffix: "профиль",
+    a11y: {
+      toggleSidebar: "Показать или скрыть панель навигации",
+      mobileSidebarTitle: "Навигация",
+      mobileSidebarDescription: "Меню навигации на мобильных устройствах.",
+      breadcrumbNav: "Навигационная цепочка",
+      more: "Ещё",
+    },
     nav: {
       items: "Номенклатура",
       brands: "Бренды",
@@ -432,6 +442,9 @@ export const ruMessages: MessageTree = {
     },
   },
   doc: {
+    grid: {
+      selectItem: "Выберите номенклатуру",
+    },
     breadcrumbHome: "Главная",
     kinds: {
       purchaseOrder: "заказ поставщику",
@@ -522,7 +535,7 @@ export const ruMessages: MessageTree = {
       exportAllLines: "Экспорт всех строк",
       exportSelectLinesFirst: "Сначала выберите одну или несколько строк в таблице.",
       exportSelectionEditModeOnly: "Выбор строк доступен только в режиме редактирования.",
-      excelFilterName: "Excel",
+      excelFilterName: "Книга Excel",
     },
     summary: {
       paymentTermsDays: "{{days}} дн.",
@@ -700,92 +713,8 @@ export const ruMessages: MessageTree = {
       searchResultsCount: "Найдено: {{count}}",
     },
   },
-  master: {
-    breadcrumb: { masterData: "НСИ" },
-    common: {
-      details: "Реквизиты",
-      optionalPlaceholder: "Необязательно",
-      codePlaceholderExample: "напр. {{example}}",
-      paymentTermsExample: "напр. 30",
-      notFound: "Запись не найдена.",
-      newLabel: "Новый",
-    },
-    item: {
-      notFound: "Номенклатура не найдена.",
-      titleNew: "Новая номенклатура",
-      titleWithCode: "Номенклатура {{code}}",
-      backToListAria: "Назад к списку номенклатуры",
-      cardHint: "Идентификация, цены и связи с каталогом.",
-      codePlaceholder: "напр. ITEM-0001",
-      namePlaceholder: "Наименование",
-    },
-    brand: {
-      notFound: "Бренд не найден.",
-      titleNew: "Новый бренд",
-      titleWithCode: "Бренд {{code}}",
-      backToListAria: "Назад к списку брендов",
-      cardHint: "Краткий код и наименование для группировки в каталоге.",
-      codePlaceholder: "напр. BR-01",
-      namePlaceholder: "Наименование бренда",
-    },
-    category: {
-      notFound: "Категория не найдена.",
-      titleNew: "Новая категория",
-      titleWithCode: "Категория {{code}}",
-      backToListAria: "Назад к списку категорий",
-      cardHint: "Краткий код и наименование для группировки в каталоге.",
-      codePlaceholder: "напр. CAT-01",
-      namePlaceholder: "Наименование категории",
-    },
-    supplier: {
-      notFound: "Поставщик не найден.",
-      titleNew: "Новый поставщик",
-      titleWithCode: "Поставщик {{code}}",
-      backToListAria: "Назад к списку поставщиков",
-      cardHint: "Код, наименование, контакты и статус поставщика.",
-      codePlaceholder: "напр. SUP-0001",
-      namePlaceholder: "Наименование поставщика",
-      taxId: "ИНН / налог. номер",
-      address: "Адрес",
-      country: "Страна",
-      relatedPurchaseOrdersTitle: "Связанные заказы поставщикам",
-      relatedPurchaseOrdersHint:
-        "Связанные закупочные документы. Только просмотр; откройте строку для деталей.",
-      openAllPurchaseOrders: "Открыть все заказы поставщикам",
-      relatedPoSummaryAria: "Сводка по связанным заказам поставщикам",
-      ordersChip: "Заказы",
-      emptyRelatedPo: "Пока нет заказов поставщикам по этому поставщику.",
-      openPurchaseOrderAria: "Открыть заказ поставщику {{number}}",
-    },
-    customer: {
-      notFound: "Клиент не найден.",
-      titleNew: "Новый клиент",
-      titleWithCode: "Клиент {{code}}",
-      backToListAria: "Назад к списку клиентов",
-      cardHint: "Код, наименование, контакты и статус клиента.",
-      codePlaceholder: "напр. CUST-0001",
-      namePlaceholder: "Наименование клиента",
-      taxId: "ИНН / налог. номер",
-      address: "Адрес",
-      country: "Страна",
-      relatedSalesOrdersTitle: "Связанные заказы клиентов",
-      relatedSalesOrdersHint:
-        "Связанные документы продаж. Только просмотр; откройте строку для деталей.",
-      openAllSalesOrders: "Открыть все заказы клиентов",
-      relatedSoSummaryAria: "Сводка по связанным заказам клиентов",
-      ordersChip: "Заказы",
-      emptyRelatedSo: "Пока нет заказов клиентов по этому клиенту.",
-      openSalesOrderAria: "Открыть заказ клиента {{number}}",
-    },
-    warehouse: {
-      notFound: "Склад не найден.",
-      titleNew: "Новый склад",
-      titleWithCode: "Склад {{code}}",
-      backToListAria: "Назад к списку складов",
-      cardHint: "Код, наименование, тип и статус склада.",
-      codePlaceholder: "напр. WH-01",
-      namePlaceholder: "Наименование склада",
-    },
-  },
+  master: ruMasterPages,
   ops: ruOps,
+  issues: ruIssuesMessages,
+  exportExcel: ruExportExcel,
 };

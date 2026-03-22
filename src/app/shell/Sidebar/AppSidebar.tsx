@@ -184,7 +184,7 @@ export function AppSidebar() {
       <SidebarFooter>
         <SidebarMenu>
           <SidebarMenuItem>
-            <SidebarNavLink to="/settings" label="Settings" icon={Settings} />
+            <SidebarNavLink to="/settings" label={t("shell.settings")} icon={Settings} />
           </SidebarMenuItem>
           <SidebarMenuItem>
             <SidebarMenuButton

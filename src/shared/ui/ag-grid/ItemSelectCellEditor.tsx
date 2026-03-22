@@ -1,4 +1,5 @@
 import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from "react";
+import { useTranslation } from "@/shared/i18n/context";
 
 export type ItemOption = { id: string; code: string; name: string };
 
@@ -22,6 +23,7 @@ export const ItemSelectCellEditor = forwardRef<
   { getValue: () => string },
   ItemSelectCellEditorProps
 >(function ItemSelectCellEditor(props, ref) {
+  const { t } = useTranslation();
   const { items, onValueChange } = props;
   const initial = getInitialValue(props);
   const [selected, setSelected] = useState(initial);
@@ -59,7 +61,7 @@ export const ItemSelectCellEditor = forwardRef<
       value={displayValue}
       onChange={handleChange}
     >
-      <option value="">Select item</option>
+      <option value="">{t("doc.grid.selectItem")}</option>
       {items.map((i) => (
         <option key={i.id} value={i.id}>
           {i.code} - {i.name}

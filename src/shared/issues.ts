@@ -7,10 +7,19 @@ export type IssueSeverity = "error" | "warning" | "info";
 
 export type IssueScope = "document" | "line" | "field" | "action" | "system";
 
+export type IssueI18n = {
+  key: string;
+  params?: Record<string, string | number>;
+};
+
 export type Issue = {
   severity: IssueSeverity;
   scope: IssueScope;
+  /** Stable English (or legacy) text for dedup, tests, and service-error matching. */
   message: string;
+  /** When set, UI should display `t(i18nKey, i18nParams)` instead of `message`. */
+  i18nKey?: string;
+  i18nParams?: Record<string, string | number>;
   /** Line reference for line-level issues (e.g. _lineId). */
   lineId?: number;
   /** Field reference for field-level issues. */
@@ -83,13 +92,27 @@ export function hasWarnings(issues: Issue[]): boolean {
 }
 
 /** Create an action-scope error issue (e.g. save/confirm/cancel/create-receipt failure). */
-export function actionIssue(message: string): Issue {
-  return { severity: "error", scope: "action", message };
+export function actionIssue(message: string, i18n?: IssueI18n): Issue {
+  return {
+    severity: "error",
+    scope: "action",
+    message,
+    ...(i18n
+      ? { i18nKey: i18n.key, i18nParams: i18n.params }
+      : {}),
+  };
 }
 
 /** Create an action-scope warning issue (e.g. post validation warning). */
-export function actionWarning(message: string): Issue {
-  return { severity: "warning", scope: "action", message };
+export function actionWarning(message: string, i18n?: IssueI18n): Issue {
+  return {
+    severity: "warning",
+    scope: "action",
+    message,
+    ...(i18n
+      ? { i18nKey: i18n.key, i18nParams: i18n.params }
+      : {}),
+  };
 }
 
 /** Create a field-scope issue (e.g. required header field or form field). */
@@ -97,6 +120,17 @@ export function fieldIssue(
   severity: IssueSeverity,
   field: string,
   message: string,
+  i18n?: IssueI18n,
 ): Issue {
-  return { severity, scope: "field", field, message };
+  return {
+    severity,
+    scope: "field",
+    field,
+    message,
+    ...(i18n
+      ? { i18nKey: i18n.key, i18nParams: i18n.params }
+      : {}),
+  };
 }
+
+export { actionIssueFromServiceMessage } from "./i18n/serviceErrorIssues";

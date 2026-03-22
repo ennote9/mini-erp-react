@@ -11,6 +11,10 @@ import { extensionFromFileName, mimeTypeForExtension, validateItemImageFile } fr
 
 const BD = BaseDirectory.AppLocalData;
 
+/** Stable messages returned in `{ error }` — map to i18n in UI. */
+export const ITEM_IMAGE_STORAGE_ERROR_TOO_LARGE = "Image must be 10 MB or smaller.";
+export const ITEM_IMAGE_STORAGE_ERROR_BAD_TYPE = "Allowed types: JPG, JPEG, PNG, WebP.";
+
 /** Relative path prefix under app local data: items/{itemId}/images/ */
 export function itemsImagesDirRelative(itemId: string): string {
   return `items/${itemId}/images`;
@@ -80,7 +84,8 @@ export async function saveItemImageFromFile(
   placement: ItemImagePlacement,
 ): Promise<{ image: ItemImage } | { error: string }> {
   const v = validateItemImageFile(file);
-  if (v) return { error: v };
+  if (v === "too_large") return { error: ITEM_IMAGE_STORAGE_ERROR_TOO_LARGE };
+  if (v === "bad_type") return { error: ITEM_IMAGE_STORAGE_ERROR_BAD_TYPE };
 
   const ext = extensionFromFileName(file.name) ?? "bin";
   const relDir = itemsImagesDirRelative(itemId);

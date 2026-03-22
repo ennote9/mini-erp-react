@@ -40,64 +40,114 @@ export function validateReceiptFull(receiptId: string): Issue[] {
   const issues: Issue[] = [];
   const receipt = receiptRepository.getById(receiptId);
   if (!receipt) {
-    issues.push(actionIssue("Receipt not found."));
+    issues.push(
+      actionIssue("Receipt not found.", { key: "issues.receipt.notFound" }),
+    );
     return issues;
   }
   if (receipt.status !== "draft") {
-    issues.push(actionIssue("Only draft receipts can be posted."));
+    issues.push(
+      actionIssue("Only draft receipts can be posted.", {
+        key: "issues.receipt.onlyDraftPost",
+      }),
+    );
     return issues;
   }
 
   const poIdTrimmed = normalizeTrim(receipt.purchaseOrderId);
   if (poIdTrimmed === "") {
-    issues.push(actionIssue("Related purchase order is required."));
+    issues.push(
+      actionIssue("Related purchase order is required.", {
+        key: "issues.receipt.poRequired",
+      }),
+    );
   } else {
     const po = purchaseOrderRepository.getById(poIdTrimmed);
     if (!po) {
-      issues.push(actionIssue("Related purchase order is required."));
+      issues.push(
+        actionIssue("Related purchase order is required.", {
+          key: "issues.receipt.poRequired",
+        }),
+      );
     } else if (po.status !== "confirmed") {
       issues.push(
-        actionIssue("Related purchase order must be confirmed before posting."),
+        actionIssue("Related purchase order must be confirmed before posting.", {
+          key: "issues.receipt.poMustBeConfirmed",
+        }),
       );
     }
   }
 
   const warehouseIdTrimmed = normalizeTrim(receipt.warehouseId);
   if (warehouseIdTrimmed === "") {
-    issues.push(actionIssue("Warehouse is required."));
+    issues.push(
+      actionIssue("Warehouse is required.", {
+        key: "issues.receipt.warehouseRequired",
+      }),
+    );
   } else {
     const warehouse = warehouseRepository.getById(warehouseIdTrimmed);
     if (!warehouse) {
-      issues.push(actionIssue("Warehouse is required."));
+      issues.push(
+        actionIssue("Warehouse is required.", {
+          key: "issues.receipt.warehouseRequired",
+        }),
+      );
     } else if (!warehouse.isActive) {
-      issues.push(actionIssue("Selected warehouse is inactive."));
+      issues.push(
+        actionIssue("Selected warehouse is inactive.", {
+          key: "issues.receipt.warehouseInactive",
+        }),
+      );
     }
   }
 
   const lines = receiptRepository.listLines(receiptId);
   if (!lines || lines.length === 0) {
-    issues.push(actionIssue("At least one line is required."));
+    issues.push(
+      actionIssue("At least one line is required.", {
+        key: "issues.receipt.linesRequired",
+      }),
+    );
   } else {
     const itemIds = new Set<string>();
     for (const line of lines) {
       const itemIdTrimmed = normalizeTrim(line.itemId);
       if (itemIdTrimmed === "") {
-        issues.push(actionIssue("Each line must have an item."));
+        issues.push(
+          actionIssue("Each line must have an item.", {
+            key: "issues.receipt.lineNeedsItem",
+          }),
+        );
         continue;
       }
       const qty = parseDocumentLineQty(line.qty);
       if (qty === null) {
-        issues.push(actionIssue("Quantity must be greater than zero."));
+        issues.push(
+          actionIssue("Quantity must be greater than zero.", {
+            key: "issues.receipt.qtyPositive",
+          }),
+        );
       }
       const item = itemRepository.getById(itemIdTrimmed);
       if (!item) {
-        issues.push(actionIssue("Each line must have an item."));
+        issues.push(
+          actionIssue("Each line must have an item.", {
+            key: "issues.receipt.lineNeedsItem",
+          }),
+        );
       } else if (!item.isActive) {
-        issues.push(actionIssue("Selected item is inactive."));
+        issues.push(
+          actionIssue("Selected item is inactive.", {
+            key: "issues.receipt.itemInactive",
+          }),
+        );
       }
       if (itemIds.has(itemIdTrimmed)) {
         issues.push(
-          actionIssue("Duplicate items are not allowed in the same document."),
+          actionIssue("Duplicate items are not allowed in the same document.", {
+            key: "issues.receipt.duplicateItems",
+          }),
         );
       }
       itemIds.add(itemIdTrimmed);
@@ -117,7 +167,10 @@ export function validateReceiptFull(receiptId: string): Issue[] {
           const item = itemRepository.getById(itemIdTrimmed);
           const code = item?.code ?? itemIdTrimmed;
           issues.push(
-            actionIssue(`Item ${code} is not on the related purchase order.`),
+            actionIssue(`Item ${code} is not on the related purchase order.`, {
+              key: "issues.receipt.itemNotOnPo",
+              params: { code },
+            }),
           );
           continue;
         }
@@ -130,6 +183,15 @@ export function validateReceiptFull(receiptId: string): Issue[] {
           issues.push(
             actionIssue(
               `Item ${code}: receipt quantity exceeds remaining to receive (ordered ${ordered}, already received ${already}, this receipt ${q}).`,
+              {
+                key: "issues.receipt.qtyExceedsRemaining",
+                params: {
+                  code,
+                  ordered,
+                  already,
+                  qty: q,
+                },
+              },
             ),
           );
         }

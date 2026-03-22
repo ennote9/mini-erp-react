@@ -31,8 +31,17 @@ type LineFormRow = {
   zeroPriceReasonCode?: string;
 };
 
-function docIssue(severity: Issue["severity"], message: string): Issue {
-  return { severity, scope: "document", message };
+function docIssue(
+  severity: Issue["severity"],
+  message: string,
+  i18n?: { key: string; params?: Record<string, string | number> },
+): Issue {
+  return {
+    severity,
+    scope: "document",
+    message,
+    ...(i18n ? { i18nKey: i18n.key, i18nParams: i18n.params } : {}),
+  };
 }
 
 function lineAmount(line: LineFormRow): number {
@@ -56,15 +65,27 @@ export function getPurchaseOrderHealth(input: PurchaseOrderHealthInput): Documen
   const zeroPriceReasonRequired = getAppSettings().commercial.zeroPriceLinesRequireReason;
 
   if (normalizeTrim(input.supplierId) === "") {
-    issues.push(fieldIssue("error", "supplierId", "Supplier is required."));
+    issues.push(
+      fieldIssue("error", "supplierId", "Supplier is required.", {
+        key: "issues.document.supplierRequired",
+      }),
+    );
   }
   if (normalizeTrim(input.warehouseId) === "") {
-    issues.push(fieldIssue("error", "warehouseId", "Warehouse is required."));
+    issues.push(
+      fieldIssue("error", "warehouseId", "Warehouse is required.", {
+        key: "issues.document.warehouseRequired",
+      }),
+    );
   }
 
   const termsErrPo = validatePaymentTermsDaysForm(input.paymentTermsDays);
   if (termsErrPo) {
-    issues.push(fieldIssue("error", "paymentTermsDays", termsErrPo));
+    issues.push(
+      fieldIssue("error", "paymentTermsDays", termsErrPo, {
+        key: "issues.master.paymentTermsDaysForm",
+      }),
+    );
   }
 
   const lines = input.lines ?? [];
@@ -125,28 +146,56 @@ export function getPurchaseOrderHealth(input: PurchaseOrderHealthInput): Documen
   }
 
   if (lines.length === 0) {
-    issues.push(docIssue("error", "At least one line is required."));
+    issues.push(
+      docIssue("error", "At least one line is required.", {
+        key: "issues.document.linesRequired",
+      }),
+    );
   } else {
     if (validLineCount === 0) {
-      issues.push(docIssue("error", "At least one valid line is required (item and quantity)."));
+      issues.push(
+        docIssue(
+          "error",
+          "At least one valid line is required (item and quantity).",
+          { key: "issues.document.linesValidRequired" },
+        ),
+      );
     }
     if (hasAnyInactiveItem) {
-      issues.push(docIssue("error", "Inactive items cannot be used in this document."));
+      issues.push(
+        docIssue("error", "Inactive items cannot be used in this document.", {
+          key: "issues.document.inactiveItems",
+        }),
+      );
     }
     const hasAnyEmptyItem = lines.some((l) => normalizeTrim(l.itemId) === "");
     if (hasAnyEmptyItem) {
-      issues.push(docIssue("error", "One or more lines have no item."));
+      issues.push(
+        docIssue("error", "One or more lines have no item.", {
+          key: "issues.document.linesNoItem",
+        }),
+      );
     }
     const hasAnyInvalidQty = lines.some((l) => parseDocumentLineQty(l.qty) === null);
     if (hasAnyInvalidQty) {
-      issues.push(docIssue("error", "One or more lines have invalid or zero quantity."));
+      issues.push(
+        docIssue("error", "One or more lines have invalid or zero quantity.", {
+          key: "issues.document.linesInvalidQty",
+        }),
+      );
     }
     const hasAnyInvalidUnitPrice = lines.some((l) => {
       const u = l.unitPrice;
       return !(typeof u === "number" && Number.isFinite(u) && u >= 0);
     });
     if (hasAnyInvalidUnitPrice) {
-      issues.push(docIssue("error", "One or more lines have an invalid unit price (must be a number ≥ 0)."));
+      issues.push(
+        docIssue(
+          "error",
+          "One or more lines have an invalid unit price (must be a number ≥ 0).",
+          { key: "issues.document.linesInvalidUnitPrice" },
+        ),
+      );
     }
   }
 
@@ -157,6 +206,12 @@ export function getPurchaseOrderHealth(input: PurchaseOrderHealthInput): Documen
         linesWithZeroPriceMissingReason === 1
           ? "One line has zero unit price without a reason. Select a zero-price reason for that line."
           : `${linesWithZeroPriceMissingReason} lines have zero unit price without a reason.`,
+        linesWithZeroPriceMissingReason === 1
+          ? { key: "issues.document.zeroPriceMissingReasonOne" }
+          : {
+              key: "issues.document.zeroPriceMissingReasonMany",
+              params: { count: linesWithZeroPriceMissingReason },
+            },
       ),
     );
   }
@@ -167,6 +222,12 @@ export function getPurchaseOrderHealth(input: PurchaseOrderHealthInput): Documen
         linesWithZeroPrice === 1
           ? "1 line has zero unit price (reason recorded)."
           : `${linesWithZeroPrice} lines have zero unit price (reasons recorded).`,
+        linesWithZeroPrice === 1
+          ? { key: "issues.document.zeroPriceRecordedOne" }
+          : {
+              key: "issues.document.zeroPriceRecordedMany",
+              params: { count: linesWithZeroPrice },
+            },
       ),
     );
   }
@@ -177,6 +238,12 @@ export function getPurchaseOrderHealth(input: PurchaseOrderHealthInput): Documen
         linesWithZeroAmount === 1
           ? "1 line has zero line amount."
           : `${linesWithZeroAmount} lines have zero line amount.`,
+        linesWithZeroAmount === 1
+          ? { key: "issues.document.zeroLineAmountOne" }
+          : {
+              key: "issues.document.zeroLineAmountMany",
+              params: { count: linesWithZeroAmount },
+            },
       ),
     );
   }
@@ -197,15 +264,27 @@ export function getSalesOrderHealth(input: SalesOrderHealthInput): DocumentHealt
   const zeroPriceReasonRequired = getAppSettings().commercial.zeroPriceLinesRequireReason;
 
   if (normalizeTrim(input.customerId) === "") {
-    issues.push(fieldIssue("error", "customerId", "Customer is required."));
+    issues.push(
+      fieldIssue("error", "customerId", "Customer is required.", {
+        key: "issues.document.customerRequired",
+      }),
+    );
   }
   if (normalizeTrim(input.warehouseId) === "") {
-    issues.push(fieldIssue("error", "warehouseId", "Warehouse is required."));
+    issues.push(
+      fieldIssue("error", "warehouseId", "Warehouse is required.", {
+        key: "issues.document.warehouseRequired",
+      }),
+    );
   }
 
   const termsErrSo = validatePaymentTermsDaysForm(input.paymentTermsDays);
   if (termsErrSo) {
-    issues.push(fieldIssue("error", "paymentTermsDays", termsErrSo));
+    issues.push(
+      fieldIssue("error", "paymentTermsDays", termsErrSo, {
+        key: "issues.master.paymentTermsDaysForm",
+      }),
+    );
   }
 
   const lines = input.lines ?? [];
@@ -266,28 +345,56 @@ export function getSalesOrderHealth(input: SalesOrderHealthInput): DocumentHealt
   }
 
   if (lines.length === 0) {
-    issues.push(docIssue("error", "At least one line is required."));
+    issues.push(
+      docIssue("error", "At least one line is required.", {
+        key: "issues.document.linesRequired",
+      }),
+    );
   } else {
     if (validLineCount === 0) {
-      issues.push(docIssue("error", "At least one valid line is required (item and quantity)."));
+      issues.push(
+        docIssue(
+          "error",
+          "At least one valid line is required (item and quantity).",
+          { key: "issues.document.linesValidRequired" },
+        ),
+      );
     }
     if (hasAnyInactiveItem) {
-      issues.push(docIssue("error", "Inactive items cannot be used in this document."));
+      issues.push(
+        docIssue("error", "Inactive items cannot be used in this document.", {
+          key: "issues.document.inactiveItems",
+        }),
+      );
     }
     const hasAnyEmptyItem = lines.some((l) => normalizeTrim(l.itemId) === "");
     if (hasAnyEmptyItem) {
-      issues.push(docIssue("error", "One or more lines have no item."));
+      issues.push(
+        docIssue("error", "One or more lines have no item.", {
+          key: "issues.document.linesNoItem",
+        }),
+      );
     }
     const hasAnyInvalidQty = lines.some((l) => parseDocumentLineQty(l.qty) === null);
     if (hasAnyInvalidQty) {
-      issues.push(docIssue("error", "One or more lines have invalid or zero quantity."));
+      issues.push(
+        docIssue("error", "One or more lines have invalid or zero quantity.", {
+          key: "issues.document.linesInvalidQty",
+        }),
+      );
     }
     const hasAnyInvalidUnitPrice = lines.some((l) => {
       const u = l.unitPrice;
       return !(typeof u === "number" && Number.isFinite(u) && u >= 0);
     });
     if (hasAnyInvalidUnitPrice) {
-      issues.push(docIssue("error", "One or more lines have an invalid unit price (must be a number ≥ 0)."));
+      issues.push(
+        docIssue(
+          "error",
+          "One or more lines have an invalid unit price (must be a number ≥ 0).",
+          { key: "issues.document.linesInvalidUnitPrice" },
+        ),
+      );
     }
   }
 
@@ -298,6 +405,12 @@ export function getSalesOrderHealth(input: SalesOrderHealthInput): DocumentHealt
         linesWithZeroPriceMissingReason === 1
           ? "One line has zero unit price without a reason. Select a zero-price reason for that line."
           : `${linesWithZeroPriceMissingReason} lines have zero unit price without a reason.`,
+        linesWithZeroPriceMissingReason === 1
+          ? { key: "issues.document.zeroPriceMissingReasonOne" }
+          : {
+              key: "issues.document.zeroPriceMissingReasonMany",
+              params: { count: linesWithZeroPriceMissingReason },
+            },
       ),
     );
   }
@@ -308,6 +421,12 @@ export function getSalesOrderHealth(input: SalesOrderHealthInput): DocumentHealt
         linesWithZeroPrice === 1
           ? "1 line has zero unit price (reason recorded)."
           : `${linesWithZeroPrice} lines have zero unit price (reasons recorded).`,
+        linesWithZeroPrice === 1
+          ? { key: "issues.document.zeroPriceRecordedOne" }
+          : {
+              key: "issues.document.zeroPriceRecordedMany",
+              params: { count: linesWithZeroPrice },
+            },
       ),
     );
   }
@@ -318,6 +437,12 @@ export function getSalesOrderHealth(input: SalesOrderHealthInput): DocumentHealt
         linesWithZeroAmount === 1
           ? "1 line has zero line amount."
           : `${linesWithZeroAmount} lines have zero line amount.`,
+        linesWithZeroAmount === 1
+          ? { key: "issues.document.zeroLineAmountOne" }
+          : {
+              key: "issues.document.zeroLineAmountMany",
+              params: { count: linesWithZeroAmount },
+            },
       ),
     );
   }

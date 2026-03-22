@@ -34,7 +34,16 @@ import {
 } from "../../../shared/commercialMoney";
 import { computePlanningDueDate, parsePaymentTermsDaysToStore } from "../../../shared/planningCommercialDates";
 import { getSalesOrderHealth } from "../../../shared/documentHealth";
-import { getErrorAndWarningMessages, actionIssue, actionWarning, combineIssues, hasErrors, issueListContainsMessage, type Issue } from "../../../shared/issues";
+import {
+  actionIssue,
+  actionIssueFromServiceMessage,
+  actionWarning,
+  combineIssues,
+  hasErrors,
+  hasWarnings,
+  issueListContainsMessage,
+  type Issue,
+} from "../../../shared/issues";
 import { DocumentIssueStrip } from "../../../shared/ui/feedback/DocumentIssueStrip";
 import { SalesOrderItemAutocomplete, type SalesOrderItemAutocompleteRef } from "../components/SalesOrderItemAutocomplete";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -69,6 +78,7 @@ import { DocumentEventLogSection } from "../../../shared/ui/object/DocumentEvent
 import { useSettings } from "../../../shared/settings/SettingsContext";
 import { useTranslation } from "@/shared/i18n/context";
 import type { TFunction } from "@/shared/i18n/resolve";
+import { planningSalesOrderExportLabels } from "@/shared/i18n/excelPlanningExportLabels";
 import { translateZeroPriceReason, translateCancelReason } from "@/shared/i18n/reasonLabels";
 import {
   translatePlanningFulfillmentState,
@@ -731,7 +741,8 @@ export function SalesOrderPage() {
     setActionIssues([]);
     const result = confirm(id);
     if (result.success) setRefresh((r) => r + 1);
-    else if (!issueListContainsMessage(health.issues, result.error)) setActionIssues([actionIssue(result.error)]);
+    else if (!issueListContainsMessage(health.issues, result.error))
+      setActionIssues([actionIssueFromServiceMessage(result.error)]);
   };
   const handleCancelDocument = () => {
     if (!id || isNew) return;
@@ -743,7 +754,8 @@ export function SalesOrderPage() {
     setActionIssues([]);
     const result = createShipment(id);
     if (result.success) navigate(`/shipments/${result.shipmentId}`);
-    else if (!issueListContainsMessage(health.issues, result.error)) setActionIssues([actionIssue(result.error)]);
+    else if (!issueListContainsMessage(health.issues, result.error))
+      setActionIssues([actionIssueFromServiceMessage(result.error)]);
   };
 
   const handleAllocateStock = () => {
@@ -751,7 +763,8 @@ export function SalesOrderPage() {
     setActionIssues([]);
     const result = allocateStock(id);
     if (result.success) setRefresh((r) => r + 1);
-    else if (!issueListContainsMessage(health.issues, result.error)) setActionIssues([actionIssue(result.error)]);
+    else if (!issueListContainsMessage(health.issues, result.error))
+      setActionIssues([actionIssueFromServiceMessage(result.error)]);
   };
 
   const handleSave = () => {
@@ -791,7 +804,7 @@ export function SalesOrderPage() {
         setRefresh((r) => r + 1);
       }
     } else if (!issueListContainsMessage(health.issues, result.error)) {
-      setActionIssues([actionIssue(result.error)]);
+      setActionIssues([actionIssueFromServiceMessage(result.error)]);
     }
   };
 
@@ -1059,16 +1072,12 @@ export function SalesOrderPage() {
     const result = cancelDocument(id, payload);
     if (result.success) setRefresh((r) => r + 1);
     else if (!issueListContainsMessage(health.issues, result.error))
-      setActionIssues([actionIssue(result.error)]);
+      setActionIssues([actionIssueFromServiceMessage(result.error)]);
   };
 
   const combinedIssues = useMemo(
     () => combineIssues(health.issues, actionIssues),
     [health.issues, actionIssues],
-  );
-  const { errors: combinedErrors, warnings: combinedWarnings } = useMemo(
-    () => getErrorAndWarningMessages(combinedIssues),
-    [combinedIssues],
   );
 
   const getRowClass = useCallback(
@@ -1184,6 +1193,8 @@ export function SalesOrderPage() {
     [t],
   );
 
+  const soExcelLabels = useMemo(() => planningSalesOrderExportLabels(t), [t, locale]);
+
   const handleExportMain = useCallback(() => {
     const rows = getExportRowsAll();
     const summary: SoDocumentSummary = {
@@ -1197,10 +1208,11 @@ export function SalesOrderPage() {
       totalAmount: isEditable ? totals.totalAmount : readonlyTotals.totalAmount,
     };
     runExportWithSaveAs(`${soNumberForFile}_document.xlsx`, () =>
-      buildDocumentXlsxBuffer(summary, rows),
+      buildDocumentXlsxBuffer(summary, rows, soExcelLabels),
     );
   }, [
     getExportRowsAll,
+    soExcelLabels,
     isNew,
     doc,
     isEditable,
@@ -1224,15 +1236,15 @@ export function SalesOrderPage() {
     const rows = getExportRowsSelected();
     if (rows.length === 0) return;
     runExportWithSaveAs(`${soNumberForFile}_selected-lines.xlsx`, () =>
-      buildLinesXlsxBuffer(rows),
+      buildLinesXlsxBuffer(rows, soExcelLabels),
     );
-  }, [getExportRowsSelected, soNumberForFile, runExportWithSaveAs]);
+  }, [getExportRowsSelected, soNumberForFile, soExcelLabels, runExportWithSaveAs]);
 
   const handleExportAll = useCallback(() => {
     const rows = getExportRowsAll();
     if (rows.length === 0) return;
-    runExportWithSaveAs(`${soNumberForFile}_all-lines.xlsx`, () => buildLinesXlsxBuffer(rows));
-  }, [getExportRowsAll, soNumberForFile, runExportWithSaveAs]);
+    runExportWithSaveAs(`${soNumberForFile}_all-lines.xlsx`, () => buildLinesXlsxBuffer(rows, soExcelLabels));
+  }, [getExportRowsAll, soNumberForFile, soExcelLabels, runExportWithSaveAs]);
 
   const exportSelectedDisabled = !isEditable || selectedLineIds.length === 0;
 
@@ -1288,8 +1300,8 @@ export function SalesOrderPage() {
             {!isNew && <StatusBadge status={doc!.status} />}
           </div>
           <div className="doc-header__right">
-            {isEditable && (combinedErrors.length > 0 || combinedWarnings.length > 0) && (
-              <DocumentIssueStrip errors={combinedErrors} warnings={combinedWarnings} />
+            {isEditable && (hasErrors(combinedIssues) || hasWarnings(combinedIssues)) && (
+              <DocumentIssueStrip issues={combinedIssues} />
             )}
             <div className="doc-header__actions">
               {isEditable && (

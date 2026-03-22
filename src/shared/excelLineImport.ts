@@ -40,6 +40,42 @@ export type ExcelImportPreview = {
   rows: ExcelImportPreviewRow[];
 };
 
+/** Recognized header cell texts (localized + legacy English). */
+export type LineImportHeaderSynonyms = {
+  code: string[];
+  barcode: string[];
+  qty: string[];
+  unitPrice: string[];
+};
+
+/** User-visible strings for the downloadable Excel template. */
+export type LineImportTemplateLabels = {
+  dataSheetName: string;
+  instructionSheetName: string;
+  columnHeaders: {
+    itemCode: string;
+    qty: string;
+    unitPrice: string;
+  };
+  instructionTitle: string;
+  /** One string per instruction line (typically 5). */
+  instructionLines: string[];
+};
+
+export type LineImportParseLabels = {
+  workbookNoWorksheets: string;
+  headerSynonyms: LineImportHeaderSynonyms;
+  buildHeaderValidationError: (
+    kind: "missing_qty" | "missing_identifier",
+    detectedHeaders: string[],
+  ) => string;
+  rowReasons: {
+    missingItemCodeBarcode: string;
+    qtyMustBePositive: string;
+    unitPriceNumericNonNegative: string;
+  };
+};
+
 type HeaderMap = {
   codeCol: number | null;
   barcodeCol: number | null;
@@ -47,51 +83,23 @@ type HeaderMap = {
   unitPriceCol: number | null;
 };
 
-type ParseOptions = {
+export type ParseOptions = {
   items: Item[];
   getDefaultUnitPrice: (item: Item) => number;
+  labels: LineImportParseLabels;
 };
-
-export async function buildLineImportTemplateXlsxBuffer(): Promise<ArrayBuffer> {
-  const { default: ExcelJS } = await import("exceljs");
-  const workbook = new ExcelJS.Workbook();
-
-  const sheet = workbook.addWorksheet("Lines Import");
-  sheet.columns = [
-    { header: "Item Code", key: "itemCode", width: 24 },
-    { header: "Qty", key: "qty", width: 10 },
-    { header: "Unit Price", key: "unitPrice", width: 14 },
-  ];
-
-  const headerRow = sheet.getRow(1);
-  headerRow.font = { bold: true };
-
-  sheet.addRow({ itemCode: "ITEM-001", qty: 5, unitPrice: 7.99 });
-  sheet.addRow({ itemCode: "ITEM-002", qty: 2, unitPrice: 9.5 });
-  sheet.addRow({ itemCode: "ITEM-003", qty: 1, unitPrice: 12.0 });
-
-  for (let rowIndex = 2; rowIndex <= 4; rowIndex++) {
-    const row = sheet.getRow(rowIndex);
-    row.font = { color: { argb: "FF6B7280" }, italic: true };
-  }
-
-  const instructions = workbook.addWorksheet("Instructions");
-  instructions.getCell("A1").value = "How to use this template";
-  instructions.getCell("A1").font = { bold: true };
-  instructions.getCell("A3").value = "1) Fill rows on the first worksheet: Lines Import.";
-  instructions.getCell("A4").value = "2) Use Item Code values that exist in your catalog.";
-  instructions.getCell("A5").value = "3) Qty is required and must be greater than 0.";
-  instructions.getCell("A6").value = "4) Unit Price is optional (defaults are applied when empty).";
-  instructions.getCell("A7").value = "5) Example rows are demos. Replace them with real data before import.";
-  instructions.columns = [{ width: 90 }];
-
-  return workbook.xlsx.writeBuffer();
-}
-
-type HeaderValidationKind = "missing_qty" | "missing_identifier";
 
 function normalizeHeader(value: string): string {
   return value.trim().toLowerCase().replace(/\s+/g, " ");
+}
+
+function cellMatchesSynonyms(cellText: string, synonyms: string[]): boolean {
+  const n = normalizeHeader(cellText);
+  if (!n) return false;
+  for (const syn of synonyms) {
+    if (normalizeHeader(syn) === n) return true;
+  }
+  return false;
 }
 
 function toText(value: unknown): string {
@@ -125,87 +133,51 @@ function collectDetectedHeaders(row1: {
   return headers;
 }
 
-function buildHeaderValidationMessage(
-  kind: HeaderValidationKind,
-  detectedHeaders: string[],
-): string {
-  const detected =
-    detectedHeaders.length > 0
-      ? detectedHeaders.join(" | ")
-      : "(row 1 appears blank)";
-
-  const lines: string[] = [];
-  lines.push("Import failed: Excel header row is not in the expected format.");
-  if (kind === "missing_qty") {
-    lines.push("Missing required quantity column.");
-    lines.push("Expected header: Qty or Quantity.");
-  } else {
-    lines.push("Missing required item identifier column.");
-    lines.push(
-      "Expected one of: Item Code, Code, Barcode, Item Barcode.",
-    );
-  }
-  lines.push(`Detected headers (row 1): ${detected}`);
-  lines.push(
-    "Tip: header row must be in row 1 and each header should be in a separate column.",
-  );
-  lines.push("Example: Item Code | Qty");
-  lines.push("         ITEM-001 | 5");
-
-  const normalizedDetected = detectedHeaders.map((h) => normalizeHeader(h));
-  if (
-    normalizedDetected.some((h) => h.includes("item") && h.includes("barcode"))
-  ) {
-    lines.push(
-      "Hint: one column seems to combine labels. Split headers into separate columns.",
-    );
-  }
-  if (
-    kind === "missing_qty" &&
-    normalizedDetected.some((h) => h.includes("qty") || h.includes("quant"))
-  ) {
-    lines.push(
-      "Hint: quantity header may be misspelled. Use exactly Qty or Quantity.",
-    );
-  }
-
-  return lines.join("\n");
-}
-
-function parseHeaderMap(worksheet: { getRow: (row: number) => { cellCount: number; getCell: (col: number) => { value: unknown } } }): HeaderMap {
+function parseHeaderMap(
+  worksheet: {
+    getRow: (row: number) => {
+      cellCount: number;
+      getCell: (col: number) => { value: unknown };
+    };
+  },
+  labels: LineImportParseLabels,
+): HeaderMap {
   const row1 = worksheet.getRow(1);
   const detectedHeaders = collectDetectedHeaders(row1);
   let codeCol: number | null = null;
   let barcodeCol: number | null = null;
   let qtyCol: number | null = null;
   let unitPriceCol: number | null = null;
+  const syn = labels.headerSynonyms;
 
   for (let c = 1; c <= row1.cellCount; c++) {
-    const h = normalizeHeader(toText(row1.getCell(c).value));
-    if (!h) continue;
-    if ((h === "item code" || h === "code") && codeCol == null) {
+    const raw = toText(row1.getCell(c).value);
+    if (!normalizeHeader(raw)) continue;
+    if (cellMatchesSynonyms(raw, syn.code) && codeCol == null) {
       codeCol = c;
       continue;
     }
-    if ((h === "barcode" || h === "item barcode") && barcodeCol == null) {
+    if (cellMatchesSynonyms(raw, syn.barcode) && barcodeCol == null) {
       barcodeCol = c;
       continue;
     }
-    if ((h === "qty" || h === "quantity") && qtyCol == null) {
+    if (cellMatchesSynonyms(raw, syn.qty) && qtyCol == null) {
       qtyCol = c;
       continue;
     }
-    if ((h === "unit price" || h === "price") && unitPriceCol == null) {
+    if (cellMatchesSynonyms(raw, syn.unitPrice) && unitPriceCol == null) {
       unitPriceCol = c;
       continue;
     }
   }
 
   if (qtyCol == null) {
-    throw new Error(buildHeaderValidationMessage("missing_qty", detectedHeaders));
+    throw new Error(labels.buildHeaderValidationError("missing_qty", detectedHeaders));
   }
   if (codeCol == null && barcodeCol == null) {
-    throw new Error(buildHeaderValidationMessage("missing_identifier", detectedHeaders));
+    throw new Error(
+      labels.buildHeaderValidationError("missing_identifier", detectedHeaders),
+    );
   }
 
   return {
@@ -216,6 +188,43 @@ function parseHeaderMap(worksheet: { getRow: (row: number) => { cellCount: numbe
   };
 }
 
+export async function buildLineImportTemplateXlsxBuffer(
+  labels: LineImportTemplateLabels,
+): Promise<ArrayBuffer> {
+  const { default: ExcelJS } = await import("exceljs");
+  const workbook = new ExcelJS.Workbook();
+
+  const sheet = workbook.addWorksheet(labels.dataSheetName);
+  const { itemCode, qty, unitPrice } = labels.columnHeaders;
+  sheet.columns = [
+    { header: itemCode, key: "itemCode", width: 24 },
+    { header: qty, key: "qty", width: 10 },
+    { header: unitPrice, key: "unitPrice", width: 14 },
+  ];
+
+  const headerRow = sheet.getRow(1);
+  headerRow.font = { bold: true };
+
+  sheet.addRow({ itemCode: "ITEM-001", qty: 5, unitPrice: 7.99 });
+  sheet.addRow({ itemCode: "ITEM-002", qty: 2, unitPrice: 9.5 });
+  sheet.addRow({ itemCode: "ITEM-003", qty: 1, unitPrice: 12.0 });
+
+  for (let rowIndex = 2; rowIndex <= 4; rowIndex++) {
+    const row = sheet.getRow(rowIndex);
+    row.font = { color: { argb: "FF6B7280" }, italic: true };
+  }
+
+  const instructions = workbook.addWorksheet(labels.instructionSheetName);
+  instructions.getCell("A1").value = labels.instructionTitle;
+  instructions.getCell("A1").font = { bold: true };
+  labels.instructionLines.forEach((line, i) => {
+    instructions.getCell(`A${i + 3}`).value = line;
+  });
+  instructions.columns = [{ width: 90 }];
+
+  return workbook.xlsx.writeBuffer();
+}
+
 export async function parseExcelLineImport(
   buffer: ArrayBuffer,
   options: ParseOptions,
@@ -224,9 +233,9 @@ export async function parseExcelLineImport(
   const workbook = new ExcelJS.Workbook();
   await workbook.xlsx.load(buffer);
   const worksheet = workbook.worksheets[0];
-  if (!worksheet) throw new Error("Excel import: workbook has no worksheets.");
+  if (!worksheet) throw new Error(options.labels.workbookNoWorksheets);
 
-  const header = parseHeaderMap(worksheet);
+  const header = parseHeaderMap(worksheet, options.labels);
   const codeMap = new Map<string, Item>();
   const barcodeMap = new Map<string, Item>();
   for (const item of options.items) {
@@ -243,6 +252,7 @@ export async function parseExcelLineImport(
   let invalidQuantityRows = 0;
   let invalidFormatRows = 0;
   const grouped = new Map<string, ExcelImportGroupedValid>();
+  const rr = options.labels.rowReasons;
 
   for (let r = 2; r <= worksheet.actualRowCount; r++) {
     const row = worksheet.getRow(r);
@@ -265,7 +275,7 @@ export async function parseExcelLineImport(
         qty: null,
         unitPrice: null,
         status: "invalid_format",
-        reason: "Missing item code/barcode.",
+        reason: rr.missingItemCodeBarcode,
       });
       invalidFormatRows++;
       continue;
@@ -279,7 +289,7 @@ export async function parseExcelLineImport(
         qty: null,
         unitPrice: null,
         status: "invalid_quantity",
-        reason: "Quantity must be a numeric value greater than 0.",
+        reason: rr.qtyMustBePositive,
       });
       invalidQuantityRows++;
       continue;
@@ -326,7 +336,7 @@ export async function parseExcelLineImport(
           qty,
           unitPrice: null,
           status: "invalid_format",
-          reason: "Unit price must be numeric and >= 0.",
+          reason: rr.unitPriceNumericNonNegative,
           itemId: matched.id,
           itemCode: matched.code,
           itemName: matched.name,

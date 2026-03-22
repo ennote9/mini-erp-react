@@ -1,4 +1,5 @@
 import type { Workbook } from "exceljs";
+import type { ExcelListSheetLabels } from "../../shared/export/excelExportLabels";
 
 export type ReceiptsExportRow = {
   no: number;
@@ -9,8 +10,6 @@ export type ReceiptsExportRow = {
   status: string;
 };
 
-const COLUMN_HEADERS = ["№", "Number", "Date", "Purchase Order", "Warehouse", "Status"] as const;
-const SHEET_NAME = "Receipts";
 const TABLE_NAME_BASE = "ReceiptsTable";
 const WIDTH_PADDING = 1.5;
 const DEFAULT_MIN = 8;
@@ -36,13 +35,14 @@ const WIDTH_BOUNDS = [
   { min: 4, max: 6 },
   { min: 8, max: 24 },
   { min: 10, max: 14 },
-  { min: 14, max: 24 },
+  { min: 8, max: 42 },
   { min: 10, max: 24 },
   { min: 8, max: 14 },
 ];
 
-function addSheet(workbook: Workbook, rows: ReceiptsExportRow[]): void {
-  const sheet = workbook.addWorksheet(SHEET_NAME, { views: [{ state: "frozen" as const, ySplit: 1 }] });
+function addSheet(workbook: Workbook, rows: ReceiptsExportRow[], labels: ExcelListSheetLabels): void {
+  const COLUMN_HEADERS = labels.headers;
+  const sheet = workbook.addWorksheet(labels.sheetName, { views: [{ state: "frozen" as const, ySplit: 1 }] });
   if (rows.length === 0) {
     sheet.addRow([...COLUMN_HEADERS]);
     for (let c = 0; c < COLUMN_HEADERS.length; c++)
@@ -66,9 +66,12 @@ function addSheet(workbook: Workbook, rows: ReceiptsExportRow[]): void {
   }
 }
 
-export async function buildReceiptsListXlsxBuffer(rows: ReceiptsExportRow[]): Promise<ArrayBuffer> {
+export async function buildReceiptsListXlsxBuffer(
+  rows: ReceiptsExportRow[],
+  labels: ExcelListSheetLabels,
+): Promise<ArrayBuffer> {
   const ExcelJS = await import("exceljs");
   const wb = new ExcelJS.Workbook();
-  addSheet(wb, rows);
+  addSheet(wb, rows, labels);
   return wb.xlsx.writeBuffer();
 }

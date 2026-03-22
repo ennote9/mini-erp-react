@@ -35,6 +35,7 @@ import { save } from "@tauri-apps/plugin-dialog";
 import { invoke } from "@tauri-apps/api/core";
 import { revealItemInDir } from "@tauri-apps/plugin-opener";
 import { useTranslation } from "@/shared/i18n/context";
+import { purchaseOrdersListExcelLabels } from "@/shared/i18n/excelListExportLabels";
 
 type StatusFilter = "all" | PlanningDocumentStatus;
 
@@ -270,16 +271,18 @@ export function PurchaseOrdersListPage() {
     [t],
   );
 
+  const listExcelLabels = useMemo(() => purchaseOrdersListExcelLabels(t), [t, locale]);
+
   const handleExportCurrentView = useCallback(() => {
     const rows = getExportRowsCurrentView();
-    runExportWithSaveAs("purchase-orders.xlsx", () => buildPurchaseOrdersListXlsxBuffer(rows));
-  }, [getExportRowsCurrentView, runExportWithSaveAs]);
+    runExportWithSaveAs("purchase-orders.xlsx", () => buildPurchaseOrdersListXlsxBuffer(rows, listExcelLabels));
+  }, [getExportRowsCurrentView, listExcelLabels, runExportWithSaveAs]);
 
   const handleExportSelected = useCallback(() => {
     const rows = getExportRowsSelected();
     if (rows.length === 0) return;
-    runExportWithSaveAs("purchase-orders-selected.xlsx", () => buildPurchaseOrdersListXlsxBuffer(rows));
-  }, [getExportRowsSelected, runExportWithSaveAs]);
+    runExportWithSaveAs("purchase-orders-selected.xlsx", () => buildPurchaseOrdersListXlsxBuffer(rows, listExcelLabels));
+  }, [getExportRowsSelected, listExcelLabels, runExportWithSaveAs]);
 
   const exportSelectedDisabled = selectedCount === 0;
 

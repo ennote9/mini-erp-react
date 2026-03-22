@@ -15,9 +15,9 @@ import { BackButton } from "../../../shared/ui/list/BackButton";
 import { StatusBadge } from "../../../shared/ui/feedback/StatusBadge";
 import { DocumentIssueStrip } from "../../../shared/ui/feedback/DocumentIssueStrip";
 import {
-  actionIssue,
-  getErrorAndWarningMessages,
+  actionIssueFromServiceMessage,
   hasErrors,
+  hasWarnings,
   type Issue,
 } from "../../../shared/issues";
 import { AgGridContainer } from "../../../shared/ui/ag-grid/AgGridContainer";
@@ -43,6 +43,7 @@ import { revealItemInDir } from "@tauri-apps/plugin-opener";
 import { factualDocumentIssuesForStrip } from "../../../shared/factualDocumentPageIssues";
 import { useTranslation } from "@/shared/i18n/context";
 import type { TFunction } from "@/shared/i18n/resolve";
+import { receiptExcelExportLabels } from "@/shared/i18n/excelPlanningExportLabels";
 import { translateCancelReason, translateReversalReason } from "@/shared/i18n/reasonLabels";
 import {
   CancelDocumentReasonDialog,
@@ -254,6 +255,8 @@ export function ReceiptPage() {
     [t],
   );
 
+  const receiptExcelLabels = useMemo(() => receiptExcelExportLabels(t), [t, locale]);
+
   const handleExportMain = useCallback(() => {
     const rows = getExportRowsAll();
     const summary: ReceiptDocumentSummary = {
@@ -264,23 +267,33 @@ export function ReceiptPage() {
       comment: doc!.comment ?? "",
     };
     runExportWithSaveAs(`${receiptNumberForFile}_document.xlsx`, () =>
-      buildDocumentXlsxBuffer(summary, rows),
+      buildDocumentXlsxBuffer(summary, rows, receiptExcelLabels),
     );
-  }, [doc, purchaseOrderNumber, warehouseName, receiptNumberForFile, getExportRowsAll, runExportWithSaveAs]);
+  }, [
+    doc,
+    purchaseOrderNumber,
+    warehouseName,
+    receiptNumberForFile,
+    getExportRowsAll,
+    runExportWithSaveAs,
+    receiptExcelLabels,
+  ]);
 
   const handleExportSelected = useCallback(() => {
     const rows = getExportRowsSelected();
     if (rows.length === 0) return;
     runExportWithSaveAs(`${receiptNumberForFile}_selected-lines.xlsx`, () =>
-      buildLinesXlsxBuffer(rows),
+      buildLinesXlsxBuffer(rows, receiptExcelLabels),
     );
-  }, [getExportRowsSelected, receiptNumberForFile, runExportWithSaveAs]);
+  }, [getExportRowsSelected, receiptNumberForFile, runExportWithSaveAs, receiptExcelLabels]);
 
   const handleExportAll = useCallback(() => {
     const rows = getExportRowsAll();
     if (rows.length === 0) return;
-    runExportWithSaveAs(`${receiptNumberForFile}_all-lines.xlsx`, () => buildLinesXlsxBuffer(rows));
-  }, [getExportRowsAll, receiptNumberForFile, runExportWithSaveAs]);
+    runExportWithSaveAs(`${receiptNumberForFile}_all-lines.xlsx`, () =>
+      buildLinesXlsxBuffer(rows, receiptExcelLabels),
+    );
+  }, [getExportRowsAll, receiptNumberForFile, runExportWithSaveAs, receiptExcelLabels]);
 
   const exportSelectedDisabled = selectedLineIds.length === 0;
 
@@ -306,7 +319,7 @@ export function ReceiptPage() {
       setActionIssues([]);
       setRefresh((r) => r + 1);
     } else {
-      setActionIssues([actionIssue(result.error)]);
+      setActionIssues([actionIssueFromServiceMessage(result.error)]);
     }
   };
 
@@ -318,7 +331,7 @@ export function ReceiptPage() {
       setActionIssues([]);
       setRefresh((r) => r + 1);
     } else {
-      setActionIssues([actionIssue(result.error)]);
+      setActionIssues([actionIssueFromServiceMessage(result.error)]);
     }
   };
 
@@ -327,10 +340,7 @@ export function ReceiptPage() {
     [actionIssues, isDraft, id, refresh],
   );
 
-  const { errors: documentErrors, warnings: documentWarnings } =
-    getErrorAndWarningMessages(issuesForStrip);
-  const hasDocumentIssues =
-    documentErrors.length > 0 || documentWarnings.length > 0;
+  const hasDocumentIssues = hasErrors(issuesForStrip) || hasWarnings(issuesForStrip);
   const postBlockedByValidation =
     isDraft &&
     settings.documents.blockPostWhenFactualHasBlockingErrors &&
@@ -361,12 +371,7 @@ export function ReceiptPage() {
             <StatusBadge status={doc.status} />
           </div>
           <div className="doc-header__right">
-            {hasDocumentIssues && (
-              <DocumentIssueStrip
-                errors={documentErrors}
-                warnings={documentWarnings}
-              />
-            )}
+            {hasDocumentIssues && <DocumentIssueStrip issues={issuesForStrip} />}
             <div className="doc-header__actions">
               {isDraft && (
                 <Button

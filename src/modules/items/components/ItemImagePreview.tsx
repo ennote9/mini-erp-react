@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import type { ItemImage } from "../model";
 import { Button } from "@/components/ui/button";
 import { ChevronLeft, ChevronRight, ExternalLink, Star, Trash2, Upload } from "lucide-react";
+import { useTranslation } from "@/shared/i18n/context";
 
 type LoadState = "idle" | "loading" | "ready" | "error";
 
@@ -23,10 +24,13 @@ type Props = {
   busy?: boolean;
 };
 
-function formatBytes(n: number): string {
-  if (n < 1024) return `${n} B`;
-  if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KB`;
-  return `${(n / (1024 * 1024)).toFixed(1)} MB`;
+function formatBytes(
+  n: number,
+  t: (path: string, params?: Record<string, string | number | undefined>) => string,
+): string {
+  if (n < 1024) return t("master.item.images.bytesB", { n });
+  if (n < 1024 * 1024) return t("master.item.images.bytesKb", { n: Number((n / 1024).toFixed(1)) });
+  return t("master.item.images.bytesMb", { n: Number((n / (1024 * 1024)).toFixed(1)) });
 }
 
 export function ItemImagePreview({
@@ -45,6 +49,7 @@ export function ItemImagePreview({
   canSelectNext,
   busy,
 }: Props) {
+  const { t } = useTranslation();
   const [imgDecodeFailed, setImgDecodeFailed] = useState(false);
 
   useEffect(() => {
@@ -64,14 +69,14 @@ export function ItemImagePreview({
       <div className="relative overflow-hidden rounded-md border border-input bg-background aspect-[4/3] max-h-[220px] flex items-center justify-center">
         {image.isPrimary && (
           <span className="absolute left-1.5 top-1.5 z-[1] rounded bg-primary/90 px-1.5 py-0.5 text-[10px] font-medium text-primary-foreground">
-            Primary
+            {t("master.item.images.badgePrimary")}
           </span>
         )}
         {(loadState === "loading" || loadState === "idle") && (
-          <p className="text-xs text-muted-foreground px-2 text-center">Loading preview…</p>
+          <p className="text-xs text-muted-foreground px-2 text-center">{t("master.item.images.loadingPreview")}</p>
         )}
         {loadState === "error" && (
-          <p className="text-xs text-destructive px-2 text-center">Preview unavailable</p>
+          <p className="text-xs text-destructive px-2 text-center">{t("master.item.images.previewUnavailable")}</p>
         )}
         {loadState === "ready" && previewUrl && (
           <img
@@ -82,7 +87,7 @@ export function ItemImagePreview({
           />
         )}
         {loadState === "ready" && !previewUrl && (
-          <p className="text-xs text-muted-foreground px-2 text-center">No preview URL</p>
+          <p className="text-xs text-muted-foreground px-2 text-center">{t("master.item.images.noPreviewUrl")}</p>
         )}
       </div>
       {showDevDecodeHint && (
@@ -100,7 +105,7 @@ export function ItemImagePreview({
           {image.fileName}
         </p>
         <p>
-          {formatBytes(image.sizeBytes)}
+          {formatBytes(image.sizeBytes, t)}
           {dim ? ` · ${dim}` : ""}
         </p>
       </div>
@@ -112,11 +117,11 @@ export function ItemImagePreview({
           className="h-8 gap-1"
           onClick={onReplace}
           disabled={busy}
-          title="Replace selected image"
-          aria-label="Replace selected image"
+          title={t("master.item.images.replaceTitle")}
+          aria-label={t("master.item.images.replaceTitle")}
         >
           <Upload className="h-3.5 w-3.5" />
-          Replace
+          {t("master.item.images.replace")}
         </Button>
         <Button
           type="button"
@@ -125,11 +130,11 @@ export function ItemImagePreview({
           className="h-8 gap-1"
           onClick={onOpenFullSize}
           disabled={busy}
-          title="Open full size"
-          aria-label="Open full size"
+          title={t("master.item.images.openFullSizeTitle")}
+          aria-label={t("master.item.images.openFullSizeTitle")}
         >
           <ExternalLink className="h-3.5 w-3.5" />
-          Open full size
+          {t("master.item.images.openFullSize")}
         </Button>
         <Button
           type="button"
@@ -138,11 +143,11 @@ export function ItemImagePreview({
           className="h-8 gap-1 text-destructive hover:text-destructive"
           onClick={onRemove}
           disabled={busy}
-          title="Remove selected image"
-          aria-label="Remove selected image"
+          title={t("master.item.images.removeTitle")}
+          aria-label={t("master.item.images.removeTitle")}
         >
           <Trash2 className="h-3.5 w-3.5" />
-          Remove
+          {t("master.item.images.remove")}
         </Button>
         <Button
           type="button"
@@ -153,19 +158,19 @@ export function ItemImagePreview({
           disabled={primaryDisabled}
           title={
             !canSetPrimary
-              ? "Select an image first"
+              ? t("master.item.images.setPrimaryTitleDisabledNoSelection")
               : image.isPrimary
-                ? "Selected image is already primary"
-                : "Set as primary image"
+                ? t("master.item.images.setPrimaryTitleAlready")
+                : t("master.item.images.setPrimaryTitle")
           }
           aria-label={
             image.isPrimary
-              ? "Primary (selected image is already primary)"
-              : "Set as primary image"
+              ? t("master.item.images.setPrimaryAriaAlready")
+              : t("master.item.images.setPrimaryTitle")
           }
         >
           <Star className="h-3.5 w-3.5" />
-          Primary
+          {t("master.item.images.setPrimary")}
         </Button>
         <Button
           type="button"
@@ -174,8 +179,8 @@ export function ItemImagePreview({
           className="h-8 w-8 p-0"
           onClick={onSelectPrevious}
           disabled={busy || !canSelectPrevious}
-          title="Previous image"
-          aria-label="Previous image"
+          title={t("master.item.images.previousImage")}
+          aria-label={t("master.item.images.previousImage")}
         >
           <ChevronLeft className="h-4 w-4" />
         </Button>
@@ -186,8 +191,8 @@ export function ItemImagePreview({
           className="h-8 w-8 p-0"
           onClick={onSelectNext}
           disabled={busy || !canSelectNext}
-          title="Next image"
-          aria-label="Next image"
+          title={t("master.item.images.nextImage")}
+          aria-label={t("master.item.images.nextImage")}
         >
           <ChevronRight className="h-4 w-4" />
         </Button>

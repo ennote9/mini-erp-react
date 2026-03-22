@@ -1,6 +1,9 @@
 /** Shared document / list UI strings (extend per-module as needed). */
 export const docCommonEn = {
   breadcrumbHome: "Home",
+  grid: {
+    selectItem: "Select item",
+  },
   /** Lower-case phrase for "Cancel {{kind}}" / "Reverse {{kind}}" titles. */
   kinds: {
     purchaseOrder: "purchase order",

@@ -19,10 +19,18 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { actionIssue, combineIssues, getErrorAndWarningMessages, issueListContainsMessage, type Issue } from "../../../shared/issues";
+import {
+  actionIssueFromServiceMessage,
+  combineIssues,
+  hasErrors,
+  hasWarnings,
+  issueListContainsMessage,
+  type Issue,
+} from "../../../shared/issues";
 import { getBrandFormHealth } from "../../../shared/masterDataHealth";
 import { DocumentIssueStrip } from "../../../shared/ui/feedback/DocumentIssueStrip";
 import { Save, X } from "lucide-react";
+import { useTranslation } from "@/shared/i18n/context";
 
 type FormState = {
   code: string;
@@ -45,14 +53,16 @@ function itemImageCount(item: Item): number {
 }
 
 function RelatedItemsImagesCell({ item }: { item: Item }) {
+  const { t } = useTranslation();
   const n = itemImageCount(item);
   if (n === 0) {
-    return <span className="text-muted-foreground tabular-nums">—</span>;
+    return <span className="text-muted-foreground tabular-nums">{t("domain.audit.summary.emDash")}</span>;
   }
   return <span className="tabular-nums text-foreground/90">{n}</span>;
 }
 
 export function BrandPage() {
+  const { t } = useTranslation();
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const isNew = id === "new";
@@ -96,10 +106,6 @@ export function BrandPage() {
     () => combineIssues(health.issues, actionIssues),
     [health.issues, actionIssues],
   );
-  const { errors: combinedErrors, warnings: combinedWarnings } = useMemo(
-    () => getErrorAndWarningMessages(combinedIssues),
-    [combinedIssues],
-  );
 
   useEffect(() => {
     if (isNew) {
@@ -130,7 +136,7 @@ export function BrandPage() {
     if (result.success) {
       navigate("/brands");
     } else if (!issueListContainsMessage(health.issues, result.error)) {
-      setActionIssues([actionIssue(result.error)]);
+      setActionIssues([actionIssueFromServiceMessage(result.error)]);
     }
   };
 
@@ -141,7 +147,7 @@ export function BrandPage() {
   if (!id) {
     return (
       <div className="doc-page doc-page--not-found">
-        <p>Brand not found.</p>
+        <p>{t("master.brand.notFound")}</p>
       </div>
     );
   }
@@ -149,23 +155,25 @@ export function BrandPage() {
   if (!isNew && !brand) {
     return (
       <div className="doc-page doc-page--not-found">
-        <p>Brand not found.</p>
+        <p>{t("master.brand.notFound")}</p>
       </div>
     );
   }
 
   const breadcrumbItems = [
-    { label: "Master Data", to: "/brands" },
-    { label: "Brands", to: "/brands" },
-    { label: isNew ? "New" : brand!.code },
+    { label: t("master.breadcrumb.masterData"), to: "/brands" },
+    { label: t("master.brand.listBreadcrumb"), to: "/brands" },
+    { label: isNew ? t("master.common.newLabel") : brand!.code },
   ];
 
-  const displayTitle = isNew ? "New Brand" : `Brand ${brand!.code}`;
+  const displayTitle = isNew ? t("master.brand.titleNew") : t("master.brand.titleWithCode", { code: brand!.code });
+
+  const em = t("domain.audit.summary.emDash");
 
   return (
     <div className="doc-page">
       <div className="doc-page__breadcrumb">
-        <BackButton to="/brands" aria-label="Back to Brands" />
+        <BackButton to="/brands" aria-label={t("master.brand.backToListAria")} />
         <Breadcrumb items={breadcrumbItems} />
       </div>
       <div className="doc-page__header">
@@ -174,17 +182,17 @@ export function BrandPage() {
             <h2 className="doc-header__title">{displayTitle}</h2>
           </div>
           <div className="doc-header__right">
-            {(combinedErrors.length > 0 || combinedWarnings.length > 0) && (
-              <DocumentIssueStrip errors={combinedErrors} warnings={combinedWarnings} />
+            {(hasErrors(combinedIssues) || hasWarnings(combinedIssues)) && (
+              <DocumentIssueStrip issues={combinedIssues} />
             )}
             <div className="doc-header__actions">
               <Button type="button" onClick={handleSave}>
                 <Save aria-hidden />
-                Save
+                {t("common.save")}
               </Button>
               <Button type="button" variant="outline" onClick={handleCancel}>
                 <X aria-hidden />
-                Cancel
+                {t("common.cancel")}
               </Button>
             </div>
           </div>
@@ -192,36 +200,36 @@ export function BrandPage() {
       </div>
       <Card className="mt-4 max-w-2xl border-0 shadow-none">
         <CardHeader className="p-2 pb-0.5">
-          <CardTitle className="text-[0.9rem] font-semibold">Details</CardTitle>
+          <CardTitle className="text-[0.9rem] font-semibold">{t("master.common.detailsTitle")}</CardTitle>
           <CardDescription className="text-xs">
-            Code, name and status for this brand.
+            {t("master.brand.detailsDescription")}
           </CardDescription>
         </CardHeader>
         <CardContent className="p-2 pt-1">
           <div className="grid gap-2 sm:grid-cols-2">
             <div className="flex flex-col gap-0.5 sm:col-span-2">
               <Label htmlFor="brand-code" className="text-sm">
-                Code <span className="text-destructive">*</span>
+                {t("doc.columns.code")} <span className="text-destructive">{t("doc.page.requiredStar")}</span>
               </Label>
               <Input
                 id="brand-code"
                 type="text"
                 value={form.code}
                 onChange={(e) => setForm((f) => ({ ...f, code: e.target.value }))}
-                placeholder="e.g. ACME"
+                placeholder={t("master.brand.codePlaceholderAlt")}
                 className="h-8 text-sm"
               />
             </div>
             <div className="flex flex-col gap-0.5 sm:col-span-2">
               <Label htmlFor="brand-name" className="text-sm">
-                Name <span className="text-destructive">*</span>
+                {t("doc.columns.name")} <span className="text-destructive">{t("doc.page.requiredStar")}</span>
               </Label>
               <Input
                 id="brand-name"
                 type="text"
                 value={form.name}
                 onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
-                placeholder="Brand name"
+                placeholder={t("master.brand.namePlaceholder")}
                 className="h-8 text-sm"
               />
             </div>
@@ -237,18 +245,18 @@ export function BrandPage() {
                 htmlFor="brand-active"
                 className="cursor-pointer text-sm font-normal"
               >
-                Active
+                {t("ops.master.activeCell.active")}
               </Label>
             </div>
             <div className="flex flex-col gap-0.5 sm:col-span-2">
-              <Label htmlFor="brand-comment" className="text-sm">Comment</Label>
+              <Label htmlFor="brand-comment" className="text-sm">{t("doc.columns.comment")}</Label>
               <Textarea
                 id="brand-comment"
                 value={form.comment}
                 onChange={(e) =>
                   setForm((f) => ({ ...f, comment: e.target.value }))
                 }
-                placeholder="Optional"
+                placeholder={t("common.optional")}
                 rows={2}
                 className="resize-none min-h-[4.5rem] text-sm"
               />
@@ -263,10 +271,10 @@ export function BrandPage() {
             <div className="flex flex-wrap items-start justify-between gap-2 gap-y-1.5">
               <div className="min-w-0 space-y-0.5 flex-1">
                 <CardTitle className="text-[0.9rem] font-semibold tracking-tight">
-                  Related Items
+                  {t("master.related.itemsTitle")}
                 </CardTitle>
                 <CardDescription className="text-xs leading-snug">
-                  Linked inventory records. Read-only; open a row for detail.
+                  {t("master.related.itemsHint")}
                 </CardDescription>
               </div>
               <Button
@@ -278,50 +286,50 @@ export function BrandPage() {
                   navigate(`/items?brandId=${encodeURIComponent(brand.id)}`)
                 }
               >
-                Open all items
+                {t("master.related.openAllItems")}
               </Button>
             </div>
           </CardHeader>
           <CardContent className="p-2 pt-1 space-y-2">
             <div
               className="flex flex-wrap gap-1.5"
-              aria-label="Related items summary"
+              aria-label={t("master.related.summaryAria")}
             >
               <span className="inline-flex items-baseline gap-1 rounded border border-border/50 bg-muted/25 px-2 py-0.5 text-[11px] tabular-nums leading-none">
-                <span className="text-muted-foreground">Items</span>
+                <span className="text-muted-foreground">{t("master.related.chipItems")}</span>
                 <span className="font-medium text-foreground/90">{relatedSummary.total}</span>
               </span>
               <span className="inline-flex items-baseline gap-1 rounded border border-border/50 bg-muted/25 px-2 py-0.5 text-[11px] tabular-nums leading-none">
-                <span className="text-muted-foreground">Active</span>
+                <span className="text-muted-foreground">{t("master.related.chipActive")}</span>
                 <span className="font-medium text-foreground/90">{relatedSummary.active}</span>
               </span>
               <span className="inline-flex items-baseline gap-1 rounded border border-border/50 bg-muted/25 px-2 py-0.5 text-[11px] tabular-nums leading-none">
-                <span className="text-muted-foreground">Inactive</span>
+                <span className="text-muted-foreground">{t("master.related.chipInactive")}</span>
                 <span className="font-medium text-foreground/90">{relatedSummary.inactive}</span>
               </span>
             </div>
             {relatedItems.length === 0 ? (
               <p className="text-sm text-muted-foreground py-3 m-0">
-                No items linked to this brand yet.
+                {t("master.related.emptyBrand")}
               </p>
             ) : (
               <div className="min-w-0 overflow-x-auto rounded-md border border-border/60">
                 <table className="list-table text-sm">
                   <thead>
                     <tr>
-                      <th className="list-table__cell--code">Code</th>
-                      <th className="list-table__cell--name">Name</th>
-                      <th className="min-w-[100px]">Category</th>
-                      <th className="w-16 text-right whitespace-nowrap">Images</th>
-                      <th className="list-table__cell--active">Active</th>
+                      <th className="list-table__cell--code">{t("master.related.colCode")}</th>
+                      <th className="list-table__cell--name">{t("master.related.colName")}</th>
+                      <th className="min-w-[100px]">{t("master.related.colCategory")}</th>
+                      <th className="w-16 text-right whitespace-nowrap">{t("master.related.colImages")}</th>
+                      <th className="list-table__cell--active">{t("master.related.colActive")}</th>
                     </tr>
                   </thead>
                   <tbody>
                     {relatedItems.map((item) => {
                       const catName =
                         item.categoryId != null && item.categoryId !== ""
-                          ? categoryRepository.getById(item.categoryId)?.name ?? "—"
-                          : "—";
+                          ? categoryRepository.getById(item.categoryId)?.name ?? em
+                          : em;
                       return (
                         <tr
                           key={item.id}
@@ -329,7 +337,7 @@ export function BrandPage() {
                           onClick={() => navigate(`/items/${item.id}`)}
                           role="button"
                           tabIndex={0}
-                          aria-label={`Open item ${item.code}`}
+                          aria-label={t("master.related.openItemAria", { code: item.code })}
                           onKeyDown={(e) => {
                             if (e.key === "Enter" || e.key === " ") {
                               e.preventDefault();
@@ -351,7 +359,9 @@ export function BrandPage() {
                                   : "status-plain-text status-plain-text--inactive"
                               }
                             >
-                              {item.isActive ? "Active" : "Inactive"}
+                              {item.isActive
+                                ? t("ops.master.activeCell.active")
+                                : t("ops.master.activeCell.inactive")}
                             </span>
                           </td>
                         </tr>

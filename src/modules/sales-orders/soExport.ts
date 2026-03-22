@@ -1,4 +1,5 @@
 import type { Workbook } from "exceljs";
+import type { PlanningDocumentExcelLabels } from "../../shared/export/excelExportLabels";
 
 export type SoExportLineRow = {
   no: number;
@@ -22,23 +23,8 @@ export type SoDocumentSummary = {
   totalAmount: number;
 };
 
-// Single source of truth for Lines sheet columns (order and headers) — matches approved grid
-const LINES_COLUMN_HEADERS = [
-  "№",
-  "Item Code",
-  "Item Name",
-  "Brand",
-  "Category",
-  "Qty",
-  "Unit Price",
-  "Line Amount",
-] as const;
-
-const LINES_SHEET_NAME = "Lines";
-const DOC_SHEET_NAME = "Document";
 const LINES_TABLE_NAME_BASE = "LinesTable";
 
-/** Excel column width padding and bounds (lightweight heuristic) */
 const WIDTH_PADDING = 1.5;
 const DEFAULT_MIN_WIDTH = 8;
 const DEFAULT_MAX_WIDTH = 50;
@@ -82,8 +68,9 @@ const LINES_WIDTH_BOUNDS: { min: number; max: number }[] = [
 function applyLinesSheetColumnWidths(
   sheet: { getColumn: (col: number) => { width?: number } },
   lineRows: SoExportLineRow[],
+  lineHeaders: readonly string[],
 ): void {
-  const headers = [...LINES_COLUMN_HEADERS];
+  const headers = [...lineHeaders];
   for (let c = 0; c < headers.length; c++) {
     const headerLen = headers[c].length;
     const valueLengths = lineRows.map((r) => {
@@ -96,16 +83,22 @@ function applyLinesSheetColumnWidths(
   }
 }
 
-function addLinesSheetWithTable(workbook: Workbook, lineRows: SoExportLineRow[], sheetName: string): void {
+function addLinesSheetWithTable(
+  workbook: Workbook,
+  lineRows: SoExportLineRow[],
+  sheetName: string,
+  lineHeaders: readonly string[],
+): void {
   const sheet = workbook.addWorksheet(sheetName);
+  const headers = [...lineHeaders];
 
   if (lineRows.length === 0) {
-    sheet.addRow([...LINES_COLUMN_HEADERS]);
-    applyLinesSheetColumnWidths(sheet, []);
+    sheet.addRow(headers);
+    applyLinesSheetColumnWidths(sheet, [], lineHeaders);
     return;
   }
 
-  const columns = LINES_COLUMN_HEADERS.map((name) => ({ name, filterButton: true }));
+  const columns = headers.map((name) => ({ name, filterButton: true }));
   const rows = lineRows.map((r) => [
     r.no,
     r.itemCode,
@@ -126,17 +119,19 @@ function addLinesSheetWithTable(workbook: Workbook, lineRows: SoExportLineRow[],
     columns,
     rows,
   });
-  applyLinesSheetColumnWidths(sheet, lineRows);
+  applyLinesSheetColumnWidths(sheet, lineRows, lineHeaders);
 }
 
-export async function buildLinesXlsxBuffer(rows: SoExportLineRow[]): Promise<ArrayBuffer> {
+export async function buildLinesXlsxBuffer(
+  rows: SoExportLineRow[],
+  labels: PlanningDocumentExcelLabels,
+): Promise<ArrayBuffer> {
   const ExcelJS = await import("exceljs");
   const workbook = new ExcelJS.Workbook();
-  addLinesSheetWithTable(workbook, rows, LINES_SHEET_NAME);
+  addLinesSheetWithTable(workbook, rows, labels.linesSheetName, labels.planningLineHeaders);
   return workbook.xlsx.writeBuffer();
 }
 
-const DOC_LABELS = ["Number", "Date", "Status", "Customer", "Warehouse", "Comment", "Total Qty", "Total Amount"] as const;
 const DOC_SUMMARY_ROWS = 8;
 
 const THIN_BORDER = { style: "thin" as const };
@@ -180,8 +175,9 @@ function formatDocumentSummaryBlock(
 function applyDocumentSheetColumnWidths(
   sheet: { getColumn: (col: number) => { width?: number } },
   summary: SoDocumentSummary,
+  docLabels: readonly string[],
 ): void {
-  const labelLengths = DOC_LABELS.map((s) => s.length);
+  const labelLengths = docLabels.map((s) => s.length);
   const valueLengths = [
     cellDisplayLength(summary.number),
     cellDisplayLength(summary.date),
@@ -201,20 +197,22 @@ function applyDocumentSheetColumnWidths(
 export async function buildDocumentXlsxBuffer(
   summary: SoDocumentSummary,
   lineRows: SoExportLineRow[],
+  labels: PlanningDocumentExcelLabels,
 ): Promise<ArrayBuffer> {
   const ExcelJS = await import("exceljs");
   const workbook = new ExcelJS.Workbook();
-  const docSheet = workbook.addWorksheet(DOC_SHEET_NAME);
-  docSheet.addRow(["Number", summary.number]);
-  docSheet.addRow(["Date", summary.date]);
-  docSheet.addRow(["Status", summary.status]);
-  docSheet.addRow(["Customer", summary.customer]);
-  docSheet.addRow(["Warehouse", summary.warehouse]);
-  docSheet.addRow(["Comment", summary.comment]);
-  docSheet.addRow(["Total Qty", summary.totalQty]);
-  docSheet.addRow(["Total Amount", summary.totalAmount]);
-  applyDocumentSheetColumnWidths(docSheet, summary);
+  const docSheet = workbook.addWorksheet(labels.documentSheetName);
+  const L = labels.planningDocumentLabels;
+  docSheet.addRow([L[0], summary.number]);
+  docSheet.addRow([L[1], summary.date]);
+  docSheet.addRow([L[2], summary.status]);
+  docSheet.addRow([L[3], summary.customer]);
+  docSheet.addRow([L[4], summary.warehouse]);
+  docSheet.addRow([L[5], summary.comment]);
+  docSheet.addRow([L[6], summary.totalQty]);
+  docSheet.addRow([L[7], summary.totalAmount]);
+  applyDocumentSheetColumnWidths(docSheet, summary, L);
   formatDocumentSummaryBlock(docSheet, summary);
-  addLinesSheetWithTable(workbook, lineRows, LINES_SHEET_NAME);
+  addLinesSheetWithTable(workbook, lineRows, labels.linesSheetName, labels.planningLineHeaders);
   return workbook.xlsx.writeBuffer();
 }

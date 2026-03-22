@@ -32,6 +32,8 @@ import { buildSuppliersListXlsxBuffer, type SuppliersExportRow } from "../suppli
 import { save } from "@tauri-apps/plugin-dialog";
 import { invoke } from "@tauri-apps/api/core";
 import { revealItemInDir } from "@tauri-apps/plugin-opener";
+import { useTranslation } from "@/shared/i18n/context";
+import { suppliersListExcelLabels } from "@/shared/i18n/excelListExportLabels";
 
 type ActiveFilter = "all" | "active" | "inactive";
 
@@ -45,8 +47,9 @@ function applyActiveFilter(
 }
 
 function ActiveStatusCellRenderer(params: ICellRendererParams<Supplier>) {
+  const { t } = useTranslation();
   const isActive = params.value as boolean;
-  const label = isActive ? "Active" : "Inactive";
+  const label = isActive ? t("ops.master.activeCell.active") : t("ops.master.activeCell.inactive");
   return (
     <span className={isActive ? "status-plain-text status-plain-text--active" : "status-plain-text status-plain-text--inactive"}>
       {label}
@@ -54,18 +57,23 @@ function ActiveStatusCellRenderer(params: ICellRendererParams<Supplier>) {
   );
 }
 
-function buildExportRowsFromSuppliers(suppliers: Supplier[]): SuppliersExportRow[] {
+function buildExportRowsFromSuppliers(
+  suppliers: Supplier[],
+  activeYes: string,
+  activeNo: string,
+): SuppliersExportRow[] {
   return suppliers.map((s, idx) => ({
     no: idx + 1,
     code: s.code ?? "",
     name: s.name ?? "",
     phone: s.phone ?? "",
     email: s.email ?? "",
-    active: s.isActive ? "Active" : "Inactive",
+    active: s.isActive ? activeYes : activeNo,
   }));
 }
 
 export function SuppliersListPage() {
+  const { t, locale } = useTranslation();
   const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState("");
   const [activeFilter, setActiveFilter] = useState<ActiveFilter>("all");
@@ -90,26 +98,28 @@ export function SuppliersListPage() {
 
   const getExportRowsCurrentView = useCallback((): SuppliersExportRow[] => {
     const api = gridRef.current?.api;
-    if (!api) return buildExportRowsFromSuppliers(filteredRows);
+    const y = t("ops.master.exportActiveYes");
+    const n = t("ops.master.exportActiveNo");
+    if (!api) return buildExportRowsFromSuppliers(filteredRows, y, n);
     const rows: Supplier[] = [];
     api.forEachNodeAfterFilterAndSort((rowNode) => {
       if (rowNode.data) rows.push(rowNode.data);
     });
-    return buildExportRowsFromSuppliers(rows);
-  }, [filteredRows]);
+    return buildExportRowsFromSuppliers(rows, y, n);
+  }, [filteredRows, t]);
 
   const getExportRowsSelected = useCallback((): SuppliersExportRow[] => {
     const api = gridRef.current?.api;
     const rows: Supplier[] = api ? (api.getSelectedRows() as Supplier[]) : [];
-    return buildExportRowsFromSuppliers(rows);
-  }, []);
+    return buildExportRowsFromSuppliers(rows, t("ops.master.exportActiveYes"), t("ops.master.exportActiveNo"));
+  }, [t]);
 
   const runExportWithSaveAs = useCallback(
     async (defaultFilename: string, buildBuffer: () => Promise<ArrayBuffer>) => {
       try {
         const path = await save({
           defaultPath: defaultFilename,
-          filters: [{ name: "Excel", extensions: ["xlsx"] }],
+          filters: [{ name: t("ops.importModal.excelFileFilterName"), extensions: ["xlsx"] }],
         });
         if (path == null) return;
 
@@ -136,84 +146,84 @@ export function SuppliersListPage() {
         URL.revokeObjectURL(url);
       }
     },
-    [],
+    [t],
   );
+
+  const listExcelLabels = useMemo(() => suppliersListExcelLabels(t), [t, locale]);
 
   const handleExportCurrentView = useCallback(() => {
     const rows = getExportRowsCurrentView();
-    runExportWithSaveAs("suppliers.xlsx", () => buildSuppliersListXlsxBuffer(rows));
-  }, [getExportRowsCurrentView, runExportWithSaveAs]);
+    runExportWithSaveAs("suppliers.xlsx", () => buildSuppliersListXlsxBuffer(rows, listExcelLabels));
+  }, [getExportRowsCurrentView, listExcelLabels, runExportWithSaveAs]);
 
   const handleExportSelected = useCallback(() => {
     const rows = getExportRowsSelected();
     if (rows.length === 0) return;
-    runExportWithSaveAs("suppliers-selected.xlsx", () => buildSuppliersListXlsxBuffer(rows));
-  }, [getExportRowsSelected, runExportWithSaveAs]);
+    runExportWithSaveAs("suppliers-selected.xlsx", () => buildSuppliersListXlsxBuffer(rows, listExcelLabels));
+  }, [getExportRowsSelected, listExcelLabels, runExportWithSaveAs]);
 
   const exportSelectedDisabled = selectedCount === 0;
 
-  const emptyTitle = hasFilter
-    ? "No suppliers match current search or filters"
-    : "No suppliers yet";
-  const emptyHint = hasFilter
-    ? "Try changing the search or filter."
-    : "Create your first supplier to start purchasing workflow.";
+  const emptyTitle = hasFilter ? t("ops.list.suppliers.emptyFiltered") : t("ops.list.suppliers.emptyDefault");
+  const emptyHint = hasFilter ? t("ops.list.suppliers.hintFilter") : t("ops.list.suppliers.hintCreate");
+
+  const emDash = t("domain.audit.summary.emDash");
 
   const columnDefs = useMemo<ColDef<Supplier>[]>(
     () => [
       agGridRowNumberColDef,
       {
         field: "code",
-        headerName: "Code",
+        headerName: t("doc.columns.code"),
         width: 140,
       },
       {
         field: "name",
-        headerName: "Name",
+        headerName: t("doc.columns.name"),
         minWidth: 180,
         flex: 1,
       },
       {
         field: "contactPerson",
-        headerName: "Contact person",
+        headerName: t("doc.columns.contactPerson"),
         width: 140,
-        valueFormatter: (params) => params.value ?? "—",
+        valueFormatter: (params) => params.value ?? emDash,
       },
       {
         field: "phone",
-        headerName: "Phone",
+        headerName: t("doc.columns.phone"),
         width: 150,
-        valueFormatter: (params) => params.value ?? "—",
+        valueFormatter: (params) => params.value ?? emDash,
       },
       {
         field: "email",
-        headerName: "Email",
+        headerName: t("doc.columns.email"),
         minWidth: 180,
-        valueFormatter: (params) => params.value ?? "—",
+        valueFormatter: (params) => params.value ?? emDash,
       },
       {
         field: "city",
-        headerName: "City",
+        headerName: t("doc.columns.city"),
         width: 120,
-        valueFormatter: (params) => params.value ?? "—",
+        valueFormatter: (params) => params.value ?? emDash,
       },
       {
         field: "paymentTermsDays",
-        headerName: "Payment terms",
+        headerName: t("doc.columns.paymentTerms"),
         width: 120,
         valueFormatter: (params) =>
           params.value != null && typeof params.value === "number"
-            ? `${params.value} days`
-            : "—",
+            ? t("doc.summary.paymentTermsDays", { days: params.value })
+            : emDash,
       },
       {
         field: "isActive",
-        headerName: "Active",
+        headerName: t("doc.columns.active"),
         width: 110,
         cellRenderer: ActiveStatusCellRenderer,
       },
     ],
-    [],
+    [t, locale, emDash],
   );
 
   return (
@@ -221,8 +231,8 @@ export function SuppliersListPage() {
       header={null}
       controls={
         <>
-          <BackButton to="/" aria-label="Back to Dashboard" />
-          <ButtonGroup className="list-page__filter-group" aria-label="Filter by status">
+          <BackButton to="/" aria-label={t("doc.list.backToDashboard")} />
+          <ButtonGroup className="list-page__filter-group" aria-label={t("ops.list.filterStatusAria")}>
             {(["all", "active", "inactive"] as const).map((value, index) => (
               <React.Fragment key={value}>
                 {index > 0 && <ButtonGroupSeparator />}
@@ -233,34 +243,34 @@ export function SuppliersListPage() {
                   onClick={() => setActiveFilter(value)}
                 >
                   {value === "all"
-                    ? "All"
+                    ? t("doc.list.all")
                     : value === "active"
-                      ? "Active"
-                      : "Inactive"}
+                      ? t("ops.master.activeCell.active")
+                      : t("ops.master.activeCell.inactive")}
                 </Button>
               </React.Fragment>
             ))}
           </ButtonGroup>
           <ListPageSearch
             inputRef={listSearchInputRef}
-            placeholder="Search"
+            placeholder={t("ops.list.suppliers.searchPlaceholder")}
             value={searchQuery}
             onChange={setSearchQuery}
-            aria-label="Search suppliers"
+            aria-label={t("ops.list.suppliers.searchAria")}
             resultCount={filteredRows.length}
           />
           <div className="flex flex-row items-center gap-2 shrink-0 ml-auto">
             {exportSuccess && (
               <div className="h-8 w-max flex items-center gap-1.5 rounded-md border border-input bg-background px-2 text-sm shrink-0">
-                <span className="text-muted-foreground text-xs">Export completed:</span>
+                <span className="text-muted-foreground text-xs">{t("doc.list.exportCompleted")}</span>
                 <span className="font-medium text-xs truncate max-w-[12rem]" title={exportSuccess.filename}>{exportSuccess.filename}</span>
                 <Button
                   type="button"
                   variant="ghost"
                   size="icon"
                   className="h-7 w-7 shrink-0 text-muted-foreground hover:text-foreground"
-                  title="Open file"
-                  aria-label="Open file"
+                  title={t("doc.list.openFile")}
+                  aria-label={t("doc.list.openFile")}
                   onClick={async () => {
                     try {
                       await invoke("open_export_file", { path: exportSuccess.path });
@@ -278,8 +288,8 @@ export function SuppliersListPage() {
                   variant="ghost"
                   size="icon"
                   className="h-7 w-7 shrink-0 text-muted-foreground hover:text-foreground"
-                  title="Open folder"
-                  aria-label="Open folder"
+                  title={t("doc.list.openFolder")}
+                  aria-label={t("doc.list.openFolder")}
                   onClick={() => {
                     revealItemInDir(exportSuccess.path);
                     setExportSuccess(null);
@@ -292,8 +302,8 @@ export function SuppliersListPage() {
                   variant="ghost"
                   size="icon"
                   className="h-6 w-6 shrink-0 text-muted-foreground/80 hover:text-muted-foreground"
-                  title="Dismiss"
-                  aria-label="Dismiss"
+                  title={t("doc.list.dismiss")}
+                  aria-label={t("doc.list.dismiss")}
                   onClick={() => setExportSuccess(null)}
                 >
                   <X className="h-3 w-3" />
@@ -309,7 +319,7 @@ export function SuppliersListPage() {
                 onClick={handleExportCurrentView}
               >
                 <FileSpreadsheet className="h-4 w-4 shrink-0" />
-                Export
+                {t("doc.list.export")}
               </Button>
               <Popover open={exportOpen} onOpenChange={setExportOpen}>
                 <PopoverTrigger asChild>
@@ -318,7 +328,7 @@ export function SuppliersListPage() {
                     variant="outline"
                     size="icon"
                     className="h-8 w-8 shrink-0 rounded-l-none border-0 shadow-none"
-                    aria-label="Export options"
+                    aria-label={t("doc.list.exportOptionsAria")}
                   >
                     <ChevronDown className="h-4 w-4" />
                   </Button>
@@ -329,13 +339,13 @@ export function SuppliersListPage() {
                       type="button"
                       disabled={exportSelectedDisabled}
                       className="w-full rounded-sm px-1.5 py-1 text-left text-sm hover:bg-accent disabled:cursor-not-allowed disabled:opacity-50"
-                      title={exportSelectedDisabled ? "Select one or more rows in the grid first." : undefined}
+                      title={exportSelectedDisabled ? t("doc.list.selectRowsForExport") : undefined}
                       onClick={() => {
                         setExportOpen(false);
                         if (!exportSelectedDisabled) handleExportSelected();
                       }}
                     >
-                      Export selected rows
+                      {t("doc.list.exportSelectedRows")}
                     </button>
                   </div>
                 </PopoverContent>
@@ -349,7 +359,7 @@ export function SuppliersListPage() {
             className="rounded-md bg-white text-black hover:bg-gray-200"
             onClick={() => navigate("/suppliers/new")}
           >
-            <span className="create-btn__plus">+</span> Create
+            <span className="create-btn__plus">+</span> {t("doc.list.create")}
           </Button>
         </>
       }

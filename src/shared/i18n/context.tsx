@@ -37,6 +37,10 @@ export function I18nProvider({ children }: { children: ReactNode }) {
     document.documentElement.lang = localeToHtmlLang(locale);
   }, [locale]);
 
+  useEffect(() => {
+    document.title = value.t("app.name");
+  }, [locale, value.t]);
+
   return <I18nContext.Provider value={value}>{children}</I18nContext.Provider>;
 }
 

@@ -42,23 +42,41 @@ export function validateShipmentFull(shipmentId: string): Issue[] {
   const issues: Issue[] = [];
   const shipment = shipmentRepository.getById(shipmentId);
   if (!shipment) {
-    issues.push(actionIssue("Shipment not found."));
+    issues.push(
+      actionIssue("Shipment not found.", { key: "issues.shipment.notFound" }),
+    );
     return issues;
   }
   if (shipment.status !== "draft") {
-    issues.push(actionIssue("Only draft shipments can be posted."));
+    issues.push(
+      actionIssue("Only draft shipments can be posted.", {
+        key: "issues.shipment.onlyDraftPost",
+      }),
+    );
     return issues;
   }
 
   const soIdTrimmed = normalizeTrim(shipment.salesOrderId);
   if (soIdTrimmed === "") {
-    issues.push(actionIssue("Related sales order is required."));
+    issues.push(
+      actionIssue("Related sales order is required.", {
+        key: "issues.shipment.soRequired",
+      }),
+    );
   } else {
     const so = salesOrderRepository.getById(soIdTrimmed);
     if (!so) {
-      issues.push(actionIssue("Related sales order is required."));
+      issues.push(
+        actionIssue("Related sales order is required.", {
+          key: "issues.shipment.soRequired",
+        }),
+      );
     } else if (so.status !== "confirmed") {
-      issues.push(actionIssue("Related sales order must be confirmed before posting."));
+      issues.push(
+        actionIssue("Related sales order must be confirmed before posting.", {
+          key: "issues.shipment.soMustBeConfirmed",
+        }),
+      );
     } else {
       reconcileSalesOrderReservations(soIdTrimmed, {
         reason: "shipment_validation",
@@ -68,7 +86,10 @@ export function validateShipmentFull(shipmentId: string): Issue[] {
       const shwh = normalizeTrim(shipment.warehouseId);
       if (sowh !== "" && shwh !== "" && sowh !== shwh) {
         issues.push(
-          actionIssue("Shipment warehouse must match the related sales order warehouse."),
+          actionIssue(
+            "Shipment warehouse must match the related sales order warehouse.",
+            { key: "issues.shipment.warehouseMismatchSo" },
+          ),
         );
       }
     }
@@ -76,39 +97,75 @@ export function validateShipmentFull(shipmentId: string): Issue[] {
 
   const warehouseIdTrimmed = normalizeTrim(shipment.warehouseId);
   if (warehouseIdTrimmed === "") {
-    issues.push(actionIssue("Warehouse is required."));
+    issues.push(
+      actionIssue("Warehouse is required.", {
+        key: "issues.shipment.warehouseRequired",
+      }),
+    );
   } else {
     const warehouse = warehouseRepository.getById(warehouseIdTrimmed);
     if (!warehouse) {
-      issues.push(actionIssue("Warehouse is required."));
+      issues.push(
+        actionIssue("Warehouse is required.", {
+          key: "issues.shipment.warehouseRequired",
+        }),
+      );
     } else if (!warehouse.isActive) {
-      issues.push(actionIssue("Selected warehouse is inactive."));
+      issues.push(
+        actionIssue("Selected warehouse is inactive.", {
+          key: "issues.shipment.warehouseInactive",
+        }),
+      );
     }
   }
 
   const lines = shipmentRepository.listLines(shipmentId);
   if (!lines || lines.length === 0) {
-    issues.push(actionIssue("At least one line is required."));
+    issues.push(
+      actionIssue("At least one line is required.", {
+        key: "issues.shipment.linesRequired",
+      }),
+    );
   } else {
     const itemIds = new Set<string>();
     for (const line of lines) {
       const itemIdTrimmed = normalizeTrim(line.itemId);
       if (itemIdTrimmed === "") {
-        issues.push(actionIssue("Each line must have an item."));
+        issues.push(
+          actionIssue("Each line must have an item.", {
+            key: "issues.shipment.lineNeedsItem",
+          }),
+        );
         continue;
       }
       const qty = parseDocumentLineQty(line.qty);
       if (qty === null) {
-        issues.push(actionIssue("Quantity must be greater than zero."));
+        issues.push(
+          actionIssue("Quantity must be greater than zero.", {
+            key: "issues.shipment.qtyPositive",
+          }),
+        );
       }
       const item = itemRepository.getById(itemIdTrimmed);
       if (!item) {
-        issues.push(actionIssue("Each line must have an item."));
+        issues.push(
+          actionIssue("Each line must have an item.", {
+            key: "issues.shipment.lineNeedsItem",
+          }),
+        );
       } else if (!item.isActive) {
-        issues.push(actionIssue("Selected item is inactive."));
+        issues.push(
+          actionIssue("Selected item is inactive.", {
+            key: "issues.shipment.itemInactive",
+          }),
+        );
       }
       if (itemIds.has(itemIdTrimmed)) {
-        issues.push(actionIssue("Duplicate items are not allowed in the same document."));
+        issues.push(
+          actionIssue("Duplicate items are not allowed in the same document.", {
+            key: "issues.shipment.duplicateItems",
+          }),
+        );
       }
       itemIds.add(itemIdTrimmed);
     }
@@ -129,7 +186,10 @@ export function validateShipmentFull(shipmentId: string): Issue[] {
             const item = itemRepository.getById(itemIdTrimmed);
             const code = item?.code ?? itemIdTrimmed;
             issues.push(
-              actionIssue(`Item ${code} is not on the related sales order.`),
+              actionIssue(`Item ${code} is not on the related sales order.`, {
+                key: "issues.shipment.itemNotOnSo",
+                params: { code },
+              }),
             );
             continue;
           }
@@ -142,6 +202,10 @@ export function validateShipmentFull(shipmentId: string): Issue[] {
             issues.push(
               actionIssue(
                 `Item ${code}: shipment quantity exceeds remaining to ship (ordered ${ordered}, already shipped ${already}, this shipment ${q}).`,
+                {
+                  key: "issues.shipment.qtyExceedsRemaining",
+                  params: { code, ordered, already, qty: q },
+                },
               ),
             );
           }
@@ -163,6 +227,10 @@ export function validateShipmentFull(shipmentId: string): Issue[] {
             issues.push(
               actionIssue(
                 `Item ${code}: insufficient reserved quantity to post (${reserved} reserved, ${q} required). Use Allocate stock on the related sales order.`,
+                {
+                  key: "issues.shipment.insufficientReserved",
+                  params: { code, reserved, required: q },
+                },
               ),
             );
           }
@@ -182,12 +250,20 @@ export function validateShipmentFull(shipmentId: string): Issue[] {
           issues.push(
             actionIssue(
               `Item ${code}: insufficient stock to post (available ${onHand}, required ${qty}).`,
+              {
+                key: "issues.shipment.insufficientStockPost",
+                params: { code, available: onHand, required: qty },
+              },
             ),
           );
         } else if (onHand === qty && qty > 0) {
           issues.push(
             actionWarning(
               `Item ${code}: no buffer remaining (shipped quantity equals available stock).`,
+              {
+                key: "issues.shipment.noBufferWarning",
+                params: { code },
+              },
             ),
           );
         }
@@ -223,6 +299,7 @@ export function post(shipmentId: string): PostResult {
         issues: [
           actionIssue(
             "Could not consume stock reservations. Refresh and try again, or re-allocate on the sales order.",
+            { key: "issues.shipment.reservationConsumeFailed" },
           ),
         ],
       };

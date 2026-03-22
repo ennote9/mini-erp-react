@@ -6,6 +6,8 @@ import {
   getItemImagePreviewSources,
   resolveAbsoluteImagePath,
   saveItemImageFromFile,
+  ITEM_IMAGE_STORAGE_ERROR_TOO_LARGE,
+  ITEM_IMAGE_STORAGE_ERROR_BAD_TYPE,
 } from "../lib/itemImageStorage";
 import {
   getPrimaryImage,
@@ -17,6 +19,7 @@ import {
   validateItemImageFile,
   validateItemImageSlotAvailable,
   ITEM_IMAGE_MAX_COUNT,
+  type ItemImageFileValidationError,
 } from "../lib/itemImageValidation";
 import { ItemImageEmptyState } from "./ItemImageEmptyState";
 import { ItemImagePreview } from "./ItemImagePreview";
@@ -31,6 +34,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { openPath } from "@tauri-apps/plugin-opener";
 import { Upload } from "lucide-react";
+import { useTranslation } from "@/shared/i18n/context";
 
 type Props = {
   isNew: boolean;
@@ -42,8 +46,32 @@ type Props = {
 type UploadIntent = "add" | "replace";
 
 export function ItemImagesCard({ isNew, itemId, images, onImagesChanged }: Props) {
+  const { t } = useTranslation();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const uploadIntentRef = useRef<UploadIntent>("add");
+
+  const translateFileValidation = useCallback(
+    (code: ItemImageFileValidationError) =>
+      code === "too_large"
+        ? t("master.item.images.errorFileTooLarge")
+        : t("master.item.images.errorFileType"),
+    [t],
+  );
+
+  const translateStorageError = useCallback(
+    (msg: string) => {
+      if (msg === ITEM_IMAGE_STORAGE_ERROR_TOO_LARGE) return t("master.item.images.errorFileTooLarge");
+      if (msg === ITEM_IMAGE_STORAGE_ERROR_BAD_TYPE) return t("master.item.images.errorFileType");
+      return msg;
+    },
+    [t],
+  );
+
+  const metaSaveFailedText = useCallback(
+    (pe: unknown) =>
+      pe instanceof Error ? pe.message : t("master.item.images.saveMetaFailed"),
+    [t],
+  );
 
   /** Order: sortOrder only. Primary does not affect ordering. */
   const orderedImages = useMemo(() => normalizeItemImages(images), [images]);
@@ -108,13 +136,13 @@ export function ItemImagesCard({ isNew, itemId, images, onImagesChanged }: Props
           setPreviewUrl(null);
           setPreviewAbsolutePath(null);
           setPreviewLoadState("error");
-          setCardMessage({ text: "Could not load image preview.", variant: "error" });
+          setCardMessage({ text: t("master.item.images.previewLoadError"), variant: "error" });
         }
       });
     return () => {
       cancelled = true;
     };
-  }, [displayImage?.id, displayImage?.relativePath]);
+  }, [displayImage?.id, displayImage?.relativePath, t]);
 
   useEffect(() => {
     let cancelled = false;
@@ -151,7 +179,7 @@ export function ItemImagesCard({ isNew, itemId, images, onImagesChanged }: Props
         await flushPendingItemsPersist();
       } catch (pe) {
         setCardMessage({
-          text: pe instanceof Error ? pe.message : "Could not save item metadata to disk.",
+          text: metaSaveFailedText(pe),
           variant: "error",
         });
         onImagesChanged();
@@ -159,19 +187,21 @@ export function ItemImagesCard({ isNew, itemId, images, onImagesChanged }: Props
       }
       onImagesChanged();
     },
-    [itemId, onImagesChanged],
+    [itemId, metaSaveFailedText, onImagesChanged],
   );
 
   const triggerPickAdd = useCallback(() => {
     setCardMessage(null);
-    const slotErr = validateItemImageSlotAvailable(orderedImages.length);
-    if (slotErr) {
-      setCardMessage({ text: slotErr, variant: "error" });
+    if (!validateItemImageSlotAvailable(orderedImages.length)) {
+      setCardMessage({
+        text: t("master.item.images.errorSlotFull", { max: ITEM_IMAGE_MAX_COUNT }),
+        variant: "error",
+      });
       return;
     }
     uploadIntentRef.current = "add";
     fileInputRef.current?.click();
-  }, [orderedImages.length]);
+  }, [orderedImages.length, t]);
 
   const triggerPickReplace = useCallback(() => {
     setCardMessage(null);
@@ -190,7 +220,7 @@ export function ItemImagesCard({ isNew, itemId, images, onImagesChanged }: Props
           getPrimaryImage(orderedImages) ??
           orderedImages[0];
         if (!target) {
-          setCardMessage({ text: "No image to replace.", variant: "error" });
+          setCardMessage({ text: t("master.item.images.noImageToReplace"), variant: "error" });
           return;
         }
         const previous = normalizeItemImages(orderedImages);
@@ -199,7 +229,7 @@ export function ItemImagesCard({ isNew, itemId, images, onImagesChanged }: Props
           isPrimary: target.isPrimary,
         });
         if ("error" in result) {
-          setCardMessage({ text: result.error, variant: "error" });
+          setCardMessage({ text: translateStorageError(result.error), variant: "error" });
           return;
         }
         const oldPath = target.relativePath;
@@ -211,7 +241,7 @@ export function ItemImagesCard({ isNew, itemId, images, onImagesChanged }: Props
           await flushPendingItemsPersist();
         } catch (pe) {
           setCardMessage({
-            text: pe instanceof Error ? pe.message : "Could not save item metadata to disk.",
+            text: metaSaveFailedText(pe),
             variant: "error",
           });
           await deleteStoredImageFile(result.image.relativePath);
@@ -224,7 +254,7 @@ export function ItemImagesCard({ isNew, itemId, images, onImagesChanged }: Props
         setSelectedId(result.image.id);
       } catch (e) {
         setCardMessage({
-          text: e instanceof Error ? e.message : "Could not save image. Use the desktop app.",
+          text: e instanceof Error ? e.message : t("master.item.images.saveImageFailed"),
           variant: "error",
         });
       } finally {
@@ -232,7 +262,15 @@ export function ItemImagesCard({ isNew, itemId, images, onImagesChanged }: Props
         if (fileInputRef.current) fileInputRef.current.value = "";
       }
     },
-    [itemId, onImagesChanged, orderedImages, selectedId],
+    [
+      itemId,
+      metaSaveFailedText,
+      onImagesChanged,
+      orderedImages,
+      selectedId,
+      t,
+      translateStorageError,
+    ],
   );
 
   const applyAddFiles = useCallback(
@@ -240,9 +278,11 @@ export function ItemImagesCard({ isNew, itemId, images, onImagesChanged }: Props
       if (!itemId || files.length === 0) return;
       const fileArr = files;
 
-      const slotErr = validateItemImageSlotAvailable(orderedImages.length);
-      if (slotErr) {
-        setCardMessage({ text: slotErr, variant: "error" });
+      if (!validateItemImageSlotAvailable(orderedImages.length)) {
+        setCardMessage({
+          text: t("master.item.images.errorSlotFull", { max: ITEM_IMAGE_MAX_COUNT }),
+          variant: "error",
+        });
         if (fileInputRef.current) fileInputRef.current.value = "";
         return;
       }
@@ -266,7 +306,7 @@ export function ItemImagesCard({ isNew, itemId, images, onImagesChanged }: Props
         }
         const val = validateItemImageFile(file);
         if (val) {
-          skipped.push(`${file.name}: ${val}`);
+          skipped.push(`${file.name}: ${translateFileValidation(val)}`);
           continue;
         }
         const placement = {
@@ -275,7 +315,7 @@ export function ItemImagesCard({ isNew, itemId, images, onImagesChanged }: Props
         };
         const result = await saveItemImageFromFile(itemId, file, placement);
         if ("error" in result) {
-          skipped.push(`${file.name}: ${result.error}`);
+          skipped.push(`${file.name}: ${translateStorageError(result.error)}`);
           continue;
         }
         newFilesWritten.push(result.image);
@@ -285,12 +325,16 @@ export function ItemImagesCard({ isNew, itemId, images, onImagesChanged }: Props
 
       if (newFilesWritten.length === 0) {
         const parts: string[] = [];
-        if (skipped.length) parts.push(`Skipped: ${skipped.join("; ")}`);
+        if (skipped.length) {
+          parts.push(`${t("master.item.images.skippedPrefix")} ${skipped.join("; ")}`);
+        }
         if (droppedDueToCap > 0) {
-          parts.push(`Only 0 images were added. Maximum per item is ${ITEM_IMAGE_MAX_COUNT}.`);
+          parts.push(
+            t("master.item.images.onlyAddedPartial", { count: 0, max: ITEM_IMAGE_MAX_COUNT }),
+          );
         }
         setCardMessage({
-          text: parts.join(" ") || "No images could be added.",
+          text: parts.join(" ") || t("master.item.images.noImagesAdded"),
           variant: "error",
         });
         setBusy(false);
@@ -304,15 +348,17 @@ export function ItemImagesCard({ isNew, itemId, images, onImagesChanged }: Props
         const summary: string[] = [];
         if (droppedDueToCap > 0) {
           summary.push(
-            `Only ${added} image${added === 1 ? "" : "s"} were added. Maximum per item is ${ITEM_IMAGE_MAX_COUNT}.`,
+            t("master.item.images.onlyAddedPartial", { count: added, max: ITEM_IMAGE_MAX_COUNT }),
           );
         } else {
-          summary.push(`Added ${added} image${added === 1 ? "" : "s"}.`);
+          summary.push(t("master.item.images.addedCount", { count: added }));
         }
         if (skipped.length > 0) {
           const maxShow = 4;
           const shown = skipped.slice(0, maxShow).join("; ");
-          summary.push(`Skipped: ${shown}${skipped.length > maxShow ? " …" : ""}`);
+          summary.push(
+            `${t("master.item.images.skippedPrefix")} ${shown}${skipped.length > maxShow ? " …" : ""}`,
+          );
         }
         setCardMessage({ text: summary.join(" "), variant: "info" });
         if (!hadImagesBefore) {
@@ -324,13 +370,21 @@ export function ItemImagesCard({ isNew, itemId, images, onImagesChanged }: Props
         }
         itemRepository.update(itemId, { images: normalizeItemImages(orderedImages) });
         onImagesChanged();
-        setCardMessage({ text: "Could not save images to disk.", variant: "error" });
+        setCardMessage({ text: t("master.item.images.couldNotSaveImages"), variant: "error" });
       } finally {
         setBusy(false);
         if (fileInputRef.current) fileInputRef.current.value = "";
       }
     },
-    [itemId, onImagesChanged, orderedImages, persistImages],
+    [
+      itemId,
+      onImagesChanged,
+      orderedImages,
+      persistImages,
+      t,
+      translateFileValidation,
+      translateStorageError,
+    ],
   );
 
   const applyFileInputChange = useCallback(
@@ -362,7 +416,7 @@ export function ItemImagesCard({ isNew, itemId, images, onImagesChanged }: Props
         await flushPendingItemsPersist();
       } catch (pe) {
         setCardMessage({
-          text: pe instanceof Error ? pe.message : "Could not save item metadata to disk.",
+          text: metaSaveFailedText(pe),
           variant: "error",
         });
         itemRepository.update(itemId, { images: previous });
@@ -373,13 +427,13 @@ export function ItemImagesCard({ isNew, itemId, images, onImagesChanged }: Props
       onImagesChanged();
     } catch (e) {
       setCardMessage({
-        text: e instanceof Error ? e.message : "Could not remove image.",
+        text: e instanceof Error ? e.message : t("master.item.images.couldNotRemove"),
         variant: "error",
       });
     } finally {
       setBusy(false);
     }
-  }, [itemId, onImagesChanged, orderedImages, selectedId]);
+  }, [itemId, metaSaveFailedText, onImagesChanged, orderedImages, selectedId, t]);
 
   const handleOpenFullSize = useCallback(async () => {
     if (!displayImage) return;
@@ -390,7 +444,7 @@ export function ItemImagesCard({ isNew, itemId, images, onImagesChanged }: Props
       await openPath(absolutePathForOpen);
     } catch (e) {
       const base =
-        e instanceof Error ? e.message : typeof e === "string" ? e : "Could not open image.";
+        e instanceof Error ? e.message : typeof e === "string" ? e : t("master.item.images.couldNotOpen");
       if (import.meta.env.DEV) {
         console.error("[ItemImagesCard] Open full size failed", {
           relativePath: displayImage.relativePath,
@@ -404,7 +458,7 @@ export function ItemImagesCard({ isNew, itemId, images, onImagesChanged }: Props
           : base;
       setCardMessage({ text: withPath, variant: "error" });
     }
-  }, [displayImage]);
+  }, [displayImage, t]);
 
   const handleSetPrimary = useCallback(async () => {
     if (!itemId || selectedId == null) return;
@@ -451,10 +505,9 @@ export function ItemImagesCard({ isNew, itemId, images, onImagesChanged }: Props
   return (
     <Card className="border-0 shadow-none xl:sticky xl:top-2">
       <CardHeader className="p-2 pb-0.5">
-        <CardTitle className="text-[0.9rem] font-semibold">Images</CardTitle>
+        <CardTitle className="text-[0.9rem] font-semibold">{t("master.item.images.cardTitle")}</CardTitle>
         <CardDescription className="text-xs">
-          Up to {ITEM_IMAGE_MAX_COUNT} images (JPG, PNG, WebP, 10 MB each). Upload accepts multiple files.
-          Arrows change selection; drag thumbnails to reorder. Stored locally.
+          {t("master.item.images.cardDescription", { max: ITEM_IMAGE_MAX_COUNT })}
         </CardDescription>
       </CardHeader>
       <CardContent className="p-2 pt-1">
@@ -527,10 +580,12 @@ export function ItemImagesCard({ isNew, itemId, images, onImagesChanged }: Props
                 disabled={busy}
               >
                 <Upload className="h-3.5 w-3.5" />
-                Upload image
+                {t("master.item.images.uploadImage")}
               </Button>
             ) : (
-              <p className="text-[11px] text-muted-foreground">Maximum {ITEM_IMAGE_MAX_COUNT} images reached.</p>
+              <p className="text-[11px] text-muted-foreground">
+                {t("master.item.images.maxReached", { max: ITEM_IMAGE_MAX_COUNT })}
+              </p>
             )}
           </div>
         )}

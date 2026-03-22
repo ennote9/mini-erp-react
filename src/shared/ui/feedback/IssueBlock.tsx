@@ -1,6 +1,8 @@
 import type { Issue } from "../../issues";
 import { issueSeverityClassName } from "../../issues";
 import { cn } from "@/lib/utils";
+import { useTranslation } from "@/shared/i18n/context";
+import { formatIssueForDisplay } from "@/shared/i18n/issueDisplay";
 
 type IssueBlockProps = {
   /** Page-level issues (e.g. save/form errors). Renders nothing when empty. */
@@ -14,6 +16,7 @@ type IssueBlockProps = {
  * Renders nothing when issues.length === 0. Dark-theme friendly.
  */
 export function IssueBlock({ issues, className }: IssueBlockProps) {
+  const { t } = useTranslation();
   if (issues.length === 0) return null;
 
   return (
@@ -29,7 +32,7 @@ export function IssueBlock({ issues, className }: IssueBlockProps) {
             key={idx}
             className={issueSeverityClassName[issue.severity] ?? issueSeverityClassName.error}
           >
-            {issue.message}
+            {formatIssueForDisplay(issue, t)}
           </li>
         ))}
       </ul>

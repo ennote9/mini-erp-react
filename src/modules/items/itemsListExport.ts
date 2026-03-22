@@ -1,4 +1,5 @@
 import type { Workbook } from "exceljs";
+import type { ExcelListSheetLabels } from "../../shared/export/excelExportLabels";
 
 export type ItemsExportRow = {
   no: number;
@@ -12,20 +13,6 @@ export type ItemsExportRow = {
   active: string;
 };
 
-// Matches approved Items list grid columns (no checkbox, no action columns)
-const ITEMS_COLUMN_HEADERS = [
-  "№",
-  "Code",
-  "Name",
-  "Brand",
-  "Category",
-  "UOM",
-  "Purchase price",
-  "Sale price",
-  "Active",
-] as const;
-
-const ITEMS_SHEET_NAME = "Items";
 const ITEMS_TABLE_NAME_BASE = "ItemsTable";
 
 const WIDTH_PADDING = 1.5;
@@ -72,8 +59,8 @@ const ITEMS_WIDTH_BOUNDS: { min: number; max: number }[] = [
 function applyItemsSheetColumnWidths(
   sheet: { getColumn: (col: number) => { width?: number } },
   rows: ItemsExportRow[],
+  headers: readonly string[],
 ): void {
-  const headers = [...ITEMS_COLUMN_HEADERS];
   for (let c = 0; c < headers.length; c++) {
     const headerLen = headers[c].length;
     const valueLengths = rows.map((r) => {
@@ -86,14 +73,15 @@ function applyItemsSheetColumnWidths(
   }
 }
 
-function addItemsSheetWithTable(workbook: Workbook, rows: ItemsExportRow[]): void {
-  const sheet = workbook.addWorksheet(ITEMS_SHEET_NAME, {
+function addItemsSheetWithTable(workbook: Workbook, rows: ItemsExportRow[], labels: ExcelListSheetLabels): void {
+  const ITEMS_COLUMN_HEADERS = labels.headers;
+  const sheet = workbook.addWorksheet(labels.sheetName, {
     views: [{ state: "frozen" as const, ySplit: 1 }],
   });
 
   if (rows.length === 0) {
     sheet.addRow([...ITEMS_COLUMN_HEADERS]);
-    applyItemsSheetColumnWidths(sheet, []);
+    applyItemsSheetColumnWidths(sheet, [], ITEMS_COLUMN_HEADERS);
     return;
   }
 
@@ -119,12 +107,15 @@ function addItemsSheetWithTable(workbook: Workbook, rows: ItemsExportRow[]): voi
     columns,
     rows: tableRows,
   });
-  applyItemsSheetColumnWidths(sheet, rows);
+  applyItemsSheetColumnWidths(sheet, rows, ITEMS_COLUMN_HEADERS);
 }
 
-export async function buildItemsListXlsxBuffer(rows: ItemsExportRow[]): Promise<ArrayBuffer> {
+export async function buildItemsListXlsxBuffer(
+  rows: ItemsExportRow[],
+  labels: ExcelListSheetLabels,
+): Promise<ArrayBuffer> {
   const ExcelJS = await import("exceljs");
   const workbook = new ExcelJS.Workbook();
-  addItemsSheetWithTable(workbook, rows);
+  addItemsSheetWithTable(workbook, rows, labels);
   return workbook.xlsx.writeBuffer();
 }

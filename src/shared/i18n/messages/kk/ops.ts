@@ -50,6 +50,42 @@ export const kkOps: MessageTree = {
       "Жолдар: {{total}} | Жарамды: {{valid}} | Белсенді емес: {{inactive}} | Табылмады: {{notFound}} | Сан қате: {{badQty}} | Пішім қате: {{badFmt}} | Тақырып өткізілді: {{headerSkipped}} | Дубликаттар біріктірілді: {{merged}} | Қосымша бағандар: {{extraCols}}",
     summaryExcel:
       "Жолдар: {{total}} | Жарамды: {{valid}} | Белсенді емес: {{inactive}} | Табылмады: {{notFound}} | Сан қате: {{badQty}} | Пішім қате: {{badFmt}} | Дубликаттар біріктірілді: {{merged}}",
+    lineImport: {
+      dataSheetName: "Жолдарды импорттау",
+      instructionsSheetName: "Нұсқаулық",
+      headerItemCode: "Тауар коды",
+      headerBarcode: "Штрихкод",
+      headerQty: "Саны",
+      headerUnitPrice: "Бағасы",
+      instructionTitle: "Үлгіні қалай қолдану керек",
+      instruction1: "1) Бірінші парақтағы жолдарды толтырыңыз: {{sheetName}}.",
+      instruction2: "2) Каталогта бар тауар кодтарын қолданыңыз.",
+      instruction3: "3) Сан міндетті және 0-ден үлкен болуы керек.",
+      instruction4: "4) Баға міндетті емес (бос болса әдепкі мәндер қолданылады).",
+      instruction5: "5) Мысал жолдар — үлгі. Импорт алдында оларды нақты деректермен ауыстырыңыз.",
+      workbookNoWorksheets: "Excel кітабында парақтар жоқ.",
+      headerErrorIntro: "Импорт сәтсіз: тақырып қатары күтілетін пішімге сәйкес емес.",
+      headerMissingQtyLine: "Міндетті сан бағаны жоқ.",
+      headerMissingQtyExpected:
+        "Сан бағаны күтіледі (мысалы Qty немесе Quantity, немесе үлгідегі тақырып).",
+      headerMissingIdLine: "Міндетті тауар идентификаторы бағаны жоқ.",
+      headerMissingIdExpected:
+        "Тауар коды және/немесе штрихкод бағаны күтіледі (немесе үлгідегі тақырыптар).",
+      headerDetectedBlank: "(1-жол бос сияқты)",
+      headerDetectedLine: "Табылған тақырыптар (1-жол): {{detected}}",
+      headerTipRow:
+        "Кеңес: тақырып қатары 1-жолда болуы керек; әр тақырып жеке бағанда.",
+      headerExample: "Мысал: {{code}} | {{qty}}",
+      headerExampleRow: "         {{sampleCode}} | {{sampleQty}}",
+      headerHintSplitLabels:
+        "Кеңес: бір бағанда бірнеше белгі біріктірілген сияқты. Оларды бөлек бағандарға бөліңіз.",
+      headerHintQtyTypo:
+        "Кеңес: сан тақырыбында қате болуы мүмкін. Үлгі тақырыптарын немесе Qty / Quantity қолданыңыз.",
+      reasonMissingItemCodeBarcode: "Тауар коды немесе штрихкод жоқ.",
+      reasonQtyMustBePositive: "Сан 0-ден үлкен сан болуы керек.",
+      reasonUnitPriceNumericNonNegative:
+        "Баға сан болуы және теріс болмауы керек.",
+    },
   },
   stock: {
     coverage: {

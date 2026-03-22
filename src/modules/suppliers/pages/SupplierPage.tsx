@@ -19,10 +19,18 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { actionIssue, combineIssues, getErrorAndWarningMessages, issueListContainsMessage, type Issue } from "../../../shared/issues";
+import {
+  actionIssueFromServiceMessage,
+  combineIssues,
+  hasErrors,
+  hasWarnings,
+  issueListContainsMessage,
+  type Issue,
+} from "../../../shared/issues";
 import { getSupplierFormHealth } from "../../../shared/masterDataHealth";
 import { DocumentIssueStrip } from "../../../shared/ui/feedback/DocumentIssueStrip";
 import { Save, X } from "lucide-react";
+import { useTranslation } from "@/shared/i18n/context";
 
 type FormState = {
   code: string;
@@ -57,6 +65,7 @@ function defaultForm(): FormState {
 }
 
 export function SupplierPage() {
+  const { t } = useTranslation();
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const isNew = id === "new";
@@ -125,10 +134,6 @@ export function SupplierPage() {
     () => combineIssues(health.issues, actionIssues),
     [health.issues, actionIssues],
   );
-  const { errors: combinedErrors, warnings: combinedWarnings } = useMemo(
-    () => getErrorAndWarningMessages(combinedIssues),
-    [combinedIssues],
-  );
 
   useEffect(() => {
     if (isNew) {
@@ -154,9 +159,9 @@ export function SupplierPage() {
   }, [id, isNew, supplier?.id, supplier?.code, supplier?.name, supplier?.isActive, supplier?.phone, supplier?.email, supplier?.comment, supplier?.contactPerson, supplier?.taxId, supplier?.address, supplier?.city, supplier?.country, supplier?.paymentTermsDays]);
 
   const parsePaymentTerms = (s: string): number | undefined => {
-    const t = s.trim();
-    if (t === "") return undefined;
-    const n = Number(t);
+    const trimmed = s.trim();
+    if (trimmed === "") return undefined;
+    const n = Number(trimmed);
     return Number.isNaN(n) ? undefined : n;
   };
 
@@ -182,7 +187,7 @@ export function SupplierPage() {
     if (result.success) {
       navigate("/suppliers");
     } else if (!issueListContainsMessage(health.issues, result.error)) {
-      setActionIssues([actionIssue(result.error)]);
+      setActionIssues([actionIssueFromServiceMessage(result.error)]);
     }
   };
 
@@ -193,7 +198,7 @@ export function SupplierPage() {
   if (!id) {
     return (
       <div className="doc-page doc-page--not-found">
-        <p>Supplier not found.</p>
+        <p>{t("master.supplier.notFound")}</p>
       </div>
     );
   }
@@ -201,23 +206,23 @@ export function SupplierPage() {
   if (!isNew && !supplier) {
     return (
       <div className="doc-page doc-page--not-found">
-        <p>Supplier not found.</p>
+        <p>{t("master.supplier.notFound")}</p>
       </div>
     );
   }
 
   const breadcrumbItems = [
-    { label: "Master Data", to: "/suppliers" },
-    { label: "Suppliers", to: "/suppliers" },
-    { label: isNew ? "New" : supplier!.code },
+    { label: t("master.breadcrumb.masterData"), to: "/suppliers" },
+    { label: t("master.supplier.listBreadcrumb"), to: "/suppliers" },
+    { label: isNew ? t("master.common.newLabel") : supplier!.code },
   ];
 
-  const displayTitle = isNew ? "New Supplier" : `Supplier ${supplier!.code}`;
+  const displayTitle = isNew ? t("master.supplier.titleNew") : t("master.supplier.titleWithCode", { code: supplier!.code });
 
   return (
     <div className="doc-page">
       <div className="doc-page__breadcrumb">
-        <BackButton to="/suppliers" aria-label="Back to Suppliers" />
+        <BackButton to="/suppliers" aria-label={t("master.supplier.backToListAria")} />
         <Breadcrumb items={breadcrumbItems} />
       </div>
       <div className="doc-page__header">
@@ -226,17 +231,17 @@ export function SupplierPage() {
             <h2 className="doc-header__title">{displayTitle}</h2>
           </div>
           <div className="doc-header__right">
-            {(combinedErrors.length > 0 || combinedWarnings.length > 0) && (
-              <DocumentIssueStrip errors={combinedErrors} warnings={combinedWarnings} />
+            {(hasErrors(combinedIssues) || hasWarnings(combinedIssues)) && (
+              <DocumentIssueStrip issues={combinedIssues} />
             )}
             <div className="doc-header__actions">
               <Button type="button" onClick={handleSave}>
                 <Save aria-hidden />
-                Save
+                {t("common.save")}
               </Button>
               <Button type="button" variant="outline" onClick={handleCancel}>
                 <X aria-hidden />
-                Cancel
+                {t("common.cancel")}
               </Button>
             </div>
           </div>
@@ -244,96 +249,96 @@ export function SupplierPage() {
       </div>
       <Card className="mt-4 max-w-2xl border-0 shadow-none">
         <CardHeader className="p-2 pb-0.5">
-          <CardTitle className="text-[0.9rem] font-semibold">Details</CardTitle>
+          <CardTitle className="text-[0.9rem] font-semibold">{t("master.common.detailsTitle")}</CardTitle>
           <CardDescription className="text-xs">
-            Code, name, contact and status for this supplier.
+            {t("master.supplier.detailsDescription")}
           </CardDescription>
         </CardHeader>
         <CardContent className="p-2 pt-1">
           <div className="grid gap-2 sm:grid-cols-2">
             <div className="flex flex-col gap-0.5 sm:col-span-2">
               <Label htmlFor="supplier-code" className="text-sm">
-                Code <span className="text-destructive">*</span>
+                {t("doc.columns.code")} <span className="text-destructive">{t("doc.page.requiredStar")}</span>
               </Label>
               <Input
                 id="supplier-code"
                 type="text"
                 value={form.code}
                 onChange={(e) => setForm((f) => ({ ...f, code: e.target.value }))}
-                placeholder="e.g. SUP-0001"
+                placeholder={t("master.supplier.codePlaceholder")}
                 className="h-8 text-sm"
               />
             </div>
             <div className="flex flex-col gap-0.5">
               <Label htmlFor="supplier-name" className="text-sm">
-                Name <span className="text-destructive">*</span>
+                {t("doc.columns.name")} <span className="text-destructive">{t("doc.page.requiredStar")}</span>
               </Label>
               <Input
                 id="supplier-name"
                 type="text"
                 value={form.name}
                 onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
-                placeholder="Supplier name"
+                placeholder={t("master.supplier.namePlaceholder")}
                 className="h-8 text-sm"
               />
             </div>
             <div className="flex flex-col gap-0.5">
-              <Label htmlFor="supplier-contactPerson" className="text-sm">Contact person</Label>
+              <Label htmlFor="supplier-contactPerson" className="text-sm">{t("doc.columns.contactPerson")}</Label>
               <Input
                 id="supplier-contactPerson"
                 type="text"
                 value={form.contactPerson}
                 onChange={(e) => setForm((f) => ({ ...f, contactPerson: e.target.value }))}
-                placeholder="Optional"
+                placeholder={t("common.optional")}
                 className="h-8 text-sm"
               />
             </div>
             <div className="flex flex-col gap-0.5">
-              <Label htmlFor="supplier-taxId" className="text-sm">Tax ID</Label>
+              <Label htmlFor="supplier-taxId" className="text-sm">{t("master.supplier.taxId")}</Label>
               <Input
                 id="supplier-taxId"
                 type="text"
                 value={form.taxId}
                 onChange={(e) => setForm((f) => ({ ...f, taxId: e.target.value }))}
-                placeholder="Optional"
+                placeholder={t("common.optional")}
                 className="h-8 text-sm"
               />
             </div>
             <div className="flex flex-col gap-0.5 sm:col-span-2">
-              <Label htmlFor="supplier-address" className="text-sm">Address</Label>
+              <Label htmlFor="supplier-address" className="text-sm">{t("master.supplier.address")}</Label>
               <Input
                 id="supplier-address"
                 type="text"
                 value={form.address}
                 onChange={(e) => setForm((f) => ({ ...f, address: e.target.value }))}
-                placeholder="Optional"
+                placeholder={t("common.optional")}
                 className="h-8 text-sm"
               />
             </div>
             <div className="flex flex-col gap-0.5">
-              <Label htmlFor="supplier-city" className="text-sm">City</Label>
+              <Label htmlFor="supplier-city" className="text-sm">{t("doc.columns.city")}</Label>
               <Input
                 id="supplier-city"
                 type="text"
                 value={form.city}
                 onChange={(e) => setForm((f) => ({ ...f, city: e.target.value }))}
-                placeholder="Optional"
+                placeholder={t("common.optional")}
                 className="h-8 text-sm"
               />
             </div>
             <div className="flex flex-col gap-0.5">
-              <Label htmlFor="supplier-country" className="text-sm">Country</Label>
+              <Label htmlFor="supplier-country" className="text-sm">{t("master.supplier.country")}</Label>
               <Input
                 id="supplier-country"
                 type="text"
                 value={form.country}
                 onChange={(e) => setForm((f) => ({ ...f, country: e.target.value }))}
-                placeholder="Optional"
+                placeholder={t("common.optional")}
                 className="h-8 text-sm"
               />
             </div>
             <div className="flex flex-col gap-0.5">
-              <Label htmlFor="supplier-paymentTermsDays" className="text-sm">Payment terms (days)</Label>
+              <Label htmlFor="supplier-paymentTermsDays" className="text-sm">{t("doc.page.paymentTermsDaysLabel")}</Label>
               <Input
                 id="supplier-paymentTermsDays"
                 type="number"
@@ -341,18 +346,18 @@ export function SupplierPage() {
                 step={1}
                 value={form.paymentTermsDays}
                 onChange={(e) => setForm((f) => ({ ...f, paymentTermsDays: e.target.value }))}
-                placeholder="e.g. 30"
+                placeholder={t("master.common.paymentTermsExample")}
                 className="h-8 text-sm"
               />
             </div>
             <div className="flex flex-col gap-0.5">
-              <Label htmlFor="supplier-phone" className="text-sm">Phone</Label>
+              <Label htmlFor="supplier-phone" className="text-sm">{t("doc.columns.phone")}</Label>
               <Input
                 id="supplier-phone"
                 type="text"
                 value={form.phone}
                 onChange={(e) => setForm((f) => ({ ...f, phone: e.target.value }))}
-                placeholder="Optional"
+                placeholder={t("common.optional")}
                 className="h-8 text-sm"
               />
             </div>
@@ -368,29 +373,29 @@ export function SupplierPage() {
                 htmlFor="supplier-active"
                 className="cursor-pointer text-sm font-normal"
               >
-                Active
+                {t("ops.master.activeCell.active")}
               </Label>
             </div>
             <div className="flex flex-col gap-0.5 sm:col-span-2">
-              <Label htmlFor="supplier-email" className="text-sm">Email</Label>
+              <Label htmlFor="supplier-email" className="text-sm">{t("doc.columns.email")}</Label>
               <Input
                 id="supplier-email"
                 type="text"
                 value={form.email}
                 onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))}
-                placeholder="Optional"
+                placeholder={t("common.optional")}
                 className="h-8 text-sm"
               />
             </div>
             <div className="flex flex-col gap-0.5 sm:col-span-2">
-              <Label htmlFor="supplier-comment" className="text-sm">Comment</Label>
+              <Label htmlFor="supplier-comment" className="text-sm">{t("doc.columns.comment")}</Label>
               <Textarea
                 id="supplier-comment"
                 value={form.comment}
                 onChange={(e) =>
                   setForm((f) => ({ ...f, comment: e.target.value }))
                 }
-                placeholder="Optional"
+                placeholder={t("common.optional")}
                 rows={2}
                 className="resize-none min-h-[4.5rem] text-sm"
               />
@@ -405,10 +410,10 @@ export function SupplierPage() {
             <div className="flex flex-wrap items-start justify-between gap-2 gap-y-1.5">
               <div className="min-w-0 space-y-0.5 flex-1">
                 <CardTitle className="text-[0.9rem] font-semibold tracking-tight">
-                  Related Purchase Orders
+                  {t("master.supplier.relatedPurchaseOrdersTitle")}
                 </CardTitle>
                 <CardDescription className="text-xs leading-snug">
-                  Linked purchasing documents. Read-only; open a row for detail.
+                  {t("master.supplier.relatedPurchaseOrdersHint")}
                 </CardDescription>
               </div>
               <Button
@@ -420,50 +425,50 @@ export function SupplierPage() {
                   navigate(`/purchase-orders?supplierId=${encodeURIComponent(supplier.id)}`)
                 }
               >
-                Open all purchase orders
+                {t("master.supplier.openAllPurchaseOrders")}
               </Button>
             </div>
           </CardHeader>
           <CardContent className="p-2 pt-1 space-y-2">
             <div
               className="flex flex-wrap gap-1.5"
-              aria-label="Related purchase orders summary"
+              aria-label={t("master.supplier.relatedPoSummaryAria")}
             >
               <span className="inline-flex items-baseline gap-1 rounded border border-border/50 bg-muted/25 px-2 py-0.5 text-[11px] tabular-nums leading-none">
-                <span className="text-muted-foreground">Orders</span>
+                <span className="text-muted-foreground">{t("master.supplier.ordersChip")}</span>
                 <span className="font-medium text-foreground/90">{relatedPoSummary.total}</span>
               </span>
               <span className="inline-flex items-baseline gap-1 rounded border border-border/50 bg-muted/25 px-2 py-0.5 text-[11px] tabular-nums leading-none">
-                <span className="text-muted-foreground">Draft</span>
+                <span className="text-muted-foreground">{t("status.labels.draft")}</span>
                 <span className="font-medium text-foreground/90">{relatedPoSummary.draft}</span>
               </span>
               <span className="inline-flex items-baseline gap-1 rounded border border-border/50 bg-muted/25 px-2 py-0.5 text-[11px] tabular-nums leading-none">
-                <span className="text-muted-foreground">Confirmed</span>
+                <span className="text-muted-foreground">{t("status.labels.confirmed")}</span>
                 <span className="font-medium text-foreground/90">{relatedPoSummary.confirmed}</span>
               </span>
               <span className="inline-flex items-baseline gap-1 rounded border border-border/50 bg-muted/25 px-2 py-0.5 text-[11px] tabular-nums leading-none">
-                <span className="text-muted-foreground">Closed</span>
+                <span className="text-muted-foreground">{t("status.labels.closed")}</span>
                 <span className="font-medium text-foreground/90">{relatedPoSummary.closed}</span>
               </span>
               <span className="inline-flex items-baseline gap-1 rounded border border-border/50 bg-muted/25 px-2 py-0.5 text-[11px] tabular-nums leading-none">
-                <span className="text-muted-foreground">Cancelled</span>
+                <span className="text-muted-foreground">{t("status.labels.cancelled")}</span>
                 <span className="font-medium text-foreground/90">{relatedPoSummary.cancelled}</span>
               </span>
             </div>
             {relatedPurchaseOrderRows.length === 0 ? (
               <p className="text-sm text-muted-foreground py-3 m-0">
-                No purchase orders linked to this supplier yet.
+                {t("master.supplier.emptyRelatedPo")}
               </p>
             ) : (
               <div className="min-w-0 overflow-x-auto rounded-md border border-border/60">
                 <table className="list-table text-sm">
                   <thead>
                     <tr>
-                      <th className="list-table__cell--code">Number</th>
-                      <th className="min-w-[100px]">Status</th>
-                      <th className="min-w-[120px]">Warehouse</th>
-                      <th className="w-14 text-right whitespace-nowrap tabular-nums">Lines</th>
-                      <th className="w-24 text-right whitespace-nowrap tabular-nums">Total</th>
+                      <th className="list-table__cell--code">{t("doc.columns.number")}</th>
+                      <th className="min-w-[100px]">{t("doc.columns.status")}</th>
+                      <th className="min-w-[120px]">{t("doc.columns.warehouse")}</th>
+                      <th className="w-14 text-right whitespace-nowrap tabular-nums">{t("doc.page.lines")}</th>
+                      <th className="w-24 text-right whitespace-nowrap tabular-nums">{t("doc.columns.total")}</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -474,7 +479,7 @@ export function SupplierPage() {
                         onClick={() => navigate(`/purchase-orders/${po.id}`)}
                         role="button"
                         tabIndex={0}
-                        aria-label={`Open purchase order ${po.number}`}
+                        aria-label={t("master.supplier.openPurchaseOrderAria", { number: po.number })}
                         onKeyDown={(e) => {
                           if (e.key === "Enter" || e.key === " ") {
                             e.preventDefault();

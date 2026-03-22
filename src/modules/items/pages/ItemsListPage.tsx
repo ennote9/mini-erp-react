@@ -35,6 +35,7 @@ import { save } from "@tauri-apps/plugin-dialog";
 import { invoke } from "@tauri-apps/api/core";
 import { revealItemInDir } from "@tauri-apps/plugin-opener";
 import { useTranslation } from "@/shared/i18n/context";
+import { itemsListExcelLabels } from "@/shared/i18n/excelListExportLabels";
 
 type ActiveFilter = "all" | "active" | "inactive";
 
@@ -197,7 +198,7 @@ export function ItemsListPage() {
       try {
         const path = await save({
           defaultPath: defaultFilename,
-          filters: [{ name: "Excel", extensions: ["xlsx"] }],
+          filters: [{ name: t("doc.page.excelFilterName"), extensions: ["xlsx"] }],
         });
         if (path == null) return;
 
@@ -224,19 +225,21 @@ export function ItemsListPage() {
         URL.revokeObjectURL(url);
       }
     },
-    [],
+    [t],
   );
+
+  const listExcelLabels = useMemo(() => itemsListExcelLabels(t), [t, locale]);
 
   const handleExportCurrentView = useCallback(() => {
     const rows = getExportRowsCurrentView();
-    runExportWithSaveAs("items.xlsx", () => buildItemsListXlsxBuffer(rows));
-  }, [getExportRowsCurrentView, runExportWithSaveAs]);
+    runExportWithSaveAs("items.xlsx", () => buildItemsListXlsxBuffer(rows, listExcelLabels));
+  }, [getExportRowsCurrentView, listExcelLabels, runExportWithSaveAs]);
 
   const handleExportSelected = useCallback(() => {
     const rows = getExportRowsSelected();
     if (rows.length === 0) return;
-    runExportWithSaveAs("items-selected.xlsx", () => buildItemsListXlsxBuffer(rows));
-  }, [getExportRowsSelected, runExportWithSaveAs]);
+    runExportWithSaveAs("items-selected.xlsx", () => buildItemsListXlsxBuffer(rows, listExcelLabels));
+  }, [getExportRowsSelected, listExcelLabels, runExportWithSaveAs]);
 
   const exportSelectedDisabled = selectedCount === 0;
 
@@ -388,7 +391,7 @@ export function ItemsListPage() {
                   className="h-7 px-1.5 text-xs shrink-0 text-muted-foreground hover:text-foreground"
                   onClick={clearBrandFilter}
                 >
-                  Clear
+                  {t("doc.list.clear")}
                 </Button>
               </div>
             )}
@@ -396,9 +399,11 @@ export function ItemsListPage() {
               <div
                 className="flex h-8 max-w-[min(100%,18rem)] items-center gap-1.5 rounded-md border border-input bg-background px-2 text-xs shrink-0"
                 role="status"
-                aria-label="Category filter active"
+                aria-label={t("ops.list.filterCategoryAria")}
               >
-                <span className="text-muted-foreground whitespace-nowrap shrink-0">Category</span>
+                <span className="text-muted-foreground whitespace-nowrap shrink-0">
+                  {t("ops.list.filterCategory")}
+                </span>
                 <span className="truncate font-medium text-foreground/90 min-w-0" title={categoryFilterLabel}>
                   {categoryFilterLabel}
                 </span>

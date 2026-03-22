@@ -57,14 +57,14 @@ export function RecentActivityPanel(props: Props) {
         <div className="flex flex-wrap items-start justify-between gap-2">
           <div className="min-w-0">
             <CardTitle className="text-sm font-semibold">{title}</CardTitle>
-            <CardDescription className="text-xs">Most recent by document date.</CardDescription>
+            <CardDescription className="text-xs">{t("dashboard.recent.byDate")}</CardDescription>
           </div>
           <button
             type="button"
             className="shrink-0 text-[11px] text-muted-foreground hover:text-foreground"
             onClick={() => navigate(listPath)}
           >
-            Open list →
+            {t("dashboard.recent.openList")}
           </button>
         </div>
       </CardHeader>

@@ -1,4 +1,5 @@
 import type { Workbook } from "exceljs";
+import type { ShipmentExcelLabels } from "../../shared/export/excelExportLabels";
 
 export type ShipmentExportLineRow = {
   no: number;
@@ -18,19 +19,6 @@ export type ShipmentDocumentSummary = {
   comment: string;
 };
 
-// Lines sheet columns — matches approved Shipment grid (no Unit price / Line amount)
-const LINES_COLUMN_HEADERS = [
-  "№",
-  "Item Code",
-  "Item Name",
-  "Brand",
-  "Category",
-  "Qty",
-  "UOM",
-] as const;
-
-const LINES_SHEET_NAME = "Lines";
-const DOC_SHEET_NAME = "Document";
 const LINES_TABLE_NAME_BASE = "LinesTable";
 
 const WIDTH_PADDING = 1.5;
@@ -75,8 +63,9 @@ const LINES_WIDTH_BOUNDS: { min: number; max: number }[] = [
 function applyLinesSheetColumnWidths(
   sheet: { getColumn: (col: number) => { width?: number } },
   lineRows: ShipmentExportLineRow[],
+  lineHeaders: readonly string[],
 ): void {
-  const headers = [...LINES_COLUMN_HEADERS];
+  const headers = [...lineHeaders];
   for (let c = 0; c < headers.length; c++) {
     const headerLen = headers[c].length;
     const valueLengths = lineRows.map((r) => {
@@ -89,16 +78,22 @@ function applyLinesSheetColumnWidths(
   }
 }
 
-function addLinesSheetWithTable(workbook: Workbook, lineRows: ShipmentExportLineRow[], sheetName: string): void {
+function addLinesSheetWithTable(
+  workbook: Workbook,
+  lineRows: ShipmentExportLineRow[],
+  sheetName: string,
+  lineHeaders: readonly string[],
+): void {
   const sheet = workbook.addWorksheet(sheetName);
+  const headers = [...lineHeaders];
 
   if (lineRows.length === 0) {
-    sheet.addRow([...LINES_COLUMN_HEADERS]);
-    applyLinesSheetColumnWidths(sheet, []);
+    sheet.addRow(headers);
+    applyLinesSheetColumnWidths(sheet, [], lineHeaders);
     return;
   }
 
-  const columns = LINES_COLUMN_HEADERS.map((name) => ({ name, filterButton: true }));
+  const columns = headers.map((name) => ({ name, filterButton: true }));
   const rows = lineRows.map((r) => [r.no, r.itemCode, r.itemName, r.brand, r.category, r.qty, r.uom]);
 
   const tableName = sanitizeTableName(LINES_TABLE_NAME_BASE);
@@ -110,17 +105,19 @@ function addLinesSheetWithTable(workbook: Workbook, lineRows: ShipmentExportLine
     columns,
     rows,
   });
-  applyLinesSheetColumnWidths(sheet, lineRows);
+  applyLinesSheetColumnWidths(sheet, lineRows, lineHeaders);
 }
 
-export async function buildLinesXlsxBuffer(rows: ShipmentExportLineRow[]): Promise<ArrayBuffer> {
+export async function buildLinesXlsxBuffer(
+  rows: ShipmentExportLineRow[],
+  labels: ShipmentExcelLabels,
+): Promise<ArrayBuffer> {
   const ExcelJS = await import("exceljs");
   const workbook = new ExcelJS.Workbook();
-  addLinesSheetWithTable(workbook, rows, LINES_SHEET_NAME);
+  addLinesSheetWithTable(workbook, rows, labels.linesSheetName, labels.shipmentLineHeaders);
   return workbook.xlsx.writeBuffer();
 }
 
-const DOC_LABELS = ["Number", "Date", "Related Sales Order", "Warehouse", "Comment"] as const;
 const DOC_SUMMARY_ROWS = 5;
 
 const THIN_BORDER = { style: "thin" as const };
@@ -162,8 +159,9 @@ function formatDocumentSummaryBlock(
 function applyDocumentSheetColumnWidths(
   sheet: { getColumn: (col: number) => { width?: number } },
   summary: ShipmentDocumentSummary,
+  docLabels: readonly string[],
 ): void {
-  const labelLengths = DOC_LABELS.map((s) => s.length);
+  const labelLengths = docLabels.map((s) => s.length);
   const valueLengths = [
     cellDisplayLength(summary.number),
     cellDisplayLength(summary.date),
@@ -180,17 +178,19 @@ function applyDocumentSheetColumnWidths(
 export async function buildDocumentXlsxBuffer(
   summary: ShipmentDocumentSummary,
   lineRows: ShipmentExportLineRow[],
+  labels: ShipmentExcelLabels,
 ): Promise<ArrayBuffer> {
   const ExcelJS = await import("exceljs");
   const workbook = new ExcelJS.Workbook();
-  const docSheet = workbook.addWorksheet(DOC_SHEET_NAME);
-  docSheet.addRow(["Number", summary.number]);
-  docSheet.addRow(["Date", summary.date]);
-  docSheet.addRow(["Related Sales Order", summary.salesOrder]);
-  docSheet.addRow(["Warehouse", summary.warehouse]);
-  docSheet.addRow(["Comment", summary.comment]);
-  applyDocumentSheetColumnWidths(docSheet, summary);
+  const docSheet = workbook.addWorksheet(labels.documentSheetName);
+  const L = labels.shipmentDocumentLabels;
+  docSheet.addRow([L[0], summary.number]);
+  docSheet.addRow([L[1], summary.date]);
+  docSheet.addRow([L[2], summary.salesOrder]);
+  docSheet.addRow([L[3], summary.warehouse]);
+  docSheet.addRow([L[4], summary.comment]);
+  applyDocumentSheetColumnWidths(docSheet, summary, L);
   formatDocumentSummaryBlock(docSheet, summary);
-  addLinesSheetWithTable(workbook, lineRows, LINES_SHEET_NAME);
+  addLinesSheetWithTable(workbook, lineRows, labels.linesSheetName, labels.shipmentLineHeaders);
   return workbook.xlsx.writeBuffer();
 }

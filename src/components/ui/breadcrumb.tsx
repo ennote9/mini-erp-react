@@ -3,15 +3,18 @@ import { Slot } from "@radix-ui/react-slot";
 import { ChevronRight } from "lucide-react";
 
 import { cn } from "@/lib/utils";
+import { useTranslationOptional } from "@/shared/i18n/context";
 
 const Breadcrumb = React.forwardRef<
   HTMLElement,
   React.ComponentPropsWithoutRef<"nav"> & {
     separator?: React.ReactNode;
   }
->(({ ...props }, ref) => (
-  <nav ref={ref} aria-label="breadcrumb" {...props} />
-));
+>(({ ...props }, ref) => {
+  const i18n = useTranslationOptional();
+  const label = i18n?.t("shell.a11y.breadcrumbNav") ?? "Breadcrumb";
+  return <nav ref={ref} aria-label={label} {...props} />;
+});
 Breadcrumb.displayName = "Breadcrumb";
 
 const BreadcrumbList = React.forwardRef<
@@ -96,17 +99,21 @@ BreadcrumbSeparator.displayName = "BreadcrumbSeparator";
 const BreadcrumbEllipsis = ({
   className,
   ...props
-}: React.ComponentProps<"span">) => (
-  <span
-    role="presentation"
-    aria-hidden="true"
-    className={cn("flex h-9 w-9 items-center justify-center", className)}
-    {...props}
-  >
-    <span className="sr-only">More</span>
-    <span className="text-muted-foreground">⋯</span>
-  </span>
-);
+}: React.ComponentProps<"span">) => {
+  const i18n = useTranslationOptional();
+  const moreLabel = i18n?.t("shell.a11y.more") ?? "More";
+  return (
+    <span
+      role="presentation"
+      aria-hidden="true"
+      className={cn("flex h-9 w-9 items-center justify-center", className)}
+      {...props}
+    >
+      <span className="sr-only">{moreLabel}</span>
+      <span className="text-muted-foreground">⋯</span>
+    </span>
+  );
+};
 BreadcrumbEllipsis.displayName = "BreadcrumbEllipsis";
 
 export {

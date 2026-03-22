@@ -7,6 +7,8 @@ import { workspaceProfileEn } from "./workspaceProfile";
 import { docCommonEn } from "./docCommon";
 import { opsEn } from "./ops";
 import { masterPagesEn } from "./masterPages";
+import { issuesMessagesEn } from "./issuesMessages";
+import { exportExcelEn } from "./exportExcelEn";
 
 /** English message tree (source of truth + fallback). */
 export const enMessages: MessageTree = {
@@ -18,4 +20,6 @@ export const enMessages: MessageTree = {
   doc: docCommonEn as unknown as MessageTree,
   ops: opsEn as unknown as MessageTree,
   master: masterPagesEn as unknown as MessageTree,
+  issues: issuesMessagesEn as unknown as MessageTree,
+  exportExcel: exportExcelEn as unknown as MessageTree,
 };

@@ -36,6 +36,7 @@ import {
   type StockBalanceCoverageStatus,
 } from "../../../shared/stockBalancesOperationalMetrics";
 import { useTranslation } from "@/shared/i18n/context";
+import { stockBalancesListExcelLabels } from "@/shared/i18n/excelListExportLabels";
 import { save } from "@tauri-apps/plugin-dialog";
 import { invoke } from "@tauri-apps/api/core";
 import { revealItemInDir } from "@tauri-apps/plugin-opener";
@@ -373,16 +374,18 @@ export function StockBalancesListPage() {
     [t],
   );
 
+  const listExcelLabels = useMemo(() => stockBalancesListExcelLabels(t), [t, locale]);
+
   const handleExportCurrentView = useCallback(() => {
     const rows = getExportRowsCurrentView();
-    runExportWithSaveAs("stock-balances.xlsx", () => buildStockBalancesListXlsxBuffer(rows));
-  }, [getExportRowsCurrentView, runExportWithSaveAs]);
+    runExportWithSaveAs("stock-balances.xlsx", () => buildStockBalancesListXlsxBuffer(rows, listExcelLabels));
+  }, [getExportRowsCurrentView, listExcelLabels, runExportWithSaveAs]);
 
   const handleExportSelected = useCallback(() => {
     const rows = getExportRowsSelected();
     if (rows.length === 0) return;
-    runExportWithSaveAs("stock-balances-selected.xlsx", () => buildStockBalancesListXlsxBuffer(rows));
-  }, [getExportRowsSelected, runExportWithSaveAs]);
+    runExportWithSaveAs("stock-balances-selected.xlsx", () => buildStockBalancesListXlsxBuffer(rows, listExcelLabels));
+  }, [getExportRowsSelected, listExcelLabels, runExportWithSaveAs]);
 
   const exportSelectedDisabled = selectedCount === 0;
 

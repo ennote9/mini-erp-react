@@ -1,21 +1,25 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { ChevronDown, ChevronUp } from "lucide-react";
 import { useTranslation } from "@/shared/i18n/context";
+import type { Issue } from "@/shared/issues";
+import { issuesToDisplayLists } from "@/shared/i18n/issueDisplay";
 
 export type DocumentIssueStripProps = {
-  /** Error messages to show in the strip and panel. */
-  errors: string[];
-  /** Warning messages to show in the strip and panel. */
-  warnings: string[];
+  /** Issues to show (translated in-strip). */
+  issues: Issue[];
 };
 
 /**
  * Reusable document-issue strip and expandable panel for PO/SO.
  * Preserves existing doc-health-strip* look and behavior (collapsed summary, chevron, expanded list).
- * Renders nothing when both errors and warnings are empty; callers typically guard with that check.
+ * Renders nothing when both errors and warnings are empty.
  */
-export function DocumentIssueStrip({ errors, warnings }: DocumentIssueStripProps) {
+export function DocumentIssueStrip({ issues }: DocumentIssueStripProps) {
   const { t } = useTranslation();
+  const { errors, warnings } = useMemo(
+    () => issuesToDisplayLists(issues, t),
+    [issues, t],
+  );
   const [expanded, setExpanded] = useState(false);
   const totalCount = errors.length + warnings.length;
   const hasAny = totalCount > 0;

@@ -1,5 +1,8 @@
 import type { MessageTree } from "../../resolve";
 import { kkOps } from "./ops";
+import { kkMasterPages } from "./masterPagesKk";
+import { kkIssuesMessages } from "./issuesMessagesKk";
+import { kkExportExcel } from "./exportExcelKk";
 import { kkSettingsEntriesFull, kkSettingsOptionsFull } from "./settingsRegistryKk";
 
 /** Kazakh UI overrides (missing keys inherit English). */
@@ -52,6 +55,13 @@ export const kkMessages: MessageTree = {
     account: "Есептік жазба",
     signedIn: "Кірді",
     workspaceSuffix: "профиль",
+    a11y: {
+      toggleSidebar: "Навигация панелін ашу немесе жабу",
+      mobileSidebarTitle: "Навигация",
+      mobileSidebarDescription: "Кіші экранда навигация мәзірін ашады.",
+      breadcrumbNav: "Навигация жолы",
+      more: "Тағы",
+    },
     nav: {
       items: "Тауарлар",
       brands: "Брендтер",
@@ -431,6 +441,9 @@ export const kkMessages: MessageTree = {
     },
   },
   doc: {
+    grid: {
+      selectItem: "Тауарды таңдаңыз",
+    },
     breadcrumbHome: "Басты",
     kinds: {
       purchaseOrder: "сатып алу тапсырысы",
@@ -521,7 +534,7 @@ export const kkMessages: MessageTree = {
       exportAllLines: "Барлық жолдарды экспорттау",
       exportSelectLinesFirst: "Алдымен торда бір немесе бірнеше жолды таңдаңыз.",
       exportSelectionEditModeOnly: "Жолдарды таңдау тек өңдеу режимінде қолжетімді.",
-      excelFilterName: "Excel",
+      excelFilterName: "Excel файлы",
     },
     summary: {
       paymentTermsDays: "{{days}} күн",
@@ -698,5 +711,8 @@ export const kkMessages: MessageTree = {
       searchResultsCount: "{{count}} нәтиже",
     },
   },
+  master: kkMasterPages,
   ops: kkOps,
+  issues: kkIssuesMessages,
+  exportExcel: kkExportExcel,
 };

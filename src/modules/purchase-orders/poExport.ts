@@ -1,4 +1,5 @@
 import type { Workbook } from "exceljs";
+import type { PlanningDocumentExcelLabels } from "../../shared/export/excelExportLabels";
 
 export type PoExportLineRow = {
   no: number;
@@ -22,20 +23,6 @@ export type PoDocumentSummary = {
   totalAmount: number;
 };
 
-// Single source of truth for Lines sheet columns (order and headers)
-const LINES_COLUMN_HEADERS = [
-  "№",
-  "Item Code",
-  "Item Name",
-  "Brand",
-  "Category",
-  "Qty",
-  "Unit Price",
-  "Line Amount",
-] as const;
-
-const LINES_SHEET_NAME = "Lines";
-const DOC_SHEET_NAME = "Document";
 const LINES_TABLE_NAME_BASE = "LinesTable";
 
 /** Excel column width padding and bounds (lightweight heuristic; not exact Excel autofit) */
@@ -43,10 +30,6 @@ const WIDTH_PADDING = 1.5;
 const DEFAULT_MIN_WIDTH = 8;
 const DEFAULT_MAX_WIDTH = 50;
 
-/**
- * Compute a single column width from header length and value lengths.
- * Deterministic, bounded. Units are Excel character-width–like.
- */
 function columnWidthFromLengths(
   headerLength: number,
   valueLengths: number[],
@@ -58,50 +41,38 @@ function columnWidthFromLengths(
   return Math.min(maxW, Math.max(minW, Math.ceil(w)));
 }
 
-/** Length of stringified cell value for width heuristic (numbers stay compact) */
 function cellDisplayLength(val: unknown): number {
   if (val === null || val === undefined) return 0;
   const s = typeof val === "number" ? String(val) : String(val);
   return s.length;
 }
 
-/**
- * Sanitize table name for Excel: must start with letter, underscore, or backslash;
- * only letters, numbers, periods, underscores allowed. Prevents corrupt workbook.
- */
 function sanitizeTableName(name: string): string {
   if (!name || name.length === 0) return "Table1";
-  // Replace invalid chars with underscore; allow only [a-zA-Z0-9._]
   let out = name.replace(/[^a-zA-Z0-9._]/g, "_");
-  // Excel: must not start with number or period
   if (/^[0-9.]/.test(out)) out = `T${out}`;
   if (out.length === 0) return "Table1";
-  // Cap length (Excel allows 255; keep reasonable)
   if (out.length > 200) out = out.slice(0, 200);
   return out;
 }
 
-/** Per-column min/max width for Lines sheet (deterministic, readability) */
 const LINES_WIDTH_BOUNDS: { min: number; max: number }[] = [
-  { min: 4, max: 6 },   // №
-  { min: 10, max: 20 }, // Item Code
-  { min: 12, max: 42 }, // Item Name (widest)
-  { min: 8, max: 18 },  // Brand
-  { min: 8, max: 18 },  // Category
-  { min: 5, max: 10 },  // Qty
-  { min: 10, max: 14 }, // Unit Price
-  { min: 11, max: 14 }, // Line Amount
+  { min: 4, max: 6 },
+  { min: 10, max: 20 },
+  { min: 12, max: 42 },
+  { min: 8, max: 18 },
+  { min: 8, max: 18 },
+  { min: 5, max: 10 },
+  { min: 10, max: 14 },
+  { min: 11, max: 14 },
 ];
 
-/**
- * Apply column widths to the Lines sheet after content is written.
- * Does not change table structure or semantics.
- */
 function applyLinesSheetColumnWidths(
   sheet: { getColumn: (col: number) => { width?: number } },
   lineRows: PoExportLineRow[],
+  lineHeaders: readonly string[],
 ): void {
-  const headers = [...LINES_COLUMN_HEADERS];
+  const headers = [...lineHeaders];
   const colCount = headers.length;
   for (let c = 0; c < colCount; c++) {
     const headerLen = headers[c].length;
@@ -115,21 +86,22 @@ function applyLinesSheetColumnWidths(
   }
 }
 
-/**
- * Add Lines sheet. If lineRows.length >= 1, creates a real Excel Table.
- * If lineRows.length === 0, adds sheet with header row only (no table) to avoid corrupt file.
- */
-function addLinesSheetWithTable(workbook: Workbook, lineRows: PoExportLineRow[], sheetName: string): void {
+function addLinesSheetWithTable(
+  workbook: Workbook,
+  lineRows: PoExportLineRow[],
+  sheetName: string,
+  lineHeaders: readonly string[],
+): void {
   const sheet = workbook.addWorksheet(sheetName);
+  const headers = [...lineHeaders];
 
   if (lineRows.length === 0) {
-    // No table when no data: header row only, no addTable (empty table can corrupt)
-    sheet.addRow([...LINES_COLUMN_HEADERS]);
-    applyLinesSheetColumnWidths(sheet, []);
+    sheet.addRow(headers);
+    applyLinesSheetColumnWidths(sheet, [], lineHeaders);
     return;
   }
 
-  const columns = LINES_COLUMN_HEADERS.map((name) => ({ name, filterButton: true }));
+  const columns = headers.map((name) => ({ name, filterButton: true }));
   const rows = lineRows.map((r) => [
     r.no,
     r.itemCode,
@@ -150,20 +122,21 @@ function addLinesSheetWithTable(workbook: Workbook, lineRows: PoExportLineRow[],
     columns,
     rows,
   });
-  applyLinesSheetColumnWidths(sheet, lineRows);
+  applyLinesSheetColumnWidths(sheet, lineRows, lineHeaders);
 }
 
-export async function buildLinesXlsxBuffer(rows: PoExportLineRow[]): Promise<ArrayBuffer> {
+export async function buildLinesXlsxBuffer(
+  rows: PoExportLineRow[],
+  labels: PlanningDocumentExcelLabels,
+): Promise<ArrayBuffer> {
   const ExcelJS = await import("exceljs");
   const workbook = new ExcelJS.Workbook();
-  addLinesSheetWithTable(workbook, rows, LINES_SHEET_NAME);
+  addLinesSheetWithTable(workbook, rows, labels.linesSheetName, labels.planningLineHeaders);
   return workbook.xlsx.writeBuffer();
 }
 
-const DOC_LABELS = ["Number", "Date", "Status", "Supplier", "Warehouse", "Comment", "Total Qty", "Total Amount"] as const;
 const DOC_SUMMARY_ROWS = 8;
 
-/** Thin border for Document summary block (ExcelJS border style) */
 const THIN_BORDER = { style: "thin" as const };
 const BLOCK_BORDER = {
   top: THIN_BORDER,
@@ -172,10 +145,6 @@ const BLOCK_BORDER = {
   right: THIN_BORDER,
 };
 
-/**
- * Format the Document sheet A1:B8 as a compact summary block: bold labels, borders,
- * alignment, date/numeric formats. Does not change sheet structure.
- */
 function formatDocumentSummaryBlock(
   sheet: {
     getRow: (row: number) => { getCell: (col: number) => { font?: unknown; border?: unknown; alignment?: unknown; fill?: unknown; numFmt?: string; value?: unknown } };
@@ -192,32 +161,26 @@ function formatDocumentSummaryBlock(
     cellB.border = BLOCK_BORDER;
     cellB.alignment = { vertical: "middle" };
   }
-  // Optional very light fill on label column only (improves readability)
   const lightFill = { type: "pattern" as const, pattern: "solid" as const, fgColor: { argb: "FFF2F2F2" } };
   for (let r = 1; r <= DOC_SUMMARY_ROWS; r++) {
     sheet.getRow(r).getCell(1).fill = lightFill;
   }
-  // Date (row 2, col B): proper date format; value as Date if parseable
   const dateCell = sheet.getRow(2).getCell(2);
   const dateParsed = Date.parse(summary.date);
   if (!Number.isNaN(dateParsed)) {
     (dateCell as { value?: unknown }).value = new Date(dateParsed);
   }
   dateCell.numFmt = "yyyy-mm-dd";
-  // Total Qty (row 7, col B): integer format
   sheet.getRow(7).getCell(2).numFmt = "0";
-  // Total Amount (row 8, col B): decimal/currency-like
   sheet.getRow(8).getCell(2).numFmt = "#,##0.00";
 }
 
-/**
- * Apply column widths to the Document sheet (label column A, value column B).
- */
 function applyDocumentSheetColumnWidths(
   sheet: { getColumn: (col: number) => { width?: number } },
   summary: PoDocumentSummary,
+  docLabels: readonly string[],
 ): void {
-  const labelLengths = DOC_LABELS.map((s) => s.length);
+  const labelLengths = docLabels.map((s) => s.length);
   const valueLengths = [
     cellDisplayLength(summary.number),
     cellDisplayLength(summary.date),
@@ -237,20 +200,22 @@ function applyDocumentSheetColumnWidths(
 export async function buildDocumentXlsxBuffer(
   summary: PoDocumentSummary,
   lineRows: PoExportLineRow[],
+  labels: PlanningDocumentExcelLabels,
 ): Promise<ArrayBuffer> {
   const ExcelJS = await import("exceljs");
   const workbook = new ExcelJS.Workbook();
-  const docSheet = workbook.addWorksheet(DOC_SHEET_NAME);
-  docSheet.addRow(["Number", summary.number]);
-  docSheet.addRow(["Date", summary.date]);
-  docSheet.addRow(["Status", summary.status]);
-  docSheet.addRow(["Supplier", summary.supplier]);
-  docSheet.addRow(["Warehouse", summary.warehouse]);
-  docSheet.addRow(["Comment", summary.comment]);
-  docSheet.addRow(["Total Qty", summary.totalQty]);
-  docSheet.addRow(["Total Amount", summary.totalAmount]);
-  applyDocumentSheetColumnWidths(docSheet, summary);
+  const docSheet = workbook.addWorksheet(labels.documentSheetName);
+  const L = labels.planningDocumentLabels;
+  docSheet.addRow([L[0], summary.number]);
+  docSheet.addRow([L[1], summary.date]);
+  docSheet.addRow([L[2], summary.status]);
+  docSheet.addRow([L[3], summary.supplier]);
+  docSheet.addRow([L[4], summary.warehouse]);
+  docSheet.addRow([L[5], summary.comment]);
+  docSheet.addRow([L[6], summary.totalQty]);
+  docSheet.addRow([L[7], summary.totalAmount]);
+  applyDocumentSheetColumnWidths(docSheet, summary, L);
   formatDocumentSummaryBlock(docSheet, summary);
-  addLinesSheetWithTable(workbook, lineRows, LINES_SHEET_NAME);
+  addLinesSheetWithTable(workbook, lineRows, labels.linesSheetName, labels.planningLineHeaders);
   return workbook.xlsx.writeBuffer();
 }

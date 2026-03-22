@@ -7,29 +7,28 @@ export const ITEM_IMAGE_MAX_COUNT = 5;
 
 export const ITEM_IMAGE_ALLOWED_EXT = new Set(["jpg", "jpeg", "png", "webp"]);
 
+export type ItemImageFileValidationError = "too_large" | "bad_type";
+
 export function extensionFromFileName(name: string): string | null {
   const i = name.lastIndexOf(".");
   if (i < 0 || i === name.length - 1) return null;
   return name.slice(i + 1).toLowerCase();
 }
 
-export function validateItemImageFile(file: File): string | null {
+export function validateItemImageFile(file: File): ItemImageFileValidationError | null {
   if (file.size > ITEM_IMAGE_MAX_BYTES) {
-    return "Image must be 10 MB or smaller.";
+    return "too_large";
   }
   const ext = extensionFromFileName(file.name);
   if (!ext || !ITEM_IMAGE_ALLOWED_EXT.has(ext)) {
-    return "Allowed types: JPG, JPEG, PNG, WebP.";
+    return "bad_type";
   }
   return null;
 }
 
 /** When adding (not replacing), enforce max count. */
-export function validateItemImageSlotAvailable(currentCount: number): string | null {
-  if (currentCount >= ITEM_IMAGE_MAX_COUNT) {
-    return `You can add up to ${ITEM_IMAGE_MAX_COUNT} images per item. Remove one to add another.`;
-  }
-  return null;
+export function validateItemImageSlotAvailable(currentCount: number): boolean {
+  return currentCount < ITEM_IMAGE_MAX_COUNT;
 }
 
 export function mimeTypeForExtension(ext: string): string {

@@ -33,6 +33,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { revealItemInDir } from "@tauri-apps/plugin-opener";
 import type { TFunction } from "../../../shared/i18n/resolve";
 import { useTranslation } from "@/shared/i18n/context";
+import { stockMovementsListExcelLabels } from "@/shared/i18n/excelListExportLabels";
 
 type RowData = StockMovement & {
   itemCode: string;
@@ -273,16 +274,18 @@ export function StockMovementsListPage() {
     [t],
   );
 
+  const listExcelLabels = useMemo(() => stockMovementsListExcelLabels(t), [t, locale]);
+
   const handleExportCurrentView = useCallback(() => {
     const rows = getExportRowsCurrentView();
-    runExportWithSaveAs("stock-movements.xlsx", () => buildStockMovementsListXlsxBuffer(rows));
-  }, [getExportRowsCurrentView, runExportWithSaveAs]);
+    runExportWithSaveAs("stock-movements.xlsx", () => buildStockMovementsListXlsxBuffer(rows, listExcelLabels));
+  }, [getExportRowsCurrentView, listExcelLabels, runExportWithSaveAs]);
 
   const handleExportSelected = useCallback(() => {
     const rows = getExportRowsSelected();
     if (rows.length === 0) return;
-    runExportWithSaveAs("stock-movements-selected.xlsx", () => buildStockMovementsListXlsxBuffer(rows));
-  }, [getExportRowsSelected, runExportWithSaveAs]);
+    runExportWithSaveAs("stock-movements-selected.xlsx", () => buildStockMovementsListXlsxBuffer(rows, listExcelLabels));
+  }, [getExportRowsSelected, listExcelLabels, runExportWithSaveAs]);
 
   const exportSelectedDisabled = selectedCount === 0;
 

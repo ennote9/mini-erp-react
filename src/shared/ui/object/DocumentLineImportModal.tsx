@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -26,6 +26,9 @@ import {
   buildLineImportTemplateXlsxBuffer,
   parseExcelLineImport,
   type ExcelImportPreview,
+  type LineImportHeaderSynonyms,
+  type LineImportParseLabels,
+  type LineImportTemplateLabels,
 } from "../../excelLineImport";
 import { useTranslation } from "@/shared/i18n/context";
 import type { TFunction } from "@/shared/i18n/resolve";
@@ -114,8 +117,101 @@ export function DocumentLineImportModal(props: Props) {
     onApply,
   } = props;
 
-  const { t } = useTranslation();
+  const { t, locale } = useTranslation();
   const emDash = t("domain.audit.summary.emDash");
+
+  const lineImportTemplateLabels = useMemo((): LineImportTemplateLabels => {
+    const sheetName = t("ops.importModal.lineImport.dataSheetName");
+    return {
+      dataSheetName: sheetName,
+      instructionSheetName: t("ops.importModal.lineImport.instructionsSheetName"),
+      columnHeaders: {
+        itemCode: t("ops.importModal.lineImport.headerItemCode"),
+        qty: t("ops.importModal.lineImport.headerQty"),
+        unitPrice: t("ops.importModal.lineImport.headerUnitPrice"),
+      },
+      instructionTitle: t("ops.importModal.lineImport.instructionTitle"),
+      instructionLines: [
+        t("ops.importModal.lineImport.instruction1", { sheetName }),
+        t("ops.importModal.lineImport.instruction2"),
+        t("ops.importModal.lineImport.instruction3"),
+        t("ops.importModal.lineImport.instruction4"),
+        t("ops.importModal.lineImport.instruction5"),
+      ],
+    };
+  }, [t, locale]);
+
+  const lineImportHeaderSynonyms = useMemo((): LineImportHeaderSynonyms => {
+    const itemCode = t("ops.importModal.lineImport.headerItemCode");
+    const qty = t("ops.importModal.lineImport.headerQty");
+    const unitPrice = t("ops.importModal.lineImport.headerUnitPrice");
+    const barcode = t("ops.importModal.lineImport.headerBarcode");
+    return {
+      code: [itemCode, "Item Code", "item code", "code"],
+      barcode: [barcode, "Barcode", "barcode", "Item Barcode", "item barcode"],
+      qty: [qty, "Qty", "qty", "Quantity", "quantity"],
+      unitPrice: [unitPrice, "Unit Price", "unit price", "Price", "price"],
+    };
+  }, [t, locale]);
+
+  const buildLineImportHeaderError = useCallback(
+    (kind: "missing_qty" | "missing_identifier", detectedHeaders: string[]) => {
+      const norm = (s: string) => s.trim().toLowerCase().replace(/\s+/g, " ");
+      const detectedText =
+        detectedHeaders.length > 0
+          ? detectedHeaders.join(" | ")
+          : t("ops.importModal.lineImport.headerDetectedBlank");
+      const lines: string[] = [
+        t("ops.importModal.lineImport.headerErrorIntro"),
+        ...(kind === "missing_qty"
+          ? [
+              t("ops.importModal.lineImport.headerMissingQtyLine"),
+              t("ops.importModal.lineImport.headerMissingQtyExpected"),
+            ]
+          : [
+              t("ops.importModal.lineImport.headerMissingIdLine"),
+              t("ops.importModal.lineImport.headerMissingIdExpected"),
+            ]),
+        t("ops.importModal.lineImport.headerDetectedLine", { detected: detectedText }),
+        t("ops.importModal.lineImport.headerTipRow"),
+        t("ops.importModal.lineImport.headerExample", {
+          code: t("ops.importModal.lineImport.headerItemCode"),
+          qty: t("ops.importModal.lineImport.headerQty"),
+        }),
+        t("ops.importModal.lineImport.headerExampleRow", {
+          sampleCode: "ITEM-001",
+          sampleQty: "5",
+        }),
+      ];
+      const normalizedDetected = detectedHeaders.map((h) => norm(h));
+      if (normalizedDetected.some((h) => h.includes("item") && h.includes("barcode"))) {
+        lines.push(t("ops.importModal.lineImport.headerHintSplitLabels"));
+      }
+      if (
+        kind === "missing_qty" &&
+        normalizedDetected.some((h) => h.includes("qty") || h.includes("quant"))
+      ) {
+        lines.push(t("ops.importModal.lineImport.headerHintQtyTypo"));
+      }
+      return lines.join("\n");
+    },
+    [t, locale],
+  );
+
+  const lineImportParseLabels = useMemo((): LineImportParseLabels => {
+    return {
+      workbookNoWorksheets: t("ops.importModal.lineImport.workbookNoWorksheets"),
+      headerSynonyms: lineImportHeaderSynonyms,
+      buildHeaderValidationError: buildLineImportHeaderError,
+      rowReasons: {
+        missingItemCodeBarcode: t("ops.importModal.lineImport.reasonMissingItemCodeBarcode"),
+        qtyMustBePositive: t("ops.importModal.lineImport.reasonQtyMustBePositive"),
+        unitPriceNumericNonNegative: t(
+          "ops.importModal.lineImport.reasonUnitPriceNumericNonNegative",
+        ),
+      },
+    };
+  }, [t, locale, lineImportHeaderSynonyms, buildLineImportHeaderError]);
   const [activeTab, setActiveTab] = useState<LineImportTab>(initialTab);
   const [pasteInput, setPasteInput] = useState("");
   const [pastePreview, setPastePreview] = useState<BatchPastePreview | null>(null);
@@ -181,7 +277,7 @@ export function DocumentLineImportModal(props: Props) {
       });
       if (path == null) return;
 
-      const buffer = await buildLineImportTemplateXlsxBuffer();
+      const buffer = await buildLineImportTemplateXlsxBuffer(lineImportTemplateLabels);
       const bytes = new Uint8Array(buffer);
       let binary = "";
       for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
@@ -192,7 +288,7 @@ export function DocumentLineImportModal(props: Props) {
       setTemplateDownloadResult({ filename, path });
       return;
     } catch {
-      const buffer = await buildLineImportTemplateXlsxBuffer();
+      const buffer = await buildLineImportTemplateXlsxBuffer(lineImportTemplateLabels);
       const blob = new Blob([buffer], {
         type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
       });
@@ -236,6 +332,7 @@ export function DocumentLineImportModal(props: Props) {
       const preview = await parseExcelLineImport(await file.arrayBuffer(), {
         items,
         getDefaultUnitPrice,
+        labels: lineImportParseLabels,
       });
       if (modalSessionRef.current !== sessionAtStart) return;
       setExcelPreview(preview);

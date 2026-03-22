@@ -19,10 +19,18 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { actionIssue, combineIssues, getErrorAndWarningMessages, issueListContainsMessage, type Issue } from "../../../shared/issues";
+import {
+  actionIssueFromServiceMessage,
+  combineIssues,
+  hasErrors,
+  hasWarnings,
+  issueListContainsMessage,
+  type Issue,
+} from "../../../shared/issues";
 import { getCustomerFormHealth } from "../../../shared/masterDataHealth";
 import { DocumentIssueStrip } from "../../../shared/ui/feedback/DocumentIssueStrip";
 import { Save, X } from "lucide-react";
+import { useTranslation } from "@/shared/i18n/context";
 
 type FormState = {
   code: string;
@@ -59,6 +67,7 @@ function defaultForm(): FormState {
 }
 
 export function CustomerPage() {
+  const { t } = useTranslation();
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const isNew = id === "new";
@@ -127,10 +136,6 @@ export function CustomerPage() {
     () => combineIssues(health.issues, actionIssues),
     [health.issues, actionIssues],
   );
-  const { errors: combinedErrors, warnings: combinedWarnings } = useMemo(
-    () => getErrorAndWarningMessages(combinedIssues),
-    [combinedIssues],
-  );
 
   useEffect(() => {
     if (isNew) {
@@ -157,9 +162,9 @@ export function CustomerPage() {
   }, [id, isNew, customer?.id, customer?.code, customer?.name, customer?.isActive, customer?.phone, customer?.email, customer?.comment, customer?.contactPerson, customer?.taxId, customer?.billingAddress, customer?.shippingAddress, customer?.city, customer?.country, customer?.paymentTermsDays]);
 
   const parsePaymentTerms = (s: string): number | undefined => {
-    const t = s.trim();
-    if (t === "") return undefined;
-    const n = Number(t);
+    const trimmed = s.trim();
+    if (trimmed === "") return undefined;
+    const n = Number(trimmed);
     return Number.isNaN(n) ? undefined : n;
   };
 
@@ -186,7 +191,7 @@ export function CustomerPage() {
     if (result.success) {
       navigate("/customers");
     } else if (!issueListContainsMessage(health.issues, result.error)) {
-      setActionIssues([actionIssue(result.error)]);
+      setActionIssues([actionIssueFromServiceMessage(result.error)]);
     }
   };
 
@@ -197,7 +202,7 @@ export function CustomerPage() {
   if (!id) {
     return (
       <div className="doc-page doc-page--not-found">
-        <p>Customer not found.</p>
+        <p>{t("master.customer.notFound")}</p>
       </div>
     );
   }
@@ -205,23 +210,23 @@ export function CustomerPage() {
   if (!isNew && !customer) {
     return (
       <div className="doc-page doc-page--not-found">
-        <p>Customer not found.</p>
+        <p>{t("master.customer.notFound")}</p>
       </div>
     );
   }
 
   const breadcrumbItems = [
-    { label: "Master Data", to: "/customers" },
-    { label: "Customers", to: "/customers" },
-    { label: isNew ? "New" : customer!.code },
+    { label: t("master.breadcrumb.masterData"), to: "/customers" },
+    { label: t("master.customer.listBreadcrumb"), to: "/customers" },
+    { label: isNew ? t("master.common.newLabel") : customer!.code },
   ];
 
-  const displayTitle = isNew ? "New Customer" : `Customer ${customer!.code}`;
+  const displayTitle = isNew ? t("master.customer.titleNew") : t("master.customer.titleWithCode", { code: customer!.code });
 
   return (
     <div className="doc-page">
       <div className="doc-page__breadcrumb">
-        <BackButton to="/customers" aria-label="Back to Customers" />
+        <BackButton to="/customers" aria-label={t("master.customer.backToListAria")} />
         <Breadcrumb items={breadcrumbItems} />
       </div>
       <div className="doc-page__header">
@@ -230,17 +235,17 @@ export function CustomerPage() {
             <h2 className="doc-header__title">{displayTitle}</h2>
           </div>
           <div className="doc-header__right">
-            {(combinedErrors.length > 0 || combinedWarnings.length > 0) && (
-              <DocumentIssueStrip errors={combinedErrors} warnings={combinedWarnings} />
+            {(hasErrors(combinedIssues) || hasWarnings(combinedIssues)) && (
+              <DocumentIssueStrip issues={combinedIssues} />
             )}
             <div className="doc-header__actions">
               <Button type="button" onClick={handleSave}>
                 <Save aria-hidden />
-                Save
+                {t("common.save")}
               </Button>
               <Button type="button" variant="outline" onClick={handleCancel}>
                 <X aria-hidden />
-                Cancel
+                {t("common.cancel")}
               </Button>
             </div>
           </div>
@@ -248,107 +253,107 @@ export function CustomerPage() {
       </div>
       <Card className="mt-4 max-w-2xl border-0 shadow-none">
         <CardHeader className="p-2 pb-0.5">
-          <CardTitle className="text-[0.9rem] font-semibold">Details</CardTitle>
+          <CardTitle className="text-[0.9rem] font-semibold">{t("master.common.detailsTitle")}</CardTitle>
           <CardDescription className="text-xs">
-            Code, name, contact and status for this customer.
+            {t("master.customer.detailsDescription")}
           </CardDescription>
         </CardHeader>
         <CardContent className="p-2 pt-1">
           <div className="grid gap-2 sm:grid-cols-2">
             <div className="flex flex-col gap-0.5 sm:col-span-2">
               <Label htmlFor="customer-code" className="text-sm">
-                Code <span className="text-destructive">*</span>
+                {t("doc.columns.code")} <span className="text-destructive">{t("doc.page.requiredStar")}</span>
               </Label>
               <Input
                 id="customer-code"
                 type="text"
                 value={form.code}
                 onChange={(e) => setForm((f) => ({ ...f, code: e.target.value }))}
-                placeholder="e.g. CUS-0001"
+                placeholder={t("master.customer.codePlaceholder")}
                 className="h-8 text-sm"
               />
             </div>
             <div className="flex flex-col gap-0.5">
               <Label htmlFor="customer-name" className="text-sm">
-                Name <span className="text-destructive">*</span>
+                {t("doc.columns.name")} <span className="text-destructive">{t("doc.page.requiredStar")}</span>
               </Label>
               <Input
                 id="customer-name"
                 type="text"
                 value={form.name}
                 onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
-                placeholder="Customer name"
+                placeholder={t("master.customer.namePlaceholder")}
                 className="h-8 text-sm"
               />
             </div>
             <div className="flex flex-col gap-0.5">
-              <Label htmlFor="customer-contactPerson" className="text-sm">Contact person</Label>
+              <Label htmlFor="customer-contactPerson" className="text-sm">{t("doc.columns.contactPerson")}</Label>
               <Input
                 id="customer-contactPerson"
                 type="text"
                 value={form.contactPerson}
                 onChange={(e) => setForm((f) => ({ ...f, contactPerson: e.target.value }))}
-                placeholder="Optional"
+                placeholder={t("common.optional")}
                 className="h-8 text-sm"
               />
             </div>
             <div className="flex flex-col gap-0.5">
-              <Label htmlFor="customer-taxId" className="text-sm">Tax ID</Label>
+              <Label htmlFor="customer-taxId" className="text-sm">{t("master.customer.taxId")}</Label>
               <Input
                 id="customer-taxId"
                 type="text"
                 value={form.taxId}
                 onChange={(e) => setForm((f) => ({ ...f, taxId: e.target.value }))}
-                placeholder="Optional"
+                placeholder={t("common.optional")}
                 className="h-8 text-sm"
               />
             </div>
             <div className="flex flex-col gap-0.5 sm:col-span-2">
-              <Label htmlFor="customer-billingAddress" className="text-sm">Billing address</Label>
+              <Label htmlFor="customer-billingAddress" className="text-sm">{t("master.customer.billingAddress")}</Label>
               <Input
                 id="customer-billingAddress"
                 type="text"
                 value={form.billingAddress}
                 onChange={(e) => setForm((f) => ({ ...f, billingAddress: e.target.value }))}
-                placeholder="Optional"
+                placeholder={t("common.optional")}
                 className="h-8 text-sm"
               />
             </div>
             <div className="flex flex-col gap-0.5 sm:col-span-2">
-              <Label htmlFor="customer-shippingAddress" className="text-sm">Shipping address</Label>
+              <Label htmlFor="customer-shippingAddress" className="text-sm">{t("master.customer.shippingAddress")}</Label>
               <Input
                 id="customer-shippingAddress"
                 type="text"
                 value={form.shippingAddress}
                 onChange={(e) => setForm((f) => ({ ...f, shippingAddress: e.target.value }))}
-                placeholder="Optional"
+                placeholder={t("common.optional")}
                 className="h-8 text-sm"
               />
             </div>
             <div className="flex flex-col gap-0.5">
-              <Label htmlFor="customer-city" className="text-sm">City</Label>
+              <Label htmlFor="customer-city" className="text-sm">{t("doc.columns.city")}</Label>
               <Input
                 id="customer-city"
                 type="text"
                 value={form.city}
                 onChange={(e) => setForm((f) => ({ ...f, city: e.target.value }))}
-                placeholder="Optional"
+                placeholder={t("common.optional")}
                 className="h-8 text-sm"
               />
             </div>
             <div className="flex flex-col gap-0.5">
-              <Label htmlFor="customer-country" className="text-sm">Country</Label>
+              <Label htmlFor="customer-country" className="text-sm">{t("master.customer.country")}</Label>
               <Input
                 id="customer-country"
                 type="text"
                 value={form.country}
                 onChange={(e) => setForm((f) => ({ ...f, country: e.target.value }))}
-                placeholder="Optional"
+                placeholder={t("common.optional")}
                 className="h-8 text-sm"
               />
             </div>
             <div className="flex flex-col gap-0.5">
-              <Label htmlFor="customer-paymentTermsDays" className="text-sm">Payment terms (days)</Label>
+              <Label htmlFor="customer-paymentTermsDays" className="text-sm">{t("doc.page.paymentTermsDaysLabel")}</Label>
               <Input
                 id="customer-paymentTermsDays"
                 type="number"
@@ -356,18 +361,18 @@ export function CustomerPage() {
                 step={1}
                 value={form.paymentTermsDays}
                 onChange={(e) => setForm((f) => ({ ...f, paymentTermsDays: e.target.value }))}
-                placeholder="e.g. 30"
+                placeholder={t("master.common.paymentTermsExample")}
                 className="h-8 text-sm"
               />
             </div>
             <div className="flex flex-col gap-0.5">
-              <Label htmlFor="customer-phone" className="text-sm">Phone</Label>
+              <Label htmlFor="customer-phone" className="text-sm">{t("doc.columns.phone")}</Label>
               <Input
                 id="customer-phone"
                 type="text"
                 value={form.phone}
                 onChange={(e) => setForm((f) => ({ ...f, phone: e.target.value }))}
-                placeholder="Optional"
+                placeholder={t("common.optional")}
                 className="h-8 text-sm"
               />
             </div>
@@ -383,29 +388,29 @@ export function CustomerPage() {
                 htmlFor="customer-active"
                 className="cursor-pointer text-sm font-normal"
               >
-                Active
+                {t("ops.master.activeCell.active")}
               </Label>
             </div>
             <div className="flex flex-col gap-0.5 sm:col-span-2">
-              <Label htmlFor="customer-email" className="text-sm">Email</Label>
+              <Label htmlFor="customer-email" className="text-sm">{t("doc.columns.email")}</Label>
               <Input
                 id="customer-email"
                 type="text"
                 value={form.email}
                 onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))}
-                placeholder="Optional"
+                placeholder={t("common.optional")}
                 className="h-8 text-sm"
               />
             </div>
             <div className="flex flex-col gap-0.5 sm:col-span-2">
-              <Label htmlFor="customer-comment" className="text-sm">Comment</Label>
+              <Label htmlFor="customer-comment" className="text-sm">{t("doc.columns.comment")}</Label>
               <Textarea
                 id="customer-comment"
                 value={form.comment}
                 onChange={(e) =>
                   setForm((f) => ({ ...f, comment: e.target.value }))
                 }
-                placeholder="Optional"
+                placeholder={t("common.optional")}
                 rows={2}
                 className="resize-none min-h-[4.5rem] text-sm"
               />
@@ -420,10 +425,10 @@ export function CustomerPage() {
             <div className="flex flex-wrap items-start justify-between gap-2 gap-y-1.5">
               <div className="min-w-0 space-y-0.5 flex-1">
                 <CardTitle className="text-[0.9rem] font-semibold tracking-tight">
-                  Related Sales Orders
+                  {t("master.customer.relatedSalesOrdersTitle")}
                 </CardTitle>
                 <CardDescription className="text-xs leading-snug">
-                  Linked sales documents. Read-only; open a row for detail.
+                  {t("master.customer.relatedSalesOrdersHint")}
                 </CardDescription>
               </div>
               <Button
@@ -435,50 +440,50 @@ export function CustomerPage() {
                   navigate(`/sales-orders?customerId=${encodeURIComponent(customer.id)}`)
                 }
               >
-                Open all sales orders
+                {t("master.customer.openAllSalesOrders")}
               </Button>
             </div>
           </CardHeader>
           <CardContent className="p-2 pt-1 space-y-2">
             <div
               className="flex flex-wrap gap-1.5"
-              aria-label="Related sales orders summary"
+              aria-label={t("master.customer.relatedSoSummaryAria")}
             >
               <span className="inline-flex items-baseline gap-1 rounded border border-border/50 bg-muted/25 px-2 py-0.5 text-[11px] tabular-nums leading-none">
-                <span className="text-muted-foreground">Orders</span>
+                <span className="text-muted-foreground">{t("master.customer.ordersChip")}</span>
                 <span className="font-medium text-foreground/90">{relatedSoSummary.total}</span>
               </span>
               <span className="inline-flex items-baseline gap-1 rounded border border-border/50 bg-muted/25 px-2 py-0.5 text-[11px] tabular-nums leading-none">
-                <span className="text-muted-foreground">Draft</span>
+                <span className="text-muted-foreground">{t("status.labels.draft")}</span>
                 <span className="font-medium text-foreground/90">{relatedSoSummary.draft}</span>
               </span>
               <span className="inline-flex items-baseline gap-1 rounded border border-border/50 bg-muted/25 px-2 py-0.5 text-[11px] tabular-nums leading-none">
-                <span className="text-muted-foreground">Confirmed</span>
+                <span className="text-muted-foreground">{t("status.labels.confirmed")}</span>
                 <span className="font-medium text-foreground/90">{relatedSoSummary.confirmed}</span>
               </span>
               <span className="inline-flex items-baseline gap-1 rounded border border-border/50 bg-muted/25 px-2 py-0.5 text-[11px] tabular-nums leading-none">
-                <span className="text-muted-foreground">Closed</span>
+                <span className="text-muted-foreground">{t("status.labels.closed")}</span>
                 <span className="font-medium text-foreground/90">{relatedSoSummary.closed}</span>
               </span>
               <span className="inline-flex items-baseline gap-1 rounded border border-border/50 bg-muted/25 px-2 py-0.5 text-[11px] tabular-nums leading-none">
-                <span className="text-muted-foreground">Cancelled</span>
+                <span className="text-muted-foreground">{t("status.labels.cancelled")}</span>
                 <span className="font-medium text-foreground/90">{relatedSoSummary.cancelled}</span>
               </span>
             </div>
             {relatedSalesOrderRows.length === 0 ? (
               <p className="text-sm text-muted-foreground py-3 m-0">
-                No sales orders linked to this customer yet.
+                {t("master.customer.emptyRelatedSo")}
               </p>
             ) : (
               <div className="min-w-0 overflow-x-auto rounded-md border border-border/60">
                 <table className="list-table text-sm">
                   <thead>
                     <tr>
-                      <th className="list-table__cell--code">Number</th>
-                      <th className="min-w-[100px]">Status</th>
-                      <th className="min-w-[120px]">Warehouse</th>
-                      <th className="w-14 text-right whitespace-nowrap tabular-nums">Lines</th>
-                      <th className="w-24 text-right whitespace-nowrap tabular-nums">Total</th>
+                      <th className="list-table__cell--code">{t("doc.columns.number")}</th>
+                      <th className="min-w-[100px]">{t("doc.columns.status")}</th>
+                      <th className="min-w-[120px]">{t("doc.columns.warehouse")}</th>
+                      <th className="w-14 text-right whitespace-nowrap tabular-nums">{t("doc.page.lines")}</th>
+                      <th className="w-24 text-right whitespace-nowrap tabular-nums">{t("doc.columns.total")}</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -489,7 +494,7 @@ export function CustomerPage() {
                         onClick={() => navigate(`/sales-orders/${so.id}`)}
                         role="button"
                         tabIndex={0}
-                        aria-label={`Open sales order ${so.number}`}
+                        aria-label={t("master.customer.openSalesOrderAria", { number: so.number })}
                         onKeyDown={(e) => {
                           if (e.key === "Enter" || e.key === " ") {
                             e.preventDefault();

@@ -19,11 +19,19 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { actionIssue, combineIssues, getErrorAndWarningMessages, issueListContainsMessage, type Issue } from "../../../shared/issues";
+import {
+  actionIssueFromServiceMessage,
+  combineIssues,
+  hasErrors,
+  hasWarnings,
+  issueListContainsMessage,
+  type Issue,
+} from "../../../shared/issues";
 import { getItemFormHealth } from "../../../shared/masterDataHealth";
 import { DocumentIssueStrip } from "../../../shared/ui/feedback/DocumentIssueStrip";
 import { ItemImagesCard } from "../components/ItemImagesCard";
 import { Save, X } from "lucide-react";
+import { useTranslation } from "@/shared/i18n/context";
 
 type FormState = {
   code: string;
@@ -54,6 +62,7 @@ function defaultForm(): FormState {
 }
 
 export function ItemPage() {
+  const { t } = useTranslation();
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const isNew = id === "new";
@@ -108,10 +117,6 @@ export function ItemPage() {
     () => combineIssues(health.issues, actionIssues),
     [health.issues, actionIssues],
   );
-  const { errors: combinedErrors, warnings: combinedWarnings } = useMemo(
-    () => getErrorAndWarningMessages(combinedIssues),
-    [combinedIssues],
-  );
 
   useEffect(() => {
     if (isNew) {
@@ -135,9 +140,9 @@ export function ItemPage() {
   }, [id, isNew, item?.id, item?.code, item?.name, item?.uom, item?.isActive, item?.description, item?.brandId, item?.categoryId, item?.barcode, item?.purchasePrice, item?.salePrice]);
 
   const parsePrice = (s: string): number | undefined => {
-    const t = s.trim();
-    if (t === "") return undefined;
-    const n = Number(t);
+    const trimmed = s.trim();
+    if (trimmed === "") return undefined;
+    const n = Number(trimmed);
     return Number.isNaN(n) ? undefined : n;
   };
 
@@ -162,7 +167,7 @@ export function ItemPage() {
       if (result.success) {
         navigate("/items");
       } else if (!issueListContainsMessage(health.issues, result.error)) {
-        setActionIssues([actionIssue(result.error)]);
+        setActionIssues([actionIssueFromServiceMessage(result.error)]);
       }
     })();
   };
@@ -174,7 +179,7 @@ export function ItemPage() {
   if (!id) {
     return (
       <div className="doc-page doc-page--not-found">
-        <p>Item not found.</p>
+        <p>{t("master.item.notFound")}</p>
       </div>
     );
   }
@@ -182,23 +187,26 @@ export function ItemPage() {
   if (!isNew && !item) {
     return (
       <div className="doc-page doc-page--not-found">
-        <p>Item not found.</p>
+        <p>{t("master.item.notFound")}</p>
       </div>
     );
   }
 
   const breadcrumbItems = [
-    { label: "Master Data", to: "/items" },
-    { label: "Items", to: "/items" },
-    { label: isNew ? "New" : item!.code },
+    { label: t("master.breadcrumb.masterData"), to: "/items" },
+    { label: t("master.item.listBreadcrumb"), to: "/items" },
+    { label: isNew ? t("master.common.newLabel") : item!.code },
   ];
 
-  const displayTitle = isNew ? "New Item" : `Item ${item!.code}`;
+  const displayTitle = isNew ? t("master.item.titleNew") : t("master.item.titleWithCode", { code: item!.code });
+
+  const inactiveSuffix = t("master.item.inactiveSuffix");
+  const selectDash = t("master.common.selectEmpty");
 
   return (
     <div className="doc-page">
       <div className="doc-page__breadcrumb">
-        <BackButton to="/items" aria-label="Back to Items" />
+        <BackButton to="/items" aria-label={t("master.item.backToListAria")} />
         <Breadcrumb items={breadcrumbItems} />
       </div>
       <div className="doc-page__header">
@@ -207,17 +215,17 @@ export function ItemPage() {
             <h2 className="doc-header__title">{displayTitle}</h2>
           </div>
           <div className="doc-header__right">
-            {(combinedErrors.length > 0 || combinedWarnings.length > 0) && (
-              <DocumentIssueStrip errors={combinedErrors} warnings={combinedWarnings} />
+            {(hasErrors(combinedIssues) || hasWarnings(combinedIssues)) && (
+              <DocumentIssueStrip issues={combinedIssues} />
             )}
             <div className="doc-header__actions">
               <Button type="button" onClick={handleSave}>
                 <Save aria-hidden />
-                Save
+                {t("common.save")}
               </Button>
               <Button type="button" variant="outline" onClick={handleCancel}>
                 <X aria-hidden />
-                Cancel
+                {t("common.cancel")}
               </Button>
             </div>
           </div>
@@ -226,54 +234,54 @@ export function ItemPage() {
       <div className="mt-4 grid gap-4 xl:grid-cols-[minmax(0,42rem)_minmax(260px,1fr)] xl:items-start">
       <Card className="max-w-2xl w-full border-0 shadow-none">
         <CardHeader className="p-2 pb-0.5">
-          <CardTitle className="text-[0.9rem] font-semibold">Details</CardTitle>
+          <CardTitle className="text-[0.9rem] font-semibold">{t("master.common.detailsTitle")}</CardTitle>
           <CardDescription className="text-xs">
-            Code, name, unit of measure and status for this item.
+            {t("master.item.detailsDescription")}
           </CardDescription>
         </CardHeader>
         <CardContent className="p-2 pt-1">
           <div className="grid gap-2 sm:grid-cols-2">
             <div className="flex flex-col gap-0.5 sm:col-span-2">
               <Label htmlFor="item-code" className="text-sm">
-                Code <span className="text-destructive">*</span>
+                {t("doc.columns.code")} <span className="text-destructive">{t("doc.page.requiredStar")}</span>
               </Label>
               <Input
                 id="item-code"
                 type="text"
                 value={form.code}
                 onChange={(e) => setForm((f) => ({ ...f, code: e.target.value }))}
-                placeholder="e.g. ITEM-001"
+                placeholder={t("master.item.codePlaceholder")}
                 className="h-8 text-sm"
               />
             </div>
             <div className="flex flex-col gap-0.5">
               <Label htmlFor="item-name" className="text-sm">
-                Name <span className="text-destructive">*</span>
+                {t("doc.columns.name")} <span className="text-destructive">{t("doc.page.requiredStar")}</span>
               </Label>
               <Input
                 id="item-name"
                 type="text"
                 value={form.name}
                 onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
-                placeholder="Item name"
+                placeholder={t("master.item.namePlaceholder")}
                 className="h-8 text-sm"
               />
             </div>
             <div className="flex flex-col gap-0.5">
               <Label htmlFor="item-uom" className="text-sm">
-                UOM <span className="text-destructive">*</span>
+                {t("doc.columns.uom")} <span className="text-destructive">{t("doc.page.requiredStar")}</span>
               </Label>
               <Input
                 id="item-uom"
                 type="text"
                 value={form.uom}
                 onChange={(e) => setForm((f) => ({ ...f, uom: e.target.value }))}
-                placeholder="e.g. EA"
+                placeholder={t("master.item.uomPlaceholder")}
                 className="h-8 text-sm"
               />
             </div>
             <div className="flex flex-col gap-0.5">
-              <Label htmlFor="item-brand" className="text-sm">Brand</Label>
+              <Label htmlFor="item-brand" className="text-sm">{t("doc.columns.brand")}</Label>
               <select
                 id="item-brand"
                 value={form.brandId}
@@ -283,16 +291,16 @@ export function ItemPage() {
                   "focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50",
                 )}
               >
-                <option value="">—</option>
+                <option value="">{selectDash}</option>
                 {brandOptions.map((b) => (
                   <option key={b.id} value={b.id}>
-                    {b.code} - {b.name} {!b.isActive ? "(inactive)" : ""}
+                    {b.code} - {b.name} {!b.isActive ? inactiveSuffix : ""}
                   </option>
                 ))}
               </select>
             </div>
             <div className="flex flex-col gap-0.5">
-              <Label htmlFor="item-category" className="text-sm">Category</Label>
+              <Label htmlFor="item-category" className="text-sm">{t("doc.columns.category")}</Label>
               <select
                 id="item-category"
                 value={form.categoryId}
@@ -302,27 +310,27 @@ export function ItemPage() {
                   "focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50",
                 )}
               >
-                <option value="">—</option>
+                <option value="">{selectDash}</option>
                 {categoryOptions.map((c) => (
                   <option key={c.id} value={c.id}>
-                    {c.code} - {c.name} {!c.isActive ? "(inactive)" : ""}
+                    {c.code} - {c.name} {!c.isActive ? inactiveSuffix : ""}
                   </option>
                 ))}
               </select>
             </div>
             <div className="flex flex-col gap-0.5 sm:col-span-2">
-              <Label htmlFor="item-barcode" className="text-sm">Barcode</Label>
+              <Label htmlFor="item-barcode" className="text-sm">{t("master.item.barcodeLabel")}</Label>
               <Input
                 id="item-barcode"
                 type="text"
                 value={form.barcode}
                 onChange={(e) => setForm((f) => ({ ...f, barcode: e.target.value }))}
-                placeholder="Optional"
+                placeholder={t("common.optional")}
                 className="h-8 text-sm"
               />
             </div>
             <div className="flex flex-col gap-0.5">
-              <Label htmlFor="item-purchasePrice" className="text-sm">Purchase price</Label>
+              <Label htmlFor="item-purchasePrice" className="text-sm">{t("doc.columns.purchasePrice")}</Label>
               <Input
                 id="item-purchasePrice"
                 type="number"
@@ -335,7 +343,7 @@ export function ItemPage() {
               />
             </div>
             <div className="flex flex-col gap-0.5">
-              <Label htmlFor="item-salePrice" className="text-sm">Sale price</Label>
+              <Label htmlFor="item-salePrice" className="text-sm">{t("doc.columns.salePrice")}</Label>
               <Input
                 id="item-salePrice"
                 type="number"
@@ -359,18 +367,18 @@ export function ItemPage() {
                 htmlFor="item-active"
                 className="cursor-pointer text-sm font-normal"
               >
-                Active
+                {t("ops.master.activeCell.active")}
               </Label>
             </div>
             <div className="flex flex-col gap-0.5 sm:col-span-2">
-              <Label htmlFor="item-description" className="text-sm">Description</Label>
+              <Label htmlFor="item-description" className="text-sm">{t("common.description")}</Label>
               <Textarea
                 id="item-description"
                 value={form.description}
                 onChange={(e) =>
                   setForm((f) => ({ ...f, description: e.target.value }))
                 }
-                placeholder="Optional"
+                placeholder={t("common.optional")}
                 rows={2}
                 className="resize-none h-auto min-h-[4.5rem] text-sm"
               />

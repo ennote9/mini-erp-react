@@ -50,6 +50,42 @@ export const ruOps: MessageTree = {
       "Строк: {{total}} | ОК: {{valid}} | Неактив: {{inactive}} | Не найдено: {{notFound}} | Неверное кол-во: {{badQty}} | Неверный формат: {{badFmt}} | Заголовок пропущен: {{headerSkipped}} | Дубликаты объединены: {{merged}} | Лишние колонки: {{extraCols}}",
     summaryExcel:
       "Строк: {{total}} | ОК: {{valid}} | Неактив: {{inactive}} | Не найдено: {{notFound}} | Неверное кол-во: {{badQty}} | Неверный формат: {{badFmt}} | Дубликаты объединены: {{merged}}",
+    lineImport: {
+      dataSheetName: "Импорт строк",
+      instructionsSheetName: "Инструкция",
+      headerItemCode: "Код номенклатуры",
+      headerBarcode: "Штрихкод",
+      headerQty: "Кол-во",
+      headerUnitPrice: "Цена",
+      instructionTitle: "Как пользоваться шаблоном",
+      instruction1: "1) Заполните строки на первом листе: {{sheetName}}.",
+      instruction2: "2) Используйте коды номенклатуры, которые есть в справочнике.",
+      instruction3: "3) Количество обязательно и должно быть больше 0.",
+      instruction4: "4) Цена необязательна (при пустом значении подставятся значения по умолчанию).",
+      instruction5: "5) Примерные строки — образец. Перед импортом замените их реальными данными.",
+      workbookNoWorksheets: "В книге Excel нет листов.",
+      headerErrorIntro: "Импорт не выполнен: строка заголовков не соответствует ожидаемому формату.",
+      headerMissingQtyLine: "Отсутствует обязательный столбец количества.",
+      headerMissingQtyExpected:
+        "Ожидается столбец количества (например Qty или Quantity, либо заголовок из шаблона).",
+      headerMissingIdLine: "Отсутствует обязательный столбец идентификатора номенклатуры.",
+      headerMissingIdExpected:
+        "Ожидается столбец кода и/или штрихкода (либо заголовки из шаблона).",
+      headerDetectedBlank: "(строка 1 выглядит пустой)",
+      headerDetectedLine: "Обнаруженные заголовки (строка 1): {{detected}}",
+      headerTipRow:
+        "Подсказка: строка заголовков должна быть в строке 1; каждый заголовок — в отдельном столбце.",
+      headerExample: "Пример: {{code}} | {{qty}}",
+      headerExampleRow: "         {{sampleCode}} | {{sampleQty}}",
+      headerHintSplitLabels:
+        "Подсказка: похоже, один столбец объединяет несколько подписей. Разделите их по столбцам.",
+      headerHintQtyTypo:
+        "Подсказка: заголовок количества может быть с опечаткой. Используйте подписи из шаблона или Qty / Quantity.",
+      reasonMissingItemCodeBarcode: "Не указан код номенклатуры или штрихкод.",
+      reasonQtyMustBePositive: "Количество должно быть числом больше 0.",
+      reasonUnitPriceNumericNonNegative:
+        "Цена должна быть числом и не может быть отрицательной.",
+    },
   },
   stock: {
     coverage: {

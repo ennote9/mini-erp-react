@@ -1,4 +1,5 @@
 import type { Workbook } from "exceljs";
+import type { ExcelListSheetLabels } from "../../shared/export/excelExportLabels";
 
 export type SalesOrdersExportRow = {
   no: number;
@@ -9,8 +10,6 @@ export type SalesOrdersExportRow = {
   status: string;
 };
 
-const COLUMN_HEADERS = ["№", "Number", "Date", "Customer", "Warehouse", "Status"] as const;
-const SHEET_NAME = "Sales Orders";
 const TABLE_NAME_BASE = "SalesOrdersTable";
 const WIDTH_PADDING = 1.5;
 const DEFAULT_MIN = 8;
@@ -41,8 +40,9 @@ const WIDTH_BOUNDS = [
   { min: 8, max: 14 },
 ];
 
-function addSheet(workbook: Workbook, rows: SalesOrdersExportRow[]): void {
-  const sheet = workbook.addWorksheet(SHEET_NAME, { views: [{ state: "frozen" as const, ySplit: 1 }] });
+function addSheet(workbook: Workbook, rows: SalesOrdersExportRow[], labels: ExcelListSheetLabels): void {
+  const COLUMN_HEADERS = labels.headers;
+  const sheet = workbook.addWorksheet(labels.sheetName, { views: [{ state: "frozen" as const, ySplit: 1 }] });
   if (rows.length === 0) {
     sheet.addRow([...COLUMN_HEADERS]);
     for (let c = 0; c < COLUMN_HEADERS.length; c++)
@@ -66,9 +66,12 @@ function addSheet(workbook: Workbook, rows: SalesOrdersExportRow[]): void {
   }
 }
 
-export async function buildSalesOrdersListXlsxBuffer(rows: SalesOrdersExportRow[]): Promise<ArrayBuffer> {
+export async function buildSalesOrdersListXlsxBuffer(
+  rows: SalesOrdersExportRow[],
+  labels: ExcelListSheetLabels,
+): Promise<ArrayBuffer> {
   const ExcelJS = await import("exceljs");
   const wb = new ExcelJS.Workbook();
-  addSheet(wb, rows);
+  addSheet(wb, rows, labels);
   return wb.xlsx.writeBuffer();
 }

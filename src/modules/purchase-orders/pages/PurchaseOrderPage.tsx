@@ -33,7 +33,16 @@ import {
 } from "../../../shared/commercialMoney";
 import { computePlanningDueDate, parsePaymentTermsDaysToStore } from "../../../shared/planningCommercialDates";
 import { getPurchaseOrderHealth } from "../../../shared/documentHealth";
-import { getErrorAndWarningMessages, actionIssue, actionWarning, combineIssues, hasErrors, issueListContainsMessage, type Issue } from "../../../shared/issues";
+import {
+  actionIssue,
+  actionIssueFromServiceMessage,
+  actionWarning,
+  combineIssues,
+  hasErrors,
+  hasWarnings,
+  issueListContainsMessage,
+  type Issue,
+} from "../../../shared/issues";
 import { DocumentIssueStrip } from "../../../shared/ui/feedback/DocumentIssueStrip";
 import { SelectField } from "@/components/ui/select-field";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -78,6 +87,7 @@ import {
 } from "../../../shared/reasonCodes";
 import { useTranslation } from "@/shared/i18n/context";
 import type { TFunction } from "@/shared/i18n/resolve";
+import { planningPurchaseOrderExportLabels } from "@/shared/i18n/excelPlanningExportLabels";
 import { translateZeroPriceReason, translateCancelReason } from "@/shared/i18n/reasonLabels";
 import { translatePlanningFulfillmentState } from "@/shared/i18n/fulfillmentLabels";
 import {
@@ -644,7 +654,8 @@ export function PurchaseOrderPage() {
     setActionIssues([]);
     const result = confirm(id);
     if (result.success) setRefresh((r) => r + 1);
-    else if (!issueListContainsMessage(health.issues, result.error)) setActionIssues([actionIssue(result.error)]);
+    else if (!issueListContainsMessage(health.issues, result.error))
+      setActionIssues([actionIssueFromServiceMessage(result.error)]);
   };
   const handleCancelDocument = () => {
     if (!id || isNew) return;
@@ -657,7 +668,8 @@ export function PurchaseOrderPage() {
     setActionIssues([]);
     const result = createReceipt(id);
     if (result.success) navigate(`/receipts/${result.receiptId}`);
-    else if (!issueListContainsMessage(health.issues, result.error)) setActionIssues([actionIssue(result.error)]);
+    else if (!issueListContainsMessage(health.issues, result.error))
+      setActionIssues([actionIssueFromServiceMessage(result.error)]);
   };
 
   const handleSave = () => {
@@ -697,7 +709,7 @@ export function PurchaseOrderPage() {
         setRefresh((r) => r + 1);
       }
     } else if (!issueListContainsMessage(health.issues, result.error)) {
-      setActionIssues([actionIssue(result.error)]);
+      setActionIssues([actionIssueFromServiceMessage(result.error)]);
     }
   };
 
@@ -913,9 +925,10 @@ export function PurchaseOrderPage() {
 
     if (skippedRows > 0) {
       setActionIssues([
-        actionWarning(
-          `Added ${lines.length} items. Skipped ${skippedRows} rows.`,
-        ),
+        actionWarning(`Added ${lines.length} items. Skipped ${skippedRows} rows.`, {
+          key: "issues.import.addedSkipped",
+          params: { added: lines.length, skipped: skippedRows },
+        }),
       ]);
     } else {
       setActionIssues([]);
@@ -1006,6 +1019,8 @@ export function PurchaseOrderPage() {
     [t],
   );
 
+  const poExcelLabels = useMemo(() => planningPurchaseOrderExportLabels(t), [t, locale]);
+
   const handleExportMain = useCallback(() => {
     const rows = getExportRowsAll();
     if (rows.length === 0) return;
@@ -1020,10 +1035,11 @@ export function PurchaseOrderPage() {
       totalAmount: isEditable ? totals.totalAmount : readonlyTotals.totalAmount,
     };
     runExportWithSaveAs(`${poNumberForFile}_document.xlsx`, () =>
-      buildDocumentXlsxBuffer(summary, rows),
+      buildDocumentXlsxBuffer(summary, rows, poExcelLabels),
     );
   }, [
     getExportRowsAll,
+    poExcelLabels,
     displayNumber,
     isEditable,
     form.date,
@@ -1045,15 +1061,15 @@ export function PurchaseOrderPage() {
     const rows = getExportRowsSelected();
     if (rows.length === 0) return;
     runExportWithSaveAs(`${poNumberForFile}_selected-lines.xlsx`, () =>
-      buildLinesXlsxBuffer(rows),
+      buildLinesXlsxBuffer(rows, poExcelLabels),
     );
-  }, [getExportRowsSelected, poNumberForFile, runExportWithSaveAs]);
+  }, [getExportRowsSelected, poNumberForFile, poExcelLabels, runExportWithSaveAs]);
 
   const handleExportAll = useCallback(() => {
     const rows = getExportRowsAll();
     if (rows.length === 0) return;
-    runExportWithSaveAs(`${poNumberForFile}_all-lines.xlsx`, () => buildLinesXlsxBuffer(rows));
-  }, [getExportRowsAll, poNumberForFile, runExportWithSaveAs]);
+    runExportWithSaveAs(`${poNumberForFile}_all-lines.xlsx`, () => buildLinesXlsxBuffer(rows, poExcelLabels));
+  }, [getExportRowsAll, poNumberForFile, poExcelLabels, runExportWithSaveAs]);
 
   const exportSelectedDisabled = !isEditable || selectedLineIds.length === 0;
 
@@ -1074,16 +1090,12 @@ export function PurchaseOrderPage() {
     const result = cancelDocument(id, payload);
     if (result.success) setRefresh((r) => r + 1);
     else if (!issueListContainsMessage(health.issues, result.error))
-      setActionIssues([actionIssue(result.error)]);
+      setActionIssues([actionIssueFromServiceMessage(result.error)]);
   };
 
   const combinedIssues = useMemo(
     () => combineIssues(health.issues, actionIssues),
     [health.issues, actionIssues],
-  );
-  const { errors: combinedErrors, warnings: combinedWarnings } = useMemo(
-    () => getErrorAndWarningMessages(combinedIssues),
-    [combinedIssues],
   );
 
   const getRowClass = useCallback(
@@ -1172,8 +1184,8 @@ export function PurchaseOrderPage() {
             {!isNew && <StatusBadge status={doc!.status} />}
           </div>
           <div className="doc-header__right">
-            {isEditable && (combinedErrors.length > 0 || combinedWarnings.length > 0) && (
-              <DocumentIssueStrip errors={combinedErrors} warnings={combinedWarnings} />
+            {isEditable && (hasErrors(combinedIssues) || hasWarnings(combinedIssues)) && (
+              <DocumentIssueStrip issues={combinedIssues} />
             )}
             <div className="doc-header__actions">
               {isEditable && (

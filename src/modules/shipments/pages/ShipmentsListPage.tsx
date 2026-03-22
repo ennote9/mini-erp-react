@@ -33,6 +33,7 @@ import { save } from "@tauri-apps/plugin-dialog";
 import { invoke } from "@tauri-apps/api/core";
 import { revealItemInDir } from "@tauri-apps/plugin-opener";
 import { useTranslation } from "@/shared/i18n/context";
+import { shipmentsListExcelLabels } from "@/shared/i18n/excelListExportLabels";
 
 type StatusFilter = "all" | FactualDocumentStatus;
 
@@ -191,16 +192,18 @@ export function ShipmentsListPage() {
     [t],
   );
 
+  const listExcelLabels = useMemo(() => shipmentsListExcelLabels(t), [t, locale]);
+
   const handleExportCurrentView = useCallback(() => {
     const rows = getExportRowsCurrentView();
-    runExportWithSaveAs("shipments.xlsx", () => buildShipmentsListXlsxBuffer(rows));
-  }, [getExportRowsCurrentView, runExportWithSaveAs]);
+    runExportWithSaveAs("shipments.xlsx", () => buildShipmentsListXlsxBuffer(rows, listExcelLabels));
+  }, [getExportRowsCurrentView, listExcelLabels, runExportWithSaveAs]);
 
   const handleExportSelected = useCallback(() => {
     const rows = getExportRowsSelected();
     if (rows.length === 0) return;
-    runExportWithSaveAs("shipments-selected.xlsx", () => buildShipmentsListXlsxBuffer(rows));
-  }, [getExportRowsSelected, runExportWithSaveAs]);
+    runExportWithSaveAs("shipments-selected.xlsx", () => buildShipmentsListXlsxBuffer(rows, listExcelLabels));
+  }, [getExportRowsSelected, listExcelLabels, runExportWithSaveAs]);
 
   const exportSelectedDisabled = selectedCount === 0;
 
