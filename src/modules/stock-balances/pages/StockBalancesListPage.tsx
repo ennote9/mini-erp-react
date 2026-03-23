@@ -17,6 +17,7 @@ import { ListPageLayout } from "../../../shared/ui/list/ListPageLayout";
 import { EmptyState } from "../../../shared/ui/feedback/EmptyState";
 import {
   AgGridContainer,
+  AgGridStockCoverageCellRenderer,
   agGridDefaultColDef,
   agGridDefaultGridOptions,
   agGridRowNumberColDef,
@@ -621,12 +622,7 @@ export function StockBalancesListPage() {
           p.value != null
             ? coverageLabel(p.value as StockBalanceCoverageStatus)
             : "—",
-        cellClass: (p) =>
-          p.data?.coverageStatus === "short"
-            ? "font-medium"
-            : p.data?.coverageStatus === "at_risk"
-              ? "text-muted-foreground"
-              : "text-muted-foreground/90",
+        cellRenderer: AgGridStockCoverageCellRenderer,
       },
     ];
   }, [showOperationalGrid, t, locale, coverageLabel]);

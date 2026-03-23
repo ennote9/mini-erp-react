@@ -12,12 +12,15 @@ import { categoryRepository } from "../../categories/repository";
 import { warehouseRepository } from "../../warehouses/repository";
 import { receiptRepository } from "../../receipts/repository";
 import { shipmentRepository } from "../../shipments/repository";
+import { salesOrderRepository } from "../../sales-orders/repository";
+import { purchaseOrderRepository } from "../../purchase-orders/repository";
 import type { StockMovement } from "../model";
 import type { SourceDocumentType } from "../../../shared/domain";
 import { ListPageLayout } from "../../../shared/ui/list/ListPageLayout";
 import { EmptyState } from "../../../shared/ui/feedback/EmptyState";
 import {
   AgGridContainer,
+  AgGridMovementTypeCellRenderer,
   agGridDefaultColDef,
   agGridDefaultGridOptions,
   agGridRowNumberColDef,
@@ -33,7 +36,6 @@ import { buildStockMovementsListXlsxBuffer, type StockMovementsExportRow } from 
 import { save } from "@tauri-apps/plugin-dialog";
 import { invoke } from "@tauri-apps/api/core";
 import { revealItemInDir } from "@tauri-apps/plugin-opener";
-import type { TFunction } from "../../../shared/i18n/resolve";
 import { useTranslation } from "@/shared/i18n/context";
 import { buildReadableUniqueFilename, ensureUniqueExportPath } from "@/shared/export/filenameBuilder";
 import { stockMovementsListExcelLabels } from "@/shared/i18n/excelListExportLabels";
@@ -45,6 +47,10 @@ type RowData = StockMovement & {
   warehouseName: string;
   sourceDocumentLabel: string;
   sourceDocumentHref: string | null;
+  /** Sales order or purchase order number when resolved from source shipment/receipt; otherwise "—". */
+  relatedOrderLabel: string;
+  /** Route to SO/PO detail when related order exists; null when label is "—". */
+  relatedOrderHref: string | null;
 };
 
 const DATE_TIME_FORMAT: Intl.DateTimeFormatOptions = {
@@ -61,25 +67,16 @@ function formatDateTime(isoString: string | null | undefined): string {
   return Number.isNaN(d.getTime()) ? String(isoString) : d.toLocaleString(undefined, DATE_TIME_FORMAT);
 }
 
-function MovementTypeCellRenderer(params: ICellRendererParams<RowData>) {
-  const { t } = useTranslation();
-  const value = params.value as string | undefined;
-  if (value == null) return null;
-  const key = `ops.stockMovements.types.${value}`;
-  const translated = t(key);
-  return translated === value ? value : translated;
-}
-
+/** Display only the source document number/code; movement type is a separate column. */
 function getSourceDocument(
   sourceDocumentType: SourceDocumentType,
   sourceDocumentId: string,
-  translate: TFunction,
 ): { label: string; href: string | null } {
   if (sourceDocumentType === "receipt") {
     const doc = receiptRepository.getById(sourceDocumentId);
     const number = doc?.number ?? sourceDocumentId;
     return {
-      label: translate("ops.stockMovements.sourceReceipt", { number }),
+      label: number,
       href: `/receipts/${sourceDocumentId}`,
     };
   }
@@ -87,11 +84,42 @@ function getSourceDocument(
     const doc = shipmentRepository.getById(sourceDocumentId);
     const number = doc?.number ?? sourceDocumentId;
     return {
-      label: translate("ops.stockMovements.sourceShipment", { number }),
+      label: number,
       href: `/shipments/${sourceDocumentId}`,
     };
   }
   return { label: sourceDocumentId, href: null };
+}
+
+const EMPTY_RELATED_ORDER = "\u2014";
+
+/**
+ * Related planning order for the movement: SO from posted shipment, PO from posted receipt.
+ * Reversal movements use the same source document id, so linkage matches the underlying receipt/shipment.
+ */
+function getRelatedOrderDisplay(
+  sourceDocumentType: SourceDocumentType,
+  sourceDocumentId: string,
+): { label: string; href: string | null } {
+  if (sourceDocumentType === "shipment") {
+    const sh = shipmentRepository.getById(sourceDocumentId);
+    const soId = sh?.salesOrderId?.trim() ?? "";
+    if (soId === "") return { label: EMPTY_RELATED_ORDER, href: null };
+    const so = salesOrderRepository.getById(soId);
+    const num = so?.number?.trim() ?? "";
+    if (num === "") return { label: EMPTY_RELATED_ORDER, href: null };
+    return { label: num, href: `/sales-orders/${soId}` };
+  }
+  if (sourceDocumentType === "receipt") {
+    const rc = receiptRepository.getById(sourceDocumentId);
+    const poId = rc?.purchaseOrderId?.trim() ?? "";
+    if (poId === "") return { label: EMPTY_RELATED_ORDER, href: null };
+    const po = purchaseOrderRepository.getById(poId);
+    const num = po?.number?.trim() ?? "";
+    if (num === "") return { label: EMPTY_RELATED_ORDER, href: null };
+    return { label: num, href: `/purchase-orders/${poId}` };
+  }
+  return { label: EMPTY_RELATED_ORDER, href: null };
 }
 
 function SourceDocumentCellRenderer(params: ICellRendererParams<RowData>) {
@@ -112,6 +140,24 @@ function SourceDocumentCellRenderer(params: ICellRendererParams<RowData>) {
   return <span>{sourceDocumentLabel}</span>;
 }
 
+function RelatedOrderCellRenderer(params: ICellRendererParams<RowData>) {
+  const data = params.data;
+  if (!data) return null;
+  const { relatedOrderLabel, relatedOrderHref } = data;
+  if (relatedOrderHref) {
+    return (
+      <Link
+        to={relatedOrderHref}
+        className="list-table__link"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {relatedOrderLabel}
+      </Link>
+    );
+  }
+  return <span>{relatedOrderLabel}</span>;
+}
+
 function filterBySearch(rows: RowData[], query: string): RowData[] {
   const q = query.trim().toLowerCase();
   if (!q) return rows;
@@ -120,7 +166,8 @@ function filterBySearch(rows: RowData[], query: string): RowData[] {
       r.itemCode.toLowerCase().includes(q) ||
       r.itemName.toLowerCase().includes(q) ||
       r.warehouseName.toLowerCase().includes(q) ||
-      r.sourceDocumentLabel.toLowerCase().includes(q),
+      r.sourceDocumentLabel.toLowerCase().includes(q) ||
+      r.relatedOrderLabel.toLowerCase().includes(q),
   );
 }
 
@@ -170,6 +217,7 @@ function buildExportRowsFromMovements(
           : String(r.qtyDelta)
         : "",
     sourceDocument: r.sourceDocumentLabel,
+    relatedOrder: r.relatedOrderLabel,
   }));
 }
 
@@ -230,7 +278,10 @@ export function StockMovementsListPage() {
         const { label: sourceDocumentLabel, href: sourceDocumentHref } = getSourceDocument(
           m.sourceDocumentType,
           m.sourceDocumentId,
-          t,
+        );
+        const { label: relatedOrderLabel, href: relatedOrderHref } = getRelatedOrderDisplay(
+          m.sourceDocumentType,
+          m.sourceDocumentId,
         );
         return {
           ...m,
@@ -239,6 +290,8 @@ export function StockMovementsListPage() {
           warehouseName: warehouse?.name ?? m.warehouseId,
           sourceDocumentLabel,
           sourceDocumentHref,
+          relatedOrderLabel,
+          relatedOrderHref,
         };
       })
       .sort(
@@ -469,7 +522,7 @@ export function StockMovementsListPage() {
         field: "movementType",
         headerName: t("doc.columns.movementType"),
         width: 120,
-        cellRenderer: MovementTypeCellRenderer,
+        cellRenderer: AgGridMovementTypeCellRenderer,
       },
       {
         field: "itemCode",
@@ -499,10 +552,18 @@ export function StockMovementsListPage() {
       },
       {
         headerName: t("doc.columns.sourceDocument"),
-        minWidth: 180,
-        width: 180,
+        minWidth: 132,
+        width: 148,
         valueGetter: (params) => params.data?.sourceDocumentLabel ?? "",
         cellRenderer: SourceDocumentCellRenderer,
+      },
+      {
+        colId: "relatedOrder",
+        headerName: t("doc.columns.relatedOrder"),
+        minWidth: 120,
+        width: 132,
+        valueGetter: (params) => params.data?.relatedOrderLabel ?? "",
+        cellRenderer: RelatedOrderCellRenderer,
       },
     ],
     [t, locale],

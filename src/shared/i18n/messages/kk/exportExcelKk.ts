@@ -85,5 +85,6 @@ export const kkExportExcel: MessageTree = {
     colMovementType: "Жылжу түрі",
     colQtyDelta: "Сан өзгерісі",
     colSourceDocument: "Көз құжат",
+    colRelatedOrder: "Байланысты тапсырыс",
   },
 };

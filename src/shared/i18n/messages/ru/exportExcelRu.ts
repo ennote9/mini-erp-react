@@ -85,5 +85,6 @@ export const ruExportExcel: MessageTree = {
     colMovementType: "Тип движения",
     colQtyDelta: "Изменение кол-ва",
     colSourceDocument: "Источник",
+    colRelatedOrder: "Связанный заказ",
   },
 };

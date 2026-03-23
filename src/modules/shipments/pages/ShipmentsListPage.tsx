@@ -14,9 +14,9 @@ import {
 import type { FactualDocumentStatus } from "../../../shared/domain";
 import { ListPageLayout } from "../../../shared/ui/list/ListPageLayout";
 import { EmptyState } from "../../../shared/ui/feedback/EmptyState";
-import { StatusBadge } from "../../../shared/ui/feedback/StatusBadge";
 import {
   AgGridContainer,
+  AgGridFactualStatusCellRenderer,
   agGridDefaultColDef,
   agGridDefaultGridOptions,
   getAgGridRowNumberColDef,
@@ -82,12 +82,6 @@ function filterByWarehouseId(rows: RowData[], warehouseId: string | null): RowDa
 function filterByCarrierId(rows: RowData[], carrierId: string | null): RowData[] {
   if (carrierId == null) return rows;
   return rows.filter((r) => (r.carrierId?.trim() ?? "") === carrierId);
-}
-
-function StatusCellRenderer(params: ICellRendererParams<RowData>) {
-  const status = params.value as string | undefined;
-  if (status == null) return null;
-  return <StatusBadge status={status} />;
 }
 
 function buildExportRowsFromShipments(rows: RowData[]): ShipmentsExportRow[] {
@@ -410,7 +404,7 @@ export function ShipmentsListPage() {
         field: "status",
         headerName: t("doc.columns.status"),
         width: 130,
-        cellRenderer: StatusCellRenderer,
+        cellRenderer: AgGridFactualStatusCellRenderer,
       },
     ],
     [t, locale],

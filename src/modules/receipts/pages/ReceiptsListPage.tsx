@@ -1,7 +1,7 @@
 import React, { useMemo, useState, useRef, useCallback, useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { AgGridReact } from "ag-grid-react";
-import type { ColDef, ICellRendererParams, SelectionChangedEvent } from "ag-grid-community";
+import type { ColDef, SelectionChangedEvent } from "ag-grid-community";
 import { receiptRepository } from "../repository";
 import { purchaseOrderRepository } from "../../purchase-orders/repository";
 import { warehouseRepository } from "../../warehouses/repository";
@@ -9,9 +9,9 @@ import type { Receipt } from "../model";
 import type { FactualDocumentStatus } from "../../../shared/domain";
 import { ListPageLayout } from "../../../shared/ui/list/ListPageLayout";
 import { EmptyState } from "../../../shared/ui/feedback/EmptyState";
-import { StatusBadge } from "../../../shared/ui/feedback/StatusBadge";
 import {
   AgGridContainer,
+  AgGridFactualStatusCellRenderer,
   agGridDefaultColDef,
   agGridDefaultGridOptions,
   getAgGridRowNumberColDef,
@@ -67,12 +67,6 @@ function filterByStatus(rows: RowData[], statusFilter: StatusFilter): RowData[] 
 function filterByWarehouseId(rows: RowData[], warehouseId: string | null): RowData[] {
   if (warehouseId == null) return rows;
   return rows.filter((r) => r.warehouseId === warehouseId);
-}
-
-function StatusCellRenderer(params: ICellRendererParams<RowData>) {
-  const status = params.value as string | undefined;
-  if (status == null) return null;
-  return <StatusBadge status={status} />;
 }
 
 function buildExportRowsFromReceipts(rows: RowData[]): ReceiptsExportRow[] {
@@ -278,7 +272,7 @@ export function ReceiptsListPage() {
         field: "status",
         headerName: t("doc.columns.status"),
         width: 130,
-        cellRenderer: StatusCellRenderer,
+        cellRenderer: AgGridFactualStatusCellRenderer,
       },
     ],
     [t, locale],

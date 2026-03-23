@@ -312,6 +312,7 @@ export const docCommonEn = {
     movementTypeShort: "Type",
     reference: "Reference",
     sourceDocument: "Source document",
+    relatedOrder: "Related order",
     qtyDelta: "Qty delta",
     dateTime: "Date/time",
     line: "Line",

@@ -86,5 +86,6 @@ export const exportExcelEn: MessageTree = {
     colMovementType: "Movement type",
     colQtyDelta: "Qty delta",
     colSourceDocument: "Source document",
+    colRelatedOrder: "Related order",
   },
 } as const;

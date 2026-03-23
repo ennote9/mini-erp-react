@@ -1,10 +1,7 @@
 import { useParams, useNavigate } from "react-router-dom";
-import { useMemo, useState, useEffect, useSyncExternalStore } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { supplierRepository } from "../repository";
 import { saveSupplier } from "../service";
-import { purchaseOrderRepository } from "../../purchase-orders/repository";
-import { warehouseRepository } from "../../warehouses/repository";
-import { StatusBadge } from "../../../shared/ui/feedback/StatusBadge";
 import { Breadcrumb } from "../../../shared/ui/object/Breadcrumb";
 import { BackButton } from "../../../shared/ui/list/BackButton";
 import { Button } from "@/components/ui/button";
@@ -31,10 +28,6 @@ import { getSupplierFormHealth } from "../../../shared/masterDataHealth";
 import { DocumentIssueStrip } from "../../../shared/ui/feedback/DocumentIssueStrip";
 import { Save, X } from "lucide-react";
 import { useTranslation } from "@/shared/i18n/context";
-import {
-  getAppReadModelRevision,
-  subscribeAppReadModelRevision,
-} from "@/shared/appReadModelRevision";
 
 type FormState = {
   code: string;
@@ -77,49 +70,6 @@ export function SupplierPage() {
     () => (id && !isNew ? supplierRepository.getById(id) : undefined),
     [id, isNew],
   );
-
-  const appReadModelRevision = useSyncExternalStore(
-    subscribeAppReadModelRevision,
-    getAppReadModelRevision,
-    getAppReadModelRevision,
-  );
-
-  const relatedPurchaseOrderRows = useMemo(() => {
-    if (!supplier?.id) return [];
-    const pos = purchaseOrderRepository
-      .list()
-      .filter((po) => po.supplierId === supplier.id)
-      .slice()
-      .sort((a, b) => {
-        const da = a.date ?? "";
-        const db = b.date ?? "";
-        if (da !== db) return db.localeCompare(da);
-        return b.number.localeCompare(a.number, undefined, { numeric: true });
-      });
-    return pos.map((po) => {
-      const lines = purchaseOrderRepository.listLines(po.id);
-      const lineCount = lines.length;
-      const totalAmount = lines.reduce((s, l) => s + l.qty * l.unitPrice, 0);
-      const wh = warehouseRepository.getById(po.warehouseId);
-      return {
-        ...po,
-        warehouseName: wh?.name ?? po.warehouseId,
-        lineCount,
-        totalAmount,
-      };
-    });
-  }, [supplier?.id, appReadModelRevision]);
-
-  const relatedPoSummary = useMemo(() => {
-    const rows = relatedPurchaseOrderRows;
-    return {
-      total: rows.length,
-      draft: rows.filter((x) => x.status === "draft").length,
-      confirmed: rows.filter((x) => x.status === "confirmed").length,
-      closed: rows.filter((x) => x.status === "closed").length,
-      cancelled: rows.filter((x) => x.status === "cancelled").length,
-    };
-  }, [relatedPurchaseOrderRows]);
 
   const [form, setForm] = useState<FormState>(defaultForm);
   const [actionIssues, setActionIssues] = useState<Issue[]>([]);
@@ -257,6 +207,21 @@ export function SupplierPage() {
           </div>
         </div>
       </div>
+      {!isNew && supplier ? (
+        <div className="flex flex-wrap gap-2">
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="h-7 shrink-0 px-2.5 text-xs"
+            onClick={() =>
+              navigate(`/purchase-orders?supplierId=${encodeURIComponent(supplier.id)}`)
+            }
+          >
+            {t("master.supplier.openAllPurchaseOrders")}
+          </Button>
+        </div>
+      ) : null}
       <Card className="mt-4 max-w-2xl border-0 shadow-none">
         <CardHeader className="p-2 pb-0.5">
           <CardTitle className="text-[0.9rem] font-semibold">{t("master.common.detailsTitle")}</CardTitle>
@@ -413,108 +378,6 @@ export function SupplierPage() {
           </div>
         </CardContent>
       </Card>
-
-      {!isNew && supplier ? (
-        <Card className="mt-4 w-full max-w-4xl min-w-0 border-0 shadow-none">
-          <CardHeader className="p-2 pb-0.5 space-y-0">
-            <div className="flex flex-wrap items-start justify-between gap-2 gap-y-1.5">
-              <div className="min-w-0 space-y-0.5 flex-1">
-                <CardTitle className="text-[0.9rem] font-semibold tracking-tight">
-                  {t("master.supplier.relatedPurchaseOrdersTitle")}
-                </CardTitle>
-                <CardDescription className="text-xs leading-snug">
-                  {t("master.supplier.relatedPurchaseOrdersHint")}
-                </CardDescription>
-              </div>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                className="h-7 shrink-0 px-2.5 text-xs"
-                onClick={() =>
-                  navigate(`/purchase-orders?supplierId=${encodeURIComponent(supplier.id)}`)
-                }
-              >
-                {t("master.supplier.openAllPurchaseOrders")}
-              </Button>
-            </div>
-          </CardHeader>
-          <CardContent className="p-2 pt-1 space-y-2">
-            <div
-              className="flex flex-wrap gap-1.5"
-              aria-label={t("master.supplier.relatedPoSummaryAria")}
-            >
-              <span className="inline-flex items-baseline gap-1 rounded border border-border/50 bg-muted/25 px-2 py-0.5 text-[11px] tabular-nums leading-none">
-                <span className="text-muted-foreground">{t("master.supplier.ordersChip")}</span>
-                <span className="font-medium text-foreground/90">{relatedPoSummary.total}</span>
-              </span>
-              <span className="inline-flex items-baseline gap-1 rounded border border-border/50 bg-muted/25 px-2 py-0.5 text-[11px] tabular-nums leading-none">
-                <span className="text-muted-foreground">{t("status.labels.draft")}</span>
-                <span className="font-medium text-foreground/90">{relatedPoSummary.draft}</span>
-              </span>
-              <span className="inline-flex items-baseline gap-1 rounded border border-border/50 bg-muted/25 px-2 py-0.5 text-[11px] tabular-nums leading-none">
-                <span className="text-muted-foreground">{t("status.labels.confirmed")}</span>
-                <span className="font-medium text-foreground/90">{relatedPoSummary.confirmed}</span>
-              </span>
-              <span className="inline-flex items-baseline gap-1 rounded border border-border/50 bg-muted/25 px-2 py-0.5 text-[11px] tabular-nums leading-none">
-                <span className="text-muted-foreground">{t("status.labels.closed")}</span>
-                <span className="font-medium text-foreground/90">{relatedPoSummary.closed}</span>
-              </span>
-              <span className="inline-flex items-baseline gap-1 rounded border border-border/50 bg-muted/25 px-2 py-0.5 text-[11px] tabular-nums leading-none">
-                <span className="text-muted-foreground">{t("status.labels.cancelled")}</span>
-                <span className="font-medium text-foreground/90">{relatedPoSummary.cancelled}</span>
-              </span>
-            </div>
-            {relatedPurchaseOrderRows.length === 0 ? (
-              <p className="text-sm text-muted-foreground py-3 m-0">
-                {t("master.supplier.emptyRelatedPo")}
-              </p>
-            ) : (
-              <div className="min-w-0 overflow-x-auto rounded-md border border-border/60">
-                <table className="list-table text-sm">
-                  <thead>
-                    <tr>
-                      <th className="list-table__cell--code">{t("doc.columns.number")}</th>
-                      <th className="min-w-[100px]">{t("doc.columns.status")}</th>
-                      <th className="min-w-[120px]">{t("doc.columns.warehouse")}</th>
-                      <th className="w-14 text-right whitespace-nowrap tabular-nums">{t("doc.page.lines")}</th>
-                      <th className="w-24 text-right whitespace-nowrap tabular-nums">{t("doc.columns.total")}</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {relatedPurchaseOrderRows.map((po) => (
-                      <tr
-                        key={po.id}
-                        className="list-table__row list-table__row--clickable"
-                        onClick={() => navigate(`/purchase-orders/${po.id}`)}
-                        role="button"
-                        tabIndex={0}
-                        aria-label={t("master.supplier.openPurchaseOrderAria", { number: po.number })}
-                        onKeyDown={(e) => {
-                          if (e.key === "Enter" || e.key === " ") {
-                            e.preventDefault();
-                            navigate(`/purchase-orders/${po.id}`);
-                          }
-                        }}
-                      >
-                        <td className="list-table__cell--code font-medium">{po.number}</td>
-                        <td>
-                          <StatusBadge status={po.status} />
-                        </td>
-                        <td className="truncate max-w-[14rem]" title={po.warehouseName}>
-                          {po.warehouseName}
-                        </td>
-                        <td className="text-right tabular-nums">{po.lineCount}</td>
-                        <td className="text-right tabular-nums">{po.totalAmount.toFixed(2)}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      ) : null}
     </div>
   );
 }

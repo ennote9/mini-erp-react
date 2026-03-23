@@ -707,6 +707,7 @@ export const kkMessages: MessageTree = {
       movementTypeShort: "Түрі",
       reference: "Сілтеме",
       sourceDocument: "Көз құжат",
+      relatedOrder: "Байланысты тапсырыс",
       qtyDelta: "Сан өзгерісі",
       dateTime: "Күні/уақыты",
       line: "Жол",

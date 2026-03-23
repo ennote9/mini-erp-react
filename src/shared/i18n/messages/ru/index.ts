@@ -710,6 +710,7 @@ export const ruMessages: MessageTree = {
       movementTypeShort: "Тип",
       reference: "Ссылка",
       sourceDocument: "Источник",
+      relatedOrder: "Связанный заказ",
       qtyDelta: "Изм. кол-ва",
       dateTime: "Дата/время",
       line: "Строка",

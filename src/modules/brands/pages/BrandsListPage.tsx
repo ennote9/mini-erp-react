@@ -1,13 +1,14 @@
 import React, { useMemo, useState, useRef, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { AgGridReact } from "ag-grid-react";
-import type { ColDef, ICellRendererParams, SelectionChangedEvent } from "ag-grid-community";
+import type { ColDef, SelectionChangedEvent } from "ag-grid-community";
 import { brandRepository } from "../repository";
 import type { Brand } from "../model";
 import { ListPageLayout } from "../../../shared/ui/list/ListPageLayout";
 import { EmptyState } from "../../../shared/ui/feedback/EmptyState";
 import {
   AgGridContainer,
+  AgGridActiveBooleanCellRenderer,
   agGridDefaultColDef,
   agGridDefaultGridOptions,
   agGridRowNumberColDef,
@@ -41,17 +42,6 @@ function applyActiveFilter(
   if (activeFilter === "active") return list.filter((x) => x.isActive);
   if (activeFilter === "inactive") return list.filter((x) => !x.isActive);
   return list;
-}
-
-function ActiveStatusCellRenderer(params: ICellRendererParams<Brand>) {
-  const { t } = useTranslation();
-  const isActive = params.value as boolean;
-  const label = isActive ? t("ops.master.activeCell.active") : t("ops.master.activeCell.inactive");
-  return (
-    <span className={isActive ? "status-plain-text status-plain-text--active" : "status-plain-text status-plain-text--inactive"}>
-      {label}
-    </span>
-  );
 }
 
 function buildExportRowsFromBrands(brands: Brand[], activeYes: string, activeNo: string): BrandsExportRow[] {
@@ -186,7 +176,7 @@ export function BrandsListPage() {
         field: "isActive",
         headerName: t("doc.columns.active"),
         width: 110,
-        cellRenderer: ActiveStatusCellRenderer,
+        cellRenderer: AgGridActiveBooleanCellRenderer,
       },
     ],
     [t, locale],

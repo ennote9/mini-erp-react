@@ -1,14 +1,15 @@
 import React, { useMemo, useState, useRef, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { AgGridReact } from "ag-grid-react";
-import type { ColDef, ICellRendererParams, SelectionChangedEvent } from "ag-grid-community";
+import type { ColDef, SelectionChangedEvent } from "ag-grid-community";
 import { carrierRepository } from "../repository";
 import type { Carrier } from "../model";
-import { translateCarrierType } from "../carrierLabels";
 import { ListPageLayout } from "../../../shared/ui/list/ListPageLayout";
 import { EmptyState } from "../../../shared/ui/feedback/EmptyState";
 import {
   AgGridContainer,
+  AgGridActiveBooleanCellRenderer,
+  AgGridCarrierTypeCellRenderer,
   agGridDefaultColDef,
   agGridDefaultGridOptions,
   agGridRowNumberColDef,
@@ -33,6 +34,7 @@ import { useTranslation } from "@/shared/i18n/context";
 import { buildReadableUniqueFilename, ensureUniqueExportPath } from "@/shared/export/filenameBuilder";
 import { carriersListExcelLabels } from "@/shared/i18n/excelListExportLabels";
 import type { TFunction } from "@/shared/i18n/resolve";
+import { translateCarrierType } from "../carrierLabels";
 
 type ActiveFilter = "all" | "active" | "inactive";
 
@@ -40,24 +42,6 @@ function applyActiveFilter(list: Carrier[], activeFilter: ActiveFilter): Carrier
   if (activeFilter === "active") return list.filter((x) => x.isActive);
   if (activeFilter === "inactive") return list.filter((x) => !x.isActive);
   return list;
-}
-
-function ActiveStatusCellRenderer(params: ICellRendererParams<Carrier>) {
-  const { t } = useTranslation();
-  const isActive = params.value as boolean;
-  const label = isActive ? t("ops.master.activeCell.active") : t("ops.master.activeCell.inactive");
-  return (
-    <span className={isActive ? "status-plain-text status-plain-text--active" : "status-plain-text status-plain-text--inactive"}>
-      {label}
-    </span>
-  );
-}
-
-function CarrierTypeCellRenderer(params: ICellRendererParams<Carrier>) {
-  const { t } = useTranslation();
-  const row = params.data;
-  if (!row) return null;
-  return <span>{translateCarrierType(t, row.carrierType)}</span>;
 }
 
 function buildExportRowsFromCarriers(
@@ -195,7 +179,7 @@ export function CarriersListPage() {
         headerName: t("doc.columns.carrierType"),
         width: 160,
         valueGetter: (p) => (p.data ? translateCarrierType(t, p.data.carrierType) : ""),
-        cellRenderer: CarrierTypeCellRenderer,
+        cellRenderer: AgGridCarrierTypeCellRenderer,
       },
       {
         field: "phone",
@@ -211,7 +195,7 @@ export function CarriersListPage() {
         field: "isActive",
         headerName: t("doc.columns.active"),
         width: 110,
-        cellRenderer: ActiveStatusCellRenderer,
+        cellRenderer: AgGridActiveBooleanCellRenderer,
       },
     ],
     [t, locale],

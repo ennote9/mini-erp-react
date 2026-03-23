@@ -14,6 +14,7 @@ import { ListPageLayout } from "../../../shared/ui/list/ListPageLayout";
 import { EmptyState } from "../../../shared/ui/feedback/EmptyState";
 import {
   AgGridContainer,
+  AgGridActiveBooleanCellRenderer,
   agGridDefaultColDef,
   agGridDefaultGridOptions,
   agGridRowNumberColDef,
@@ -58,17 +59,6 @@ function applyBrandIdFilter(items: Item[], brandId: string | null): Item[] {
 function applyCategoryIdFilter(items: Item[], categoryId: string | null): Item[] {
   if (categoryId == null || categoryId === "") return items;
   return items.filter((x) => x.categoryId === categoryId);
-}
-
-function ActiveStatusCellRenderer(params: ICellRendererParams<Item>) {
-  const { t } = useTranslation();
-  const isActive = params.value as boolean;
-  const label = isActive ? t("ops.master.activeCell.active") : t("ops.master.activeCell.inactive");
-  return (
-    <span className={isActive ? "status-plain-text status-plain-text--active" : "status-plain-text status-plain-text--inactive"}>
-      {label}
-    </span>
-  );
 }
 
 /** Image count only — no thumbnails (Items list). */
@@ -347,7 +337,7 @@ export function ItemsListPage() {
         field: "isActive",
         headerName: t("doc.columns.active"),
         width: 100,
-        cellRenderer: ActiveStatusCellRenderer,
+        cellRenderer: AgGridActiveBooleanCellRenderer,
       },
     ],
     [t, locale],

@@ -1,7 +1,7 @@
 import React, { useMemo, useState, useRef, useCallback, useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { AgGridReact } from "ag-grid-react";
-import type { ColDef, ICellRendererParams, SelectionChangedEvent } from "ag-grid-community";
+import type { ColDef, SelectionChangedEvent } from "ag-grid-community";
 import { purchaseOrderRepository } from "../repository";
 import { supplierRepository } from "../../suppliers/repository";
 import { warehouseRepository } from "../../warehouses/repository";
@@ -11,9 +11,9 @@ import type { PurchaseOrder } from "../model";
 import type { PlanningDocumentStatus } from "../../../shared/domain";
 import { ListPageLayout } from "../../../shared/ui/list/ListPageLayout";
 import { EmptyState } from "../../../shared/ui/feedback/EmptyState";
-import { StatusBadge } from "../../../shared/ui/feedback/StatusBadge";
 import {
   AgGridContainer,
+  AgGridPlanningStatusCellRenderer,
   agGridDefaultColDef,
   agGridDefaultGridOptions,
   getAgGridRowNumberColDef,
@@ -88,12 +88,6 @@ function parseQueryId(searchParams: URLSearchParams, key: string): string | null
   if (raw == null) return null;
   const t = raw.trim();
   return t === "" ? null : t;
-}
-
-function StatusCellRenderer(params: ICellRendererParams<RowData>) {
-  const status = params.value as string | undefined;
-  if (status == null) return null;
-  return <StatusBadge status={status} />;
 }
 
 function buildExportRowsFromPO(rows: RowData[]): PurchaseOrdersExportRow[] {
@@ -389,7 +383,7 @@ export function PurchaseOrdersListPage() {
         field: "status",
         headerName: t("doc.columns.status"),
         width: 130,
-        cellRenderer: StatusCellRenderer,
+        cellRenderer: AgGridPlanningStatusCellRenderer,
       },
     ],
     [t, locale],

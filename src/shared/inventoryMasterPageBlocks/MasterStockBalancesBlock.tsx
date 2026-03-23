@@ -14,7 +14,8 @@ import { formatMasterInventoryQty } from "./formatting";
 
 export type MasterStockBalancesBlockLabels = {
   title: string;
-  description: string;
+  /** Omitted on some pages (e.g. category) when the section title is enough. */
+  description?: string;
   openAll: string;
   summaryAria: string;
   empty: string;
@@ -32,6 +33,8 @@ type Props = {
    */
   onBalanceRowClick?: (row: ItemPageBalanceRow) => void;
   rowAriaLabel: (row: ItemPageBalanceRow) => string;
+  /** When true, the outline "open all" button is not shown in the card header (caller renders it elsewhere). */
+  hideHeaderOpenButton?: boolean;
 };
 
 function rowKeyDown(e: KeyboardEvent, action: () => void) {
@@ -51,6 +54,7 @@ export function MasterStockBalancesBlock({
   onOpenAll,
   onBalanceRowClick,
   rowAriaLabel,
+  hideHeaderOpenButton = false,
 }: Props) {
   const { t } = useTranslation();
   const rowNavigate = onBalanceRowClick ?? ((_row: ItemPageBalanceRow) => onOpenAll());
@@ -58,21 +62,32 @@ export function MasterStockBalancesBlock({
   return (
     <Card className="mt-4 w-full max-w-4xl min-w-0 border-0 shadow-none">
       <CardHeader className="p-2 pb-0.5 space-y-0">
-        <div className="flex flex-wrap items-start justify-between gap-2 gap-y-1.5">
-          <div className="min-w-0 space-y-0.5 flex-1">
+        {hideHeaderOpenButton ? (
+          <div className={`min-w-0 ${labels.description ? "space-y-0.5" : ""}`}>
             <CardTitle className="text-[0.9rem] font-semibold tracking-tight">{labels.title}</CardTitle>
-            <CardDescription className="text-xs leading-snug">{labels.description}</CardDescription>
+            {labels.description ? (
+              <CardDescription className="text-xs leading-snug">{labels.description}</CardDescription>
+            ) : null}
           </div>
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            className="h-7 shrink-0 px-2.5 text-xs"
-            onClick={onOpenAll}
-          >
-            {labels.openAll}
-          </Button>
-        </div>
+        ) : (
+          <div className="flex flex-wrap items-start justify-between gap-2 gap-y-1.5">
+            <div className={`min-w-0 flex-1 ${labels.description ? "space-y-0.5" : ""}`}>
+              <CardTitle className="text-[0.9rem] font-semibold tracking-tight">{labels.title}</CardTitle>
+              {labels.description ? (
+                <CardDescription className="text-xs leading-snug">{labels.description}</CardDescription>
+              ) : null}
+            </div>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="h-7 shrink-0 px-2.5 text-xs"
+              onClick={onOpenAll}
+            >
+              {labels.openAll}
+            </Button>
+          </div>
+        )}
       </CardHeader>
       <CardContent className="p-2 pt-1 space-y-2">
         <MasterStockBalanceSummaryChips summary={summary} ariaLabel={labels.summaryAria} />

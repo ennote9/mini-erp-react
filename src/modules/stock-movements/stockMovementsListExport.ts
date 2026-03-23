@@ -10,6 +10,7 @@ export type StockMovementsExportRow = {
   warehouse: string;
   qtyDelta: string;
   sourceDocument: string;
+  relatedOrder: string;
 };
 
 const TABLE_NAME_BASE = "StockMovementsTable";
@@ -42,6 +43,7 @@ const WIDTH_BOUNDS = [
   { min: 10, max: 24 },
   { min: 10, max: 14 },
   { min: 14, max: 28 },
+  { min: 10, max: 18 },
 ];
 
 function addSheet(workbook: Workbook, rows: StockMovementsExportRow[], labels: ExcelListSheetLabels): void {
@@ -63,6 +65,7 @@ function addSheet(workbook: Workbook, rows: StockMovementsExportRow[], labels: E
     r.warehouse,
     r.qtyDelta,
     r.sourceDocument,
+    r.relatedOrder,
   ]);
   sheet.addTable({
     name: sanitizeTableName(TABLE_NAME_BASE),
@@ -74,7 +77,9 @@ function addSheet(workbook: Workbook, rows: StockMovementsExportRow[], labels: E
   });
   for (let c = 0; c < COLUMN_HEADERS.length; c++) {
     const valueLengths = rows.map((r) =>
-      cellLen([r.no, r.dateTime, r.movementType, r.itemCode, r.itemName, r.warehouse, r.qtyDelta, r.sourceDocument][c]),
+      cellLen(
+        [r.no, r.dateTime, r.movementType, r.itemCode, r.itemName, r.warehouse, r.qtyDelta, r.sourceDocument, r.relatedOrder][c],
+      ),
     );
     const b = WIDTH_BOUNDS[c] ?? { min: DEFAULT_MIN, max: DEFAULT_MAX };
     sheet.getColumn(c + 1).width = columnWidth(COLUMN_HEADERS[c].length, valueLengths, b.min, b.max);

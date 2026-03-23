@@ -194,6 +194,7 @@ export function stockMovementsListExcelLabels(t: TFunction): ExcelListSheetLabel
       t("exportExcel.list.colWarehouse"),
       t("exportExcel.list.colQtyDelta"),
       t("exportExcel.list.colSourceDocument"),
+      t("exportExcel.list.colRelatedOrder"),
     ],
   };
 }

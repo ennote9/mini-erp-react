@@ -14,7 +14,7 @@ import { formatMasterInventoryDateTime, formatMasterInventoryQtyDelta } from "./
 
 export type MasterStockMovementsBlockLabels = {
   title: string;
-  description: string;
+  description?: string;
   openAll: string;
   empty: string;
 };
@@ -23,6 +23,8 @@ type BaseProps = {
   labels: MasterStockMovementsBlockLabels;
   onOpenAll: () => void;
   movementTypeLabel: (code: string) => string;
+  /** When true, the outline "open all" button is not shown in the card header (caller renders it elsewhere). */
+  hideHeaderOpenButton?: boolean;
 };
 
 type SingleItemProps = BaseProps & {
@@ -54,26 +56,37 @@ function rowKeyDown(e: KeyboardEvent, action: () => void) {
  */
 export function MasterStockMovementsBlock(props: MasterStockMovementsBlockProps) {
   const { t } = useTranslation();
-  const { labels, onOpenAll, movementTypeLabel, variant, rows } = props;
+  const { labels, onOpenAll, movementTypeLabel, variant, rows, hideHeaderOpenButton = false } = props;
 
   return (
     <Card className="mt-4 w-full max-w-4xl min-w-0 border-0 shadow-none">
       <CardHeader className="p-2 pb-0.5 space-y-0">
-        <div className="flex flex-wrap items-start justify-between gap-2 gap-y-1.5">
-          <div className="min-w-0 space-y-0.5 flex-1">
+        {hideHeaderOpenButton ? (
+          <div className={`min-w-0 ${labels.description ? "space-y-0.5" : ""}`}>
             <CardTitle className="text-[0.9rem] font-semibold tracking-tight">{labels.title}</CardTitle>
-            <CardDescription className="text-xs leading-snug">{labels.description}</CardDescription>
+            {labels.description ? (
+              <CardDescription className="text-xs leading-snug">{labels.description}</CardDescription>
+            ) : null}
           </div>
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            className="h-7 shrink-0 px-2.5 text-xs"
-            onClick={onOpenAll}
-          >
-            {labels.openAll}
-          </Button>
-        </div>
+        ) : (
+          <div className="flex flex-wrap items-start justify-between gap-2 gap-y-1.5">
+            <div className={`min-w-0 flex-1 ${labels.description ? "space-y-0.5" : ""}`}>
+              <CardTitle className="text-[0.9rem] font-semibold tracking-tight">{labels.title}</CardTitle>
+              {labels.description ? (
+                <CardDescription className="text-xs leading-snug">{labels.description}</CardDescription>
+              ) : null}
+            </div>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="h-7 shrink-0 px-2.5 text-xs"
+              onClick={onOpenAll}
+            >
+              {labels.openAll}
+            </Button>
+          </div>
+        )}
       </CardHeader>
       <CardContent className="p-2 pt-1 space-y-2">
         {rows.length === 0 ? (
