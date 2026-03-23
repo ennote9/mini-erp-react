@@ -2,7 +2,7 @@
  * Items list — AG Grid migration. Uses shared AgGridContainer and defaultColDef.
  * Preserves search, All/Active/Inactive filters, New button, row navigation, empty state.
  */
-import React, { useMemo, useState, useRef, useCallback } from "react";
+import React, { useMemo, useState, useRef, useCallback, useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { AgGridReact } from "ag-grid-react";
 import type { ColDef, ICellRendererParams, SelectionChangedEvent } from "ag-grid-community";
@@ -36,6 +36,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { revealItemInDir } from "@tauri-apps/plugin-opener";
 import { useTranslation } from "@/shared/i18n/context";
 import { itemsListExcelLabels } from "@/shared/i18n/excelListExportLabels";
+import { readOptionalItemLifecycleFromQuery } from "@/shared/navigation/listQueryStatus";
 
 type ActiveFilter = "all" | "active" | "inactive";
 
@@ -124,6 +125,15 @@ export function ItemsListPage() {
 
   const [searchQuery, setSearchQuery] = useState("");
   const [activeFilter, setActiveFilter] = useState<ActiveFilter>("all");
+
+  const lifecycleFromQuery = useMemo(
+    () => readOptionalItemLifecycleFromQuery(searchParams),
+    [searchParams],
+  );
+  useEffect(() => {
+    if (lifecycleFromQuery === undefined) return;
+    setActiveFilter(lifecycleFromQuery);
+  }, [lifecycleFromQuery]);
   const [exportSuccess, setExportSuccess] = useState<{ path: string; filename: string } | null>(null);
   const [exportOpen, setExportOpen] = useState(false);
   const [selectedCount, setSelectedCount] = useState(0);

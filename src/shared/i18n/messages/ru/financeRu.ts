@@ -1,0 +1,62 @@
+export const financeRu = {
+  sectionTitle: "Оплата и счёт",
+  sectionHint:
+    "Учёт оплат по этому заказу. Счёт на оплату отделён от предварительного документа клиенту.",
+  paymentStatusLabel: "Статус оплаты",
+  paymentStatus: {
+    unpaid: "Не оплачен",
+    partially_paid: "Частично оплачен",
+    paid: "Оплачен",
+  },
+  orderTotal: "Сумма заказа",
+  paidTotal: "Оплачено",
+  remaining: "Остаток",
+  openCustomerInvoice: "Открыть счёт на оплату",
+  openCustomerInvoiceShort: "Счёт на оплату",
+  invoiceTitle: "Счёт на оплату",
+  invoiceSubtitle: "Счёт по заказу клиента — операционный документ, не кассовый чек.",
+  invoiceDisclaimer:
+    "Документ отражает суммы к оплате по заказу для оперативного контроля. Не является фискальным или налоговым счётом-фактурой, если иное не задано вашим процессом.",
+  sectionPaymentSummary: "Суммы",
+  sectionLines: "Коммерческие строки",
+  dueDate: "Срок оплаты",
+  paymentHistory: "Зафиксированные оплаты",
+  noPayments: "Оплаты ещё не внесены.",
+  addPayment: "Зафиксировать оплату",
+  amount: "Сумма",
+  paidAt: "Дата и время",
+  method: "Способ",
+  reference: "Номер / ссылка",
+  comment: "Комментарий",
+  paymentMethod: {
+    cash: "Наличные",
+    bank_transfer: "Банковский перевод",
+    card: "Карта",
+    other: "Другое",
+  },
+  deletePayment: "Удалить оплату",
+  deletePaymentConfirm: "Удалить эту запись об оплате?",
+  validation: {
+    amountPositive: "Укажите сумму больше нуля.",
+    paidAtRequired: "Укажите дату и время оплаты.",
+  },
+  errors: {
+    generic: "Не удалось сохранить оплату.",
+    deleteFailed: "Не удалось удалить оплату.",
+    soNotFound: "Заказ клиента не найден.",
+    soCancelled: "Нельзя менять оплаты по отменённому заказу.",
+    amountInvalid: "Сумма должна быть больше нуля.",
+    paidAtRequired: "Укажите дату и время оплаты.",
+    paidAtInvalid: "Некорректная дата или время оплаты.",
+    paymentNotFound: "Оплата не найдена.",
+    paymentWrongOrder: "Эта оплата относится к другому заказу.",
+  },
+  invoicePreparedFrom: "Подготовлено по заказу клиента {{number}}",
+  printedAt: "Распечатано",
+  invoiceUnavailable:
+    "Счёт на оплату недоступен для отменённых заказов или заказов без строк.",
+  invoiceNeedsLines:
+    "Добавьте хотя бы одну коммерческую строку, чтобы вести оплаты и открыть счёт на оплату.",
+  readOnlyCancelled:
+    "Заказ отменён — суммы показаны для справки; добавлять или удалять оплаты нельзя.",
+} as const;

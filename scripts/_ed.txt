@@ -1,0 +1,393 @@
+          <div className="doc-lines mt-[calc(0.5rem+1cm)]">
+            <div className="doc-lines__header mb-1.5 max-w-2xl">
+              <h3 className="doc-lines__title">{t("doc.page.lines")}</h3>
+            </div>
+            {!isNew && soFulfillment ? (
+              <div className="mb-2 max-w-4xl text-xs">
+                <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
+                  <span className="font-medium text-foreground">{t("doc.fulfillment.so.sectionTitle")}</span>
+                  <span className="tabular-nums text-muted-foreground">
+                    {translatePlanningFulfillmentState(t, soFulfillment.state)}
+                  </span>
+                  <span className="text-muted-foreground tabular-nums">
+                    {t("doc.fulfillment.so.shippedOrdered", {
+                      shipped: soFulfillment.totalShipped,
+                      ordered: soFulfillment.totalOrdered,
+                    })}
+                  </span>
+                  <span className="text-muted-foreground">
+                    {t("doc.fulfillment.so.remainingLabel")}{" "}
+                    <span className="text-foreground tabular-nums">
+                      {soFulfillment.totalRemaining < 0
+                        ? t("doc.fulfillment.remainingOver", { qty: soFulfillment.totalRemaining })
+                        : soFulfillment.totalRemaining}
+                    </span>
+                  </span>
+                  <span className="text-muted-foreground tabular-nums">
+                    {t("doc.fulfillment.so.shipmentsPostedTotal", {
+                      posted: soFulfillment.postedShipmentCount,
+                      total: soFulfillment.relatedShipmentCount,
+                    })}
+                  </span>
+                  {soFulfillment.hasOverFulfillment ? (
+                    <span className="text-destructive font-medium">{t("doc.fulfillment.so.overShipped")}</span>
+                  ) : null}
+                </div>
+              </div>
+            ) : null}
+            {!isNew && showSalesOrderAllocationUi && soAllocationView ? (
+              <div className="mb-2 max-w-4xl text-xs">
+                <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
+                  <span className="font-medium text-foreground">{t("doc.fulfillment.so.allocationSectionTitle")}</span>
+                  <span className="tabular-nums text-muted-foreground">
+                    {translateSalesOrderAllocationState(t, soAllocationView.state)}
+                  </span>
+                  <span className="text-muted-foreground">
+                    {t("doc.columns.reserved")}{" "}
+                    <span className="text-foreground tabular-nums">{soAllocationView.totalReserved}</span>
+                  </span>
+                  <span className="text-muted-foreground">
+                    {t("doc.columns.shortage")}{" "}
+                    <span className="text-foreground tabular-nums">{soAllocationView.totalShortage}</span>
+                    <span className="text-muted-foreground/80"> {t("doc.fulfillment.so.allocationShortageHint")}</span>
+                  </span>
+                </div>
+              </div>
+            ) : null}
+            {isEditable && (
+              <div className="flex items-end gap-2 w-full mb-1.5">
+                <Card className="border-0 shadow-none flex-1 min-w-0">
+                  <CardContent className="p-2 pb-0">
+                    <div className="grid grid-cols-2 md:grid-cols-[minmax(200px,240px)_auto_auto_auto_minmax(160px,220px)_minmax(260px,1fr)] gap-x-2 gap-y-1 items-end w-max max-w-full">
+                    <div className="flex flex-col gap-0.5">
+                      <Label htmlFor="line-entry-item" className="text-sm">
+                        {t("doc.page.itemLabel")} <span className="text-destructive">*</span>
+                      </Label>
+                      <SalesOrderItemAutocomplete
+                        ref={lineEntryItemPickerRef}
+                        id="line-entry-item"
+                        value={lineEntryItemId}
+                        onChange={handleLineEntryItemChange}
+                        items={itemRepository.list()}
+                        placeholder={t("doc.page.searchItemPlaceholder")}
+                        className="w-[240px]"
+                        dropdownRightEdgeRef={lineEntryDropdownRightEdgeRef}
+                      />
+                    </div>
+                    <div className="flex flex-col gap-0.5">
+                      <Label htmlFor="line-entry-qty" className="text-sm">
+                        {t("doc.columns.qty")} <span className="text-destructive">*</span>
+                      </Label>
+                      <Input
+                        ref={lineEntryQtyInputRef}
+                        id="line-entry-qty"
+                        type="number"
+                        min={1}
+                        value={lineEntryQty}
+                        onChange={(e) =>
+                          setLineEntryQty(Number(e.target.value) || 1)
+                        }
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter" && editingLineId === null) {
+                            e.preventDefault();
+                            addLineFromEntry();
+                          }
+                        }}
+                        className="h-8 w-[80px] text-sm text-right align-middle [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                      />
+                    </div>
+                    <div className="flex flex-col gap-0.5">
+                      <Label htmlFor="line-entry-unit-price" className="text-sm">
+                        {t("doc.columns.unitPrice")}
+                      </Label>
+                      <Input
+                        id="line-entry-unit-price"
+                        type="number"
+                        min={0}
+                        step={0.01}
+                        value={lineEntryUnitPrice}
+                        onChange={(e) => {
+                          const v = Number(e.target.value);
+                          const next = Number.isFinite(v) && v >= 0 ? v : 0;
+                          setLineEntryUnitPrice(next);
+                          if (roundMoney(next) !== 0) setLineEntryZeroPriceReason("");
+                        }}
+                        className="h-8 w-[80px] text-sm text-right align-middle [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                      />
+                    </div>
+                    <div className="flex flex-col gap-0.5 md:col-span-1">
+                      <Label htmlFor="so-line-entry-zp-reason" className="text-sm">
+                        {t("doc.page.zeroPriceReasonLabel")}
+                        {roundMoney(lineEntryUnitPrice) === 0 ? (
+                          <span className="text-destructive"> *</span>
+                        ) : null}
+                      </Label>
+                      <SelectField
+                        id="so-line-entry-zp-reason"
+                        value={lineEntryZeroPriceReason}
+                        onChange={setLineEntryZeroPriceReason}
+                        options={zeroPriceReasonOptions}
+                        placeholder={
+                          roundMoney(lineEntryUnitPrice) === 0
+                            ? t("doc.cancelDialog.selectPlaceholder")
+                            : t("domain.audit.summary.emDash")
+                        }
+                        className="w-[min(100%,220px)] min-w-0"
+                        disabled={roundMoney(lineEntryUnitPrice) !== 0}
+                      />
+                    </div>
+                    <div
+                      ref={lineEntryDropdownRightEdgeRef}
+                      className="flex gap-1.5 flex-shrink-0 items-center"
+                    >
+                      {editingLineId === null ? (
+                        <>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            className="h-8 gap-1.5"
+                            onClick={addLineFromEntry}
+                            title={t("doc.page.addLineTitle")}
+                          >
+                            <Plus className="h-4 w-4 shrink-0" aria-hidden />
+                            {t("doc.page.addLine")}
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            className="h-8 gap-1.5"
+                            onClick={() => {
+                              setLineImportInitialTab("paste");
+                              setIsLineImportModalOpen(true);
+                            }}
+                            title={t("doc.page.addLinesTitle")}
+                          >
+                            <ClipboardPaste className="h-4 w-4 shrink-0" aria-hidden />
+                            {t("doc.page.addLines")}
+                          </Button>
+                        </>
+                      ) : (
+                        <>
+                          <Button
+                            type="button"
+                            size="sm"
+                            className="h-8 gap-1.5"
+                            onClick={updateLineFromEntry}
+                          >
+                            <Check className="h-4 w-4 shrink-0" aria-hidden />
+                            {t("doc.page.updateLine")}
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            className="h-8 gap-1.5"
+                            disabled={form.lines.length <= 1}
+                            onClick={() => {
+                              if (editingLineId !== null) {
+                                removeLineByLineId(editingLineId);
+                                cancelEdit();
+                              }
+                            }}
+                          >
+                            <Trash2 className="h-4 w-4 shrink-0" aria-hidden />
+                            {t("doc.page.remove")}
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            className="h-8 gap-1.5"
+                            onClick={cancelEdit}
+                          >
+                            <X className="h-4 w-4 shrink-0" aria-hidden />
+                            {t("doc.page.cancelEdit")}
+                          </Button>
+                        </>
+                      )}
+                    </div>
+                    <div className="doc-lines__contextual-slot min-h-9 flex items-end">
+                      {duplicateChoicePending && editingLineId === null ? (
+                        <div className="flex flex-col gap-1">
+                          <span className="text-muted-foreground text-xs leading-tight">{t("doc.page.itemAlreadyExists")}</span>
+                          <div className="flex items-center gap-1.5">
+                            <Button
+                              type="button"
+                              variant="default"
+                              size="sm"
+                              className="h-8"
+                              onClick={handleDuplicateIncreaseQty}
+                            >
+                              {t("doc.page.increaseQuantity")}
+                            </Button>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              className="h-8"
+                              onClick={handleDuplicateCancel}
+                            >
+                              {t("common.cancel")}
+                            </Button>
+                          </div>
+                        </div>
+                      ) : selectedLineIds.length >= 2 ? (
+                        <div className="flex flex-col gap-1">
+                          <span className="text-muted-foreground text-xs leading-tight">
+                            {t("doc.page.linesSelected", { count: selectedLineIds.length })}
+                          </span>
+                          <div className="flex items-center gap-1.5">
+                            <Button type="button" variant="outline" size="sm" className="h-8" onClick={removeSelectedLines}>
+                              {t("doc.page.removeSelectedLines")}
+                            </Button>
+                          </div>
+                        </div>
+                      ) : null}
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+                <div className="flex flex-row flex-wrap items-center justify-end gap-2 shrink-0">
+                  <DocumentPrintActionsMenu
+                    items={salesOrderPrintMenuItems}
+                    triggerLabel={t("doc.page.print")}
+                    aria-label={t("doc.page.printMenuAria")}
+                  />
+                  {exportSuccess && (
+                    <div className="h-8 w-max flex items-center gap-1.5 rounded-md border border-input bg-background px-2 text-sm shrink-0">
+                      <span className="text-muted-foreground text-xs">{t("doc.list.exportCompleted")}</span>
+                      <span className="font-medium text-xs truncate max-w-[12rem]" title={exportSuccess.filename}>{exportSuccess.filename}</span>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        className="h-7 w-7 shrink-0 text-muted-foreground hover:text-foreground"
+                        title={t("doc.list.openFile")}
+                        aria-label={t("doc.list.openFile")}
+                        onClick={async () => {
+                          try {
+                            await invoke("open_export_file", { path: exportSuccess.path });
+                            setExportSuccess(null);
+                          } catch (err) {
+                            console.error("Export failed", err);
+                            setExportSuccess(null);
+                          }
+                        }}
+                      >
+                        <File className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        className="h-7 w-7 shrink-0 text-muted-foreground hover:text-foreground"
+                        title={t("doc.list.openFolder")}
+                        aria-label={t("doc.list.openFolder")}
+                        onClick={() => {
+                          revealItemInDir(exportSuccess.path);
+                          setExportSuccess(null);
+                        }}
+                      >
+                        <FolderOpen className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        className="h-6 w-6 shrink-0 text-muted-foreground/80 hover:text-muted-foreground"
+                        title={t("doc.list.dismiss")}
+                        aria-label={t("doc.list.dismiss")}
+                        onClick={() => setExportSuccess(null)}
+                      >
+                        <X className="h-3 w-3" />
+                      </Button>
+                    </div>
+                  )}
+                  <div className="flex items-stretch rounded-md border border-input shrink-0">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="h-8 rounded-r-none border-0 border-r border-input gap-1.5"
+                      onClick={handleExportMain}
+                    >
+                      <FileSpreadsheet className="h-4 w-4 shrink-0" />
+                      {t("doc.page.export")}
+                    </Button>
+                    <Popover open={exportOpen} onOpenChange={setExportOpen}>
+                      <PopoverTrigger asChild>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="icon"
+                          className="h-8 w-8 shrink-0 rounded-l-none border-0 shadow-none"
+                          aria-label={t("doc.list.exportOptionsAria")}
+                        >
+                          <ChevronDown className="h-4 w-4" />
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="!w-max min-w-0 p-1.5" align="end" side="top">
+                        <div className="flex flex-col gap-0.5">
+                          <button
+                            type="button"
+                            disabled={exportSelectedDisabled}
+                            className="w-full rounded-sm px-1.5 py-1 text-left text-sm hover:bg-accent disabled:cursor-not-allowed disabled:opacity-50"
+                            title={
+                              exportSelectedDisabled
+                                ? !isEditable
+                                  ? t("doc.list.exportSelectionEditModeOnly")
+                                  : t("doc.list.exportSelectLinesFirst")
+                                : undefined
+                            }
+                            onClick={() => {
+                              setExportOpen(false);
+                              if (!exportSelectedDisabled) handleExportSelected();
+                            }}
+                          >
+                            {t("doc.list.exportSelectedRows")}
+                          </button>
+                          <button
+                            type="button"
+                            className="w-full rounded-sm px-1.5 py-1 text-left text-sm hover:bg-accent"
+                            onClick={() => {
+                              setExportOpen(false);
+                              handleExportAll();
+                            }}
+                          >
+                            {t("doc.list.exportAllLines")}
+                          </button>
+                        </div>
+                      </PopoverContent>
+                    </Popover>
+                  </div>
+                </div>
+              </div>
+            )}
+            <div className="doc-lines__grid">
+              <AgGridContainer themeClass="doc-lines-grid">
+                <AgGridReact<LineFormRow>
+                  ref={linesGridRef}
+                  rowData={form.lines}
+                  columnDefs={linesColumnDefs}
+                  defaultColDef={agGridDefaultColDef}
+                  getRowId={(p) => String(p.data._lineId)}
+                  getRowClass={getRowClass}
+                  rowSelection={isEditable ? { mode: "multiRow", checkboxes: true, headerCheckbox: true, enableClickSelection: true } : undefined}
+                  selectionColumnDef={isEditable ? agGridSelectionColumnDef : undefined}
+                  onSelectionChanged={isEditable ? onLinesSelectionChanged : undefined}
+                />
+              </AgGridContainer>
+            </div>
+            {form.lines.length > 0 && (
+              <div className="doc-lines__totals mt-1.5 flex gap-6 text-sm">
+                <span>
+                  {t("doc.page.totalQty")}: {totals.totalQty}
+                </span>
+                <span>
+                  {t("doc.page.totalAmount")}: {totals.totalAmount.toFixed(2)}
+                </span>
+              </div>
+            )}
+          </div>

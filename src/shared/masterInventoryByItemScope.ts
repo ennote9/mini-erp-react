@@ -90,8 +90,10 @@ export type MasterScopeMovementRow = {
   id: string;
   datetime: string;
   movementTypeCode: string;
+  itemId: string;
   itemCode: string;
   itemName: string;
+  warehouseId: string;
   warehouseName: string;
   qtyDelta: number;
   sourceDocumentLabel: string;
@@ -114,8 +116,10 @@ export function buildRecentScopedMovementsForItemIds(
       id: m.id,
       datetime: m.datetime,
       movementTypeCode: m.movementType,
+      itemId: m.itemId,
       itemCode: item?.code ?? m.itemId,
       itemName: item?.name ?? m.itemId,
+      warehouseId: m.warehouseId,
       warehouseName: wh?.name ?? m.warehouseId,
       qtyDelta: m.qtyDelta,
       sourceDocumentLabel: sourceDocumentLabel(

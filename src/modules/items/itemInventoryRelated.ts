@@ -98,6 +98,7 @@ export type ItemPageMovementRow = {
   id: string;
   datetime: string;
   movementTypeCode: string;
+  warehouseId: string;
   warehouseName: string;
   qtyDelta: number;
   sourceDocumentLabel: string;
@@ -118,6 +119,7 @@ export function buildRecentItemPageMovements(
       id: m.id,
       datetime: m.datetime,
       movementTypeCode: m.movementType,
+      warehouseId: m.warehouseId,
       warehouseName: wh?.name ?? m.warehouseId,
       qtyDelta: m.qtyDelta,
       sourceDocumentLabel: sourceDocumentLabel(m.sourceDocumentType, m.sourceDocumentId, translate),

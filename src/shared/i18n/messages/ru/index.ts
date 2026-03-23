@@ -3,6 +3,7 @@ import { ruOps } from "./ops";
 import { ruMasterPages } from "./masterPagesRu";
 import { ruIssuesMessages } from "./issuesMessagesRu";
 import { ruExportExcel } from "./exportExcelRu";
+import { financeRu } from "./financeRu";
 import { ruSettingsEntriesFull, ruSettingsOptionsFull } from "./settingsRegistryRu";
 
 /** Russian UI overrides (missing keys inherit English). */
@@ -101,6 +102,7 @@ export const ruMessages: MessageTree = {
     salesOrders: "Заказы клиентов",
     salesOrder: "Заказ клиента",
     salesOrderCustomerDocument: "Предварительный документ клиенту",
+    salesOrderCustomerInvoice: "Счёт на оплату (заказ клиента)",
     shipments: "Отгрузки",
     shipment: "Отгрузка",
     shipmentCustomerDocument: "Итоговый документ клиенту",
@@ -221,12 +223,19 @@ export const ruMessages: MessageTree = {
   dashboard: {
     title: "Панель",
     subtitle:
-      "Оперативный срез: документы и запасы, последние поступления и отгрузки, быстрые переходы.",
+      "Оперативная панель: на что обратить внимание, конвейер документов, строки запасов, последние поступления и отгрузки, быстрые переходы.",
     sections: {
-      documents: "Документы",
-      inventory: "Запасы",
-      recentActivity: "Недавняя активность",
-      navSignals: "Навигация и сигналы",
+      priority: "Требуют внимания",
+      pipeline: "Конвейер документов",
+      inventory: "Запасы и НСИ",
+      logistics: "Последние поступления и отгрузки",
+      shortcuts: "Быстрые переходы",
+    },
+    pipeline: {
+      hint: "Нажмите на число по статусу, чтобы открыть список с этим фильтром. Ссылка на карточке — полный список.",
+    },
+    inventorySection: {
+      hint: "Числа строк отражают текущие сохранённые остатки и движения; откройте список для деталей и действий.",
     },
     po: { title: "Заказы поставщикам" },
     so: { title: "Заказы клиентам" },
@@ -240,40 +249,56 @@ export const ruMessages: MessageTree = {
       posted: "Проведён",
       reversed: "Сторнирован",
     },
-    stockBalances: { title: "Остатки", balanceRows: "Строк остатков" },
-    stockMovements: { title: "Движения", movementRows: "Строк движений" },
+    stockBalances: {
+      title: "Остатки",
+      balanceRows: "Строк остатков",
+      hint: "По одной строке на позицию и склад с сохранённым остатком.",
+    },
+    stockMovements: {
+      title: "Движения",
+      movementRows: "Строк движений",
+      hint: "Проведённые строки движений, меняющие остатки.",
+    },
     items: {
       title: "Номенклатура",
       total: "Всего позиций",
       active: "Активные",
       withImages: "С изображениями",
+      hint: "Состояние каталога: покрытие и готовность изображений.",
     },
     recentReceipts: { title: "Недавние поступления", empty: "Поступлений пока нет." },
     recentShipments: { title: "Недавние отгрузки", empty: "Отгрузок пока нет." },
     quickLinks: {
-      title: "Быстрые ссылки",
+      title: "Быстрые переходы",
       po: "Заказы поставщикам",
       so: "Заказы клиентам",
       receipts: "Поступления",
       shipments: "Отгрузки",
       stockBalances: "Остатки",
       stockMovements: "Движения",
+      customers: "Клиенты",
+      suppliers: "Поставщики",
+      warehouses: "Склады",
+      carriers: "Перевозчики",
     },
     signals: {
-      title: "Сигналы",
-      subtitle: "Лёгкие проверки по текущим данным.",
+      title: "Оперативные проверки",
+      subtitle: "Счётчики по локальным данным — перейдите по ссылке, чтобы просмотреть или закрыть очередь.",
       inactiveItems: "Неактивные позиции",
       itemsWithoutImages: "Без изображений",
       draftReceipts: "Черновики поступлений",
       draftShipments: "Черновики отгрузок",
       masterDataHint: "НСИ",
+      reviewAction: "Открыть список →",
     },
-    quickLinksSubtitle: "Переход к частым спискам.",
+    quickLinksSubtitle: "Сразу к спискам, которые чаще всего нужны в работе.",
     openList: "Открыть список →",
     openArrow: "Открыть →",
     totalLabel: "Всего",
     recent: {
       byDate: "Самые свежие по дате документа.",
+      logisticsHintReceipts: "Входящие документы по заказам поставщикам — новее по дате документа.",
+      logisticsHintShipments: "Исходящие документы по заказам клиентов — новее по дате документа.",
       openList: "Открыть список →",
       columns: {
         number: "Номер",
@@ -567,6 +592,11 @@ export const ruMessages: MessageTree = {
       titleNumbered: "Заказ поставщику {{number}}",
       backToListAria: "Назад к списку заказов поставщикам",
       importTemplateLabel: "Шаблон строк заказа поставщику (Excel)",
+      tabLines: "Строки",
+      tabEventLog: "Журнал событий",
+      tabPanelsAria: "Рабочие области заказа поставщику",
+      tabSaveDocumentFirst: "Сначала сохраните заказ поставщику, чтобы открыть журнал событий.",
+      tabEventLogDisabled: "Журнал событий отключён в профиле или настройках документов.",
       errors: {
         invalidItem: "Выбранная позиция недействительна и не может быть добавлена.",
         inactiveItem: "Неактивные позиции нельзя добавлять.",
@@ -587,6 +617,16 @@ export const ruMessages: MessageTree = {
         invalidItem: "Выбранная позиция недействительна и не может быть добавлена.",
         inactiveItem: "Неактивные позиции нельзя добавлять.",
       },
+      sectionDocument: "Документ",
+      sectionDelivery: "Доставка",
+      sectionCommercial: "Коммерция",
+      sectionNotes: "Примечания",
+      tabLines: "Строки",
+      tabPayments: "Оплата",
+      tabEventLog: "Журнал событий",
+      tabPanelsAria: "Рабочие области заказа клиента",
+      tabSaveDocumentFirst: "Сначала сохраните заказ, чтобы вести оплаты и журнал.",
+      tabEventLogDisabled: "Журнал событий отключён в профиле или настройках документов.",
     },
     receipt: {
       titleNew: "Новое поступление",
@@ -796,4 +836,5 @@ export const ruMessages: MessageTree = {
   ops: ruOps,
   issues: ruIssuesMessages,
   exportExcel: ruExportExcel,
+  finance: financeRu as unknown as MessageTree,
 };

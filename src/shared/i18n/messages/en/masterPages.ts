@@ -106,7 +106,8 @@ export const masterPagesEn = {
     relatedStockMovementsHint: "Latest {{limit}} movements for this item. Open the list for the full history.",
     openAllStockMovements: "Open stock movements",
     emptyRelatedStockMovements: "No stock movements found for this item.",
-    openStockMovementsListRowAria: "Open stock movements filtered by this item",
+    openStockMovementsListRowAria:
+      "Open stock movements filtered by this item, warehouse {{warehouse}}",
   },
   brand: {
     notFound: "Brand not found.",
@@ -131,7 +132,8 @@ export const masterPagesEn = {
       "Latest {{limit}} movements for items of this brand. Open the list for the full history.",
     openAllStockMovements: "Open stock movements",
     emptyRelatedStockMovements: "No stock movements found for this brand yet.",
-    openStockMovementsListRowAria: "Open stock movements filtered by this brand",
+    openStockMovementsListRowAria:
+      "Open stock movements filtered by this brand, item {{item}}, warehouse {{warehouse}}",
   },
   category: {
     notFound: "Category not found.",
@@ -157,7 +159,8 @@ export const masterPagesEn = {
       "Latest {{limit}} movements for items in this category. Open the list for the full history.",
     openAllStockMovements: "Open stock movements",
     emptyRelatedStockMovements: "No stock movements found for this category yet.",
-    openStockMovementsListRowAria: "Open stock movements filtered by this category",
+    openStockMovementsListRowAria:
+      "Open stock movements filtered by this category, item {{item}}, warehouse {{warehouse}}",
   },
   supplier: {
     notFound: "Supplier not found.",

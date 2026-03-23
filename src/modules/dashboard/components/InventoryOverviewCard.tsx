@@ -17,15 +17,22 @@ type Props = {
   title: string;
   listPath: string;
   metrics: InventoryMetric[];
+  /** One line of context under the title (operational cockpit copy). */
+  description?: string;
 };
 
-export function InventoryOverviewCard({ title, listPath, metrics }: Props) {
+export function InventoryOverviewCard({ title, listPath, metrics, description }: Props) {
   const { t } = useTranslation();
   return (
     <Card className="min-w-0 border-border/60 bg-card/40 shadow-none">
       <CardHeader className="space-y-0 p-3 pb-2">
         <div className="flex flex-row items-start justify-between gap-2">
-          <CardTitle className="text-sm font-semibold">{title}</CardTitle>
+          <div className="min-w-0 space-y-0.5">
+            <CardTitle className="text-sm font-semibold">{title}</CardTitle>
+            {description ? (
+              <p className="m-0 text-[11px] leading-snug text-muted-foreground">{description}</p>
+            ) : null}
+          </div>
           <Link
             to={listPath}
             className="shrink-0 text-[11px] text-muted-foreground hover:text-foreground"

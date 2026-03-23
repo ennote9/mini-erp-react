@@ -87,6 +87,7 @@ import {
 } from "../../../shared/reasonCodes";
 import { useTranslation } from "@/shared/i18n/context";
 import type { TFunction } from "@/shared/i18n/resolve";
+import { cn } from "@/lib/utils";
 import { planningPurchaseOrderExportLabels } from "@/shared/i18n/excelPlanningExportLabels";
 import { translateZeroPriceReason, translateCancelReason } from "@/shared/i18n/reasonLabels";
 import { translatePlanningFulfillmentState } from "@/shared/i18n/fulfillmentLabels";
@@ -503,6 +504,7 @@ export function PurchaseOrderPage() {
   const [lineImportInitialTab, setLineImportInitialTab] = useState<LineImportTab>("paste");
   const [exportOpen, setExportOpen] = useState(false);
   const [exportSuccess, setExportSuccess] = useState<{ path: string; filename: string } | null>(null);
+  const [poWorkingTab, setPoWorkingTab] = useState<"lines" | "events">("lines");
   const linesGridRef = useRef<AgGridReact<LineFormRow> | null>(null);
   const lineEntryItemPickerRef = useRef<PurchaseOrderItemAutocompleteRef | null>(null);
   const lineEntryQtyInputRef = useRef<HTMLInputElement | null>(null);
@@ -1225,6 +1227,120 @@ export function PurchaseOrderPage() {
                 </Button>
               )}
               {isEditable && (
+                <>
+                  {exportSuccess && (
+                    <div className="h-8 w-max flex max-w-[min(100%,20rem)] items-center gap-1.5 rounded-md border border-input bg-background px-2 text-sm shrink-0">
+                      <span className="text-muted-foreground text-xs">{t("doc.list.exportCompleted")}</span>
+                      <span className="font-medium text-xs truncate max-w-[12rem]" title={exportSuccess.filename}>
+                        {exportSuccess.filename}
+                      </span>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        className="h-7 w-7 shrink-0 text-muted-foreground hover:text-foreground"
+                        title={t("doc.list.openFile")}
+                        aria-label={t("doc.list.openFile")}
+                        onClick={async () => {
+                          const path = exportSuccess.path;
+                          try {
+                            await invoke("open_export_file", { path });
+                            setExportSuccess(null);
+                          } catch (err) {
+                            console.error("Export failed", err);
+                            setExportSuccess(null);
+                          }
+                        }}
+                      >
+                        <File className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        className="h-7 w-7 shrink-0 text-muted-foreground hover:text-foreground"
+                        title={t("doc.list.openFolder")}
+                        aria-label={t("doc.list.openFolder")}
+                        onClick={() => {
+                          revealItemInDir(exportSuccess.path);
+                          setExportSuccess(null);
+                        }}
+                      >
+                        <FolderOpen className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        className="h-6 w-6 shrink-0 text-muted-foreground/80 hover:text-muted-foreground"
+                        title={t("doc.list.dismiss")}
+                        aria-label={t("doc.list.dismiss")}
+                        onClick={() => setExportSuccess(null)}
+                      >
+                        <X className="h-3 w-3" />
+                      </Button>
+                    </div>
+                  )}
+                  <div className="flex items-stretch rounded-md border border-input shrink-0">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="h-8 rounded-r-none border-0 border-r border-input gap-1.5"
+                      onClick={handleExportMain}
+                    >
+                      <FileSpreadsheet className="h-4 w-4 shrink-0" />
+                      {t("doc.page.export")}
+                    </Button>
+                    <Popover open={exportOpen} onOpenChange={setExportOpen}>
+                      <PopoverTrigger asChild>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="icon"
+                          className="h-8 w-8 shrink-0 rounded-l-none border-0 shadow-none"
+                          aria-label={t("doc.list.exportOptionsAria")}
+                        >
+                          <ChevronDown className="h-4 w-4" />
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="!w-max min-w-0 p-1.5" align="end" side="top">
+                        <div className="flex flex-col gap-0.5">
+                          <button
+                            type="button"
+                            disabled={exportSelectedDisabled}
+                            className="w-full rounded-sm px-1.5 py-1 text-left text-sm hover:bg-accent disabled:cursor-not-allowed disabled:opacity-50"
+                            title={
+                              exportSelectedDisabled
+                                ? !isEditable
+                                  ? t("doc.list.exportSelectionEditModeOnly")
+                                  : t("doc.list.exportSelectLinesFirst")
+                                : undefined
+                            }
+                            onClick={() => {
+                              setExportOpen(false);
+                              if (!exportSelectedDisabled) handleExportSelected();
+                            }}
+                          >
+                            {t("doc.list.exportSelectedRows")}
+                          </button>
+                          <button
+                            type="button"
+                            className="w-full rounded-sm px-1.5 py-1 text-left text-sm hover:bg-accent"
+                            onClick={() => {
+                              setExportOpen(false);
+                              handleExportAll();
+                            }}
+                          >
+                            {t("doc.list.exportAllLines")}
+                          </button>
+                        </div>
+                      </PopoverContent>
+                    </Popover>
+                  </div>
+                </>
+              )}
+              {isEditable && (
                 <Button type="button" variant="outline" onClick={handleCancel}>
                   <X aria-hidden />
                   {t("common.cancel")}
@@ -1236,9 +1352,9 @@ export function PurchaseOrderPage() {
       }
       summary={null}
     >
+      <>
       {isEditable ? (
-        <>
-          <Card className="max-w-2xl border-0 shadow-none">
+        <Card className="max-w-2xl border-0 shadow-none">
             <CardHeader className="p-2 pb-0.5">
               <CardTitle className="text-[0.9rem] font-semibold">{t("doc.page.details")}</CardTitle>
             </CardHeader>
@@ -1332,12 +1448,113 @@ export function PurchaseOrderPage() {
                   />
                 </div>
               </div>
+
             </CardContent>
           </Card>
-          <div className="doc-lines mt-[calc(0.5rem+1cm)]">
-            <div className="doc-lines__header mb-1.5 max-w-2xl">
-              <h3 className="doc-lines__title">{t("doc.page.lines")}</h3>
-            </div>
+      ) : (
+        <Card className="max-w-2xl border-0 shadow-none">
+            <CardHeader className="p-2 pb-0.5">
+              <CardTitle className="text-[0.9rem] font-semibold">{t("doc.page.details")}</CardTitle>
+            </CardHeader>
+            <CardContent className="p-2 pt-1">
+              <dl className="doc-summary doc-summary--compact doc-summary--dense">
+                <div className="doc-summary__row">
+                  <dt className="doc-summary__term">{t("doc.columns.number")}</dt>
+                  <dd className="doc-summary__value">{doc!.number}</dd>
+                </div>
+                <div className="doc-summary__row">
+                  <dt className="doc-summary__term">{t("doc.columns.date")}</dt>
+                  <dd className="doc-summary__value">{normalizeDateForPO(doc!.date)}</dd>
+                </div>
+                <div className="doc-summary__row">
+                  <dt className="doc-summary__term">{t("doc.columns.supplier")}</dt>
+                  <dd className="doc-summary__value">{supplierName}</dd>
+                </div>
+                <div className="doc-summary__row">
+                  <dt className="doc-summary__term">{t("doc.columns.warehouse")}</dt>
+                  <dd className="doc-summary__value">{warehouseName}</dd>
+                </div>
+                <div className="doc-summary__row">
+                  <dt className="doc-summary__term">{t("doc.summary.paymentTerms")}</dt>
+                  <dd className="doc-summary__value">
+                    {doc!.paymentTermsDays !== undefined
+                      ? t("doc.summary.paymentTermsDays", { days: doc!.paymentTermsDays })
+                      : t("domain.audit.summary.emDash")}
+                  </dd>
+                </div>
+                <div className="doc-summary__row">
+                  <dt className="doc-summary__term">{t("doc.page.dueDate")}</dt>
+                  <dd className="doc-summary__value">
+                    {doc!.dueDate != null && doc!.dueDate !== ""
+                      ? doc!.dueDate
+                      : t("domain.audit.summary.emDash")}
+                  </dd>
+                </div>
+                {doc!.comment != null && doc!.comment !== "" && (
+                  <div className="doc-summary__row">
+                    <dt className="doc-summary__term">{t("doc.columns.comment")}</dt>
+                    <dd className="doc-summary__value">{doc!.comment}</dd>
+                  </div>
+                )}
+                {doc!.status === "cancelled" && doc!.cancelReasonCode != null && doc!.cancelReasonCode !== "" && (
+                  <>
+                    <div className="doc-summary__row">
+                      <dt className="doc-summary__term">{t("doc.summary.cancelReason")}</dt>
+                      <dd className="doc-summary__value">
+                        {translateCancelReason(t, doc!.cancelReasonCode as CancelDocumentReasonCode)}
+                      </dd>
+                    </div>
+                    {doc!.cancelReasonComment != null && doc!.cancelReasonComment !== "" && (
+                      <div className="doc-summary__row">
+                        <dt className="doc-summary__term">{t("doc.summary.cancelComment")}</dt>
+                        <dd className="doc-summary__value">{doc!.cancelReasonComment}</dd>
+                      </div>
+                    )}
+                  </>
+                )}
+              </dl>
+
+            </CardContent>
+          </Card>
+      )}
+      <div className="doc-po-working-area mt-4 max-w-full">
+        <div
+          className="mb-3 flex flex-wrap gap-1 border-b border-border"
+          role="tablist"
+          aria-label={t("doc.po.tabPanelsAria")}
+        >
+          <button
+            type="button"
+            role="tab"
+            aria-selected={poWorkingTab === "lines"}
+            className={cn(
+              "-mb-px border-b-2 px-3 py-2 text-sm font-medium transition-colors",
+              poWorkingTab === "lines"
+                ? "border-primary text-foreground"
+                : "border-transparent text-muted-foreground hover:text-foreground",
+            )}
+            onClick={() => setPoWorkingTab("lines")}
+          >
+            {t("doc.po.tabLines")}
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={poWorkingTab === "events"}
+            className={cn(
+              "-mb-px border-b-2 px-3 py-2 text-sm font-medium transition-colors",
+              poWorkingTab === "events"
+                ? "border-primary text-foreground"
+                : "border-transparent text-muted-foreground hover:text-foreground",
+            )}
+            onClick={() => setPoWorkingTab("events")}
+          >
+            {t("doc.po.tabEventLog")}
+          </button>
+        </div>
+        {poWorkingTab === "lines" && isEditable && (
+
+          <div className="doc-lines mt-0">
             {!isNew && poFulfillment ? (
               <div className="mb-2 max-w-4xl text-xs">
                 <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
@@ -1564,232 +1781,6 @@ export function PurchaseOrderPage() {
                   </div>
                 </CardContent>
               </Card>
-                <div className="flex flex-row items-center gap-2 shrink-0">
-                  {exportSuccess && (
-                    <div className="h-8 w-max flex items-center gap-1.5 rounded-md border border-input bg-background px-2 text-sm shrink-0">
-                      <span className="text-muted-foreground text-xs">{t("doc.list.exportCompleted")}</span>
-                      <span className="font-medium text-xs truncate max-w-[12rem]" title={exportSuccess.filename}>{exportSuccess.filename}</span>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon"
-                        className="h-7 w-7 shrink-0 text-muted-foreground hover:text-foreground"
-                        title={t("doc.list.openFile")}
-                        aria-label={t("doc.list.openFile")}
-                        onClick={async () => {
-                          const path = exportSuccess.path;
-                          console.log("[Export] Open file handler started", { path });
-                          try {
-                            await invoke("open_export_file", { path });
-                            console.log("[Export] Open file succeeded");
-                            setExportSuccess(null);
-                          } catch (err) {
-                            console.error("[Export] Open file failed", err);
-                            setExportSuccess(null);
-                          }
-                        }}
-                      >
-                        <File className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon"
-                        className="h-7 w-7 shrink-0 text-muted-foreground hover:text-foreground"
-                        title={t("doc.list.openFolder")}
-                        aria-label={t("doc.list.openFolder")}
-                        onClick={() => {
-                          revealItemInDir(exportSuccess.path);
-                          setExportSuccess(null);
-                        }}
-                      >
-                        <FolderOpen className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon"
-                        className="h-6 w-6 shrink-0 text-muted-foreground/80 hover:text-muted-foreground"
-                        title={t("doc.list.dismiss")}
-                        aria-label={t("doc.list.dismiss")}
-                        onClick={() => setExportSuccess(null)}
-                      >
-                        <X className="h-3 w-3" />
-                      </Button>
-                    </div>
-                  )}
-                  <div className="flex items-stretch rounded-md border border-input shrink-0">
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      className="h-8 rounded-r-none border-0 border-r border-input gap-1.5"
-                      onClick={handleExportMain}
-                    >
-                      <FileSpreadsheet className="h-4 w-4 shrink-0" />
-                      {t("doc.page.export")}
-                    </Button>
-                    <Popover open={exportOpen} onOpenChange={setExportOpen}>
-                      <PopoverTrigger asChild>
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="icon"
-                          className="h-8 w-8 shrink-0 rounded-l-none border-0 shadow-none"
-                          aria-label={t("doc.list.exportOptionsAria")}
-                        >
-                          <ChevronDown className="h-4 w-4" />
-                        </Button>
-                      </PopoverTrigger>
-                      <PopoverContent className="!w-max min-w-0 p-1.5" align="end" side="top">
-                        <div className="flex flex-col gap-0.5">
-                          <button
-                            type="button"
-                            disabled={exportSelectedDisabled}
-                            className="w-full rounded-sm px-1.5 py-1 text-left text-sm hover:bg-accent disabled:cursor-not-allowed disabled:opacity-50"
-                            title={
-                              exportSelectedDisabled
-                                ? !isEditable
-                                  ? t("doc.list.exportSelectionEditModeOnly")
-                                  : t("doc.list.exportSelectLinesFirst")
-                                : undefined
-                            }
-                            onClick={() => {
-                              setExportOpen(false);
-                              if (!exportSelectedDisabled) handleExportSelected();
-                            }}
-                          >
-                            {t("doc.list.exportSelectedRows")}
-                          </button>
-                          <button
-                            type="button"
-                            className="w-full rounded-sm px-1.5 py-1 text-left text-sm hover:bg-accent"
-                            onClick={() => {
-                              setExportOpen(false);
-                              handleExportAll();
-                            }}
-                          >
-                            {t("doc.list.exportAllLines")}
-                          </button>
-                        </div>
-                      </PopoverContent>
-                    </Popover>
-                  </div>
-                </div>
-              </div>
-            )}
-            {!isEditable && (
-              <div className="flex flex-row items-center justify-end gap-2 w-full mb-1.5">
-                {exportSuccess && (
-                  <div className="h-8 w-max flex items-center gap-1.5 rounded-md border border-input bg-background px-2 text-sm shrink-0">
-                    <span className="text-muted-foreground text-xs">{t("doc.list.exportCompleted")}</span>
-                    <span className="font-medium text-xs truncate max-w-[12rem]" title={exportSuccess.filename}>{exportSuccess.filename}</span>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      className="h-7 w-7 shrink-0 text-muted-foreground hover:text-foreground"
-                      title={t("doc.list.openFile")}
-                      aria-label={t("doc.list.openFile")}
-                      onClick={async () => {
-                        const path = exportSuccess.path;
-                        console.log("[Export] Open file handler started", { path });
-                        try {
-                          await invoke("open_export_file", { path });
-                          console.log("[Export] Open file succeeded");
-                          setExportSuccess(null);
-                        } catch (err) {
-                          console.error("[Export] Open file failed", err);
-                          setExportSuccess(null);
-                        }
-                      }}
-                    >
-                      <File className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      className="h-7 w-7 shrink-0 text-muted-foreground hover:text-foreground"
-                      title={t("doc.list.openFolder")}
-                      aria-label={t("doc.list.openFolder")}
-                      onClick={() => {
-                        revealItemInDir(exportSuccess.path);
-                        setExportSuccess(null);
-                      }}
-                    >
-                      <FolderOpen className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      className="h-6 w-6 shrink-0 text-muted-foreground/80 hover:text-muted-foreground"
-                      title={t("doc.list.dismiss")}
-                      aria-label={t("doc.list.dismiss")}
-                      onClick={() => setExportSuccess(null)}
-                    >
-                      <X className="h-3 w-3" />
-                    </Button>
-                  </div>
-                )}
-                <div className="flex items-stretch rounded-md border border-input shrink-0">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    className="h-8 rounded-r-none border-0 border-r border-input gap-1.5"
-                    onClick={handleExportMain}
-                  >
-                    <FileSpreadsheet className="h-4 w-4 shrink-0" />
-                    {t("doc.page.export")}
-                  </Button>
-                  <Popover open={exportOpen} onOpenChange={setExportOpen}>
-                    <PopoverTrigger asChild>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="icon"
-                        className="h-8 w-8 shrink-0 rounded-l-none border-0 shadow-none"
-                        aria-label={t("doc.list.exportOptionsAria")}
-                      >
-                        <ChevronDown className="h-4 w-4" />
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="!w-max min-w-0 p-1.5" align="end" side="top">
-                      <div className="flex flex-col gap-0.5">
-                        <button
-                          type="button"
-                          disabled={exportSelectedDisabled}
-                          className="w-full rounded-sm px-1.5 py-1 text-left text-sm hover:bg-accent disabled:cursor-not-allowed disabled:opacity-50"
-                          title={
-                            exportSelectedDisabled
-                              ? !isEditable
-                                ? t("doc.list.exportSelectionEditModeOnly")
-                                : t("doc.list.exportSelectLinesFirst")
-                              : undefined
-                          }
-                          onClick={() => {
-                            setExportOpen(false);
-                            if (!exportSelectedDisabled) handleExportSelected();
-                          }}
-                        >
-                          {t("doc.list.exportSelectedRows")}
-                        </button>
-                        <button
-                          type="button"
-                          className="w-full rounded-sm px-1.5 py-1 text-left text-sm hover:bg-accent"
-                          onClick={() => {
-                            setExportOpen(false);
-                            handleExportAll();
-                          }}
-                        >
-                          {t("doc.list.exportAllLines")}
-                        </button>
-                      </div>
-                    </PopoverContent>
-                  </Popover>
-                </div>
               </div>
             )}
             <div className="doc-lines__grid">
@@ -1819,74 +1810,10 @@ export function PurchaseOrderPage() {
               </div>
             )}
           </div>
-        </>
-      ) : (
-        <>
-          <Card className="max-w-2xl border-0 shadow-none">
-            <CardHeader className="p-2 pb-0.5">
-              <CardTitle className="text-[0.9rem] font-semibold">{t("doc.page.details")}</CardTitle>
-            </CardHeader>
-            <CardContent className="p-2 pt-1">
-              <dl className="doc-summary doc-summary--compact doc-summary--dense">
-                <div className="doc-summary__row">
-                  <dt className="doc-summary__term">{t("doc.columns.number")}</dt>
-                  <dd className="doc-summary__value">{doc!.number}</dd>
-                </div>
-                <div className="doc-summary__row">
-                  <dt className="doc-summary__term">{t("doc.columns.date")}</dt>
-                  <dd className="doc-summary__value">{normalizeDateForPO(doc!.date)}</dd>
-                </div>
-                <div className="doc-summary__row">
-                  <dt className="doc-summary__term">{t("doc.columns.supplier")}</dt>
-                  <dd className="doc-summary__value">{supplierName}</dd>
-                </div>
-                <div className="doc-summary__row">
-                  <dt className="doc-summary__term">{t("doc.columns.warehouse")}</dt>
-                  <dd className="doc-summary__value">{warehouseName}</dd>
-                </div>
-                <div className="doc-summary__row">
-                  <dt className="doc-summary__term">{t("doc.summary.paymentTerms")}</dt>
-                  <dd className="doc-summary__value">
-                    {doc!.paymentTermsDays !== undefined
-                      ? t("doc.summary.paymentTermsDays", { days: doc!.paymentTermsDays })
-                      : t("domain.audit.summary.emDash")}
-                  </dd>
-                </div>
-                <div className="doc-summary__row">
-                  <dt className="doc-summary__term">{t("doc.page.dueDate")}</dt>
-                  <dd className="doc-summary__value">
-                    {doc!.dueDate != null && doc!.dueDate !== ""
-                      ? doc!.dueDate
-                      : t("domain.audit.summary.emDash")}
-                  </dd>
-                </div>
-                {doc!.comment != null && doc!.comment !== "" && (
-                  <div className="doc-summary__row">
-                    <dt className="doc-summary__term">{t("doc.columns.comment")}</dt>
-                    <dd className="doc-summary__value">{doc!.comment}</dd>
-                  </div>
-                )}
-                {doc!.status === "cancelled" && doc!.cancelReasonCode != null && doc!.cancelReasonCode !== "" && (
-                  <>
-                    <div className="doc-summary__row">
-                      <dt className="doc-summary__term">{t("doc.summary.cancelReason")}</dt>
-                      <dd className="doc-summary__value">
-                        {translateCancelReason(t, doc!.cancelReasonCode as CancelDocumentReasonCode)}
-                      </dd>
-                    </div>
-                    {doc!.cancelReasonComment != null && doc!.cancelReasonComment !== "" && (
-                      <div className="doc-summary__row">
-                        <dt className="doc-summary__term">{t("doc.summary.cancelComment")}</dt>
-                        <dd className="doc-summary__value">{doc!.cancelReasonComment}</dd>
-                      </div>
-                    )}
-                  </>
-                )}
-              </dl>
-            </CardContent>
-          </Card>
-          <div className="doc-lines mt-[calc(0.5rem+1cm)]">
-            <h3 className="doc-lines__title">{t("doc.page.lines")}</h3>
+        )}
+        {poWorkingTab === "lines" && !isEditable && (
+
+          <div className="doc-lines mt-0">
             {poFulfillment ? (
               <div className="mb-2 max-w-4xl text-xs">
                 <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
@@ -1946,8 +1873,21 @@ export function PurchaseOrderPage() {
               </>
             )}
           </div>
-        </>
-      )}
+        )}
+        {poWorkingTab === "events" && (
+          <div className="doc-po-tab-panel doc-po-tab-panel--events">
+            {isNew ? (
+              <p className="text-sm text-muted-foreground">{t("doc.po.tabSaveDocumentFirst")}</p>
+            ) : showDocumentEventLogSection && id ? (
+              <DocumentEventLogSection entityType="purchase_order" entityId={id} refresh={refresh} />
+            ) : (
+              <p className="text-sm text-muted-foreground">{t("doc.po.tabEventLogDisabled")}</p>
+            )}
+          </div>
+        )}
+      </div>
+      </>
+
       <DocumentLineImportModal
         open={isLineImportModalOpen}
         initialTab={lineImportInitialTab}
@@ -1966,9 +1906,6 @@ export function PurchaseOrderPage() {
         onOpenChange={setIsLineImportModalOpen}
         onApply={handleApplyImportedLines}
       />
-      {!isNew && id && showDocumentEventLogSection ? (
-        <DocumentEventLogSection entityType="purchase_order" entityId={id} refresh={refresh} />
-      ) : null}
       <CancelDocumentReasonDialog
         open={cancelReasonDialogOpen}
         onOpenChange={setCancelReasonDialogOpen}

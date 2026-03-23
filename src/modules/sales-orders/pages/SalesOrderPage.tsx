@@ -23,6 +23,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { SelectField } from "@/components/ui/select-field";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import {
   agGridDefaultColDef,
   agGridDefaultGridOptions,
@@ -31,6 +32,7 @@ import {
 import { todayYYYYMMDD, normalizeDateForSO } from "../dateUtils";
 import { usePlanningDocumentHotkeys } from "../../../shared/hotkeys";
 import {
+  getCommercialMoneyDecimalPlaces,
   lineAmountMoney,
   roundMoney,
   sumPlanningDocumentLineAmounts,
@@ -49,6 +51,9 @@ import {
 } from "../../../shared/issues";
 import { DocumentIssueStrip } from "../../../shared/ui/feedback/DocumentIssueStrip";
 import { SalesOrderItemAutocomplete, type SalesOrderItemAutocompleteRef } from "../components/SalesOrderItemAutocomplete";
+import { SalesOrderFinanceSection } from "../components/SalesOrderFinanceSection";
+import { deriveSalesOrderPaymentSummary } from "../salesOrderFinance";
+import { salesOrderPaymentRepository } from "../salesOrderPaymentRepository";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
   DocumentLineImportModal,
@@ -573,7 +578,10 @@ export function SalesOrderPage() {
 
   const salesOrderPrintMenuItems = useMemo(() => {
     if (!id || !canOpenPreliminaryCustomerDoc) return [];
-    return [{ to: `/sales-orders/${id}/customer-document`, label: t("doc.customerDocument.preliminaryTitle") }];
+    return [
+      { to: `/sales-orders/${id}/customer-document`, label: t("doc.customerDocument.preliminaryTitle") },
+      { to: `/sales-orders/${id}/customer-invoice`, label: t("finance.openCustomerInvoiceShort") },
+    ];
   }, [id, canOpenPreliminaryCustomerDoc, t, locale]);
 
   const nextLineIdRef = useRef(0);
@@ -595,6 +603,7 @@ export function SalesOrderPage() {
   const [lineImportInitialTab, setLineImportInitialTab] = useState<LineImportTab>("paste");
   const [exportSuccess, setExportSuccess] = useState<{ path: string; filename: string } | null>(null);
   const [exportOpen, setExportOpen] = useState(false);
+  const [soWorkingTab, setSoWorkingTab] = useState<"lines" | "payments" | "events">("lines");
   const linesGridRef = useRef<AgGridReact<LineFormRow> | null>(null);
   const lineEntryItemPickerRef = useRef<SalesOrderItemAutocompleteRef | null>(null);
   const lineEntryQtyInputRef = useRef<HTMLInputElement | null>(null);
@@ -1145,6 +1154,23 @@ export function SalesOrderPage() {
     return { totalQty, totalAmount };
   }, [lines]);
 
+  const soDetailsPaymentSummary = useMemo(() => {
+    const totalAmount = isEditable ? totals.totalAmount : readonlyTotals.totalAmount;
+    const payments = !isNew && id ? salesOrderPaymentRepository.listBySalesOrderId(id) : [];
+    return deriveSalesOrderPaymentSummary(totalAmount, payments);
+  }, [isEditable, totals.totalAmount, readonlyTotals.totalAmount, isNew, id, refresh]);
+
+  const paymentStatusDetailClass = useMemo(() => {
+    switch (soDetailsPaymentSummary.status) {
+      case "paid":
+        return "text-emerald-600 dark:text-emerald-500";
+      case "partially_paid":
+        return "text-amber-600 dark:text-amber-500";
+      default:
+        return "text-muted-foreground";
+    }
+  }, [soDetailsPaymentSummary.status]);
+
   const health = useMemo(
     () =>
       getSalesOrderHealth({
@@ -1465,6 +1491,124 @@ export function SalesOrderPage() {
                   {t("doc.page.cancelDocument")}
                 </Button>
               )}
+              {!isNew && (
+                <>
+                  <DocumentPrintActionsMenu
+                    items={salesOrderPrintMenuItems}
+                    triggerLabel={t("doc.page.print")}
+                    aria-label={t("doc.page.printMenuAria")}
+                  />
+                  {exportSuccess && (
+                    <div className="h-8 w-max flex max-w-[min(100%,20rem)] items-center gap-1.5 rounded-md border border-input bg-background px-2 text-sm shrink-0">
+                      <span className="text-muted-foreground text-xs">{t("doc.list.exportCompleted")}</span>
+                      <span className="font-medium text-xs truncate max-w-[12rem]" title={exportSuccess.filename}>
+                        {exportSuccess.filename}
+                      </span>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        className="h-7 w-7 shrink-0 text-muted-foreground hover:text-foreground"
+                        title={t("doc.list.openFile")}
+                        aria-label={t("doc.list.openFile")}
+                        onClick={async () => {
+                          try {
+                            await invoke("open_export_file", { path: exportSuccess.path });
+                            setExportSuccess(null);
+                          } catch (err) {
+                            console.error("Export failed", err);
+                            setExportSuccess(null);
+                          }
+                        }}
+                      >
+                        <File className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        className="h-7 w-7 shrink-0 text-muted-foreground hover:text-foreground"
+                        title={t("doc.list.openFolder")}
+                        aria-label={t("doc.list.openFolder")}
+                        onClick={() => {
+                          revealItemInDir(exportSuccess.path);
+                          setExportSuccess(null);
+                        }}
+                      >
+                        <FolderOpen className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        className="h-6 w-6 shrink-0 text-muted-foreground/80 hover:text-muted-foreground"
+                        title={t("doc.list.dismiss")}
+                        aria-label={t("doc.list.dismiss")}
+                        onClick={() => setExportSuccess(null)}
+                      >
+                        <X className="h-3 w-3" />
+                      </Button>
+                    </div>
+                  )}
+                  <div className="flex items-stretch rounded-md border border-input shrink-0">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="h-8 rounded-r-none border-0 border-r border-input gap-1.5"
+                      onClick={handleExportMain}
+                    >
+                      <FileSpreadsheet className="h-4 w-4 shrink-0" />
+                      {t("doc.page.export")}
+                    </Button>
+                    <Popover open={exportOpen} onOpenChange={setExportOpen}>
+                      <PopoverTrigger asChild>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="icon"
+                          className="h-8 w-8 shrink-0 rounded-l-none border-0 shadow-none"
+                          aria-label={t("doc.list.exportOptionsAria")}
+                        >
+                          <ChevronDown className="h-4 w-4" />
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="!w-max min-w-0 p-1.5" align="end" side="top">
+                        <div className="flex flex-col gap-0.5">
+                          <button
+                            type="button"
+                            disabled={exportSelectedDisabled}
+                            className="w-full rounded-sm px-1.5 py-1 text-left text-sm hover:bg-accent disabled:cursor-not-allowed disabled:opacity-50"
+                            title={
+                              exportSelectedDisabled
+                                ? !isEditable
+                                  ? t("doc.list.exportSelectionEditModeOnly")
+                                  : t("doc.list.exportSelectLinesFirst")
+                                : undefined
+                            }
+                            onClick={() => {
+                              setExportOpen(false);
+                              if (!exportSelectedDisabled) handleExportSelected();
+                            }}
+                          >
+                            {t("doc.list.exportSelectedRows")}
+                          </button>
+                          <button
+                            type="button"
+                            className="w-full rounded-sm px-1.5 py-1 text-left text-sm hover:bg-accent"
+                            onClick={() => {
+                              setExportOpen(false);
+                              handleExportAll();
+                            }}
+                          >
+                            {t("doc.list.exportAllLines")}
+                          </button>
+                        </div>
+                      </PopoverContent>
+                    </Popover>
+                  </div>
+                </>
+              )}
               {isEditable && (
                 <Button type="button" variant="outline" onClick={handleCancel}>
                   <X aria-hidden />
@@ -1479,188 +1623,512 @@ export function SalesOrderPage() {
     >
       {isEditable ? (
         <>
-          <Card className="max-w-2xl border-0 shadow-none">
+          <Card className="w-full max-w-6xl border-0 shadow-none">
             <CardHeader className="p-2 pb-0.5">
               <CardTitle className="text-[0.9rem] font-semibold">{t("doc.page.details")}</CardTitle>
             </CardHeader>
             <CardContent className="p-2 pt-1">
-              <div className="grid w-fit grid-cols-[280px_280px] gap-x-2 gap-y-1">
-                <div className="flex min-w-0 w-full flex-col gap-0.5">
-                  <Label htmlFor="so-number" className="text-sm">{t("doc.columns.number")}</Label>
-                  <div id="so-number" className="flex h-8 items-center text-sm text-muted-foreground">
-                    {displayNumber}
-                  </div>
+              <div className="grid gap-4 lg:grid-cols-2 lg:items-start lg:gap-8">
+                <div className="flex min-w-0 flex-col gap-4">
+                  <section className="min-w-0" aria-labelledby="so-details-doc-heading">
+                    <h3
+                      id="so-details-doc-heading"
+                      className="mb-2 text-[0.7rem] font-semibold uppercase tracking-wide text-muted-foreground"
+                    >
+                      {t("doc.so.sectionDocument")}
+                    </h3>
+                    <div className="grid grid-cols-1 gap-x-4 gap-y-2 sm:grid-cols-2">
+                      <div className="flex min-w-0 flex-col gap-0.5">
+                        <Label htmlFor="so-number" className="text-sm">
+                          {t("doc.columns.number")}
+                        </Label>
+                        <div id="so-number" className="flex h-8 items-center text-sm text-muted-foreground">
+                          {displayNumber}
+                        </div>
+                      </div>
+                      <div className="flex min-w-0 flex-col gap-0.5">
+                        <Label htmlFor="so-date" className="text-sm">
+                          {t("doc.columns.date")} <span className="text-destructive">*</span>
+                        </Label>
+                        <DatePickerField
+                          id="so-date"
+                          value={form.date}
+                          onChange={(v) => setForm((f) => ({ ...f, date: v }))}
+                          className="h-8 w-full min-w-0 [&_input]:text-sm"
+                        />
+                      </div>
+                      {doc ? (
+                        <div className="flex min-w-0 flex-col gap-0.5 sm:col-span-2">
+                          <span className="text-sm text-muted-foreground">{t("doc.columns.status")}</span>
+                          <div className="flex min-h-[2rem] items-center">
+                            <StatusBadge status={doc.status} />
+                          </div>
+                        </div>
+                      ) : null}
+                      <div className="flex min-w-0 flex-col gap-0.5">
+                        <Label htmlFor="so-customer" className="text-sm">
+                          {t("doc.columns.customer")} <span className="text-destructive">*</span>
+                        </Label>
+                        <SelectField
+                          id="so-customer"
+                          value={form.customerId}
+                          onChange={(customerId) => setForm((f) => ({ ...f, customerId }))}
+                          options={activeCustomers.map((c) => ({
+                            value: c.id,
+                            label: `${c.code} - ${c.name}`,
+                          }))}
+                          placeholder={t("doc.page.selectCustomer")}
+                          className="w-full min-w-0"
+                        />
+                      </div>
+                      <div className="flex min-w-0 flex-col gap-0.5">
+                        <Label htmlFor="so-warehouse" className="text-sm">
+                          {t("doc.columns.warehouse")} <span className="text-destructive">*</span>
+                        </Label>
+                        <SelectField
+                          id="so-warehouse"
+                          value={form.warehouseId}
+                          onChange={(warehouseId) => setForm((f) => ({ ...f, warehouseId }))}
+                          options={activeWarehouses.map((w) => ({
+                            value: w.id,
+                            label: `${w.code} - ${w.name}`,
+                          }))}
+                          placeholder={t("doc.page.selectWarehouse")}
+                          className="w-full min-w-0"
+                        />
+                      </div>
+                    </div>
+                  </section>
+                  <section className="min-w-0" aria-labelledby="so-details-delivery-heading">
+                    <h3
+                      id="so-details-delivery-heading"
+                      className="mb-2 text-[0.7rem] font-semibold uppercase tracking-wide text-muted-foreground"
+                    >
+                      {t("doc.so.sectionDelivery")}
+                    </h3>
+                    <div className="flex flex-col gap-3">
+                      <div className="flex min-w-0 flex-col gap-0.5">
+                        <Label htmlFor="so-carrier" className="text-sm">
+                          {t("doc.so.carrier")}
+                        </Label>
+                        <select
+                          id="so-carrier"
+                          className={cn(
+                            "flex h-8 w-full max-w-full rounded-md border border-input bg-background px-3 py-1 text-sm text-foreground",
+                          )}
+                          value={form.carrierId}
+                          onChange={(e) => setForm((f) => ({ ...f, carrierId: e.target.value }))}
+                          aria-label={t("doc.so.carrier")}
+                        >
+                          <option value="">{t("doc.shipment.carrierNotSet")}</option>
+                          {carrierSelectOptions.map((c) => (
+                            <option key={c.id} value={c.id}>
+                              {c.name} · {translateCarrierType(t, c.carrierType)}
+                            </option>
+                          ))}
+                        </select>
+                        <p className="text-xs text-muted-foreground m-0 leading-snug">{t("doc.so.carrierHint")}</p>
+                      </div>
+                      <p className="text-xs text-muted-foreground m-0 leading-snug">{t("doc.so.deliveryHint")}</p>
+                      <div className="grid grid-cols-1 gap-x-4 gap-y-2 sm:grid-cols-2">
+                        <div className="flex min-w-0 flex-col gap-0.5">
+                          <Label htmlFor="so-recipient-name" className="text-sm">
+                            {t("doc.shipment.recipientName")}
+                          </Label>
+                          <Input
+                            id="so-recipient-name"
+                            type="text"
+                            value={form.recipientName}
+                            onChange={(e) => setForm((f) => ({ ...f, recipientName: e.target.value }))}
+                            placeholder={t("doc.shipment.recipientNamePlaceholder")}
+                            className="h-8 text-sm"
+                            autoComplete="name"
+                          />
+                        </div>
+                        <div className="flex min-w-0 flex-col gap-0.5">
+                          <Label htmlFor="so-recipient-phone" className="text-sm">
+                            {t("doc.shipment.recipientPhone")}
+                          </Label>
+                          <Input
+                            id="so-recipient-phone"
+                            type="text"
+                            value={form.recipientPhone}
+                            onChange={(e) => setForm((f) => ({ ...f, recipientPhone: e.target.value }))}
+                            placeholder={t("doc.shipment.recipientPhonePlaceholder")}
+                            className="h-8 text-sm"
+                            autoComplete="tel"
+                          />
+                        </div>
+                      </div>
+                      <div className="flex min-w-0 flex-col gap-0.5">
+                        <Label htmlFor="so-delivery-address" className="text-sm">
+                          {t("doc.shipment.deliveryAddress")}
+                        </Label>
+                        <Textarea
+                          id="so-delivery-address"
+                          value={form.deliveryAddress}
+                          onChange={(e) => setForm((f) => ({ ...f, deliveryAddress: e.target.value }))}
+                          placeholder={t("doc.shipment.deliveryAddressPlaceholder")}
+                          rows={2}
+                          className="min-h-[2.5rem] resize-y text-sm"
+                        />
+                      </div>
+                      <div className="flex min-w-0 flex-col gap-0.5">
+                        <Label htmlFor="so-delivery-comment" className="text-sm">
+                          {t("doc.shipment.deliveryComment")}
+                        </Label>
+                        <Textarea
+                          id="so-delivery-comment"
+                          value={form.deliveryComment}
+                          onChange={(e) => setForm((f) => ({ ...f, deliveryComment: e.target.value }))}
+                          placeholder={t("doc.shipment.deliveryCommentPlaceholder")}
+                          rows={2}
+                          className="min-h-[2.5rem] resize-y text-sm"
+                        />
+                      </div>
+                    </div>
+                  </section>
                 </div>
-                <div className="flex min-w-0 w-full flex-col gap-0.5">
-                  <Label htmlFor="so-date" className="text-sm">
-                    {t("doc.columns.date")} <span className="text-destructive">*</span>
-                  </Label>
-                  <DatePickerField
-                    id="so-date"
-                    value={form.date}
-                    onChange={(v) => setForm((f) => ({ ...f, date: v }))}
-                    className="h-8 w-full min-w-0 [&_input]:text-sm"
-                  />
-                </div>
-                <div className="flex min-w-0 w-full flex-col gap-0.5">
-                  <Label htmlFor="so-customer" className="text-sm">
-                    {t("doc.columns.customer")} <span className="text-destructive">*</span>
-                  </Label>
-                  <SelectField
-                    id="so-customer"
-                    value={form.customerId}
-                    onChange={(customerId) =>
-                      setForm((f) => ({ ...f, customerId }))
-                    }
-                    options={activeCustomers.map((c) => ({
-                      value: c.id,
-                      label: `${c.code} - ${c.name}`,
-                    }))}
-                    placeholder={t("doc.page.selectCustomer")}
-                    className="w-full min-w-0"
-                  />
-                </div>
-                <div className="flex min-w-0 w-full flex-col gap-0.5">
-                  <Label htmlFor="so-warehouse" className="text-sm">
-                    {t("doc.columns.warehouse")} <span className="text-destructive">*</span>
-                  </Label>
-                  <SelectField
-                    id="so-warehouse"
-                    value={form.warehouseId}
-                    onChange={(warehouseId) =>
-                      setForm((f) => ({ ...f, warehouseId }))
-                    }
-                    options={activeWarehouses.map((w) => ({
-                      value: w.id,
-                      label: `${w.code} - ${w.name}`,
-                    }))}
-                    placeholder={t("doc.page.selectWarehouse")}
-                    className="w-full min-w-0"
-                  />
-                </div>
-                <div className="col-span-2 flex min-w-0 w-full max-w-[min(100%,36rem)] flex-col gap-0.5">
-                  <Label htmlFor="so-carrier" className="text-sm">
-                    {t("doc.so.carrier")}
-                  </Label>
-                  <select
-                    id="so-carrier"
-                    className={cn(
-                      "flex h-8 w-full max-w-md rounded-md border border-input bg-background px-3 py-1 text-sm text-foreground",
-                    )}
-                    value={form.carrierId}
-                    onChange={(e) => setForm((f) => ({ ...f, carrierId: e.target.value }))}
-                    aria-label={t("doc.so.carrier")}
-                  >
-                    <option value="">{t("doc.shipment.carrierNotSet")}</option>
-                    {carrierSelectOptions.map((c) => (
-                      <option key={c.id} value={c.id}>
-                        {c.name} · {translateCarrierType(t, c.carrierType)}
-                      </option>
-                    ))}
-                  </select>
-                  <p className="text-xs text-muted-foreground m-0 leading-snug">
-                    {t("doc.so.carrierHint")}
-                  </p>
-                </div>
-                <div className="col-span-2 flex min-w-0 w-full max-w-[min(100%,36rem)] flex-col gap-0.5">
-                  <p className="text-xs text-muted-foreground m-0 leading-snug">{t("doc.so.deliveryHint")}</p>
-                </div>
-                <div className="flex min-w-0 w-full flex-col gap-0.5">
-                  <Label htmlFor="so-recipient-name" className="text-sm">
-                    {t("doc.shipment.recipientName")}
-                  </Label>
-                  <Input
-                    id="so-recipient-name"
-                    type="text"
-                    value={form.recipientName}
-                    onChange={(e) => setForm((f) => ({ ...f, recipientName: e.target.value }))}
-                    placeholder={t("doc.shipment.recipientNamePlaceholder")}
-                    className="h-8 text-sm"
-                    autoComplete="name"
-                  />
-                </div>
-                <div className="flex min-w-0 w-full flex-col gap-0.5">
-                  <Label htmlFor="so-recipient-phone" className="text-sm">
-                    {t("doc.shipment.recipientPhone")}
-                  </Label>
-                  <Input
-                    id="so-recipient-phone"
-                    type="text"
-                    value={form.recipientPhone}
-                    onChange={(e) => setForm((f) => ({ ...f, recipientPhone: e.target.value }))}
-                    placeholder={t("doc.shipment.recipientPhonePlaceholder")}
-                    className="h-8 text-sm"
-                    autoComplete="tel"
-                  />
-                </div>
-                <div className="col-span-2 flex min-w-0 w-full max-w-[min(100%,36rem)] flex-col gap-0.5">
-                  <Label htmlFor="so-delivery-address" className="text-sm">
-                    {t("doc.shipment.deliveryAddress")}
-                  </Label>
-                  <Textarea
-                    id="so-delivery-address"
-                    value={form.deliveryAddress}
-                    onChange={(e) => setForm((f) => ({ ...f, deliveryAddress: e.target.value }))}
-                    placeholder={t("doc.shipment.deliveryAddressPlaceholder")}
-                    rows={2}
-                    className="min-h-[2.5rem] resize-y text-sm"
-                  />
-                </div>
-                <div className="col-span-2 flex min-w-0 w-full max-w-[min(100%,36rem)] flex-col gap-0.5">
-                  <Label htmlFor="so-delivery-comment" className="text-sm">
-                    {t("doc.shipment.deliveryComment")}
-                  </Label>
-                  <Textarea
-                    id="so-delivery-comment"
-                    value={form.deliveryComment}
-                    onChange={(e) => setForm((f) => ({ ...f, deliveryComment: e.target.value }))}
-                    placeholder={t("doc.shipment.deliveryCommentPlaceholder")}
-                    rows={2}
-                    className="min-h-[2.5rem] resize-y text-sm"
-                  />
-                </div>
-                <div className="flex min-w-0 w-full flex-col gap-0.5">
-                  <Label htmlFor="so-payment-terms" className="text-sm">
-                    {t("doc.page.paymentTermsDaysLabel")}
-                  </Label>
-                  <Input
-                    id="so-payment-terms"
-                    type="number"
-                    min={0}
-                    step={1}
-                    value={form.paymentTermsDays}
-                    onChange={(e) => setForm((f) => ({ ...f, paymentTermsDays: e.target.value }))}
-                    placeholder={t("doc.page.paymentTermsInputPlaceholderCustomer")}
-                    className="h-8 text-sm"
-                  />
-                </div>
-                <div className="flex min-w-0 w-full flex-col gap-0.5">
-                  <span className="text-sm text-muted-foreground">{t("doc.page.dueDate")}</span>
-                  <div className="flex h-8 items-center text-sm text-foreground/90 tabular-nums">
-                    {computedDueDateDisplay}
-                  </div>
-                </div>
-                <div className="col-span-2 flex flex-col gap-0.5">
-                  <Label htmlFor="so-comment" className="text-sm">{t("doc.columns.comment")}</Label>
-                  <Input
-                    id="so-comment"
-                    type="text"
-                    value={form.comment}
-                    onChange={(e) =>
-                      setForm((f) => ({ ...f, comment: e.target.value }))
-                    }
-                    placeholder={t("common.optional")}
-                    className="h-8 text-sm"
-                  />
+                <div className="flex min-w-0 flex-col gap-4">
+                  <section className="min-w-0" aria-labelledby="so-details-commercial-heading">
+                    <h3
+                      id="so-details-commercial-heading"
+                      className="mb-2 text-[0.7rem] font-semibold uppercase tracking-wide text-muted-foreground"
+                    >
+                      {t("doc.so.sectionCommercial")}
+                    </h3>
+                    <div className="grid grid-cols-1 gap-x-4 gap-y-2 sm:grid-cols-2">
+                      <div className="flex min-w-0 flex-col gap-0.5">
+                        <Label htmlFor="so-payment-terms" className="text-sm">
+                          {t("doc.page.paymentTermsDaysLabel")}
+                        </Label>
+                        <Input
+                          id="so-payment-terms"
+                          type="number"
+                          min={0}
+                          step={1}
+                          value={form.paymentTermsDays}
+                          onChange={(e) => setForm((f) => ({ ...f, paymentTermsDays: e.target.value }))}
+                          placeholder={t("doc.page.paymentTermsInputPlaceholderCustomer")}
+                          className="h-8 text-sm"
+                        />
+                      </div>
+                      <div className="flex min-w-0 flex-col gap-0.5">
+                        <span className="text-sm text-muted-foreground">{t("doc.page.dueDate")}</span>
+                        <div className="flex h-8 items-center text-sm text-foreground/90 tabular-nums">
+                          {computedDueDateDisplay}
+                        </div>
+                      </div>
+                    </div>
+                    <div className="mt-3 space-y-2 rounded-md border border-border/60 bg-muted/20 px-3 py-2.5">
+                      <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
+                        <span className="text-sm text-muted-foreground">{t("finance.orderTotal")}</span>
+                        <span className="text-base font-semibold tabular-nums text-foreground">
+                          {roundMoney(soDetailsPaymentSummary.totalAmount).toFixed(getCommercialMoneyDecimalPlaces())}
+                        </span>
+                      </div>
+                      <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
+                        <span className="text-sm text-muted-foreground">{t("finance.paidTotal")}</span>
+                        <span className="text-sm font-medium tabular-nums text-foreground">
+                          {roundMoney(soDetailsPaymentSummary.paidAmount).toFixed(getCommercialMoneyDecimalPlaces())}
+                        </span>
+                      </div>
+                      <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
+                        <span className="text-sm text-muted-foreground">{t("finance.remaining")}</span>
+                        <span className="text-sm font-medium tabular-nums text-foreground">
+                          {roundMoney(soDetailsPaymentSummary.remainingAmount).toFixed(getCommercialMoneyDecimalPlaces())}
+                        </span>
+                      </div>
+                      <div className="flex flex-wrap items-center justify-between gap-2 border-t border-border/50 pt-2">
+                        <span className="text-sm text-muted-foreground">{t("finance.paymentStatusLabel")}</span>
+                        <Badge variant="outline" className={cn("font-medium", paymentStatusDetailClass)}>
+                          {t(`finance.paymentStatus.${soDetailsPaymentSummary.status}`)}
+                        </Badge>
+                      </div>
+                    </div>
+                  </section>
+                  <section className="min-w-0" aria-labelledby="so-details-notes-heading">
+                    <h3
+                      id="so-details-notes-heading"
+                      className="mb-2 text-[0.7rem] font-semibold uppercase tracking-wide text-muted-foreground"
+                    >
+                      {t("doc.so.sectionNotes")}
+                    </h3>
+                    <Label htmlFor="so-comment" className="sr-only">
+                      {t("doc.columns.comment")}
+                    </Label>
+                    <Textarea
+                      id="so-comment"
+                      value={form.comment}
+                      onChange={(e) => setForm((f) => ({ ...f, comment: e.target.value }))}
+                      placeholder={t("common.optional")}
+                      rows={3}
+                      className="min-h-[4.5rem] resize-y text-sm"
+                    />
+                  </section>
                 </div>
               </div>
             </CardContent>
           </Card>
-          <div className="doc-lines mt-[calc(0.5rem+1cm)]">
-            <div className="doc-lines__header mb-1.5 max-w-2xl">
-              <h3 className="doc-lines__title">{t("doc.page.lines")}</h3>
-            </div>
-            {!isNew && soFulfillment ? (
+        </>
+      ) : (
+        <>
+          <Card className="w-full max-w-6xl border-0 shadow-none">
+            <CardHeader className="p-2 pb-0.5">
+              <CardTitle className="text-[0.9rem] font-semibold">{t("doc.page.details")}</CardTitle>
+            </CardHeader>
+            <CardContent className="p-2 pt-1">
+              <div className="grid gap-4 lg:grid-cols-2 lg:items-start lg:gap-8">
+                <div className="flex min-w-0 flex-col gap-4">
+                  <section className="min-w-0" aria-labelledby="so-ro-details-doc-heading">
+                    <h3
+                      id="so-ro-details-doc-heading"
+                      className="mb-2 text-[0.7rem] font-semibold uppercase tracking-wide text-muted-foreground"
+                    >
+                      {t("doc.so.sectionDocument")}
+                    </h3>
+                    <dl className="doc-summary doc-summary--compact doc-summary--dense">
+                      <div className="doc-summary__row">
+                        <dt className="doc-summary__term">{t("doc.columns.number")}</dt>
+                        <dd className="doc-summary__value font-medium">{doc!.number}</dd>
+                      </div>
+                      <div className="doc-summary__row">
+                        <dt className="doc-summary__term">{t("doc.columns.date")}</dt>
+                        <dd className="doc-summary__value">{normalizeDateForSO(doc!.date)}</dd>
+                      </div>
+                      <div className="doc-summary__row">
+                        <dt className="doc-summary__term">{t("doc.columns.status")}</dt>
+                        <dd className="doc-summary__value">
+                          <StatusBadge status={doc!.status} />
+                        </dd>
+                      </div>
+                      <div className="doc-summary__row">
+                        <dt className="doc-summary__term">{t("doc.columns.customer")}</dt>
+                        <dd className="doc-summary__value">{customerName}</dd>
+                      </div>
+                      <div className="doc-summary__row">
+                        <dt className="doc-summary__term">{t("doc.columns.warehouse")}</dt>
+                        <dd className="doc-summary__value">{warehouseName}</dd>
+                      </div>
+                    </dl>
+                  </section>
+                  <section className="min-w-0" aria-labelledby="so-ro-details-delivery-heading">
+                    <h3
+                      id="so-ro-details-delivery-heading"
+                      className="mb-2 text-[0.7rem] font-semibold uppercase tracking-wide text-muted-foreground"
+                    >
+                      {t("doc.so.sectionDelivery")}
+                    </h3>
+                    <dl className="doc-summary doc-summary--compact doc-summary--dense">
+                      <div className="doc-summary__row">
+                        <dt className="doc-summary__term">{t("doc.so.carrier")}</dt>
+                        <dd className="doc-summary__value">{carrierReadOnlyLabel}</dd>
+                      </div>
+                      <div className="doc-summary__row">
+                        <dt className="doc-summary__term">{t("doc.shipment.recipientName")}</dt>
+                        <dd className="doc-summary__value">
+                          {doc!.recipientName?.trim()
+                            ? doc!.recipientName.trim()
+                            : emDashSummary}
+                        </dd>
+                      </div>
+                      <div className="doc-summary__row">
+                        <dt className="doc-summary__term">{t("doc.shipment.recipientPhone")}</dt>
+                        <dd className="doc-summary__value">
+                          {doc!.recipientPhone?.trim()
+                            ? doc!.recipientPhone.trim()
+                            : emDashSummary}
+                        </dd>
+                      </div>
+                      <div className="doc-summary__row">
+                        <dt className="doc-summary__term">{t("doc.shipment.deliveryAddress")}</dt>
+                        <dd className="doc-summary__value whitespace-pre-wrap text-sm leading-snug">
+                          {doc!.deliveryAddress?.trim()
+                            ? doc!.deliveryAddress.trim()
+                            : emDashSummary}
+                        </dd>
+                      </div>
+                      <div className="doc-summary__row">
+                        <dt className="doc-summary__term">{t("doc.shipment.deliveryComment")}</dt>
+                        <dd className="doc-summary__value whitespace-pre-wrap text-sm leading-snug">
+                          {doc!.deliveryComment?.trim()
+                            ? doc!.deliveryComment.trim()
+                            : emDashSummary}
+                        </dd>
+                      </div>
+                    </dl>
+                  </section>
+                </div>
+                <div className="flex min-w-0 flex-col gap-4">
+                  <section className="min-w-0" aria-labelledby="so-ro-details-commercial-heading">
+                    <h3
+                      id="so-ro-details-commercial-heading"
+                      className="mb-2 text-[0.7rem] font-semibold uppercase tracking-wide text-muted-foreground"
+                    >
+                      {t("doc.so.sectionCommercial")}
+                    </h3>
+                    <dl className="doc-summary doc-summary--compact doc-summary--dense">
+                      <div className="doc-summary__row">
+                        <dt className="doc-summary__term">{t("doc.summary.paymentTerms")}</dt>
+                        <dd className="doc-summary__value">
+                          {doc!.paymentTermsDays !== undefined
+                            ? t("doc.summary.paymentTermsDays", { days: doc!.paymentTermsDays })
+                            : t("domain.audit.summary.emDash")}
+                        </dd>
+                      </div>
+                      <div className="doc-summary__row">
+                        <dt className="doc-summary__term">{t("doc.page.dueDate")}</dt>
+                        <dd className="doc-summary__value">
+                          {doc!.dueDate != null && doc!.dueDate !== ""
+                            ? doc!.dueDate
+                            : t("domain.audit.summary.emDash")}
+                        </dd>
+                      </div>
+                    </dl>
+                    <div className="mt-3 space-y-2 rounded-md border border-border/60 bg-muted/20 px-3 py-2.5">
+                      <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
+                        <span className="text-sm text-muted-foreground">{t("finance.orderTotal")}</span>
+                        <span className="text-base font-semibold tabular-nums text-foreground">
+                          {roundMoney(soDetailsPaymentSummary.totalAmount).toFixed(getCommercialMoneyDecimalPlaces())}
+                        </span>
+                      </div>
+                      <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
+                        <span className="text-sm text-muted-foreground">{t("finance.paidTotal")}</span>
+                        <span className="text-sm font-medium tabular-nums text-foreground">
+                          {roundMoney(soDetailsPaymentSummary.paidAmount).toFixed(getCommercialMoneyDecimalPlaces())}
+                        </span>
+                      </div>
+                      <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
+                        <span className="text-sm text-muted-foreground">{t("finance.remaining")}</span>
+                        <span className="text-sm font-medium tabular-nums text-foreground">
+                          {roundMoney(soDetailsPaymentSummary.remainingAmount).toFixed(getCommercialMoneyDecimalPlaces())}
+                        </span>
+                      </div>
+                      <div className="flex flex-wrap items-center justify-between gap-2 border-t border-border/50 pt-2">
+                        <span className="text-sm text-muted-foreground">{t("finance.paymentStatusLabel")}</span>
+                        <Badge variant="outline" className={cn("font-medium", paymentStatusDetailClass)}>
+                          {t(`finance.paymentStatus.${soDetailsPaymentSummary.status}`)}
+                        </Badge>
+                      </div>
+                    </div>
+                  </section>
+                  <section className="min-w-0" aria-labelledby="so-ro-details-notes-heading">
+                    <h3
+                      id="so-ro-details-notes-heading"
+                      className="mb-2 text-[0.7rem] font-semibold uppercase tracking-wide text-muted-foreground"
+                    >
+                      {t("doc.so.sectionNotes")}
+                    </h3>
+                    <div className="space-y-3">
+                      <div>
+                        <p className="mb-1 text-xs font-medium text-muted-foreground">{t("doc.columns.comment")}</p>
+                        {doc!.comment != null && doc!.comment.trim() !== "" ? (
+                          <p className="whitespace-pre-wrap rounded-md border border-border/60 bg-muted/25 p-2.5 text-sm leading-relaxed text-foreground">
+                            {doc!.comment}
+                          </p>
+                        ) : (
+                          <p className="text-sm text-muted-foreground">{emDashSummary}</p>
+                        )}
+                      </div>
+                      {doc!.status === "cancelled" && doc!.cancelReasonCode != null && doc!.cancelReasonCode !== "" && (
+                        <div className="space-y-2 rounded-md border border-destructive/30 bg-destructive/5 p-2.5">
+                          <p className="text-xs font-medium text-destructive">{t("doc.summary.cancelReason")}</p>
+                          <p className="text-sm leading-relaxed">
+                            {translateCancelReason(t, doc!.cancelReasonCode as CancelDocumentReasonCode)}
+                          </p>
+                          {doc!.cancelReasonComment != null && doc!.cancelReasonComment.trim() !== "" && (
+                            <>
+                              <p className="text-xs font-medium text-muted-foreground">{t("doc.summary.cancelComment")}</p>
+                              <p className="whitespace-pre-wrap text-sm leading-relaxed">{doc!.cancelReasonComment}</p>
+                            </>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  </section>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </>
+      )}
+      <div className="doc-so-working-area mt-4 max-w-full">
+        <div
+          className="mb-3 flex flex-wrap gap-1 border-b border-border"
+          role="tablist"
+          aria-label={t("doc.so.tabPanelsAria")}
+        >
+          <button
+            type="button"
+            role="tab"
+            aria-selected={soWorkingTab === "lines"}
+            className={cn(
+              "-mb-px border-b-2 px-3 py-2 text-sm font-medium transition-colors",
+              soWorkingTab === "lines"
+                ? "border-primary text-foreground"
+                : "border-transparent text-muted-foreground hover:text-foreground",
+            )}
+            onClick={() => setSoWorkingTab("lines")}
+          >
+            {t("doc.so.tabLines")}
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={soWorkingTab === "payments"}
+            className={cn(
+              "-mb-px border-b-2 px-3 py-2 text-sm font-medium transition-colors",
+              soWorkingTab === "payments"
+                ? "border-primary text-foreground"
+                : "border-transparent text-muted-foreground hover:text-foreground",
+            )}
+            onClick={() => setSoWorkingTab("payments")}
+          >
+            {t("doc.so.tabPayments")}
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={soWorkingTab === "events"}
+            className={cn(
+              "-mb-px border-b-2 px-3 py-2 text-sm font-medium transition-colors",
+              soWorkingTab === "events"
+                ? "border-primary text-foreground"
+                : "border-transparent text-muted-foreground hover:text-foreground",
+            )}
+            onClick={() => setSoWorkingTab("events")}
+          >
+            {t("doc.so.tabEventLog")}
+          </button>
+        </div>
+        {soWorkingTab === "payments" && (
+          <div className="doc-so-tab-panel doc-so-tab-panel--payments">
+            {isNew ? (
+              <p className="text-sm text-muted-foreground">{t("doc.so.tabSaveDocumentFirst")}</p>
+            ) : doc ? (
+              <SalesOrderFinanceSection
+                salesOrderId={id!}
+                cancelled={doc.status === "cancelled"}
+                orderTotalAmount={isEditable ? totals.totalAmount : readonlyTotals.totalAmount}
+                hasLines={isEditable ? form.lines.length > 0 : lines.length > 0}
+              />
+            ) : null}
+          </div>
+        )}
+        {soWorkingTab === "events" && (
+          <div className="doc-so-tab-panel doc-so-tab-panel--events">
+            {isNew ? (
+              <p className="text-sm text-muted-foreground">{t("doc.so.tabSaveDocumentFirst")}</p>
+            ) : showDocumentEventLogSection && id ? (
+              <DocumentEventLogSection entityType="sales_order" entityId={id} refresh={refresh} />
+            ) : (
+              <p className="text-sm text-muted-foreground">{t("doc.so.tabEventLogDisabled")}</p>
+            )}
+          </div>
+        )}
+        {soWorkingTab === "lines" && isEditable && (
+          <div className="doc-lines mt-0">
+{!isNew && soFulfillment ? (
               <div className="mb-2 max-w-4xl text-xs">
                 <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
                   <span className="font-medium text-foreground">{t("doc.fulfillment.so.sectionTitle")}</span>
@@ -1907,123 +2375,9 @@ export function SalesOrderPage() {
                   </div>
                 </CardContent>
               </Card>
-                <div className="flex flex-row flex-wrap items-center justify-end gap-2 shrink-0">
-                  <DocumentPrintActionsMenu
-                    items={salesOrderPrintMenuItems}
-                    triggerLabel={t("doc.page.print")}
-                    aria-label={t("doc.page.printMenuAria")}
-                  />
-                  {exportSuccess && (
-                    <div className="h-8 w-max flex items-center gap-1.5 rounded-md border border-input bg-background px-2 text-sm shrink-0">
-                      <span className="text-muted-foreground text-xs">{t("doc.list.exportCompleted")}</span>
-                      <span className="font-medium text-xs truncate max-w-[12rem]" title={exportSuccess.filename}>{exportSuccess.filename}</span>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon"
-                        className="h-7 w-7 shrink-0 text-muted-foreground hover:text-foreground"
-                        title={t("doc.list.openFile")}
-                        aria-label={t("doc.list.openFile")}
-                        onClick={async () => {
-                          try {
-                            await invoke("open_export_file", { path: exportSuccess.path });
-                            setExportSuccess(null);
-                          } catch (err) {
-                            console.error("Export failed", err);
-                            setExportSuccess(null);
-                          }
-                        }}
-                      >
-                        <File className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon"
-                        className="h-7 w-7 shrink-0 text-muted-foreground hover:text-foreground"
-                        title={t("doc.list.openFolder")}
-                        aria-label={t("doc.list.openFolder")}
-                        onClick={() => {
-                          revealItemInDir(exportSuccess.path);
-                          setExportSuccess(null);
-                        }}
-                      >
-                        <FolderOpen className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon"
-                        className="h-6 w-6 shrink-0 text-muted-foreground/80 hover:text-muted-foreground"
-                        title={t("doc.list.dismiss")}
-                        aria-label={t("doc.list.dismiss")}
-                        onClick={() => setExportSuccess(null)}
-                      >
-                        <X className="h-3 w-3" />
-                      </Button>
-                    </div>
-                  )}
-                  <div className="flex items-stretch rounded-md border border-input shrink-0">
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      className="h-8 rounded-r-none border-0 border-r border-input gap-1.5"
-                      onClick={handleExportMain}
-                    >
-                      <FileSpreadsheet className="h-4 w-4 shrink-0" />
-                      {t("doc.page.export")}
-                    </Button>
-                    <Popover open={exportOpen} onOpenChange={setExportOpen}>
-                      <PopoverTrigger asChild>
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="icon"
-                          className="h-8 w-8 shrink-0 rounded-l-none border-0 shadow-none"
-                          aria-label={t("doc.list.exportOptionsAria")}
-                        >
-                          <ChevronDown className="h-4 w-4" />
-                        </Button>
-                      </PopoverTrigger>
-                      <PopoverContent className="!w-max min-w-0 p-1.5" align="end" side="top">
-                        <div className="flex flex-col gap-0.5">
-                          <button
-                            type="button"
-                            disabled={exportSelectedDisabled}
-                            className="w-full rounded-sm px-1.5 py-1 text-left text-sm hover:bg-accent disabled:cursor-not-allowed disabled:opacity-50"
-                            title={
-                              exportSelectedDisabled
-                                ? !isEditable
-                                  ? t("doc.list.exportSelectionEditModeOnly")
-                                  : t("doc.list.exportSelectLinesFirst")
-                                : undefined
-                            }
-                            onClick={() => {
-                              setExportOpen(false);
-                              if (!exportSelectedDisabled) handleExportSelected();
-                            }}
-                          >
-                            {t("doc.list.exportSelectedRows")}
-                          </button>
-                          <button
-                            type="button"
-                            className="w-full rounded-sm px-1.5 py-1 text-left text-sm hover:bg-accent"
-                            onClick={() => {
-                              setExportOpen(false);
-                              handleExportAll();
-                            }}
-                          >
-                            {t("doc.list.exportAllLines")}
-                          </button>
-                        </div>
-                      </PopoverContent>
-                    </Popover>
-                  </div>
-                </div>
               </div>
             )}
-            <div className="doc-lines__grid">
+<div className="doc-lines__grid">
               <AgGridContainer themeClass="doc-lines-grid">
                 <AgGridReact<LineFormRow>
                   ref={linesGridRef}
@@ -2049,111 +2403,10 @@ export function SalesOrderPage() {
               </div>
             )}
           </div>
-        </>
-      ) : (
-        <>
-          <Card className="max-w-2xl border-0 shadow-none">
-            <CardHeader className="p-2 pb-0.5">
-              <CardTitle className="text-[0.9rem] font-semibold">{t("doc.page.details")}</CardTitle>
-            </CardHeader>
-            <CardContent className="p-2 pt-1">
-              <dl className="doc-summary doc-summary--compact doc-summary--dense">
-                <div className="doc-summary__row">
-                  <dt className="doc-summary__term">{t("doc.columns.number")}</dt>
-                  <dd className="doc-summary__value">{doc!.number}</dd>
-                </div>
-                <div className="doc-summary__row">
-                  <dt className="doc-summary__term">{t("doc.columns.date")}</dt>
-                  <dd className="doc-summary__value">{normalizeDateForSO(doc!.date)}</dd>
-                </div>
-                <div className="doc-summary__row">
-                  <dt className="doc-summary__term">{t("doc.columns.customer")}</dt>
-                  <dd className="doc-summary__value">{customerName}</dd>
-                </div>
-                <div className="doc-summary__row">
-                  <dt className="doc-summary__term">{t("doc.columns.warehouse")}</dt>
-                  <dd className="doc-summary__value">{warehouseName}</dd>
-                </div>
-                <div className="doc-summary__row">
-                  <dt className="doc-summary__term">{t("doc.so.carrier")}</dt>
-                  <dd className="doc-summary__value">{carrierReadOnlyLabel}</dd>
-                </div>
-                <div className="doc-summary__row">
-                  <dt className="doc-summary__term">{t("doc.shipment.recipientName")}</dt>
-                  <dd className="doc-summary__value">
-                    {doc!.recipientName?.trim()
-                      ? doc!.recipientName.trim()
-                      : emDashSummary}
-                  </dd>
-                </div>
-                <div className="doc-summary__row">
-                  <dt className="doc-summary__term">{t("doc.shipment.recipientPhone")}</dt>
-                  <dd className="doc-summary__value">
-                    {doc!.recipientPhone?.trim()
-                      ? doc!.recipientPhone.trim()
-                      : emDashSummary}
-                  </dd>
-                </div>
-                <div className="doc-summary__row">
-                  <dt className="doc-summary__term">{t("doc.shipment.deliveryAddress")}</dt>
-                  <dd className="doc-summary__value whitespace-pre-wrap">
-                    {doc!.deliveryAddress?.trim()
-                      ? doc!.deliveryAddress.trim()
-                      : emDashSummary}
-                  </dd>
-                </div>
-                <div className="doc-summary__row">
-                  <dt className="doc-summary__term">{t("doc.shipment.deliveryComment")}</dt>
-                  <dd className="doc-summary__value whitespace-pre-wrap">
-                    {doc!.deliveryComment?.trim()
-                      ? doc!.deliveryComment.trim()
-                      : emDashSummary}
-                  </dd>
-                </div>
-                <div className="doc-summary__row">
-                  <dt className="doc-summary__term">{t("doc.summary.paymentTerms")}</dt>
-                  <dd className="doc-summary__value">
-                    {doc!.paymentTermsDays !== undefined
-                      ? t("doc.summary.paymentTermsDays", { days: doc!.paymentTermsDays })
-                      : t("domain.audit.summary.emDash")}
-                  </dd>
-                </div>
-                <div className="doc-summary__row">
-                  <dt className="doc-summary__term">{t("doc.page.dueDate")}</dt>
-                  <dd className="doc-summary__value">
-                    {doc!.dueDate != null && doc!.dueDate !== ""
-                      ? doc!.dueDate
-                      : t("domain.audit.summary.emDash")}
-                  </dd>
-                </div>
-                {doc!.comment != null && doc!.comment !== "" && (
-                  <div className="doc-summary__row">
-                    <dt className="doc-summary__term">{t("doc.columns.comment")}</dt>
-                    <dd className="doc-summary__value">{doc!.comment}</dd>
-                  </div>
-                )}
-                {doc!.status === "cancelled" && doc!.cancelReasonCode != null && doc!.cancelReasonCode !== "" && (
-                  <>
-                    <div className="doc-summary__row">
-                      <dt className="doc-summary__term">{t("doc.summary.cancelReason")}</dt>
-                      <dd className="doc-summary__value">
-                        {translateCancelReason(t, doc!.cancelReasonCode as CancelDocumentReasonCode)}
-                      </dd>
-                    </div>
-                    {doc!.cancelReasonComment != null && doc!.cancelReasonComment !== "" && (
-                      <div className="doc-summary__row">
-                        <dt className="doc-summary__term">{t("doc.summary.cancelComment")}</dt>
-                        <dd className="doc-summary__value">{doc!.cancelReasonComment}</dd>
-                      </div>
-                    )}
-                  </>
-                )}
-              </dl>
-            </CardContent>
-          </Card>
-          <div className="doc-lines mt-[calc(0.5rem+1cm)]">
-            <h3 className="doc-lines__title">{t("doc.page.lines")}</h3>
-            {soFulfillment ? (
+        )}
+        {soWorkingTab === "lines" && !isEditable && (
+          <div className="doc-lines mt-0">
+{soFulfillment ? (
               <div className="mb-2 max-w-4xl text-xs">
                 <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
                   <span className="font-medium text-foreground">{t("doc.fulfillment.so.sectionTitle")}</span>
@@ -2205,120 +2458,6 @@ export function SalesOrderPage() {
                 </div>
               </div>
             ) : null}
-            <div className="flex flex-row flex-wrap items-center justify-end gap-2 w-full mb-1.5">
-              <DocumentPrintActionsMenu
-                items={salesOrderPrintMenuItems}
-                triggerLabel={t("doc.page.print")}
-                aria-label={t("doc.page.printMenuAria")}
-              />
-              {exportSuccess && (
-                <div className="h-8 w-max flex items-center gap-1.5 rounded-md border border-input bg-background px-2 text-sm shrink-0">
-                  <span className="text-muted-foreground text-xs">{t("doc.list.exportCompleted")}</span>
-                  <span className="font-medium text-xs truncate max-w-[12rem]" title={exportSuccess.filename}>{exportSuccess.filename}</span>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    className="h-7 w-7 shrink-0 text-muted-foreground hover:text-foreground"
-                    title={t("doc.list.openFile")}
-                    aria-label={t("doc.list.openFile")}
-                    onClick={async () => {
-                      try {
-                        await invoke("open_export_file", { path: exportSuccess.path });
-                        setExportSuccess(null);
-                      } catch (err) {
-                        console.error("Export failed", err);
-                        setExportSuccess(null);
-                      }
-                    }}
-                  >
-                    <File className="h-4 w-4" />
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    className="h-7 w-7 shrink-0 text-muted-foreground hover:text-foreground"
-                    title={t("doc.list.openFolder")}
-                    aria-label={t("doc.list.openFolder")}
-                    onClick={() => {
-                      revealItemInDir(exportSuccess.path);
-                      setExportSuccess(null);
-                    }}
-                  >
-                    <FolderOpen className="h-4 w-4" />
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    className="h-6 w-6 shrink-0 text-muted-foreground/80 hover:text-muted-foreground"
-                    title={t("doc.list.dismiss")}
-                    aria-label={t("doc.list.dismiss")}
-                    onClick={() => setExportSuccess(null)}
-                  >
-                    <X className="h-3 w-3" />
-                  </Button>
-                </div>
-              )}
-              <div className="flex items-stretch rounded-md border border-input shrink-0">
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  className="h-8 rounded-r-none border-0 border-r border-input gap-1.5"
-                  onClick={handleExportMain}
-                >
-                  <FileSpreadsheet className="h-4 w-4 shrink-0" />
-                  {t("doc.page.export")}
-                </Button>
-                <Popover open={exportOpen} onOpenChange={setExportOpen}>
-                  <PopoverTrigger asChild>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="icon"
-                      className="h-8 w-8 shrink-0 rounded-l-none border-0 shadow-none"
-                      aria-label={t("doc.list.exportOptionsAria")}
-                    >
-                      <ChevronDown className="h-4 w-4" />
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="!w-max min-w-0 p-1.5" align="end" side="top">
-                    <div className="flex flex-col gap-0.5">
-                      <button
-                        type="button"
-                        disabled={exportSelectedDisabled}
-                        className="w-full rounded-sm px-1.5 py-1 text-left text-sm hover:bg-accent disabled:cursor-not-allowed disabled:opacity-50"
-                        title={
-                          exportSelectedDisabled
-                            ? !isEditable
-                              ? t("doc.list.exportSelectionEditModeOnly")
-                              : t("doc.list.exportSelectLinesFirst")
-                            : undefined
-                        }
-                        onClick={() => {
-                          setExportOpen(false);
-                          if (!exportSelectedDisabled) handleExportSelected();
-                        }}
-                      >
-                        {t("doc.list.exportSelectedRows")}
-                      </button>
-                      <button
-                        type="button"
-                        className="w-full rounded-sm px-1.5 py-1 text-left text-sm hover:bg-accent"
-                        onClick={() => {
-                          setExportOpen(false);
-                          handleExportAll();
-                        }}
-                      >
-                        {t("doc.list.exportAllLines")}
-                      </button>
-                    </div>
-                  </PopoverContent>
-                </Popover>
-              </div>
-            </div>
             {linesWithItem.length === 0 ? (
               <p className="doc-lines__empty">{t("doc.page.noLines")}</p>
             ) : (
@@ -2347,8 +2486,9 @@ export function SalesOrderPage() {
               </>
             )}
           </div>
-        </>
-      )}
+        )}
+      </div>
+
       <DocumentLineImportModal
         open={isLineImportModalOpen}
         initialTab={lineImportInitialTab}
@@ -2367,9 +2507,6 @@ export function SalesOrderPage() {
         onOpenChange={setIsLineImportModalOpen}
         onApply={handleApplyImportedLines}
       />
-      {!isNew && id && showDocumentEventLogSection ? (
-        <DocumentEventLogSection entityType="sales_order" entityId={id} refresh={refresh} />
-      ) : null}
       <CancelDocumentReasonDialog
         open={cancelReasonDialogOpen}
         onOpenChange={setCancelReasonDialogOpen}

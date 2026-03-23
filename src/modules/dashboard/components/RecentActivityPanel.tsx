@@ -31,6 +31,8 @@ export type RecentActivityShipmentRow = {
 type ReceiptProps = {
   variant: "receipt";
   title: string;
+  /** Shown under the title (e.g. cockpit framing). Defaults to `dashboard.recent.byDate`. */
+  description?: string;
   listPath: string;
   emptyMessage: string;
   rows: RecentActivityReceiptRow[];
@@ -39,6 +41,7 @@ type ReceiptProps = {
 type ShipmentProps = {
   variant: "shipment";
   title: string;
+  description?: string;
   listPath: string;
   emptyMessage: string;
   rows: RecentActivityShipmentRow[];
@@ -50,6 +53,7 @@ export function RecentActivityPanel(props: Props) {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const { title, listPath, emptyMessage, rows } = props;
+  const description = props.description ?? t("dashboard.recent.byDate");
 
   return (
     <Card className="min-w-0 border-border/60 bg-card/40 shadow-none">
@@ -57,7 +61,7 @@ export function RecentActivityPanel(props: Props) {
         <div className="flex flex-wrap items-start justify-between gap-2">
           <div className="min-w-0">
             <CardTitle className="text-sm font-semibold">{title}</CardTitle>
-            <CardDescription className="text-xs">{t("dashboard.recent.byDate")}</CardDescription>
+            <CardDescription className="text-xs">{description}</CardDescription>
           </div>
           <button
             type="button"

@@ -19,6 +19,10 @@ const LINKS: { to: string; labelKey: string; feature?: "navStockMovements" }[] =
   { to: "/stock-balances", labelKey: "dashboard.quickLinks.stockBalances" },
   { to: "/stock-movements", labelKey: "dashboard.quickLinks.stockMovements", feature: "navStockMovements" },
   { to: "/items", labelKey: "dashboard.items.title" },
+  { to: "/customers", labelKey: "dashboard.quickLinks.customers" },
+  { to: "/suppliers", labelKey: "dashboard.quickLinks.suppliers" },
+  { to: "/warehouses", labelKey: "dashboard.quickLinks.warehouses" },
+  { to: "/carriers", labelKey: "dashboard.quickLinks.carriers" },
 ];
 
 export function DashboardQuickLinks() {

@@ -17,24 +17,25 @@ Dashboard is the high-level overview screen for the owner of a small business.
 
 ## Block structure (implemented)
 
-### A. Document overview (four cards)
-- **Purchase orders** — totals by planning status: draft, confirmed, closed, cancelled
-- **Sales orders** — same breakdown
-- **Receipts** — factual breakdown: draft, posted, **reversed**, cancelled
-- **Shipments** — factual breakdown: draft, posted, **reversed**, cancelled
+### A. Needs attention (operational checks)
+- Single card: inactive items, items without images, draft receipts/shipments — each with **Open list →** deep links (`/items?lifecycle=inactive`, `/receipts?status=draft`, etc. where supported)
 
-### B. Inventory overview (cards)
-- **Stock balances** — count of balance rows (link to list)
-- **Stock movements** — count of movement rows (link to list); card may be **hidden** in Lite workspace
-- **Items** — total items, active count, count with images (link to items list)
+### B. Document pipeline (four cards)
+- **Purchase orders** — totals by planning status; **each status chip links** to the PO list with `?status=…`
+- **Sales orders** — same
+- **Receipts** — factual breakdown; chips link with `?status=…`
+- **Shipments** — factual breakdown; chips link with `?status=…`
 
-### C. Recent activity
-- **Recent receipts** — latest rows with PO number, warehouse, status (link into receipt)
-- **Recent shipments** — latest rows with SO number, warehouse, status (link into shipment)
+### C. Inventory & master data (cards)
+- **Stock balances** — balance row count + short hint (link to list)
+- **Stock movements** — movement row count + hint (link; card may be **hidden** in Lite workspace)
+- **Items** — totals, active, with images + hint (link to items list)
 
-### D. Quick navigation + signals
-- **Quick links** — shortcuts to major modules
-- **Signals** — operational hints (e.g. inactive items, items without images, counts of draft receipts/shipments)
+### D. Latest inbound & outbound
+- **Recent receipts** / **Recent shipments** — same tables as before; subtitles frame logistics context
+
+### E. Shortcuts
+- **Quick links** — documents, stock, items, plus customers, suppliers, warehouses, carriers (respects stock-movements feature flag)
 
 ## Freshness
 

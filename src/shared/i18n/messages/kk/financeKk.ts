@@ -1,0 +1,62 @@
+export const financeKk = {
+  sectionTitle: "Төлем және шот",
+  sectionHint:
+    "Бұл тапсырыс бойынша төлемдерді есептеу. Төлем шоты алдын ала клиент құжатынан бөлек.",
+  paymentStatusLabel: "Төлем күйі",
+  paymentStatus: {
+    unpaid: "Төленбеген",
+    partially_paid: "Ішінара төленген",
+    paid: "Төленген",
+  },
+  orderTotal: "Тапсырыс сомасы",
+  paidTotal: "Төленді",
+  remaining: "Қалпы",
+  openCustomerInvoice: "Төлем шотын ашу",
+  openCustomerInvoiceShort: "Төлем шоты",
+  invoiceTitle: "Төлем шоты",
+  invoiceSubtitle: "Сату тапсырысы бойынша шот — операциялық құжат, касса чегі емес.",
+  invoiceDisclaimer:
+    "Құжат сату тапсырысы бойынша төлеуге тиіс сомаларды операциялық бақылау үшін көрсетеді. Салықтық немесе фискалдық шот ретінде қызмет етпейді, егер процесіңіз бөлек анықтамаса.",
+  sectionPaymentSummary: "Сомалар",
+  sectionLines: "Сауда жолдары",
+  dueDate: "Төлем мерзімі",
+  paymentHistory: "Тіркелген төлемдер",
+  noPayments: "Төлемдер әлі тіркелмеген.",
+  addPayment: "Төлемді тіркеу",
+  amount: "Сома",
+  paidAt: "Күні мен уақыты",
+  method: "Әдіс",
+  reference: "Нөмір / сілтеме",
+  comment: "Пікір",
+  paymentMethod: {
+    cash: "Қолма-қол",
+    bank_transfer: "Банк аударымы",
+    card: "Карта",
+    other: "Басқа",
+  },
+  deletePayment: "Төлемді жою",
+  deletePaymentConfirm: "Бұл төлем жазбасын жою керек пе?",
+  validation: {
+    amountPositive: "Нөлден үлкен сома енгізіңіз.",
+    paidAtRequired: "Төлем күні мен уақытын көрсетіңіз.",
+  },
+  errors: {
+    generic: "Төлемді сақтау мүмкін болмады.",
+    deleteFailed: "Төлемді жою мүмкін болмады.",
+    soNotFound: "Сату тапсырысы табылмады.",
+    soCancelled: "Болдырылған тапсырыста төлемдерді өзгертуге болмайды.",
+    amountInvalid: "Сома нөлден үлкен болуы керек.",
+    paidAtRequired: "Төлем күні мен уақытын көрсетіңіз.",
+    paidAtInvalid: "Төлем күні немесе уақыты жарамсыз.",
+    paymentNotFound: "Төлем табылмады.",
+    paymentWrongOrder: "Бұл төлем басқа тапсырысқа жатады.",
+  },
+  invoicePreparedFrom: "Сату тапсырысы {{number}} бойынша дайындалған",
+  printedAt: "Басып шығарылған",
+  invoiceUnavailable:
+    "Төлем шоты болдырылған тапсырыстарға немесе жолдары жоқ тапсырыстарға қолжетімсіз.",
+  invoiceNeedsLines:
+    "Төлемдерді есептеу және төлем шотын ашу үшін кем дегенде бір сауда жолын қосыңыз.",
+  readOnlyCancelled:
+    "Тапсырыс болдырылған — сомалар анықтама үшін көрсетіледі; төлем қосу немесе жоюға болмайды.",
+} as const;

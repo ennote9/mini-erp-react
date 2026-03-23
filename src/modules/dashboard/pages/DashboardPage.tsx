@@ -25,6 +25,10 @@ import {
   DashboardSignals,
 } from "../components";
 
+function statusHref(basePath: string, status: string): string {
+  return `${basePath}?status=${encodeURIComponent(status)}`;
+}
+
 export function DashboardPage() {
   const { t } = useTranslation();
   const { settings } = useSettings();
@@ -50,6 +54,11 @@ export function DashboardPage() {
   const recentShipments = useMemo(() => getRecentShipments(8), [appReadModelRevision]);
   const signals = useMemo(() => getDashboardSignals(), [appReadModelRevision]);
 
+  const poPath = "/purchase-orders";
+  const soPath = "/sales-orders";
+  const rcPath = "/receipts";
+  const shPath = "/shipments";
+
   return (
     <div className="dashboard-page mx-auto max-w-[1600px] space-y-6 p-4 md:p-5" data-module="dashboard">
       <header className="space-y-1">
@@ -59,56 +68,127 @@ export function DashboardPage() {
         <p className="m-0 max-w-2xl text-sm text-muted-foreground">{t("dashboard.subtitle")}</p>
       </header>
 
+      <section className="space-y-2" aria-labelledby="dash-priority-heading">
+        <h2
+          id="dash-priority-heading"
+          className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground"
+        >
+          {t("dashboard.sections.priority")}
+        </h2>
+        <DashboardSignals signals={signals} />
+      </section>
+
       <section className="space-y-2" aria-labelledby="dash-doc-heading">
         <h2
           id="dash-doc-heading"
           className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground"
         >
-          {t("dashboard.sections.documents")}
+          {t("dashboard.sections.pipeline")}
         </h2>
+        <p className="m-0 max-w-3xl text-xs text-muted-foreground">{t("dashboard.pipeline.hint")}</p>
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
           <DocumentOverviewCard
             title={t("dashboard.po.title")}
-            listPath="/purchase-orders"
+            listPath={poPath}
             total={po.total}
             stats={[
-              { key: "draft", label: t("dashboard.stats.draft"), value: po.draft },
-              { key: "confirmed", label: t("dashboard.stats.confirmed"), value: po.confirmed },
-              { key: "closed", label: t("dashboard.stats.closed"), value: po.closed },
-              { key: "cancelled", label: t("dashboard.stats.cancelled"), value: po.cancelled },
+              { key: "draft", label: t("dashboard.stats.draft"), value: po.draft, href: statusHref(poPath, "draft") },
+              {
+                key: "confirmed",
+                label: t("dashboard.stats.confirmed"),
+                value: po.confirmed,
+                href: statusHref(poPath, "confirmed"),
+              },
+              { key: "closed", label: t("dashboard.stats.closed"), value: po.closed, href: statusHref(poPath, "closed") },
+              {
+                key: "cancelled",
+                label: t("dashboard.stats.cancelled"),
+                value: po.cancelled,
+                href: statusHref(poPath, "cancelled"),
+              },
             ]}
           />
           <DocumentOverviewCard
             title={t("dashboard.so.title")}
-            listPath="/sales-orders"
+            listPath={soPath}
             total={so.total}
             stats={[
-              { key: "draft", label: t("dashboard.stats.draft"), value: so.draft },
-              { key: "confirmed", label: t("dashboard.stats.confirmed"), value: so.confirmed },
-              { key: "closed", label: t("dashboard.stats.closed"), value: so.closed },
-              { key: "cancelled", label: t("dashboard.stats.cancelled"), value: so.cancelled },
+              { key: "draft", label: t("dashboard.stats.draft"), value: so.draft, href: statusHref(soPath, "draft") },
+              {
+                key: "confirmed",
+                label: t("dashboard.stats.confirmed"),
+                value: so.confirmed,
+                href: statusHref(soPath, "confirmed"),
+              },
+              { key: "closed", label: t("dashboard.stats.closed"), value: so.closed, href: statusHref(soPath, "closed") },
+              {
+                key: "cancelled",
+                label: t("dashboard.stats.cancelled"),
+                value: so.cancelled,
+                href: statusHref(soPath, "cancelled"),
+              },
             ]}
           />
           <DocumentOverviewCard
             title={t("dashboard.receipts.title")}
-            listPath="/receipts"
+            listPath={rcPath}
             total={receipts.total}
             stats={[
-              { key: "draft", label: t("dashboard.stats.draft"), value: receipts.draft },
-              { key: "posted", label: t("dashboard.stats.posted"), value: receipts.posted },
-              { key: "reversed", label: t("dashboard.stats.reversed"), value: receipts.reversed },
-              { key: "cancelled", label: t("dashboard.stats.cancelled"), value: receipts.cancelled },
+              {
+                key: "draft",
+                label: t("dashboard.stats.draft"),
+                value: receipts.draft,
+                href: statusHref(rcPath, "draft"),
+              },
+              {
+                key: "posted",
+                label: t("dashboard.stats.posted"),
+                value: receipts.posted,
+                href: statusHref(rcPath, "posted"),
+              },
+              {
+                key: "reversed",
+                label: t("dashboard.stats.reversed"),
+                value: receipts.reversed,
+                href: statusHref(rcPath, "reversed"),
+              },
+              {
+                key: "cancelled",
+                label: t("dashboard.stats.cancelled"),
+                value: receipts.cancelled,
+                href: statusHref(rcPath, "cancelled"),
+              },
             ]}
           />
           <DocumentOverviewCard
             title={t("dashboard.shipments.title")}
-            listPath="/shipments"
+            listPath={shPath}
             total={shipments.total}
             stats={[
-              { key: "draft", label: t("dashboard.stats.draft"), value: shipments.draft },
-              { key: "posted", label: t("dashboard.stats.posted"), value: shipments.posted },
-              { key: "reversed", label: t("dashboard.stats.reversed"), value: shipments.reversed },
-              { key: "cancelled", label: t("dashboard.stats.cancelled"), value: shipments.cancelled },
+              {
+                key: "draft",
+                label: t("dashboard.stats.draft"),
+                value: shipments.draft,
+                href: statusHref(shPath, "draft"),
+              },
+              {
+                key: "posted",
+                label: t("dashboard.stats.posted"),
+                value: shipments.posted,
+                href: statusHref(shPath, "posted"),
+              },
+              {
+                key: "reversed",
+                label: t("dashboard.stats.reversed"),
+                value: shipments.reversed,
+                href: statusHref(shPath, "reversed"),
+              },
+              {
+                key: "cancelled",
+                label: t("dashboard.stats.cancelled"),
+                value: shipments.cancelled,
+                href: statusHref(shPath, "cancelled"),
+              },
             ]}
           />
         </div>
@@ -121,6 +201,7 @@ export function DashboardPage() {
         >
           {t("dashboard.sections.inventory")}
         </h2>
+        <p className="m-0 max-w-3xl text-xs text-muted-foreground">{t("dashboard.inventorySection.hint")}</p>
         <div
           className={cn(
             "grid grid-cols-1 gap-3",
@@ -130,6 +211,7 @@ export function DashboardPage() {
           <InventoryOverviewCard
             title={t("dashboard.stockBalances.title")}
             listPath="/stock-balances"
+            description={t("dashboard.stockBalances.hint")}
             metrics={[
               { key: "rows", label: t("dashboard.stockBalances.balanceRows"), value: inventory.balanceRows },
             ]}
@@ -138,14 +220,20 @@ export function DashboardPage() {
             <InventoryOverviewCard
               title={t("dashboard.stockMovements.title")}
               listPath="/stock-movements"
+              description={t("dashboard.stockMovements.hint")}
               metrics={[
-                { key: "rows", label: t("dashboard.stockMovements.movementRows"), value: inventory.movementRows },
+                {
+                  key: "rows",
+                  label: t("dashboard.stockMovements.movementRows"),
+                  value: inventory.movementRows,
+                },
               ]}
             />
           ) : null}
           <InventoryOverviewCard
             title={t("dashboard.items.title")}
             listPath="/items"
+            description={t("dashboard.items.hint")}
             metrics={[
               { key: "total", label: t("dashboard.items.total"), value: inventory.itemsTotal },
               { key: "active", label: t("dashboard.items.active"), value: inventory.itemsActive },
@@ -160,12 +248,13 @@ export function DashboardPage() {
           id="dash-activity-heading"
           className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground"
         >
-          {t("dashboard.sections.recentActivity")}
+          {t("dashboard.sections.logistics")}
         </h2>
         <div className="grid grid-cols-1 gap-3 xl:grid-cols-2">
           <RecentActivityPanel
             variant="receipt"
             title={t("dashboard.recentReceipts.title")}
+            description={t("dashboard.recent.logisticsHintReceipts")}
             listPath="/receipts"
             emptyMessage={t("dashboard.recentReceipts.empty")}
             rows={recentReceipts}
@@ -173,6 +262,7 @@ export function DashboardPage() {
           <RecentActivityPanel
             variant="shipment"
             title={t("dashboard.recentShipments.title")}
+            description={t("dashboard.recent.logisticsHintShipments")}
             listPath="/shipments"
             emptyMessage={t("dashboard.recentShipments.empty")}
             rows={recentShipments}
@@ -185,12 +275,9 @@ export function DashboardPage() {
           id="dash-nav-heading"
           className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground"
         >
-          {t("dashboard.sections.navSignals")}
+          {t("dashboard.sections.shortcuts")}
         </h2>
-        <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
-          <DashboardQuickLinks />
-          <DashboardSignals signals={signals} />
-        </div>
+        <DashboardQuickLinks />
       </section>
     </div>
   );

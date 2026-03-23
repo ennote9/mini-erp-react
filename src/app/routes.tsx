@@ -17,6 +17,7 @@ import {
   SalesOrdersListPage,
   SalesOrderPage,
   SalesOrderCustomerDocumentPage,
+  SalesOrderCustomerInvoicePage,
 } from "../modules/sales-orders";
 import {
   ShipmentsListPage,
@@ -57,6 +58,7 @@ export function AppRoutes() {
         <Route path="receipts/:id" element={<ReceiptPage />} />
         <Route path="sales-orders" element={<SalesOrdersListPage />} />
         <Route path="sales-orders/:id/customer-document" element={<SalesOrderCustomerDocumentPage />} />
+        <Route path="sales-orders/:id/customer-invoice" element={<SalesOrderCustomerInvoicePage />} />
         <Route path="sales-orders/:id" element={<SalesOrderPage />} />
         <Route path="shipments" element={<ShipmentsListPage />} />
         <Route path="shipments/:id/delivery-sheet" element={<ShipmentDeliverySheetPage />} />

@@ -1,0 +1,196 @@
+          <div className="doc-lines mt-[calc(0.5rem+1cm)]">
+            <h3 className="doc-lines__title">{t("doc.page.lines")}</h3>
+            {soFulfillment ? (
+              <div className="mb-2 max-w-4xl text-xs">
+                <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
+                  <span className="font-medium text-foreground">{t("doc.fulfillment.so.sectionTitle")}</span>
+                  <span className="tabular-nums text-muted-foreground">
+                    {translatePlanningFulfillmentState(t, soFulfillment.state)}
+                  </span>
+                  <span className="text-muted-foreground tabular-nums">
+                    {t("doc.fulfillment.so.shippedOrdered", {
+                      shipped: soFulfillment.totalShipped,
+                      ordered: soFulfillment.totalOrdered,
+                    })}
+                  </span>
+                  <span className="text-muted-foreground">
+                    {t("doc.fulfillment.so.remainingLabel")}{" "}
+                    <span className="text-foreground tabular-nums">
+                      {soFulfillment.totalRemaining < 0
+                        ? t("doc.fulfillment.remainingOver", { qty: soFulfillment.totalRemaining })
+                        : soFulfillment.totalRemaining}
+                    </span>
+                  </span>
+                  <span className="text-muted-foreground tabular-nums">
+                    {t("doc.fulfillment.so.shipmentsPostedTotal", {
+                      posted: soFulfillment.postedShipmentCount,
+                      total: soFulfillment.relatedShipmentCount,
+                    })}
+                  </span>
+                  {soFulfillment.hasOverFulfillment ? (
+                    <span className="text-destructive font-medium">{t("doc.fulfillment.so.overShipped")}</span>
+                  ) : null}
+                </div>
+              </div>
+            ) : null}
+            {showSalesOrderAllocationUi && soAllocationView ? (
+              <div className="mb-2 max-w-4xl text-xs">
+                <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
+                  <span className="font-medium text-foreground">{t("doc.fulfillment.so.allocationSectionTitle")}</span>
+                  <span className="tabular-nums text-muted-foreground">
+                    {translateSalesOrderAllocationState(t, soAllocationView.state)}
+                  </span>
+                  <span className="text-muted-foreground">
+                    {t("doc.columns.reserved")}{" "}
+                    <span className="text-foreground tabular-nums">{soAllocationView.totalReserved}</span>
+                  </span>
+                  <span className="text-muted-foreground">
+                    {t("doc.columns.shortage")}{" "}
+                    <span className="text-foreground tabular-nums">{soAllocationView.totalShortage}</span>
+                    <span className="text-muted-foreground/80"> {t("doc.fulfillment.so.allocationShortageHint")}</span>
+                  </span>
+                </div>
+              </div>
+            ) : null}
+            <div className="flex flex-row flex-wrap items-center justify-end gap-2 w-full mb-1.5">
+              <DocumentPrintActionsMenu
+                items={salesOrderPrintMenuItems}
+                triggerLabel={t("doc.page.print")}
+                aria-label={t("doc.page.printMenuAria")}
+              />
+              {exportSuccess && (
+                <div className="h-8 w-max flex items-center gap-1.5 rounded-md border border-input bg-background px-2 text-sm shrink-0">
+                  <span className="text-muted-foreground text-xs">{t("doc.list.exportCompleted")}</span>
+                  <span className="font-medium text-xs truncate max-w-[12rem]" title={exportSuccess.filename}>{exportSuccess.filename}</span>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="h-7 w-7 shrink-0 text-muted-foreground hover:text-foreground"
+                    title={t("doc.list.openFile")}
+                    aria-label={t("doc.list.openFile")}
+                    onClick={async () => {
+                      try {
+                        await invoke("open_export_file", { path: exportSuccess.path });
+                        setExportSuccess(null);
+                      } catch (err) {
+                        console.error("Export failed", err);
+                        setExportSuccess(null);
+                      }
+                    }}
+                  >
+                    <File className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="h-7 w-7 shrink-0 text-muted-foreground hover:text-foreground"
+                    title={t("doc.list.openFolder")}
+                    aria-label={t("doc.list.openFolder")}
+                    onClick={() => {
+                      revealItemInDir(exportSuccess.path);
+                      setExportSuccess(null);
+                    }}
+                  >
+                    <FolderOpen className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="h-6 w-6 shrink-0 text-muted-foreground/80 hover:text-muted-foreground"
+                    title={t("doc.list.dismiss")}
+                    aria-label={t("doc.list.dismiss")}
+                    onClick={() => setExportSuccess(null)}
+                  >
+                    <X className="h-3 w-3" />
+                  </Button>
+                </div>
+              )}
+              <div className="flex items-stretch rounded-md border border-input shrink-0">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="h-8 rounded-r-none border-0 border-r border-input gap-1.5"
+                  onClick={handleExportMain}
+                >
+                  <FileSpreadsheet className="h-4 w-4 shrink-0" />
+                  {t("doc.page.export")}
+                </Button>
+                <Popover open={exportOpen} onOpenChange={setExportOpen}>
+                  <PopoverTrigger asChild>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="icon"
+                      className="h-8 w-8 shrink-0 rounded-l-none border-0 shadow-none"
+                      aria-label={t("doc.list.exportOptionsAria")}
+                    >
+                      <ChevronDown className="h-4 w-4" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="!w-max min-w-0 p-1.5" align="end" side="top">
+                    <div className="flex flex-col gap-0.5">
+                      <button
+                        type="button"
+                        disabled={exportSelectedDisabled}
+                        className="w-full rounded-sm px-1.5 py-1 text-left text-sm hover:bg-accent disabled:cursor-not-allowed disabled:opacity-50"
+                        title={
+                          exportSelectedDisabled
+                            ? !isEditable
+                              ? t("doc.list.exportSelectionEditModeOnly")
+                              : t("doc.list.exportSelectLinesFirst")
+                            : undefined
+                        }
+                        onClick={() => {
+                          setExportOpen(false);
+                          if (!exportSelectedDisabled) handleExportSelected();
+                        }}
+                      >
+                        {t("doc.list.exportSelectedRows")}
+                      </button>
+                      <button
+                        type="button"
+                        className="w-full rounded-sm px-1.5 py-1 text-left text-sm hover:bg-accent"
+                        onClick={() => {
+                          setExportOpen(false);
+                          handleExportAll();
+                        }}
+                      >
+                        {t("doc.list.exportAllLines")}
+                      </button>
+                    </div>
+                  </PopoverContent>
+                </Popover>
+              </div>
+            </div>
+            {linesWithItem.length === 0 ? (
+              <p className="doc-lines__empty">{t("doc.page.noLines")}</p>
+            ) : (
+              <>
+                <div className="doc-lines__grid">
+                  <AgGridContainer themeClass="doc-lines-grid">
+                    <AgGridReact<LineWithItem>
+                      {...agGridDefaultGridOptions}
+                      rowData={linesWithItem}
+                      columnDefs={readOnlyLinesColumnDefs}
+                      defaultColDef={agGridDefaultColDef}
+                      getRowId={(p) => p.data.id}
+                      rowSelection={{ mode: "multiRow", checkboxes: true, headerCheckbox: true, enableClickSelection: true }}
+                      selectionColumnDef={agGridSelectionColumnDef}
+                    />
+                  </AgGridContainer>
+                </div>
+                <div className="doc-lines__totals mt-1.5 flex gap-6 text-sm">
+                  <span>
+                    {t("doc.page.totalQty")}: {readonlyTotals.totalQty}
+                  </span>
+                  <span>
+                    {t("doc.page.totalAmount")}: {readonlyTotals.totalAmount.toFixed(2)}
+                  </span>
+                </div>
+              </>
+            )}
+          </div>

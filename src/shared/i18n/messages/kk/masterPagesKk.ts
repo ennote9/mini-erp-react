@@ -110,7 +110,8 @@ export const kkMasterPages: MessageTree = {
       "Тауар бойынша соңғы {{limit}} қозғалыс. Толық тарих үшін тізімді ашыңыз.",
     openAllStockMovements: "Қозғалыстарды ашу",
     emptyRelatedStockMovements: "Бұл тауар бойынша қозғалыс жоқ.",
-    openStockMovementsListRowAria: "Осы тауар бойынша сүзілген қозғалыстарды ашу",
+    openStockMovementsListRowAria:
+      "Осы тауар және {{warehouse}} қоймасы бойынша сүзілген қозғалыстарды ашу",
   },
   brand: {
     notFound: "Бренд табылмады.",
@@ -136,7 +137,8 @@ export const kkMasterPages: MessageTree = {
       "Бренд тауарлары бойынша соңғы {{limit}} қозғалыс. Толық тарих үшін тізімді ашыңыз.",
     openAllStockMovements: "Қозғалыстарды ашу",
     emptyRelatedStockMovements: "Бұл бренд бойынша қозғалыс әлі жоқ.",
-    openStockMovementsListRowAria: "Осы бренд бойынша сүзілген қозғалыстарды ашу",
+    openStockMovementsListRowAria:
+      "Осы бренд, {{item}} тауары және {{warehouse}} қоймасы бойынша сүзілген қозғалыстарды ашу",
   },
   category: {
     notFound: "Санат табылмады.",
@@ -162,7 +164,8 @@ export const kkMasterPages: MessageTree = {
       "Санат тауарлары бойынша соңғы {{limit}} қозғалыс. Толық тарих үшін тізімді ашыңыз.",
     openAllStockMovements: "Қозғалыстарды ашу",
     emptyRelatedStockMovements: "Бұл санат бойынша қозғалыс әлі жоқ.",
-    openStockMovementsListRowAria: "Осы санат бойынша сүзілген қозғалыстарды ашу",
+    openStockMovementsListRowAria:
+      "Осы санат, {{item}} тауары және {{warehouse}} қоймасы бойынша сүзілген қозғалыстарды ашу",
   },
   supplier: {
     notFound: "Жеткізуші табылмады.",

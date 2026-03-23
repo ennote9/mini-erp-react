@@ -109,7 +109,8 @@ export const ruMasterPages: MessageTree = {
       "Последние {{limit}} движений по номенклатуре. Откройте список для полной истории.",
     openAllStockMovements: "Открыть движения",
     emptyRelatedStockMovements: "По этой номенклатуре движений нет.",
-    openStockMovementsListRowAria: "Открыть движения с фильтром по номенклатуре",
+    openStockMovementsListRowAria:
+      "Открыть движения по номенклатуре и складу {{warehouse}}",
   },
   brand: {
     notFound: "Бренд не найден.",
@@ -135,7 +136,8 @@ export const ruMasterPages: MessageTree = {
       "Последние {{limit}} движений по позициям бренда. Откройте список для полной истории.",
     openAllStockMovements: "Открыть движения",
     emptyRelatedStockMovements: "По этому бренду движений пока нет.",
-    openStockMovementsListRowAria: "Открыть движения с фильтром по бренду",
+    openStockMovementsListRowAria:
+      "Открыть движения по бренду, позиция {{item}}, склад {{warehouse}}",
   },
   category: {
     notFound: "Категория не найдена.",
@@ -161,7 +163,8 @@ export const ruMasterPages: MessageTree = {
       "Последние {{limit}} движений по позициям категории. Откройте список для полной истории.",
     openAllStockMovements: "Открыть движения",
     emptyRelatedStockMovements: "По этой категории движений пока нет.",
-    openStockMovementsListRowAria: "Открыть движения с фильтром по категории",
+    openStockMovementsListRowAria:
+      "Открыть движения по категории, позиция {{item}}, склад {{warehouse}}",
   },
   supplier: {
     notFound: "Поставщик не найден.",

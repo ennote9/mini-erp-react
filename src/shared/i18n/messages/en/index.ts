@@ -9,6 +9,7 @@ import { opsEn } from "./ops";
 import { masterPagesEn } from "./masterPages";
 import { issuesMessagesEn } from "./issuesMessages";
 import { exportExcelEn } from "./exportExcelEn";
+import { financeEn } from "./finance";
 
 /** English message tree (source of truth + fallback). */
 export const enMessages: MessageTree = {
@@ -22,4 +23,5 @@ export const enMessages: MessageTree = {
   master: masterPagesEn as unknown as MessageTree,
   issues: issuesMessagesEn as unknown as MessageTree,
   exportExcel: exportExcelEn as unknown as MessageTree,
+  finance: financeEn as unknown as MessageTree,
 };

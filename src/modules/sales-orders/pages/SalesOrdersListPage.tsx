@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useRef, useCallback } from "react";
+import React, { useMemo, useState, useRef, useCallback, useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { AgGridReact } from "ag-grid-react";
 import type { ColDef, ICellRendererParams, SelectionChangedEvent } from "ag-grid-community";
@@ -37,6 +37,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { revealItemInDir } from "@tauri-apps/plugin-opener";
 import { useTranslation } from "@/shared/i18n/context";
 import { salesOrdersListExcelLabels } from "@/shared/i18n/excelListExportLabels";
+import { readOptionalPlanningStatusFromQuery } from "@/shared/navigation/listQueryStatus";
 
 type StatusFilter = "all" | PlanningDocumentStatus;
 
@@ -148,6 +149,15 @@ export function SalesOrdersListPage() {
 
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
+
+  const statusFromQuery = useMemo(
+    () => readOptionalPlanningStatusFromQuery(searchParams),
+    [searchParams],
+  );
+  useEffect(() => {
+    if (statusFromQuery === undefined) return;
+    setStatusFilter(statusFromQuery);
+  }, [statusFromQuery]);
   const [exportSuccess, setExportSuccess] = useState<{ path: string; filename: string } | null>(null);
   const [exportOpen, setExportOpen] = useState(false);
   const [selectedCount, setSelectedCount] = useState(0);
