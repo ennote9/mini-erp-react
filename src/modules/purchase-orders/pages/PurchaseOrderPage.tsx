@@ -1803,7 +1803,7 @@ export function PurchaseOrderPage() {
               </Card>
               </div>
             )}
-            <div className="doc-lines__grid">
+            <div className="doc-lines__grid doc-lines__grid--fixed-h h-[22rem] min-h-[22rem]">
               <AgGridContainer themeClass="doc-lines-grid">
                 <AgGridReact<LineFormRow>
                   {...agGridDefaultGridOptions}
@@ -1871,7 +1871,7 @@ export function PurchaseOrderPage() {
               <p className="doc-lines__empty">{t("doc.page.noLines")}</p>
             ) : (
               <>
-                <div className="doc-lines__grid">
+                <div className="doc-lines__grid doc-lines__grid--fixed-h h-[22rem] min-h-[22rem]">
                   <AgGridContainer themeClass="doc-lines-grid">
                     <AgGridReact<LineWithItem>
                       {...agGridDefaultGridOptions}

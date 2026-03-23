@@ -220,19 +220,8 @@ export const kkMessages: MessageTree = {
   },
   dashboard: {
     title: "Басқару тақтасы",
-    subtitle:
-      "Тікелей операциялық панель: назар аудару, құжат ағыны, қор жолдары, соңғы түсім мен жөнелту.",
     sections: {
-      priority: "Назар аудару керек",
       pipeline: "Құжат ағыны",
-      inventory: "Қорлар мен анықтамалық",
-      logistics: "Соңғы түсім мен жөнелту",
-    },
-    pipeline: {
-      hint: "Күй санына басыңыз — тізім сол күйге сүзіледі. Карточкадағы сілтеме — толық тізім.",
-    },
-    inventorySection: {
-      hint: "Жол саны ағымдағы сақталған қалдық пен қозғалыс жолдарын көрсетеді; толығырақ үшін тізімді ашыңыз.",
     },
     po: { title: "Сатып алу тапсырыстары" },
     so: { title: "Сату тапсырыстары" },
@@ -246,56 +235,8 @@ export const kkMessages: MessageTree = {
       posted: "Жүргізілген",
       reversed: "Кері қайтарылған",
     },
-    stockBalances: {
-      title: "Қалдықтар",
-      balanceRows: "Қалдық жолдары",
-      hint: "Тауар мен қойма үшін сақталған қалдық бар бір жол.",
-    },
-    stockMovements: {
-      title: "Қозғалыстар",
-      movementRows: "Қозғалыс жолдары",
-      hint: "Қалдықты өзгертетін жүргізілген қозғалыс жолдары.",
-    },
-    items: {
-      title: "Тауарлар",
-      total: "Барлық позициялар",
-      active: "Белсенді",
-      withImages: "Суреті бар",
-      hint: "Каталог күйі: қамту және суреттердің дайындығы.",
-    },
-    recentReceipts: { title: "Соңғы түсімдер", empty: "Түсімдер әлі жоқ." },
-    recentShipments: { title: "Соңғы жөнелтулер", empty: "Жөнелтулер әлі жоқ." },
-    signals: {
-      title: "Операциялық тексерулер",
-      subtitle: "Жергілікті деректерден есептелген — қарау немесе кезекті тазалау үшін сілтемеге өтіңіз.",
-      inactiveItems: "Белсенді емес позициялар",
-      itemsWithoutImages: "Суретсіз позициялар",
-      draftReceipts: "Түсім жобалары",
-      draftShipments: "Жөнелту жобалары",
-      masterDataHint: "Анықтама",
-      reviewAction: "Тізімді ашу →",
-    },
-    quickLinksSubtitle: "Күнделікте керек тізімдерге тікелей өту.",
     openList: "Тізімді ашу →",
-    openArrow: "Ашу →",
     totalLabel: "Барлығы",
-    recent: {
-      byDate: "Құжат күні бойынша ең соңғы.",
-      logisticsHintReceipts: "Сатып алу тапсырыстарына байланысты кіріс құжаттары — құжат күні бойынша жаңалары.",
-      logisticsHintShipments: "Сату тапсырыстарына байланысты шығыс құжаттары — құжат күні бойынша жаңалары.",
-      openList: "Тізімді ашу →",
-      columns: {
-        number: "Нөмір",
-        date: "Күні",
-        status: "Күйі",
-        source: "Көз",
-        warehouse: "Қойма",
-      },
-      poPrefix: "САТ",
-      soPrefix: "СТ",
-      openReceiptAria: "Түсімді ашу {{number}}",
-      openShipmentAria: "Жөнелтуді ашу {{number}}",
-    },
   },
   domain: {
     reasons: {
