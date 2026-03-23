@@ -65,13 +65,20 @@ import {
   Check,
   ChevronDown,
   CircleCheck,
+  ClipboardList,
+  Coins,
   File,
   FileSpreadsheet,
   FileX,
   FolderOpen,
+  History,
+  List,
+  Activity,
   Plus,
   Save,
+  Truck,
   Trash2,
+  Wallet,
   X,
 } from "lucide-react";
 import { buildLinesXlsxBuffer, buildDocumentXlsxBuffer, type SoExportLineRow, type SoDocumentSummary } from "../soExport";
@@ -86,6 +93,7 @@ import { DocumentEventLogSection } from "../../../shared/ui/object/DocumentEvent
 import { DocumentPrintActionsMenu } from "../../../shared/ui/object/DocumentPrintActionsMenu";
 import { useSettings } from "../../../shared/settings/SettingsContext";
 import { useTranslation } from "@/shared/i18n/context";
+import { buildReadableUniqueFilename, ensureUniqueExportPath } from "@/shared/export/filenameBuilder";
 import { cn } from "@/lib/utils";
 import type { TFunction } from "@/shared/i18n/resolve";
 import { planningSalesOrderExportLabels } from "@/shared/i18n/excelPlanningExportLabels";
@@ -603,7 +611,7 @@ export function SalesOrderPage() {
   const [lineImportInitialTab, setLineImportInitialTab] = useState<LineImportTab>("paste");
   const [exportSuccess, setExportSuccess] = useState<{ path: string; filename: string } | null>(null);
   const [exportOpen, setExportOpen] = useState(false);
-  const [soWorkingTab, setSoWorkingTab] = useState<"lines" | "payments" | "events">("lines");
+  const [soWorkingTab, setSoWorkingTab] = useState<"lines" | "execution" | "payments" | "events">("lines");
   const linesGridRef = useRef<AgGridReact<LineFormRow> | null>(null);
   const lineEntryItemPickerRef = useRef<SalesOrderItemAutocompleteRef | null>(null);
   const lineEntryQtyInputRef = useRef<HTMLInputElement | null>(null);
@@ -1160,17 +1168,6 @@ export function SalesOrderPage() {
     return deriveSalesOrderPaymentSummary(totalAmount, payments);
   }, [isEditable, totals.totalAmount, readonlyTotals.totalAmount, isNew, id, refresh]);
 
-  const paymentStatusDetailClass = useMemo(() => {
-    switch (soDetailsPaymentSummary.status) {
-      case "paid":
-        return "text-emerald-600 dark:text-emerald-500";
-      case "partially_paid":
-        return "text-amber-600 dark:text-amber-500";
-      default:
-        return "text-muted-foreground";
-    }
-  }, [soDetailsPaymentSummary.status]);
-
   const health = useMemo(
     () =>
       getSalesOrderHealth({
@@ -1285,12 +1282,16 @@ export function SalesOrderPage() {
 
   const runExportWithSaveAs = useCallback(
     async (defaultFilename: string, buildBuffer: () => Promise<ArrayBuffer>) => {
+      const extension = defaultFilename.toLowerCase().endsWith(".pdf") ? "pdf" : "xlsx";
+      const base = defaultFilename.replace(/\.[^.]+$/, "");
+      const generatedFilename = buildReadableUniqueFilename({ base, extension });
       try {
         const path = await save({
-          defaultPath: defaultFilename,
+          defaultPath: generatedFilename,
           filters: [{ name: t("doc.page.excelFilterName"), extensions: ["xlsx"] }],
         });
         if (path == null) return;
+        const safePath = await ensureUniqueExportPath(path);
 
         const buffer = await buildBuffer();
         const bytes = new Uint8Array(buffer);
@@ -1298,9 +1299,9 @@ export function SalesOrderPage() {
         for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
         const contentsBase64 = btoa(binary);
 
-        await invoke("write_export_file", { path, contentsBase64 });
-        const filename = path.replace(/^.*[/\\]/, "") || defaultFilename;
-        setExportSuccess({ path, filename });
+        await invoke("write_export_file", { path: safePath, contentsBase64 });
+        const filename = safePath.replace(/^.*[/\\]/, "") || generatedFilename;
+        setExportSuccess({ path: safePath, filename });
       } catch (err) {
         console.error("Export failed", err);
         const buffer = await buildBuffer();
@@ -1434,16 +1435,24 @@ export function SalesOrderPage() {
         <div className="doc-header">
           <div className="doc-header__title-row">
             <h2 className="doc-header__title">{displayTitle}</h2>
-            {!isNew && <StatusBadge status={doc!.status} />}
+            {!isNew && (
+              <Badge
+                variant="outline"
+                className="h-6 rounded-full border-border px-2.5 text-xs font-medium leading-none text-foreground"
+              >
+                {t(`status.labels.${doc!.status}`)}
+              </Badge>
+            )}
           </div>
           <div className="doc-header__right">
             {isEditable && (hasErrors(combinedIssues) || hasWarnings(combinedIssues)) && (
               <DocumentIssueStrip issues={combinedIssues} />
             )}
-            <div className="doc-header__actions">
+            <div className="doc-header__actions items-center [&_button]:!text-xs [&_button]:!leading-tight [&_button_svg]:!h-3 [&_button_svg]:!w-3 [&_button_svg]:!max-h-3 [&_button_svg]:!max-w-3">
               {isEditable && (
                 <Button
                   type="button"
+                  className="h-[1.625rem] !px-1 !py-0 !gap-0.5"
                   onClick={handleSave}
                   title={t("doc.page.saveTitle")}
                 >
@@ -1454,6 +1463,7 @@ export function SalesOrderPage() {
               {!isNew && isDraft && (
                 <Button
                   type="button"
+                  className="h-[1.625rem] !px-1 !py-0 !gap-0.5"
                   onClick={handleConfirm}
                   disabled={
                     settings.documents.blockConfirmWhenPlanningHasBlockingErrors &&
@@ -1474,19 +1484,21 @@ export function SalesOrderPage() {
                 <Button
                   type="button"
                   variant="outline"
+                  className="h-[1.625rem] !px-1 !py-0 !gap-0.5"
                   onClick={handleAllocateStock}
                   title={t("doc.page.allocateStockTitle")}
                 >
+                  <ClipboardList className="h-3 w-3" aria-hidden />
                   {t("doc.page.allocateStock")}
                 </Button>
               )}
               {!isNew && isConfirmed && (
-                <Button type="button" onClick={handleCreateShipment}>
-                  <span className="create-btn__plus">+</span> {t("doc.page.createShipment")}
+                <Button type="button" className="h-[1.625rem] !px-1 !py-0 !gap-0.5" onClick={handleCreateShipment}>
+                  <Truck className="h-3 w-3" aria-hidden /> {t("doc.page.createShipment")}
                 </Button>
               )}
               {!isNew && (isDraft || isConfirmed) && (
-                <Button type="button" variant="outline" onClick={handleCancelDocument}>
+                <Button type="button" variant="outline" className="h-[1.625rem] !px-1 !py-0 !gap-0.5" onClick={handleCancelDocument}>
                   <FileX aria-hidden />
                   {t("doc.page.cancelDocument")}
                 </Button>
@@ -1497,120 +1509,123 @@ export function SalesOrderPage() {
                     items={salesOrderPrintMenuItems}
                     triggerLabel={t("doc.page.print")}
                     aria-label={t("doc.page.printMenuAria")}
+                    className="h-[1.625rem] !px-1 !py-0 !gap-0.5"
                   />
-                  {exportSuccess && (
-                    <div className="h-8 w-max flex max-w-[min(100%,20rem)] items-center gap-1.5 rounded-md border border-input bg-background px-2 text-sm shrink-0">
-                      <span className="text-muted-foreground text-xs">{t("doc.list.exportCompleted")}</span>
-                      <span className="font-medium text-xs truncate max-w-[12rem]" title={exportSuccess.filename}>
-                        {exportSuccess.filename}
-                      </span>
+                  <div className="relative shrink-0">
+                    <div className="flex items-stretch rounded-md border border-input shrink-0">
                       <Button
                         type="button"
-                        variant="ghost"
-                        size="icon"
-                        className="h-7 w-7 shrink-0 text-muted-foreground hover:text-foreground"
-                        title={t("doc.list.openFile")}
-                        aria-label={t("doc.list.openFile")}
-                        onClick={async () => {
-                          try {
-                            await invoke("open_export_file", { path: exportSuccess.path });
-                            setExportSuccess(null);
-                          } catch (err) {
-                            console.error("Export failed", err);
-                            setExportSuccess(null);
-                          }
-                        }}
+                        variant="outline"
+                        size="sm"
+                        className="h-[1.625rem] rounded-r-none border-0 border-r border-input !px-1 !py-0 !gap-0.5"
+                        onClick={handleExportMain}
                       >
-                        <File className="h-4 w-4" />
+                        <FileSpreadsheet className="h-4 w-4 shrink-0" />
+                        {t("doc.page.export")}
                       </Button>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon"
-                        className="h-7 w-7 shrink-0 text-muted-foreground hover:text-foreground"
-                        title={t("doc.list.openFolder")}
-                        aria-label={t("doc.list.openFolder")}
-                        onClick={() => {
-                          revealItemInDir(exportSuccess.path);
-                          setExportSuccess(null);
-                        }}
-                      >
-                        <FolderOpen className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon"
-                        className="h-6 w-6 shrink-0 text-muted-foreground/80 hover:text-muted-foreground"
-                        title={t("doc.list.dismiss")}
-                        aria-label={t("doc.list.dismiss")}
-                        onClick={() => setExportSuccess(null)}
-                      >
-                        <X className="h-3 w-3" />
-                      </Button>
+                      <Popover open={exportOpen} onOpenChange={setExportOpen}>
+                        <PopoverTrigger asChild>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="icon"
+                            className="h-[1.625rem] w-[1.625rem] shrink-0 rounded-l-none border-0 shadow-none"
+                            aria-label={t("doc.list.exportOptionsAria")}
+                          >
+                            <ChevronDown className="h-4 w-4" />
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="!w-max min-w-0 p-1.5" align="end" side="top">
+                          <div className="flex flex-col gap-0.5">
+                            <button
+                              type="button"
+                              disabled={exportSelectedDisabled}
+                              className="w-full rounded-sm px-1.5 py-1 text-left text-sm hover:bg-accent disabled:cursor-not-allowed disabled:opacity-50"
+                              title={
+                                exportSelectedDisabled
+                                  ? !isEditable
+                                    ? t("doc.list.exportSelectionEditModeOnly")
+                                    : t("doc.list.exportSelectLinesFirst")
+                                  : undefined
+                              }
+                              onClick={() => {
+                                setExportOpen(false);
+                                if (!exportSelectedDisabled) handleExportSelected();
+                              }}
+                            >
+                              {t("doc.list.exportSelectedRows")}
+                            </button>
+                            <button
+                              type="button"
+                              className="w-full rounded-sm px-1.5 py-1 text-left text-sm hover:bg-accent"
+                              onClick={() => {
+                                setExportOpen(false);
+                                handleExportAll();
+                              }}
+                            >
+                              {t("doc.list.exportAllLines")}
+                            </button>
+                          </div>
+                        </PopoverContent>
+                      </Popover>
                     </div>
-                  )}
-                  <div className="flex items-stretch rounded-md border border-input shrink-0">
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      className="h-8 rounded-r-none border-0 border-r border-input gap-1.5"
-                      onClick={handleExportMain}
-                    >
-                      <FileSpreadsheet className="h-4 w-4 shrink-0" />
-                      {t("doc.page.export")}
-                    </Button>
-                    <Popover open={exportOpen} onOpenChange={setExportOpen}>
-                      <PopoverTrigger asChild>
+                    {exportSuccess && (
+                      <div className="absolute right-0 top-full z-10 mt-1 h-7 w-max flex max-w-[20rem] items-center gap-0 rounded-md border border-input bg-background px-1 text-sm">
+                        <CircleCheck className="h-3.5 w-3.5 shrink-0 text-emerald-400" aria-label={t("doc.list.exportCompleted")} />
+                        <span className="ml-1 font-medium text-xs truncate max-w-[12rem]" title={exportSuccess.filename}>
+                          {exportSuccess.filename}
+                        </span>
                         <Button
                           type="button"
-                          variant="outline"
+                          variant="ghost"
                           size="icon"
-                          className="h-8 w-8 shrink-0 rounded-l-none border-0 shadow-none"
-                          aria-label={t("doc.list.exportOptionsAria")}
-                        >
-                          <ChevronDown className="h-4 w-4" />
-                        </Button>
-                      </PopoverTrigger>
-                      <PopoverContent className="!w-max min-w-0 p-1.5" align="end" side="top">
-                        <div className="flex flex-col gap-0.5">
-                          <button
-                            type="button"
-                            disabled={exportSelectedDisabled}
-                            className="w-full rounded-sm px-1.5 py-1 text-left text-sm hover:bg-accent disabled:cursor-not-allowed disabled:opacity-50"
-                            title={
-                              exportSelectedDisabled
-                                ? !isEditable
-                                  ? t("doc.list.exportSelectionEditModeOnly")
-                                  : t("doc.list.exportSelectLinesFirst")
-                                : undefined
+                          className="h-5 w-5 !p-0 shrink-0 text-muted-foreground hover:text-foreground"
+                          title={t("doc.list.openFile")}
+                          aria-label={t("doc.list.openFile")}
+                          onClick={async () => {
+                            try {
+                              await invoke("open_export_file", { path: exportSuccess.path });
+                              setExportSuccess(null);
+                            } catch (err) {
+                              console.error("Export failed", err);
+                              setExportSuccess(null);
                             }
-                            onClick={() => {
-                              setExportOpen(false);
-                              if (!exportSelectedDisabled) handleExportSelected();
-                            }}
-                          >
-                            {t("doc.list.exportSelectedRows")}
-                          </button>
-                          <button
-                            type="button"
-                            className="w-full rounded-sm px-1.5 py-1 text-left text-sm hover:bg-accent"
-                            onClick={() => {
-                              setExportOpen(false);
-                              handleExportAll();
-                            }}
-                          >
-                            {t("doc.list.exportAllLines")}
-                          </button>
-                        </div>
-                      </PopoverContent>
-                    </Popover>
+                          }}
+                        >
+                          <File className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          className="h-5 w-5 !p-0 shrink-0 text-muted-foreground hover:text-foreground"
+                          title={t("doc.list.openFolder")}
+                          aria-label={t("doc.list.openFolder")}
+                          onClick={() => {
+                            revealItemInDir(exportSuccess.path);
+                            setExportSuccess(null);
+                          }}
+                        >
+                          <FolderOpen className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          className="h-[1.125rem] w-[1.125rem] !p-0 shrink-0 text-muted-foreground/80 hover:text-muted-foreground"
+                          title={t("doc.list.dismiss")}
+                          aria-label={t("doc.list.dismiss")}
+                          onClick={() => setExportSuccess(null)}
+                        >
+                          <X className="h-3 w-3" />
+                        </Button>
+                      </div>
+                    )}
                   </div>
                 </>
               )}
               {isEditable && (
-                <Button type="button" variant="outline" onClick={handleCancel}>
+                <Button type="button" variant="outline" className="h-[1.625rem] !px-1 !py-0 !gap-0.5" onClick={handleCancel}>
                   <X aria-hidden />
                   {t("common.cancel")}
                 </Button>
@@ -1621,33 +1636,34 @@ export function SalesOrderPage() {
       }
       summary={null}
     >
+      <div className="doc-so-page flex w-full min-w-0 flex-col gap-2">
       {isEditable ? (
-        <>
-          <Card className="w-full max-w-6xl border-0 shadow-none">
-            <CardHeader className="p-2 pb-0.5">
+          <Card className="w-full border-0 bg-transparent shadow-none">
+            <CardHeader className="px-3 py-2 pb-1.5">
               <CardTitle className="text-[0.9rem] font-semibold">{t("doc.page.details")}</CardTitle>
             </CardHeader>
-            <CardContent className="p-2 pt-1">
-              <div className="grid gap-4 lg:grid-cols-2 lg:items-start lg:gap-8">
-                <div className="flex min-w-0 flex-col gap-4">
+            <CardContent className="px-3 pb-3 pt-0">
+              <div className="grid w-full min-w-0 grid-cols-1 gap-x-[1.5cm] gap-y-2 lg:grid-cols-[max-content_max-content_max-content_max-content] lg:justify-start lg:items-start">
+                <div className="flex min-w-0 flex-col gap-2.5 p-3">
                   <section className="min-w-0" aria-labelledby="so-details-doc-heading">
                     <h3
                       id="so-details-doc-heading"
-                      className="mb-2 text-[0.7rem] font-semibold uppercase tracking-wide text-muted-foreground"
+                      className="mb-0.5 flex items-center gap-1 text-[0.7rem] font-semibold uppercase tracking-wide text-muted-foreground"
                     >
+                      <File className="h-3.5 w-3.5" aria-hidden />
                       {t("doc.so.sectionDocument")}
                     </h3>
-                    <div className="grid grid-cols-1 gap-x-4 gap-y-2 sm:grid-cols-2">
+                    <div className="grid grid-cols-1 gap-x-2.5 gap-y-0 sm:grid-cols-2">
                       <div className="flex min-w-0 flex-col gap-0.5">
-                        <Label htmlFor="so-number" className="text-sm">
+                        <Label htmlFor="so-number" className="text-xs leading-none">
                           {t("doc.columns.number")}
                         </Label>
-                        <div id="so-number" className="flex h-8 items-center text-sm text-muted-foreground">
+                        <div id="so-number" className="flex h-6 items-center text-sm leading-tight text-muted-foreground">
                           {displayNumber}
                         </div>
                       </div>
                       <div className="flex min-w-0 flex-col gap-0.5">
-                        <Label htmlFor="so-date" className="text-sm">
+                        <Label htmlFor="so-date" className="text-xs leading-none">
                           {t("doc.columns.date")} <span className="text-destructive">*</span>
                         </Label>
                         <DatePickerField
@@ -1659,14 +1675,14 @@ export function SalesOrderPage() {
                       </div>
                       {doc ? (
                         <div className="flex min-w-0 flex-col gap-0.5 sm:col-span-2">
-                          <span className="text-sm text-muted-foreground">{t("doc.columns.status")}</span>
-                          <div className="flex min-h-[2rem] items-center">
+                          <span className="text-xs leading-none text-muted-foreground">{t("doc.columns.status")}</span>
+                          <div className="flex min-h-[1.5rem] items-center">
                             <StatusBadge status={doc.status} />
                           </div>
                         </div>
                       ) : null}
                       <div className="flex min-w-0 flex-col gap-0.5">
-                        <Label htmlFor="so-customer" className="text-sm">
+                        <Label htmlFor="so-customer" className="text-xs leading-none">
                           {t("doc.columns.customer")} <span className="text-destructive">*</span>
                         </Label>
                         <SelectField
@@ -1682,7 +1698,7 @@ export function SalesOrderPage() {
                         />
                       </div>
                       <div className="flex min-w-0 flex-col gap-0.5">
-                        <Label htmlFor="so-warehouse" className="text-sm">
+                        <Label htmlFor="so-warehouse" className="text-xs leading-none">
                           {t("doc.columns.warehouse")} <span className="text-destructive">*</span>
                         </Label>
                         <SelectField
@@ -1699,16 +1715,19 @@ export function SalesOrderPage() {
                       </div>
                     </div>
                   </section>
+                </div>
+                <div className="flex min-h-0 min-w-0 flex-col p-3">
                   <section className="min-w-0" aria-labelledby="so-details-delivery-heading">
                     <h3
                       id="so-details-delivery-heading"
-                      className="mb-2 text-[0.7rem] font-semibold uppercase tracking-wide text-muted-foreground"
+                      className="mb-0.5 flex items-center gap-1 text-[0.7rem] font-semibold uppercase tracking-wide text-muted-foreground"
                     >
+                      <Truck className="h-3.5 w-3.5" aria-hidden />
                       {t("doc.so.sectionDelivery")}
                     </h3>
-                    <div className="flex flex-col gap-3">
+                    <div className="flex flex-col gap-1.5">
                       <div className="flex min-w-0 flex-col gap-0.5">
-                        <Label htmlFor="so-carrier" className="text-sm">
+                        <Label htmlFor="so-carrier" className="text-xs leading-none">
                           {t("doc.so.carrier")}
                         </Label>
                         <select
@@ -1730,9 +1749,9 @@ export function SalesOrderPage() {
                         <p className="text-xs text-muted-foreground m-0 leading-snug">{t("doc.so.carrierHint")}</p>
                       </div>
                       <p className="text-xs text-muted-foreground m-0 leading-snug">{t("doc.so.deliveryHint")}</p>
-                      <div className="grid grid-cols-1 gap-x-4 gap-y-2 sm:grid-cols-2">
+                      <div className="grid grid-cols-1 gap-x-2.5 gap-y-1 sm:grid-cols-2">
                         <div className="flex min-w-0 flex-col gap-0.5">
-                          <Label htmlFor="so-recipient-name" className="text-sm">
+                          <Label htmlFor="so-recipient-name" className="text-xs leading-none">
                             {t("doc.shipment.recipientName")}
                           </Label>
                           <Input
@@ -1746,7 +1765,7 @@ export function SalesOrderPage() {
                           />
                         </div>
                         <div className="flex min-w-0 flex-col gap-0.5">
-                          <Label htmlFor="so-recipient-phone" className="text-sm">
+                          <Label htmlFor="so-recipient-phone" className="text-xs leading-none">
                             {t("doc.shipment.recipientPhone")}
                           </Label>
                           <Input
@@ -1761,7 +1780,7 @@ export function SalesOrderPage() {
                         </div>
                       </div>
                       <div className="flex min-w-0 flex-col gap-0.5">
-                        <Label htmlFor="so-delivery-address" className="text-sm">
+                        <Label htmlFor="so-delivery-address" className="text-xs leading-none">
                           {t("doc.shipment.deliveryAddress")}
                         </Label>
                         <Textarea
@@ -1774,7 +1793,7 @@ export function SalesOrderPage() {
                         />
                       </div>
                       <div className="flex min-w-0 flex-col gap-0.5">
-                        <Label htmlFor="so-delivery-comment" className="text-sm">
+                        <Label htmlFor="so-delivery-comment" className="text-xs leading-none">
                           {t("doc.shipment.deliveryComment")}
                         </Label>
                         <Textarea
@@ -1789,17 +1808,18 @@ export function SalesOrderPage() {
                     </div>
                   </section>
                 </div>
-                <div className="flex min-w-0 flex-col gap-4">
+                <div className="flex min-h-0 min-w-0 flex-col p-3">
                   <section className="min-w-0" aria-labelledby="so-details-commercial-heading">
                     <h3
                       id="so-details-commercial-heading"
-                      className="mb-2 text-[0.7rem] font-semibold uppercase tracking-wide text-muted-foreground"
+                      className="mb-0.5 flex items-center gap-1 text-[0.7rem] font-semibold uppercase tracking-wide text-muted-foreground"
                     >
+                      <Coins className="h-3.5 w-3.5" aria-hidden />
                       {t("doc.so.sectionCommercial")}
                     </h3>
-                    <div className="grid grid-cols-1 gap-x-4 gap-y-2 sm:grid-cols-2">
+                    <div className="grid grid-cols-1 gap-x-2.5 gap-y-0.5 sm:grid-cols-2">
                       <div className="flex min-w-0 flex-col gap-0.5">
-                        <Label htmlFor="so-payment-terms" className="text-sm">
+                        <Label htmlFor="so-payment-terms" className="text-sm leading-tight">
                           {t("doc.page.paymentTermsDaysLabel")}
                         </Label>
                         <Input
@@ -1814,44 +1834,47 @@ export function SalesOrderPage() {
                         />
                       </div>
                       <div className="flex min-w-0 flex-col gap-0.5">
-                        <span className="text-sm text-muted-foreground">{t("doc.page.dueDate")}</span>
-                        <div className="flex h-8 items-center text-sm text-foreground/90 tabular-nums">
+                        <span className="text-sm leading-tight text-muted-foreground">{t("doc.page.dueDate")}</span>
+                        <div className="flex h-5 items-center text-sm leading-tight text-foreground/90 tabular-nums">
                           {computedDueDateDisplay}
                         </div>
                       </div>
                     </div>
-                    <div className="mt-3 space-y-2 rounded-md border border-border/60 bg-muted/20 px-3 py-2.5">
-                      <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
-                        <span className="text-sm text-muted-foreground">{t("finance.orderTotal")}</span>
-                        <span className="text-base font-semibold tabular-nums text-foreground">
+                    <div className="mt-0.5 space-y-0 px-0 py-0">
+                      <div className="grid grid-cols-[minmax(0,7.25rem)_minmax(0,1fr)] items-center gap-x-2">
+                        <span className="text-xs leading-tight text-muted-foreground whitespace-nowrap">{t("finance.orderTotal")}</span>
+                        <span className="text-xs font-semibold leading-tight tabular-nums text-foreground">
                           {roundMoney(soDetailsPaymentSummary.totalAmount).toFixed(getCommercialMoneyDecimalPlaces())}
                         </span>
                       </div>
-                      <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
-                        <span className="text-sm text-muted-foreground">{t("finance.paidTotal")}</span>
-                        <span className="text-sm font-medium tabular-nums text-foreground">
+                      <div className="grid grid-cols-[minmax(0,7.25rem)_minmax(0,1fr)] items-center gap-x-2">
+                        <span className="text-xs leading-tight text-muted-foreground whitespace-nowrap">{t("finance.paidTotal")}</span>
+                        <span className="text-xs font-medium leading-tight tabular-nums text-foreground">
                           {roundMoney(soDetailsPaymentSummary.paidAmount).toFixed(getCommercialMoneyDecimalPlaces())}
                         </span>
                       </div>
-                      <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
-                        <span className="text-sm text-muted-foreground">{t("finance.remaining")}</span>
-                        <span className="text-sm font-medium tabular-nums text-foreground">
+                      <div className="grid grid-cols-[minmax(0,7.25rem)_minmax(0,1fr)] items-center gap-x-2">
+                        <span className="text-xs leading-tight text-muted-foreground whitespace-nowrap">{t("finance.remaining")}</span>
+                        <span className="text-xs font-medium leading-tight tabular-nums text-foreground">
                           {roundMoney(soDetailsPaymentSummary.remainingAmount).toFixed(getCommercialMoneyDecimalPlaces())}
                         </span>
                       </div>
-                      <div className="flex flex-wrap items-center justify-between gap-2 border-t border-border/50 pt-2">
-                        <span className="text-sm text-muted-foreground">{t("finance.paymentStatusLabel")}</span>
-                        <Badge variant="outline" className={cn("font-medium", paymentStatusDetailClass)}>
+                      <div className="grid grid-cols-[minmax(0,7.25rem)_minmax(0,1fr)] items-center gap-x-2">
+                        <span className="text-xs leading-tight text-muted-foreground whitespace-nowrap">{t("finance.paymentStatusLabel")}</span>
+                        <Badge variant="outline" className="h-auto border-0 p-0 text-left text-xs leading-tight text-foreground">
                           {t(`finance.paymentStatus.${soDetailsPaymentSummary.status}`)}
                         </Badge>
                       </div>
                     </div>
                   </section>
+                </div>
+                <div className="flex min-h-0 min-w-0 flex-col p-3">
                   <section className="min-w-0" aria-labelledby="so-details-notes-heading">
                     <h3
                       id="so-details-notes-heading"
-                      className="mb-2 text-[0.7rem] font-semibold uppercase tracking-wide text-muted-foreground"
+                      className="mb-1 flex items-center gap-1 text-[0.7rem] font-semibold uppercase tracking-wide text-muted-foreground"
                     >
+                      <ClipboardList className="h-3.5 w-3.5" aria-hidden />
                       {t("doc.so.sectionNotes")}
                     </h3>
                     <Label htmlFor="so-comment" className="sr-only">
@@ -1863,68 +1886,70 @@ export function SalesOrderPage() {
                       onChange={(e) => setForm((f) => ({ ...f, comment: e.target.value }))}
                       placeholder={t("common.optional")}
                       rows={3}
-                      className="min-h-[4.5rem] resize-y text-sm"
+                      className="min-h-[4rem] resize-y text-sm"
                     />
                   </section>
                 </div>
               </div>
             </CardContent>
           </Card>
-        </>
       ) : (
-        <>
-          <Card className="w-full max-w-6xl border-0 shadow-none">
-            <CardHeader className="p-2 pb-0.5">
+          <Card className="w-full border-0 bg-transparent shadow-none">
+            <CardHeader className="px-3 py-2 pb-1.5">
               <CardTitle className="text-[0.9rem] font-semibold">{t("doc.page.details")}</CardTitle>
             </CardHeader>
-            <CardContent className="p-2 pt-1">
-              <div className="grid gap-4 lg:grid-cols-2 lg:items-start lg:gap-8">
-                <div className="flex min-w-0 flex-col gap-4">
+            <CardContent className="px-3 pb-3 pt-0">
+              <div className="grid w-full min-w-0 grid-cols-1 gap-x-[1.5cm] gap-y-2 lg:grid-cols-[max-content_max-content_max-content_max-content] lg:justify-start lg:items-start">
+                <div className="flex min-w-0 flex-col gap-2.5 p-3">
                   <section className="min-w-0" aria-labelledby="so-ro-details-doc-heading">
                     <h3
                       id="so-ro-details-doc-heading"
-                      className="mb-2 text-[0.7rem] font-semibold uppercase tracking-wide text-muted-foreground"
+                      className="mb-0.5 flex items-center gap-1 text-[0.7rem] font-semibold uppercase tracking-wide text-muted-foreground"
                     >
+                      <File className="h-3.5 w-3.5" aria-hidden />
                       {t("doc.so.sectionDocument")}
                     </h3>
-                    <dl className="doc-summary doc-summary--compact doc-summary--dense">
-                      <div className="doc-summary__row">
+                    <dl className="doc-summary doc-summary--compact doc-summary--dense so-doc-summary-compact">
+                      <div className="doc-summary__row py-0.5">
                         <dt className="doc-summary__term">{t("doc.columns.number")}</dt>
                         <dd className="doc-summary__value font-medium">{doc!.number}</dd>
                       </div>
-                      <div className="doc-summary__row">
+                      <div className="doc-summary__row py-0.5">
                         <dt className="doc-summary__term">{t("doc.columns.date")}</dt>
                         <dd className="doc-summary__value">{normalizeDateForSO(doc!.date)}</dd>
                       </div>
-                      <div className="doc-summary__row">
+                      <div className="doc-summary__row py-0.5">
                         <dt className="doc-summary__term">{t("doc.columns.status")}</dt>
                         <dd className="doc-summary__value">
                           <StatusBadge status={doc!.status} />
                         </dd>
                       </div>
-                      <div className="doc-summary__row">
+                      <div className="doc-summary__row py-0.5">
                         <dt className="doc-summary__term">{t("doc.columns.customer")}</dt>
                         <dd className="doc-summary__value">{customerName}</dd>
                       </div>
-                      <div className="doc-summary__row">
+                      <div className="doc-summary__row py-0.5">
                         <dt className="doc-summary__term">{t("doc.columns.warehouse")}</dt>
                         <dd className="doc-summary__value">{warehouseName}</dd>
                       </div>
                     </dl>
                   </section>
+                </div>
+                <div className="flex min-h-0 min-w-0 flex-col p-3">
                   <section className="min-w-0" aria-labelledby="so-ro-details-delivery-heading">
                     <h3
                       id="so-ro-details-delivery-heading"
-                      className="mb-2 text-[0.7rem] font-semibold uppercase tracking-wide text-muted-foreground"
+                      className="mb-0.5 flex items-center gap-1 text-[0.7rem] font-semibold uppercase tracking-wide text-muted-foreground"
                     >
+                      <Truck className="h-3.5 w-3.5" aria-hidden />
                       {t("doc.so.sectionDelivery")}
                     </h3>
-                    <dl className="doc-summary doc-summary--compact doc-summary--dense">
-                      <div className="doc-summary__row">
+                    <dl className="doc-summary doc-summary--compact doc-summary--dense so-doc-summary-compact">
+                      <div className="doc-summary__row py-0.5">
                         <dt className="doc-summary__term">{t("doc.so.carrier")}</dt>
                         <dd className="doc-summary__value">{carrierReadOnlyLabel}</dd>
                       </div>
-                      <div className="doc-summary__row">
+                      <div className="doc-summary__row py-0.5">
                         <dt className="doc-summary__term">{t("doc.shipment.recipientName")}</dt>
                         <dd className="doc-summary__value">
                           {doc!.recipientName?.trim()
@@ -1932,7 +1957,7 @@ export function SalesOrderPage() {
                             : emDashSummary}
                         </dd>
                       </div>
-                      <div className="doc-summary__row">
+                      <div className="doc-summary__row py-0.5">
                         <dt className="doc-summary__term">{t("doc.shipment.recipientPhone")}</dt>
                         <dd className="doc-summary__value">
                           {doc!.recipientPhone?.trim()
@@ -1940,7 +1965,7 @@ export function SalesOrderPage() {
                             : emDashSummary}
                         </dd>
                       </div>
-                      <div className="doc-summary__row">
+                      <div className="doc-summary__row py-0.5">
                         <dt className="doc-summary__term">{t("doc.shipment.deliveryAddress")}</dt>
                         <dd className="doc-summary__value whitespace-pre-wrap text-sm leading-snug">
                           {doc!.deliveryAddress?.trim()
@@ -1948,7 +1973,7 @@ export function SalesOrderPage() {
                             : emDashSummary}
                         </dd>
                       </div>
-                      <div className="doc-summary__row">
+                      <div className="doc-summary__row py-0.5">
                         <dt className="doc-summary__term">{t("doc.shipment.deliveryComment")}</dt>
                         <dd className="doc-summary__value whitespace-pre-wrap text-sm leading-snug">
                           {doc!.deliveryComment?.trim()
@@ -1959,16 +1984,17 @@ export function SalesOrderPage() {
                     </dl>
                   </section>
                 </div>
-                <div className="flex min-w-0 flex-col gap-4">
+                <div className="flex min-h-0 min-w-0 flex-col p-3">
                   <section className="min-w-0" aria-labelledby="so-ro-details-commercial-heading">
                     <h3
                       id="so-ro-details-commercial-heading"
-                      className="mb-2 text-[0.7rem] font-semibold uppercase tracking-wide text-muted-foreground"
+                      className="mb-0.5 flex items-center gap-1 text-[0.7rem] font-semibold uppercase tracking-wide text-muted-foreground"
                     >
+                      <Coins className="h-3.5 w-3.5" aria-hidden />
                       {t("doc.so.sectionCommercial")}
                     </h3>
-                    <dl className="doc-summary doc-summary--compact doc-summary--dense">
-                      <div className="doc-summary__row">
+                    <dl className="doc-summary doc-summary--compact doc-summary--dense so-doc-summary-compact">
+                      <div className="doc-summary__row py-0.5">
                         <dt className="doc-summary__term">{t("doc.summary.paymentTerms")}</dt>
                         <dd className="doc-summary__value">
                           {doc!.paymentTermsDays !== undefined
@@ -1976,7 +2002,7 @@ export function SalesOrderPage() {
                             : t("domain.audit.summary.emDash")}
                         </dd>
                       </div>
-                      <div className="doc-summary__row">
+                      <div className="doc-summary__row py-0.5">
                         <dt className="doc-summary__term">{t("doc.page.dueDate")}</dt>
                         <dd className="doc-summary__value">
                           {doc!.dueDate != null && doc!.dueDate !== ""
@@ -1985,76 +2011,76 @@ export function SalesOrderPage() {
                         </dd>
                       </div>
                     </dl>
-                    <div className="mt-3 space-y-2 rounded-md border border-border/60 bg-muted/20 px-3 py-2.5">
-                      <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
-                        <span className="text-sm text-muted-foreground">{t("finance.orderTotal")}</span>
-                        <span className="text-base font-semibold tabular-nums text-foreground">
+                    <div className="mt-0.5 space-y-0 px-0 py-0">
+                      <div className="grid grid-cols-[minmax(0,7.25rem)_minmax(0,1fr)] items-center gap-x-2">
+                        <span className="text-xs leading-tight text-muted-foreground whitespace-nowrap">{t("finance.orderTotal")}</span>
+                        <span className="text-xs font-semibold leading-tight tabular-nums text-foreground">
                           {roundMoney(soDetailsPaymentSummary.totalAmount).toFixed(getCommercialMoneyDecimalPlaces())}
                         </span>
                       </div>
-                      <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
-                        <span className="text-sm text-muted-foreground">{t("finance.paidTotal")}</span>
-                        <span className="text-sm font-medium tabular-nums text-foreground">
+                      <div className="grid grid-cols-[minmax(0,7.25rem)_minmax(0,1fr)] items-center gap-x-2">
+                        <span className="text-xs leading-tight text-muted-foreground whitespace-nowrap">{t("finance.paidTotal")}</span>
+                        <span className="text-xs font-medium leading-tight tabular-nums text-foreground">
                           {roundMoney(soDetailsPaymentSummary.paidAmount).toFixed(getCommercialMoneyDecimalPlaces())}
                         </span>
                       </div>
-                      <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
-                        <span className="text-sm text-muted-foreground">{t("finance.remaining")}</span>
-                        <span className="text-sm font-medium tabular-nums text-foreground">
+                      <div className="grid grid-cols-[minmax(0,7.25rem)_minmax(0,1fr)] items-center gap-x-2">
+                        <span className="text-xs leading-tight text-muted-foreground whitespace-nowrap">{t("finance.remaining")}</span>
+                        <span className="text-xs font-medium leading-tight tabular-nums text-foreground">
                           {roundMoney(soDetailsPaymentSummary.remainingAmount).toFixed(getCommercialMoneyDecimalPlaces())}
                         </span>
                       </div>
-                      <div className="flex flex-wrap items-center justify-between gap-2 border-t border-border/50 pt-2">
-                        <span className="text-sm text-muted-foreground">{t("finance.paymentStatusLabel")}</span>
-                        <Badge variant="outline" className={cn("font-medium", paymentStatusDetailClass)}>
+                      <div className="grid grid-cols-[minmax(0,7.25rem)_minmax(0,1fr)] items-center gap-x-2">
+                        <span className="text-xs leading-tight text-muted-foreground whitespace-nowrap">{t("finance.paymentStatusLabel")}</span>
+                        <Badge variant="outline" className="h-auto border-0 p-0 text-left text-xs leading-tight text-foreground">
                           {t(`finance.paymentStatus.${soDetailsPaymentSummary.status}`)}
                         </Badge>
                       </div>
                     </div>
                   </section>
+                </div>
+                <div className="flex min-h-0 min-w-0 flex-col p-3">
                   <section className="min-w-0" aria-labelledby="so-ro-details-notes-heading">
                     <h3
                       id="so-ro-details-notes-heading"
-                      className="mb-2 text-[0.7rem] font-semibold uppercase tracking-wide text-muted-foreground"
+                      className="mb-0.5 flex items-center gap-1 text-[0.7rem] font-semibold uppercase tracking-wide text-muted-foreground"
                     >
+                      <ClipboardList className="h-3.5 w-3.5" aria-hidden />
                       {t("doc.so.sectionNotes")}
                     </h3>
-                    <div className="space-y-3">
-                      <div>
-                        <p className="mb-1 text-xs font-medium text-muted-foreground">{t("doc.columns.comment")}</p>
-                        {doc!.comment != null && doc!.comment.trim() !== "" ? (
-                          <p className="whitespace-pre-wrap rounded-md border border-border/60 bg-muted/25 p-2.5 text-sm leading-relaxed text-foreground">
-                            {doc!.comment}
-                          </p>
-                        ) : (
-                          <p className="text-sm text-muted-foreground">{emDashSummary}</p>
-                        )}
+                    <dl className="doc-summary doc-summary--compact doc-summary--dense so-doc-summary-compact so-notes-summary-stack">
+                      <div className="doc-summary__row py-0.5">
+                        <dt className="doc-summary__term">{t("doc.columns.comment")}</dt>
+                        <dd className="doc-summary__value whitespace-pre-wrap">
+                          {doc!.comment != null && doc!.comment.trim() !== "" ? doc!.comment : emDashSummary}
+                        </dd>
                       </div>
                       {doc!.status === "cancelled" && doc!.cancelReasonCode != null && doc!.cancelReasonCode !== "" && (
-                        <div className="space-y-2 rounded-md border border-destructive/30 bg-destructive/5 p-2.5">
-                          <p className="text-xs font-medium text-destructive">{t("doc.summary.cancelReason")}</p>
-                          <p className="text-sm leading-relaxed">
-                            {translateCancelReason(t, doc!.cancelReasonCode as CancelDocumentReasonCode)}
-                          </p>
+                        <>
+                          <div className="doc-summary__row py-0.5">
+                            <dt className="doc-summary__term text-destructive">{t("doc.summary.cancelReason")}</dt>
+                            <dd className="doc-summary__value whitespace-pre-wrap">
+                              {translateCancelReason(t, doc!.cancelReasonCode as CancelDocumentReasonCode)}
+                            </dd>
+                          </div>
                           {doc!.cancelReasonComment != null && doc!.cancelReasonComment.trim() !== "" && (
-                            <>
-                              <p className="text-xs font-medium text-muted-foreground">{t("doc.summary.cancelComment")}</p>
-                              <p className="whitespace-pre-wrap text-sm leading-relaxed">{doc!.cancelReasonComment}</p>
-                            </>
+                            <div className="doc-summary__row py-0.5">
+                              <dt className="doc-summary__term">{t("doc.summary.cancelComment")}</dt>
+                              <dd className="doc-summary__value whitespace-pre-wrap">{doc!.cancelReasonComment}</dd>
+                            </div>
                           )}
-                        </div>
+                        </>
                       )}
-                    </div>
+                    </dl>
                   </section>
                 </div>
               </div>
             </CardContent>
           </Card>
-        </>
       )}
-      <div className="doc-so-working-area mt-4 max-w-full">
+      <div className="doc-so-working-area mt-0 max-w-full border-t border-border/60 pt-2">
         <div
-          className="mb-3 flex flex-wrap gap-1 border-b border-border"
+          className="mb-2 flex flex-wrap gap-1 border-b border-border"
           role="tablist"
           aria-label={t("doc.so.tabPanelsAria")}
         >
@@ -2070,7 +2096,27 @@ export function SalesOrderPage() {
             )}
             onClick={() => setSoWorkingTab("lines")}
           >
-            {t("doc.so.tabLines")}
+            <span className="inline-flex items-center gap-1.5">
+              <List className="h-3.5 w-3.5" aria-hidden />
+              {t("doc.so.tabLines")}
+            </span>
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={soWorkingTab === "execution"}
+            className={cn(
+              "-mb-px border-b-2 px-3 py-2 text-sm font-medium transition-colors",
+              soWorkingTab === "execution"
+                ? "border-primary text-foreground"
+                : "border-transparent text-muted-foreground hover:text-foreground",
+            )}
+            onClick={() => setSoWorkingTab("execution")}
+          >
+            <span className="inline-flex items-center gap-1.5">
+              <Activity className="h-3.5 w-3.5" aria-hidden />
+              {t("doc.so.tabExecution")}
+            </span>
           </button>
           <button
             type="button"
@@ -2084,7 +2130,10 @@ export function SalesOrderPage() {
             )}
             onClick={() => setSoWorkingTab("payments")}
           >
-            {t("doc.so.tabPayments")}
+            <span className="inline-flex items-center gap-1.5">
+              <Wallet className="h-3.5 w-3.5" aria-hidden />
+              {t("doc.so.tabPayments")}
+            </span>
           </button>
           <button
             type="button"
@@ -2098,9 +2147,113 @@ export function SalesOrderPage() {
             )}
             onClick={() => setSoWorkingTab("events")}
           >
-            {t("doc.so.tabEventLog")}
+            <span className="inline-flex items-center gap-1.5">
+              <History className="h-3.5 w-3.5" aria-hidden />
+              {t("doc.so.tabEventLog")}
+            </span>
           </button>
         </div>
+        {soWorkingTab === "execution" && (
+          <div className="doc-so-tab-panel doc-so-tab-panel--execution space-y-2">
+            {!isNew ? (
+              <div className="grid gap-2 lg:grid-cols-2">
+                {soFulfillment ? (
+                  <section className="rounded-md border border-border/60 bg-transparent p-3">
+                    <div className="mb-2 flex items-start justify-between gap-2">
+                      <h3 className="text-sm font-semibold text-foreground">{t("doc.fulfillment.so.sectionTitle")}</h3>
+                      <Badge
+                        variant="outline"
+                        className={cn(
+                          "h-6 rounded-full px-2 text-[11px] font-semibold",
+                          soFulfillment.hasOverFulfillment
+                            ? "border-destructive/60 text-destructive"
+                            : "border-border text-foreground",
+                        )}
+                      >
+                        {translatePlanningFulfillmentState(t, soFulfillment.state)}
+                      </Badge>
+                    </div>
+                    <div className="grid grid-cols-2 gap-x-3 gap-y-1.5 text-xs">
+                      <div className="space-y-0.5">
+                        <p className="text-[11px] uppercase tracking-wide text-muted-foreground">{t("doc.columns.shipped")}</p>
+                        <p className="tabular-nums text-sm font-semibold text-foreground">{soFulfillment.totalShipped}</p>
+                      </div>
+                      <div className="space-y-0.5">
+                        <p className="text-[11px] uppercase tracking-wide text-muted-foreground">{t("doc.columns.ordered")}</p>
+                        <p className="tabular-nums text-sm font-semibold text-foreground">{soFulfillment.totalOrdered}</p>
+                      </div>
+                      <div className="space-y-0.5">
+                        <p className="text-[11px] uppercase tracking-wide text-muted-foreground">
+                          {t("doc.fulfillment.so.remainingLabel")}
+                        </p>
+                        <p
+                          className={cn(
+                            "tabular-nums text-sm font-semibold",
+                            soFulfillment.totalRemaining < 0 ? "text-destructive" : "text-foreground",
+                          )}
+                        >
+                          {soFulfillment.totalRemaining < 0
+                            ? t("doc.fulfillment.remainingOver", { qty: soFulfillment.totalRemaining })
+                            : soFulfillment.totalRemaining}
+                        </p>
+                      </div>
+                      <div className="col-span-2 space-y-0.5">
+                        <p className="text-[11px] uppercase tracking-wide text-muted-foreground">
+                          {t("doc.fulfillment.so.shipmentsPostedTotal", {
+                            posted: soFulfillment.postedShipmentCount,
+                            total: soFulfillment.relatedShipmentCount,
+                          })}
+                        </p>
+                      </div>
+                    </div>
+                    {soFulfillment.hasOverFulfillment ? (
+                      <p className="mt-2 text-xs font-medium text-destructive">{t("doc.fulfillment.so.overShipped")}</p>
+                    ) : null}
+                  </section>
+                ) : null}
+                {showSalesOrderAllocationUi && soAllocationView ? (
+                  <section className="rounded-md border border-border/60 bg-transparent p-3">
+                    <div className="mb-2 flex items-start justify-between gap-2">
+                      <h3 className="text-sm font-semibold text-foreground">{t("doc.fulfillment.so.allocationSectionTitle")}</h3>
+                      <Badge
+                        variant="outline"
+                        className={cn(
+                          "h-6 rounded-full px-2 text-[11px] font-semibold",
+                          soAllocationView.totalShortage > 0
+                            ? "border-destructive/60 text-destructive"
+                            : "border-border text-foreground",
+                        )}
+                      >
+                        {translateSalesOrderAllocationState(t, soAllocationView.state)}
+                      </Badge>
+                    </div>
+                    <div className="grid grid-cols-2 gap-x-3 gap-y-1.5 text-xs">
+                      <div className="space-y-0.5">
+                        <p className="text-[11px] uppercase tracking-wide text-muted-foreground">{t("doc.columns.reserved")}</p>
+                        <p className="tabular-nums text-sm font-semibold text-foreground">{soAllocationView.totalReserved}</p>
+                      </div>
+                      <div className="space-y-0.5">
+                        <p className="text-[11px] uppercase tracking-wide text-muted-foreground">{t("doc.columns.shortage")}</p>
+                        <p
+                          className={cn(
+                            "tabular-nums text-sm font-semibold",
+                            soAllocationView.totalShortage > 0 ? "text-destructive" : "text-foreground",
+                          )}
+                        >
+                          {soAllocationView.totalShortage}
+                        </p>
+                      </div>
+                    </div>
+                    <p className="mt-2 text-xs text-muted-foreground/85">{t("doc.fulfillment.so.allocationShortageHint")}</p>
+                  </section>
+                ) : null}
+              </div>
+            ) : null}
+            {isNew ? (
+              <p className="text-sm text-muted-foreground">{t("doc.so.tabSaveDocumentFirst")}</p>
+            ) : null}
+          </div>
+        )}
         {soWorkingTab === "payments" && (
           <div className="doc-so-tab-panel doc-so-tab-panel--payments">
             {isNew ? (
@@ -2128,58 +2281,6 @@ export function SalesOrderPage() {
         )}
         {soWorkingTab === "lines" && isEditable && (
           <div className="doc-lines mt-0">
-{!isNew && soFulfillment ? (
-              <div className="mb-2 max-w-4xl text-xs">
-                <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
-                  <span className="font-medium text-foreground">{t("doc.fulfillment.so.sectionTitle")}</span>
-                  <span className="tabular-nums text-muted-foreground">
-                    {translatePlanningFulfillmentState(t, soFulfillment.state)}
-                  </span>
-                  <span className="text-muted-foreground tabular-nums">
-                    {t("doc.fulfillment.so.shippedOrdered", {
-                      shipped: soFulfillment.totalShipped,
-                      ordered: soFulfillment.totalOrdered,
-                    })}
-                  </span>
-                  <span className="text-muted-foreground">
-                    {t("doc.fulfillment.so.remainingLabel")}{" "}
-                    <span className="text-foreground tabular-nums">
-                      {soFulfillment.totalRemaining < 0
-                        ? t("doc.fulfillment.remainingOver", { qty: soFulfillment.totalRemaining })
-                        : soFulfillment.totalRemaining}
-                    </span>
-                  </span>
-                  <span className="text-muted-foreground tabular-nums">
-                    {t("doc.fulfillment.so.shipmentsPostedTotal", {
-                      posted: soFulfillment.postedShipmentCount,
-                      total: soFulfillment.relatedShipmentCount,
-                    })}
-                  </span>
-                  {soFulfillment.hasOverFulfillment ? (
-                    <span className="text-destructive font-medium">{t("doc.fulfillment.so.overShipped")}</span>
-                  ) : null}
-                </div>
-              </div>
-            ) : null}
-            {!isNew && showSalesOrderAllocationUi && soAllocationView ? (
-              <div className="mb-2 max-w-4xl text-xs">
-                <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
-                  <span className="font-medium text-foreground">{t("doc.fulfillment.so.allocationSectionTitle")}</span>
-                  <span className="tabular-nums text-muted-foreground">
-                    {translateSalesOrderAllocationState(t, soAllocationView.state)}
-                  </span>
-                  <span className="text-muted-foreground">
-                    {t("doc.columns.reserved")}{" "}
-                    <span className="text-foreground tabular-nums">{soAllocationView.totalReserved}</span>
-                  </span>
-                  <span className="text-muted-foreground">
-                    {t("doc.columns.shortage")}{" "}
-                    <span className="text-foreground tabular-nums">{soAllocationView.totalShortage}</span>
-                    <span className="text-muted-foreground/80"> {t("doc.fulfillment.so.allocationShortageHint")}</span>
-                  </span>
-                </div>
-              </div>
-            ) : null}
             {isEditable && (
               <div className="flex items-end gap-2 w-full mb-1.5">
                 <Card className="border-0 shadow-none flex-1 min-w-0">
@@ -2406,58 +2507,6 @@ export function SalesOrderPage() {
         )}
         {soWorkingTab === "lines" && !isEditable && (
           <div className="doc-lines mt-0">
-{soFulfillment ? (
-              <div className="mb-2 max-w-4xl text-xs">
-                <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
-                  <span className="font-medium text-foreground">{t("doc.fulfillment.so.sectionTitle")}</span>
-                  <span className="tabular-nums text-muted-foreground">
-                    {translatePlanningFulfillmentState(t, soFulfillment.state)}
-                  </span>
-                  <span className="text-muted-foreground tabular-nums">
-                    {t("doc.fulfillment.so.shippedOrdered", {
-                      shipped: soFulfillment.totalShipped,
-                      ordered: soFulfillment.totalOrdered,
-                    })}
-                  </span>
-                  <span className="text-muted-foreground">
-                    {t("doc.fulfillment.so.remainingLabel")}{" "}
-                    <span className="text-foreground tabular-nums">
-                      {soFulfillment.totalRemaining < 0
-                        ? t("doc.fulfillment.remainingOver", { qty: soFulfillment.totalRemaining })
-                        : soFulfillment.totalRemaining}
-                    </span>
-                  </span>
-                  <span className="text-muted-foreground tabular-nums">
-                    {t("doc.fulfillment.so.shipmentsPostedTotal", {
-                      posted: soFulfillment.postedShipmentCount,
-                      total: soFulfillment.relatedShipmentCount,
-                    })}
-                  </span>
-                  {soFulfillment.hasOverFulfillment ? (
-                    <span className="text-destructive font-medium">{t("doc.fulfillment.so.overShipped")}</span>
-                  ) : null}
-                </div>
-              </div>
-            ) : null}
-            {showSalesOrderAllocationUi && soAllocationView ? (
-              <div className="mb-2 max-w-4xl text-xs">
-                <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
-                  <span className="font-medium text-foreground">{t("doc.fulfillment.so.allocationSectionTitle")}</span>
-                  <span className="tabular-nums text-muted-foreground">
-                    {translateSalesOrderAllocationState(t, soAllocationView.state)}
-                  </span>
-                  <span className="text-muted-foreground">
-                    {t("doc.columns.reserved")}{" "}
-                    <span className="text-foreground tabular-nums">{soAllocationView.totalReserved}</span>
-                  </span>
-                  <span className="text-muted-foreground">
-                    {t("doc.columns.shortage")}{" "}
-                    <span className="text-foreground tabular-nums">{soAllocationView.totalShortage}</span>
-                    <span className="text-muted-foreground/80"> {t("doc.fulfillment.so.allocationShortageHint")}</span>
-                  </span>
-                </div>
-              </div>
-            ) : null}
             {linesWithItem.length === 0 ? (
               <p className="doc-lines__empty">{t("doc.page.noLines")}</p>
             ) : (
@@ -2487,6 +2536,7 @@ export function SalesOrderPage() {
             )}
           </div>
         )}
+      </div>
       </div>
 
       <DocumentLineImportModal

@@ -622,6 +622,7 @@ export const ruMessages: MessageTree = {
       sectionCommercial: "Коммерция",
       sectionNotes: "Примечания",
       tabLines: "Строки",
+      tabExecution: "Исполнение",
       tabPayments: "Оплата",
       tabEventLog: "Журнал событий",
       tabPanelsAria: "Рабочие области заказа клиента",
@@ -809,7 +810,7 @@ export const ruMessages: MessageTree = {
       active: "Активен",
     },
     list: {
-      searchPlaceholder: "Поиск…",
+      searchPlaceholder: "Поиск",
       new: "Создать",
       export: "Экспорт",
       open: "Открыть",

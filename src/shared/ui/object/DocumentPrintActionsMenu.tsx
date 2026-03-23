@@ -14,6 +14,8 @@ type DocumentPrintActionsMenuProps = {
   triggerLabel: string;
   "aria-label": string;
   className?: string;
+  /** Tailwind classes for Printer + chevron (defaults to muted). */
+  iconClassName?: string;
 };
 
 /**
@@ -24,6 +26,7 @@ export function DocumentPrintActionsMenu({
   triggerLabel,
   "aria-label": ariaLabel,
   className,
+  iconClassName,
 }: DocumentPrintActionsMenuProps) {
   const [open, setOpen] = useState(false);
 
@@ -43,9 +46,9 @@ export function DocumentPrintActionsMenu({
             className,
           )}
         >
-          <Printer className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
+          <Printer className={cn("h-4 w-4 shrink-0", iconClassName ?? "text-muted-foreground")} aria-hidden />
           <span className="whitespace-nowrap">{triggerLabel}</span>
-          <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
+          <ChevronDown className={cn("h-4 w-4 shrink-0", iconClassName ?? "text-muted-foreground")} aria-hidden />
         </button>
       </PopoverTrigger>
       <PopoverContent

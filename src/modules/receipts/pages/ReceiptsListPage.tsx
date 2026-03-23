@@ -33,8 +33,10 @@ import { save } from "@tauri-apps/plugin-dialog";
 import { invoke } from "@tauri-apps/api/core";
 import { revealItemInDir } from "@tauri-apps/plugin-opener";
 import { useTranslation } from "@/shared/i18n/context";
+import { buildReadableUniqueFilename, ensureUniqueExportPath } from "@/shared/export/filenameBuilder";
 import { receiptsListExcelLabels } from "@/shared/i18n/excelListExportLabels";
 import { readOptionalFactualStatusFromQuery } from "@/shared/navigation/listQueryStatus";
+import { toGeneratedCodeSearchTokens } from "@/shared/generatedVisibleCodes";
 
 type StatusFilter = "all" | FactualDocumentStatus;
 
@@ -46,11 +48,15 @@ type RowData = Receipt & {
 function filterBySearch(rows: RowData[], query: string): RowData[] {
   const q = query.trim().toLowerCase();
   if (!q) return rows;
-  return rows.filter(
-    (r) =>
-      r.number.toLowerCase().includes(q) ||
-      r.purchaseOrderNumber.toLowerCase().includes(q),
-  );
+  const codeTokens = toGeneratedCodeSearchTokens(q);
+  return rows.filter((r) => {
+    const n = r.number.toLowerCase();
+    const nCompact = n.replace(/[^a-z0-9]/g, "");
+    if (n.includes(q) || codeTokens.some((t) => n.includes(t) || nCompact.includes(t))) return true;
+    const po = r.purchaseOrderNumber.toLowerCase();
+    const poCompact = po.replace(/[^a-z0-9]/g, "");
+    return po.includes(q) || codeTokens.some((t) => po.includes(t) || poCompact.includes(t));
+  });
 }
 
 function filterByStatus(rows: RowData[], statusFilter: StatusFilter): RowData[] {
@@ -170,11 +176,15 @@ export function ReceiptsListPage() {
   const runExportWithSaveAs = useCallback(
     async (defaultFilename: string, buildBuffer: () => Promise<ArrayBuffer>) => {
       try {
+        const extension = defaultFilename.toLowerCase().endsWith(".pdf") ? "pdf" : "xlsx";
+        const base = defaultFilename.replace(/\.[^.]+$/, "");
+        const generatedFilename = buildReadableUniqueFilename({ base, extension });
         const path = await save({
-          defaultPath: defaultFilename,
+          defaultPath: generatedFilename,
           filters: [{ name: t("doc.page.excelFilterName"), extensions: ["xlsx"] }],
         });
         if (path == null) return;
+        const safePath = await ensureUniqueExportPath(path);
 
         const buffer = await buildBuffer();
         const bytes = new Uint8Array(buffer);
@@ -182,9 +192,9 @@ export function ReceiptsListPage() {
         for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
         const contentsBase64 = btoa(binary);
 
-        await invoke("write_export_file", { path, contentsBase64 });
-        const filename = path.replace(/^.*[/\\]/, "") || defaultFilename;
-        setExportSuccess({ path, filename });
+        await invoke("write_export_file", { path: safePath, contentsBase64 });
+        const filename = safePath.replace(/^.*[/\\]/, "") || generatedFilename;
+        setExportSuccess({ path: safePath, filename });
       } catch (err) {
         console.error("Export failed", err);
         const buffer = await buildBuffer();
@@ -383,7 +393,7 @@ export function ReceiptsListPage() {
                 type="button"
                 variant="outline"
                 size="sm"
-                className="h-8 rounded-r-none border-0 border-r border-input gap-1.5"
+                className="h-[1.625rem] rounded-r-none border-0 border-r border-input !px-1 !py-0 !gap-0.5"
                 onClick={handleExportCurrentView}
               >
                 <FileSpreadsheet className="h-4 w-4 shrink-0" />
@@ -395,7 +405,7 @@ export function ReceiptsListPage() {
                     type="button"
                     variant="outline"
                     size="icon"
-                    className="h-8 w-8 shrink-0 rounded-l-none border-0 shadow-none"
+                    className="h-[1.625rem] w-[1.625rem] shrink-0 rounded-l-none border-0 shadow-none"
                     aria-label={t("doc.list.exportOptionsAria")}
                   >
                     <ChevronDown className="h-4 w-4" />

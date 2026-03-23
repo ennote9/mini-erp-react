@@ -225,7 +225,7 @@ export const opsEn = {
       hintCarrierOnly:
         "No sales orders for this carrier. Try clearing the carrier filter.",
       searchAria: "Search sales orders",
-      searchPlaceholder: "Number, customer, warehouse, carrier, recipient…",
+      searchPlaceholder: "Search",
       filterWarehouseAria: "Warehouse filter active",
       filterCarrierAria: "Carrier filter active",
       filterItemAria: "Item filter active",
@@ -273,7 +273,7 @@ export const opsEn = {
       hintCarrierOnly:
         "No shipments for this carrier. Try clearing the carrier filter.",
       searchAria: "Search shipments",
-      searchPlaceholder: "Number, order, carrier, tracking, recipient, address…",
+      searchPlaceholder: "Search",
       filterWarehouseAria: "Warehouse filter active",
       filterCarrierAria: "Carrier filter active",
       filterItemAria: "Item filter active",

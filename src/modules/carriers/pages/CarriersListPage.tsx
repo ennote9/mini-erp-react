@@ -30,6 +30,7 @@ import { save } from "@tauri-apps/plugin-dialog";
 import { invoke } from "@tauri-apps/api/core";
 import { revealItemInDir } from "@tauri-apps/plugin-opener";
 import { useTranslation } from "@/shared/i18n/context";
+import { buildReadableUniqueFilename, ensureUniqueExportPath } from "@/shared/export/filenameBuilder";
 import { carriersListExcelLabels } from "@/shared/i18n/excelListExportLabels";
 import type { TFunction } from "@/shared/i18n/resolve";
 
@@ -121,11 +122,15 @@ export function CarriersListPage() {
   const runExportWithSaveAs = useCallback(
     async (defaultFilename: string, buildBuffer: () => Promise<ArrayBuffer>) => {
       try {
+        const extension = defaultFilename.toLowerCase().endsWith(".pdf") ? "pdf" : "xlsx";
+        const base = defaultFilename.replace(/\.[^.]+$/, "");
+        const generatedFilename = buildReadableUniqueFilename({ base, extension });
         const path = await save({
-          defaultPath: defaultFilename,
+          defaultPath: generatedFilename,
           filters: [{ name: t("ops.importModal.excelFileFilterName"), extensions: ["xlsx"] }],
         });
         if (path == null) return;
+        const safePath = await ensureUniqueExportPath(path);
 
         const buffer = await buildBuffer();
         const bytes = new Uint8Array(buffer);
@@ -133,9 +138,9 @@ export function CarriersListPage() {
         for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
         const contentsBase64 = btoa(binary);
 
-        await invoke("write_export_file", { path, contentsBase64 });
-        const filename = path.replace(/^.*[/\\]/, "") || defaultFilename;
-        setExportSuccess({ path, filename });
+        await invoke("write_export_file", { path: safePath, contentsBase64 });
+        const filename = safePath.replace(/^.*[/\\]/, "") || generatedFilename;
+        setExportSuccess({ path: safePath, filename });
       } catch (err) {
         console.error("Export failed", err);
         const buffer = await buildBuffer();
@@ -301,7 +306,7 @@ export function CarriersListPage() {
                 type="button"
                 variant="outline"
                 size="sm"
-                className="h-8 rounded-r-none border-0 border-r border-input gap-1.5"
+                className="h-[1.625rem] rounded-r-none border-0 border-r border-input !px-1 !py-0 !gap-0.5"
                 onClick={handleExportCurrentView}
               >
                 <FileSpreadsheet className="h-4 w-4 shrink-0" />
@@ -313,7 +318,7 @@ export function CarriersListPage() {
                     type="button"
                     variant="outline"
                     size="icon"
-                    className="h-8 w-8 shrink-0 rounded-l-none border-0 shadow-none"
+                    className="h-[1.625rem] w-[1.625rem] shrink-0 rounded-l-none border-0 shadow-none"
                     aria-label={t("doc.list.exportOptionsAria")}
                   >
                     <ChevronDown className="h-4 w-4" />
@@ -342,10 +347,10 @@ export function CarriersListPage() {
             type="button"
             variant="default"
             size="sm"
-            className="rounded-md bg-white text-black hover:bg-gray-200"
+            className="list-page__create-btn rounded-md bg-white text-black hover:bg-gray-200"
             onClick={() => navigate("/carriers/new")}
           >
-            <span className="create-btn__plus">+</span> {t("doc.list.create")}
+            <svg className="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M12 5v14" /><path d="M5 12h14" /></svg> {t("doc.list.create")}
           </Button>
         </>
       }

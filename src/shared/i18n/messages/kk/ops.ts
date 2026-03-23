@@ -223,7 +223,7 @@ export const kkOps: MessageTree = {
       hintCarrierOnly:
         "Бұл тасымалдаушы бойынша тапсырыс жоқ. Тасымалдаушы сүзгісін алып тастап көріңіз.",
       searchAria: "Сату тапсырыстарын іздеу",
-      searchPlaceholder: "Нөмір, клиент, қойма, тасымалдаушы, алушы…",
+      searchPlaceholder: "Іздеу",
       filterWarehouseAria: "Қойма сүзгісі белсенді",
       filterCarrierAria: "Тасымалдаушы сүзгісі белсенді",
       filterItemAria: "Тауар сүзгісі белсенді",
@@ -268,7 +268,7 @@ export const kkOps: MessageTree = {
       hintCarrierOnly:
         "Бұл тасымалдаушы бойынша жөнелту жоқ. Тасымалдаушы сүзгісін алып тастап көріңіз.",
       searchAria: "Жөнелтулерді іздеу",
-      searchPlaceholder: "Нөмір, тапсырыс, тасымалдаушы, бақылау, алушы, мекенжай…",
+      searchPlaceholder: "Іздеу",
       filterWarehouseAria: "Қойма сүзгісі белсенді",
       filterCarrierAria: "Тасымалдаушы сүзгісі белсенді",
       filterItemAria: "Тауар сүзгісі белсенді",

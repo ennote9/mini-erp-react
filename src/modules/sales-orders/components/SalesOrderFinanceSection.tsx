@@ -13,13 +13,7 @@ import { deriveSalesOrderPaymentSummary } from "../salesOrderFinance";
 import { CUSTOMER_PAYMENT_METHOD_CODES } from "../salesOrderPaymentModel";
 import type { CustomerPaymentMethod } from "../salesOrderPaymentModel";
 import { getCommercialMoneyDecimalPlaces, roundMoney } from "@/shared/commercialMoney";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -138,12 +132,8 @@ export function SalesOrderFinanceSection(props: SalesOrderFinanceSectionProps) {
   );
 
   return (
-    <Card className="max-w-4xl border-border/80 shadow-none">
-      <CardHeader className="p-2 pb-0.5">
-        <CardTitle className="text-[0.9rem] font-semibold">{t("finance.sectionTitle")}</CardTitle>
-        <CardDescription className="text-xs leading-snug">{t("finance.sectionHint")}</CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-4 p-2 pt-1">
+    <Card className="max-w-4xl border-0 bg-transparent shadow-none">
+      <CardContent className="space-y-4 p-2">
         <div className="flex flex-wrap items-center gap-2">
           {canOpenInvoice ? (
             <Button type="button" variant="outline" size="sm" className="gap-1.5" asChild>
@@ -171,7 +161,7 @@ export function SalesOrderFinanceSection(props: SalesOrderFinanceSectionProps) {
 
         {showAmountsAndPayments ? (
           <>
-            <div className="rounded-md border border-border bg-muted/15 px-3 py-2 text-sm">
+            <div className="rounded-md border border-border px-3 py-2 text-sm">
               <div className="flex flex-wrap gap-x-6 gap-y-1">
                 <span>
                   <span className="text-muted-foreground">{t("common.status")}: </span>
@@ -190,62 +180,6 @@ export function SalesOrderFinanceSection(props: SalesOrderFinanceSectionProps) {
                   {formatMoney(summary.remainingAmount)}
                 </span>
               </div>
-            </div>
-
-            <div>
-              <h4 className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                {t("finance.paymentHistory")}
-              </h4>
-              {payments.length === 0 ? (
-                <p className="text-sm text-muted-foreground">{t("finance.noPayments")}</p>
-              ) : (
-                <div className="overflow-x-auto rounded-md border border-border">
-                  <table className="w-full border-collapse text-sm">
-                    <thead>
-                      <tr className="border-b border-border bg-muted/30 text-left text-xs text-muted-foreground">
-                        <th className="px-2 py-1.5 font-medium">{t("finance.paidAt")}</th>
-                        <th className="px-2 py-1.5 font-medium">{t("finance.amount")}</th>
-                        <th className="px-2 py-1.5 font-medium">{t("finance.method")}</th>
-                        <th className="px-2 py-1.5 font-medium">{t("finance.reference")}</th>
-                        <th className="px-2 py-1.5 font-medium">{t("finance.comment")}</th>
-                        {canMutatePayments ? <th className="px-2 py-1.5 w-10" /> : null}
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {payments.map((p) => (
-                        <tr key={p.id} className="border-b border-border/80 last:border-0">
-                          <td className="px-2 py-1.5 tabular-nums whitespace-nowrap">
-                            {formatPaidAtDisplay(locale, p.paidAt)}
-                          </td>
-                          <td className="px-2 py-1.5 tabular-nums">{formatMoney(p.amount)}</td>
-                          <td className="px-2 py-1.5">{t(`finance.paymentMethod.${p.method}`)}</td>
-                          <td className="px-2 py-1.5 max-w-[10rem] truncate" title={p.reference ?? ""}>
-                            {p.reference ?? "—"}
-                          </td>
-                          <td className="px-2 py-1.5 max-w-[12rem] truncate" title={p.comment ?? ""}>
-                            {p.comment ?? "—"}
-                          </td>
-                          <td className="px-1 py-1">
-                            {canMutatePayments ? (
-                              <Button
-                                type="button"
-                                variant="ghost"
-                                size="icon"
-                                className="h-8 w-8 text-muted-foreground hover:text-destructive"
-                                title={t("finance.deletePayment")}
-                                aria-label={t("finance.deletePayment")}
-                                onClick={() => handleDelete(p.id)}
-                              >
-                                <Trash2 className="h-4 w-4" />
-                              </Button>
-                            ) : null}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
             </div>
 
             {canMutatePayments ? (
@@ -278,7 +212,7 @@ export function SalesOrderFinanceSection(props: SalesOrderFinanceSectionProps) {
                     type="datetime-local"
                     value={paidAtLocal}
                     onChange={(e) => setPaidAtLocal(e.target.value)}
-                    className="h-8 text-sm"
+                    className="h-8 text-sm [color-scheme:dark]"
                   />
                 </div>
                 <div className="flex flex-col gap-0.5 sm:col-span-2 lg:col-span-1">
@@ -325,6 +259,62 @@ export function SalesOrderFinanceSection(props: SalesOrderFinanceSectionProps) {
               </Button>
             </div>
             ) : null}
+
+            <div>
+              <h4 className="mb-1 text-xs font-semibold uppercase tracking-wide leading-none text-muted-foreground">
+                {t("finance.paymentHistory")}
+              </h4>
+              {payments.length === 0 ? (
+                <p className="text-sm text-muted-foreground">{t("finance.noPayments")}</p>
+              ) : (
+                <div className="overflow-x-auto rounded-md border border-border">
+                  <table className="w-full border-collapse text-sm leading-tight">
+                    <thead>
+                      <tr className="border-b border-border text-left text-xs text-muted-foreground">
+                        <th className="px-1 py-1 font-medium">{t("finance.paidAt")}</th>
+                        <th className="px-1 py-1 font-medium">{t("finance.amount")}</th>
+                        <th className="px-1 py-1 font-medium">{t("finance.method")}</th>
+                        <th className="px-1 py-1 font-medium">{t("finance.reference")}</th>
+                        <th className="px-1 py-1 font-medium">{t("finance.comment")}</th>
+                        {canMutatePayments ? <th className="w-8 px-0 py-1" /> : null}
+                      </tr>
+                    </thead>
+                    <tbody className="text-xs">
+                      {payments.map((p) => (
+                        <tr key={p.id} className="border-b border-border/80 last:border-0">
+                          <td className="px-1 py-px tabular-nums whitespace-nowrap align-middle">
+                            {formatPaidAtDisplay(locale, p.paidAt)}
+                          </td>
+                          <td className="px-1 py-px tabular-nums align-middle">{formatMoney(p.amount)}</td>
+                          <td className="px-1 py-px align-middle">{t(`finance.paymentMethod.${p.method}`)}</td>
+                          <td className="max-w-[10rem] truncate px-1 py-px align-middle" title={p.reference ?? ""}>
+                            {p.reference ?? "—"}
+                          </td>
+                          <td className="max-w-[12rem] truncate px-1 py-px align-middle" title={p.comment ?? ""}>
+                            {p.comment ?? "—"}
+                          </td>
+                          <td className="p-0 align-middle">
+                            {canMutatePayments ? (
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="icon"
+                                className="h-6 w-6 text-muted-foreground hover:text-destructive"
+                                title={t("finance.deletePayment")}
+                                aria-label={t("finance.deletePayment")}
+                                onClick={() => handleDelete(p.id)}
+                              >
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </Button>
+                            ) : null}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
           </>
         ) : null}
       </CardContent>

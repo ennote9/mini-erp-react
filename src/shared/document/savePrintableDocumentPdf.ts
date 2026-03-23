@@ -1,5 +1,9 @@
 import { invoke } from "@tauri-apps/api/core";
 import { save } from "@tauri-apps/plugin-dialog";
+import {
+  buildReadableUniqueFilename,
+  ensureUniqueExportPath,
+} from "@/shared/export/filenameBuilder";
 import { sanitizeDocumentFilenameBase } from "./documentFilename";
 import { renderElementToPdfBase64 } from "./renderElementToPdf";
 import { PdfWriteFailedError } from "./savePdfFile";
@@ -25,29 +29,30 @@ export async function savePrintableDocumentPdf(options: {
   filterName: string;
 }): Promise<{ path: string; filename: string } | null> {
   const base = sanitizeDocumentFilenameBase(options.defaultFilename.replace(/\.pdf$/i, ""));
-  const defaultPath = `${base}.pdf`;
+  const defaultPath = buildReadableUniqueFilename({ base, extension: "pdf" });
 
   const path = await save({
     defaultPath,
     filters: [{ name: options.filterName, extensions: ["pdf"] }],
   });
   if (path == null) return null;
+  const safePath = await ensureUniqueExportPath(path);
 
   try {
-    await invoke("webview_print_to_pdf", { path });
-    const filename = path.replace(/^.*[/\\]/, "") || defaultPath;
-    return { path, filename };
+    await invoke("webview_print_to_pdf", { path: safePath });
+    const filename = safePath.replace(/^.*[/\\]/, "") || defaultPath;
+    return { path: safePath, filename };
   } catch (err) {
     if (options.root && isNativePdfUnsupported(err)) {
       const contentsBase64 = await renderElementToPdfBase64(options.root);
       try {
-        await invoke("write_export_file", { path, contentsBase64 });
+        await invoke("write_export_file", { path: safePath, contentsBase64 });
       } catch (writeErr) {
         console.error("[pdf] write_export_file failed (fallback)", writeErr);
         throw new PdfWriteFailedError();
       }
-      const filename = path.replace(/^.*[/\\]/, "") || defaultPath;
-      return { path, filename };
+      const filename = safePath.replace(/^.*[/\\]/, "") || defaultPath;
+      return { path: safePath, filename };
     }
     throw err;
   }

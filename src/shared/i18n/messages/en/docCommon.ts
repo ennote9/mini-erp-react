@@ -147,6 +147,7 @@ export const docCommonEn = {
       inactiveItem: "Inactive items cannot be added.",
     },
     tabLines: "Lines",
+    tabExecution: "Execution",
     tabPayments: "Payments",
     tabEventLog: "Event log",
     tabPanelsAria: "Sales order working areas",
@@ -338,7 +339,7 @@ export const docCommonEn = {
     active: "Active",
   },
   list: {
-    searchPlaceholder: "Search…",
+    searchPlaceholder: "Search",
     new: "New",
     export: "Export",
     open: "Open",

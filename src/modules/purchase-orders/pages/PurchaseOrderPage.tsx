@@ -12,13 +12,13 @@ import { categoryRepository } from "../../categories/repository";
 import type { PurchaseOrderLine } from "../model";
 import { DocumentPageLayout } from "../../../shared/ui/object/DocumentPageLayout";
 import { BackButton } from "../../../shared/ui/list/BackButton";
-import { StatusBadge } from "../../../shared/ui/feedback/StatusBadge";
 import { AgGridContainer } from "../../../shared/ui/ag-grid/AgGridContainer";
 import { Button } from "@/components/ui/button";
 import { DatePickerField } from "@/components/ui/date-picker-field";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import {
   agGridDefaultColDef,
   agGridDefaultGridOptions,
@@ -60,6 +60,8 @@ import {
   FileSpreadsheet,
   FileX,
   FolderOpen,
+  History,
+  List,
   Plus,
   Save,
   Trash2,
@@ -86,6 +88,7 @@ import {
   type ZeroPriceLineReasonCode,
 } from "../../../shared/reasonCodes";
 import { useTranslation } from "@/shared/i18n/context";
+import { buildReadableUniqueFilename, ensureUniqueExportPath } from "@/shared/export/filenameBuilder";
 import type { TFunction } from "@/shared/i18n/resolve";
 import { cn } from "@/lib/utils";
 import { planningPurchaseOrderExportLabels } from "@/shared/i18n/excelPlanningExportLabels";
@@ -986,12 +989,16 @@ export function PurchaseOrderPage() {
 
   const runExportWithSaveAs = useCallback(
     async (defaultFilename: string, buildBuffer: () => Promise<ArrayBuffer>) => {
+      const extension = defaultFilename.toLowerCase().endsWith(".pdf") ? "pdf" : "xlsx";
+      const base = defaultFilename.replace(/\.[^.]+$/, "");
+      const generatedFilename = buildReadableUniqueFilename({ base, extension });
       try {
         const path = await save({
-          defaultPath: defaultFilename,
+          defaultPath: generatedFilename,
           filters: [{ name: t("doc.page.excelFilterName"), extensions: ["xlsx"] }],
         });
         if (path == null) return;
+        const safePath = await ensureUniqueExportPath(path);
 
         const buffer = await buildBuffer();
         const bytes = new Uint8Array(buffer);
@@ -999,9 +1006,9 @@ export function PurchaseOrderPage() {
         for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
         const contentsBase64 = btoa(binary);
 
-        await invoke("write_export_file", { path, contentsBase64 });
-        const filename = path.replace(/^.*[/\\]/, "") || defaultFilename;
-        setExportSuccess({ path, filename });
+        await invoke("write_export_file", { path: safePath, contentsBase64 });
+        const filename = safePath.replace(/^.*[/\\]/, "") || generatedFilename;
+        setExportSuccess({ path: safePath, filename });
       } catch (err) {
         // If we're not running inside Tauri or the dialog/command fails,
         // fall back to a browser download (best-effort).
@@ -1183,7 +1190,14 @@ export function PurchaseOrderPage() {
         <div className="doc-header">
           <div className="doc-header__title-row">
             <h2 className="doc-header__title">{displayTitle}</h2>
-            {!isNew && <StatusBadge status={doc!.status} />}
+            {!isNew && (
+              <Badge
+                variant="outline"
+                className="h-6 rounded-full border-border px-2.5 text-xs font-medium leading-none text-foreground"
+              >
+                {t(`status.labels.${doc!.status}`)}
+              </Badge>
+            )}
           </div>
           <div className="doc-header__right">
             {isEditable && (hasErrors(combinedIssues) || hasWarnings(combinedIssues)) && (
@@ -1286,7 +1300,7 @@ export function PurchaseOrderPage() {
                       type="button"
                       variant="outline"
                       size="sm"
-                      className="h-8 rounded-r-none border-0 border-r border-input gap-1.5"
+                      className="h-[1.625rem] rounded-r-none border-0 border-r border-input !px-1 !py-0 !gap-0.5"
                       onClick={handleExportMain}
                     >
                       <FileSpreadsheet className="h-4 w-4 shrink-0" />
@@ -1298,7 +1312,7 @@ export function PurchaseOrderPage() {
                           type="button"
                           variant="outline"
                           size="icon"
-                          className="h-8 w-8 shrink-0 rounded-l-none border-0 shadow-none"
+                          className="h-[1.625rem] w-[1.625rem] shrink-0 rounded-l-none border-0 shadow-none"
                           aria-label={t("doc.list.exportOptionsAria")}
                         >
                           <ChevronDown className="h-4 w-4" />
@@ -1535,7 +1549,10 @@ export function PurchaseOrderPage() {
             )}
             onClick={() => setPoWorkingTab("lines")}
           >
-            {t("doc.po.tabLines")}
+            <span className="inline-flex items-center gap-1.5">
+              <List className="h-3.5 w-3.5" aria-hidden />
+              {t("doc.po.tabLines")}
+            </span>
           </button>
           <button
             type="button"
@@ -1549,7 +1566,10 @@ export function PurchaseOrderPage() {
             )}
             onClick={() => setPoWorkingTab("events")}
           >
-            {t("doc.po.tabEventLog")}
+            <span className="inline-flex items-center gap-1.5">
+              <History className="h-3.5 w-3.5" aria-hidden />
+              {t("doc.po.tabEventLog")}
+            </span>
           </button>
         </div>
         {poWorkingTab === "lines" && isEditable && (

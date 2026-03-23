@@ -223,7 +223,7 @@ export const ruOps: MessageTree = {
       hintCarrierOnly:
         "Нет заказов по этому перевозчику. Снимите фильтр по перевозчику.",
       searchAria: "Поиск заказов клиентов",
-      searchPlaceholder: "Номер, клиент, склад, перевозчик, получатель…",
+      searchPlaceholder: "Поиск",
       filterWarehouseAria: "Активен фильтр по складу",
       filterCarrierAria: "Активен фильтр по перевозчику",
       filterItemAria: "Активен фильтр по номенклатуре",
@@ -267,7 +267,7 @@ export const ruOps: MessageTree = {
       hintCarrierOnly:
         "Нет отгрузок по этому перевозчику. Снимите фильтр по перевозчику.",
       searchAria: "Поиск отгрузок",
-      searchPlaceholder: "Номер, заказ, перевозчик, трек, получатель, адрес…",
+      searchPlaceholder: "Поиск",
       filterWarehouseAria: "Активен фильтр по складу",
       filterCarrierAria: "Активен фильтр по перевозчику",
       filterItemAria: "Активен фильтр по номенклатуре",

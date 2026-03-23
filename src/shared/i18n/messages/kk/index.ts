@@ -620,6 +620,7 @@ export const kkMessages: MessageTree = {
       sectionCommercial: "Сауда",
       sectionNotes: "Ескертпелер",
       tabLines: "Жолдар",
+      tabExecution: "Орындау",
       tabPayments: "Төлем",
       tabEventLog: "Оқиға журналы",
       tabPanelsAria: "Сату тапсырысының жұмыс аймақтары",
@@ -806,7 +807,7 @@ export const kkMessages: MessageTree = {
       active: "Белсенді",
     },
     list: {
-      searchPlaceholder: "Іздеу…",
+      searchPlaceholder: "Іздеу",
       new: "Жаңа",
       export: "Экспорт",
       open: "Ашу",

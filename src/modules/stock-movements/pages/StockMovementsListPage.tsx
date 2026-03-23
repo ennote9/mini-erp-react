@@ -35,6 +35,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { revealItemInDir } from "@tauri-apps/plugin-opener";
 import type { TFunction } from "../../../shared/i18n/resolve";
 import { useTranslation } from "@/shared/i18n/context";
+import { buildReadableUniqueFilename, ensureUniqueExportPath } from "@/shared/export/filenameBuilder";
 import { stockMovementsListExcelLabels } from "@/shared/i18n/excelListExportLabels";
 import { normalizeTrim } from "../../../shared/validation";
 
@@ -349,11 +350,15 @@ export function StockMovementsListPage() {
   const runExportWithSaveAs = useCallback(
     async (defaultFilename: string, buildBuffer: () => Promise<ArrayBuffer>) => {
       try {
+        const extension = defaultFilename.toLowerCase().endsWith(".pdf") ? "pdf" : "xlsx";
+        const base = defaultFilename.replace(/\.[^.]+$/, "");
+        const generatedFilename = buildReadableUniqueFilename({ base, extension });
         const path = await save({
-          defaultPath: defaultFilename,
+          defaultPath: generatedFilename,
           filters: [{ name: t("ops.importModal.excelFileFilterName"), extensions: ["xlsx"] }],
         });
         if (path == null) return;
+        const safePath = await ensureUniqueExportPath(path);
 
         const buffer = await buildBuffer();
         const bytes = new Uint8Array(buffer);
@@ -361,9 +366,9 @@ export function StockMovementsListPage() {
         for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
         const contentsBase64 = btoa(binary);
 
-        await invoke("write_export_file", { path, contentsBase64 });
-        const filename = path.replace(/^.*[/\\]/, "") || defaultFilename;
-        setExportSuccess({ path, filename });
+        await invoke("write_export_file", { path: safePath, contentsBase64 });
+        const filename = safePath.replace(/^.*[/\\]/, "") || generatedFilename;
+        setExportSuccess({ path: safePath, filename });
       } catch (err) {
         console.error("Export failed", err);
         const buffer = await buildBuffer();
@@ -677,7 +682,7 @@ export function StockMovementsListPage() {
                 type="button"
                 variant="outline"
                 size="sm"
-                className="h-8 rounded-r-none border-0 border-r border-input gap-1.5"
+                className="h-[1.625rem] rounded-r-none border-0 border-r border-input !px-1 !py-0 !gap-0.5"
                 onClick={handleExportCurrentView}
               >
                 <FileSpreadsheet className="h-4 w-4 shrink-0" />
@@ -689,7 +694,7 @@ export function StockMovementsListPage() {
                     type="button"
                     variant="outline"
                     size="icon"
-                    className="h-8 w-8 shrink-0 rounded-l-none border-0 shadow-none"
+                    className="h-[1.625rem] w-[1.625rem] shrink-0 rounded-l-none border-0 shadow-none"
                     aria-label={t("doc.list.exportOptionsAria")}
                   >
                     <ChevronDown className="h-4 w-4" />

@@ -8,6 +8,11 @@ import {
 import { registerPersistenceFlush } from "../../shared/persistenceCoordinator";
 import { bumpAppReadModelRevision } from "../../shared/appReadModelRevision";
 import {
+  extractGeneratedVisibleCodeCounter,
+  formatGeneratedVisibleCode,
+  normalizeGeneratedVisibleCode,
+} from "../../shared/generatedVisibleCodes";
+import {
   isCancelDocumentReasonCode,
   isReversalDocumentReasonCode,
 } from "../../shared/reasonCodes";
@@ -53,9 +58,8 @@ function computeNextNumericId(records: Array<{ id: string }>): number {
 function computeNextReceiptNumberCounter(records: Receipt[]): number {
   let max = 0;
   for (const r of records) {
-    const m = /^RCPT-(\d+)$/.exec(r.number);
-    if (!m) continue;
-    const n = Number.parseInt(m[1], 10);
+    const n = extractGeneratedVisibleCodeCounter(r.number, "RCPT");
+    if (n == null) continue;
     if (!Number.isNaN(n) && n > max) max = n;
   }
   return max + 1;
@@ -99,7 +103,7 @@ function normalizeReceiptRecord(raw: unknown): ReceiptPersistRecord | null {
   if (rec.lines.length > 0 && lines.length === 0) return null;
   return {
     id: rec.id,
-    number: rec.number,
+    number: normalizeGeneratedVisibleCode(rec.number, "RCPT") ?? rec.number,
     date: rec.date,
     purchaseOrderId: rec.purchaseOrderId,
     warehouseId: rec.warehouseId,
@@ -171,7 +175,7 @@ function nextLineId(): string {
   return String(lineNextId++);
 }
 function nextNumber(): string {
-  return `RCPT-${String(numberCounter++).padStart(6, "0")}`;
+  return formatGeneratedVisibleCode("RCPT", numberCounter++);
 }
 
 async function bootstrapFromDisk(): Promise<void> {
