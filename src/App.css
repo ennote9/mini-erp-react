@@ -1259,6 +1259,12 @@ summary,
   flex: 1;
   min-height: 120px;
 }
+
+/* Document lines: explicit height (e.g. h-[22rem]) must win over flex:1 or AG Grid root collapses (~2px). */
+.doc-page .doc-lines__grid.doc-lines__grid--fixed-h {
+  flex: 0 0 auto;
+}
+
 .doc-lines__grid .ag-theme-quartz-dark {
   height: 100%;
   min-height: 0;

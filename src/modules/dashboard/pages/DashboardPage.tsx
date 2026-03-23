@@ -21,7 +21,6 @@ import {
   DocumentOverviewCard,
   InventoryOverviewCard,
   RecentActivityPanel,
-  DashboardQuickLinks,
   DashboardSignals,
 } from "../components";
 
@@ -268,16 +267,6 @@ export function DashboardPage() {
             rows={recentShipments}
           />
         </div>
-      </section>
-
-      <section className="space-y-2" aria-labelledby="dash-nav-heading">
-        <h2
-          id="dash-nav-heading"
-          className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground"
-        >
-          {t("dashboard.sections.shortcuts")}
-        </h2>
-        <DashboardQuickLinks />
       </section>
     </div>
   );

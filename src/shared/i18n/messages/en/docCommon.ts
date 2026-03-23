@@ -71,7 +71,6 @@ export const docCommonEn = {
     selectCustomer: "Select customer",
     paymentTermsDaysLabel: "Payment terms (days)",
     paymentTermsInputPlaceholder: "From supplier or enter",
-    paymentTermsInputPlaceholderCustomer: "From customer or enter",
     allocateStock: "Allocate stock",
     allocateStockTitle: "Allocate stock (Alt+Shift+A)",
     dueDate: "Due date",
@@ -138,10 +137,6 @@ export const docCommonEn = {
     importTemplateLabel: "Sales order lines template (Excel)",
     importWarning: "Added {{added}} items. Skipped {{skipped}} rows.",
     carrier: "Carrier",
-    carrierHint:
-      "Defaults from the customer’s preferred carrier when you change customer; you can override before shipping.",
-    deliveryHint:
-      "Optional. Values copy to a new shipment when you create one; you can still change them on the shipment.",
     errors: {
       invalidItem: "Selected item is invalid and cannot be added.",
       inactiveItem: "Inactive items cannot be added.",
@@ -171,8 +166,6 @@ export const docCommonEn = {
     titleNew: "New shipment",
     titleNumbered: "Shipment {{number}}",
     backToListAria: "Back to shipments",
-    detailsDescription:
-      "Sales order, warehouse, carrier and tracking, plus optional recipient and delivery details.",
     relatedSalesOrder: "Related sales order",
     emptyLines: "No lines on this shipment.",
     carrier: "Carrier",

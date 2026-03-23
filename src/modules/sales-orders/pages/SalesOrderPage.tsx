@@ -14,7 +14,6 @@ import { categoryRepository } from "../../categories/repository";
 import type { SalesOrderLine } from "../model";
 import { DocumentPageLayout } from "../../../shared/ui/object/DocumentPageLayout";
 import { BackButton } from "../../../shared/ui/list/BackButton";
-import { StatusBadge } from "../../../shared/ui/feedback/StatusBadge";
 import { AgGridContainer } from "../../../shared/ui/ag-grid/AgGridContainer";
 import { Button } from "@/components/ui/button";
 import { DatePickerField } from "@/components/ui/date-picker-field";
@@ -1643,8 +1642,8 @@ export function SalesOrderPage() {
               <CardTitle className="text-[0.9rem] font-semibold">{t("doc.page.details")}</CardTitle>
             </CardHeader>
             <CardContent className="px-3 pb-3 pt-0">
-              <div className="grid w-full min-w-0 grid-cols-1 gap-x-[1.5cm] gap-y-2 lg:grid-cols-[max-content_max-content_max-content_max-content] lg:justify-start lg:items-start">
-                <div className="flex min-w-0 flex-col gap-2.5 p-3">
+              <div className="flex w-full min-w-0 flex-col gap-y-2 overflow-x-auto lg:flex-row lg:flex-nowrap lg:justify-start lg:gap-x-[1.5cm] lg:gap-y-0 lg:items-start">
+                <div className="flex w-fit min-w-0 max-w-full shrink-0 flex-col gap-2.5 p-3">
                   <section className="min-w-0" aria-labelledby="so-details-doc-heading">
                     <h3
                       id="so-details-doc-heading"
@@ -1653,8 +1652,8 @@ export function SalesOrderPage() {
                       <File className="h-3.5 w-3.5" aria-hidden />
                       {t("doc.so.sectionDocument")}
                     </h3>
-                    <div className="grid grid-cols-1 gap-x-2.5 gap-y-0 sm:grid-cols-2">
-                      <div className="flex min-w-0 flex-col gap-0.5">
+                    <div className="grid grid-cols-1 gap-x-2.5 gap-y-0 sm:grid-cols-2 sm:justify-items-start">
+                      <div className="flex w-full max-w-[140px] min-w-0 flex-col gap-0.5">
                         <Label htmlFor="so-number" className="text-xs leading-none">
                           {t("doc.columns.number")}
                         </Label>
@@ -1662,7 +1661,7 @@ export function SalesOrderPage() {
                           {displayNumber}
                         </div>
                       </div>
-                      <div className="flex min-w-0 flex-col gap-0.5">
+                      <div className="flex w-full max-w-[140px] min-w-0 flex-col gap-0.5">
                         <Label htmlFor="so-date" className="text-xs leading-none">
                           {t("doc.columns.date")} <span className="text-destructive">*</span>
                         </Label>
@@ -1670,18 +1669,10 @@ export function SalesOrderPage() {
                           id="so-date"
                           value={form.date}
                           onChange={(v) => setForm((f) => ({ ...f, date: v }))}
-                          className="h-8 w-full min-w-0 [&_input]:text-sm"
+                          className="h-8 w-full max-w-[140px] min-w-0 [&_input]:text-sm"
                         />
                       </div>
-                      {doc ? (
-                        <div className="flex min-w-0 flex-col gap-0.5 sm:col-span-2">
-                          <span className="text-xs leading-none text-muted-foreground">{t("doc.columns.status")}</span>
-                          <div className="flex min-h-[1.5rem] items-center">
-                            <StatusBadge status={doc.status} />
-                          </div>
-                        </div>
-                      ) : null}
-                      <div className="flex min-w-0 flex-col gap-0.5">
+                      <div className="flex w-full max-w-[140px] min-w-0 flex-col gap-0.5">
                         <Label htmlFor="so-customer" className="text-xs leading-none">
                           {t("doc.columns.customer")} <span className="text-destructive">*</span>
                         </Label>
@@ -1694,10 +1685,10 @@ export function SalesOrderPage() {
                             label: `${c.code} - ${c.name}`,
                           }))}
                           placeholder={t("doc.page.selectCustomer")}
-                          className="w-full min-w-0"
+                          className="!w-[140px] min-w-0"
                         />
                       </div>
-                      <div className="flex min-w-0 flex-col gap-0.5">
+                      <div className="flex w-full max-w-[140px] min-w-0 flex-col gap-0.5">
                         <Label htmlFor="so-warehouse" className="text-xs leading-none">
                           {t("doc.columns.warehouse")} <span className="text-destructive">*</span>
                         </Label>
@@ -1710,14 +1701,14 @@ export function SalesOrderPage() {
                             label: `${w.code} - ${w.name}`,
                           }))}
                           placeholder={t("doc.page.selectWarehouse")}
-                          className="w-full min-w-0"
+                          className="!w-[140px] min-w-0"
                         />
                       </div>
                     </div>
                   </section>
                 </div>
-                <div className="flex min-h-0 min-w-0 flex-col p-3">
-                  <section className="min-w-0" aria-labelledby="so-details-delivery-heading">
+                <div className="flex min-h-0 w-fit min-w-0 max-w-full shrink-0 flex-col p-3">
+                  <section className="flex min-w-0 flex-col" aria-labelledby="so-details-delivery-heading">
                     <h3
                       id="so-details-delivery-heading"
                       className="mb-0.5 flex items-center gap-1 text-[0.7rem] font-semibold uppercase tracking-wide text-muted-foreground"
@@ -1725,7 +1716,7 @@ export function SalesOrderPage() {
                       <Truck className="h-3.5 w-3.5" aria-hidden />
                       {t("doc.so.sectionDelivery")}
                     </h3>
-                    <div className="flex flex-col gap-1.5">
+                    <div className="flex w-full max-w-[20rem] min-w-0 flex-col gap-1.5 self-start">
                       <div className="flex min-w-0 flex-col gap-0.5">
                         <Label htmlFor="so-carrier" className="text-xs leading-none">
                           {t("doc.so.carrier")}
@@ -1733,7 +1724,7 @@ export function SalesOrderPage() {
                         <select
                           id="so-carrier"
                           className={cn(
-                            "flex h-8 w-full max-w-full rounded-md border border-input bg-background px-3 py-1 text-sm text-foreground",
+                            "flex h-8 w-full max-w-full rounded-md border border-input bg-background px-1.5 py-0 text-sm leading-tight text-foreground",
                           )}
                           value={form.carrierId}
                           onChange={(e) => setForm((f) => ({ ...f, carrierId: e.target.value }))}
@@ -1746,9 +1737,7 @@ export function SalesOrderPage() {
                             </option>
                           ))}
                         </select>
-                        <p className="text-xs text-muted-foreground m-0 leading-snug">{t("doc.so.carrierHint")}</p>
                       </div>
-                      <p className="text-xs text-muted-foreground m-0 leading-snug">{t("doc.so.deliveryHint")}</p>
                       <div className="grid grid-cols-1 gap-x-2.5 gap-y-1 sm:grid-cols-2">
                         <div className="flex min-w-0 flex-col gap-0.5">
                           <Label htmlFor="so-recipient-name" className="text-xs leading-none">
@@ -1759,8 +1748,7 @@ export function SalesOrderPage() {
                             type="text"
                             value={form.recipientName}
                             onChange={(e) => setForm((f) => ({ ...f, recipientName: e.target.value }))}
-                            placeholder={t("doc.shipment.recipientNamePlaceholder")}
-                            className="h-8 text-sm"
+                            className="h-8 px-1.5 py-0 text-sm leading-tight"
                             autoComplete="name"
                           />
                         </div>
@@ -1773,8 +1761,7 @@ export function SalesOrderPage() {
                             type="text"
                             value={form.recipientPhone}
                             onChange={(e) => setForm((f) => ({ ...f, recipientPhone: e.target.value }))}
-                            placeholder={t("doc.shipment.recipientPhonePlaceholder")}
-                            className="h-8 text-sm"
+                            className="h-8 px-1.5 py-0 text-sm leading-tight"
                             autoComplete="tel"
                           />
                         </div>
@@ -1787,9 +1774,8 @@ export function SalesOrderPage() {
                           id="so-delivery-address"
                           value={form.deliveryAddress}
                           onChange={(e) => setForm((f) => ({ ...f, deliveryAddress: e.target.value }))}
-                          placeholder={t("doc.shipment.deliveryAddressPlaceholder")}
                           rows={2}
-                          className="min-h-[2.5rem] resize-y text-sm"
+                          className="min-h-[2.5rem] resize-y px-1.5 py-0.5 text-sm leading-tight"
                         />
                       </div>
                       <div className="flex min-w-0 flex-col gap-0.5">
@@ -1800,16 +1786,15 @@ export function SalesOrderPage() {
                           id="so-delivery-comment"
                           value={form.deliveryComment}
                           onChange={(e) => setForm((f) => ({ ...f, deliveryComment: e.target.value }))}
-                          placeholder={t("doc.shipment.deliveryCommentPlaceholder")}
                           rows={2}
-                          className="min-h-[2.5rem] resize-y text-sm"
+                          className="min-h-[2.5rem] resize-y px-1.5 py-0.5 text-sm leading-tight"
                         />
                       </div>
                     </div>
                   </section>
                 </div>
-                <div className="flex min-h-0 min-w-0 flex-col p-3">
-                  <section className="min-w-0" aria-labelledby="so-details-commercial-heading">
+                <div className="flex min-h-0 w-fit min-w-0 max-w-full shrink-0 flex-col p-3">
+                  <section className="flex min-w-0 flex-col" aria-labelledby="so-details-commercial-heading">
                     <h3
                       id="so-details-commercial-heading"
                       className="mb-0.5 flex items-center gap-1 text-[0.7rem] font-semibold uppercase tracking-wide text-muted-foreground"
@@ -1817,9 +1802,9 @@ export function SalesOrderPage() {
                       <Coins className="h-3.5 w-3.5" aria-hidden />
                       {t("doc.so.sectionCommercial")}
                     </h3>
-                    <div className="grid grid-cols-1 gap-x-2.5 gap-y-0.5 sm:grid-cols-2">
-                      <div className="flex min-w-0 flex-col gap-0.5">
-                        <Label htmlFor="so-payment-terms" className="text-sm leading-tight">
+                    <div className="grid grid-cols-1 gap-x-2.5 gap-y-0.5 sm:grid-cols-2 sm:items-start sm:justify-items-start">
+                      <div className="flex w-full min-w-0 max-w-[calc(120px-1cm)] flex-col gap-0.5">
+                        <Label htmlFor="so-payment-terms" className="text-xs leading-tight">
                           {t("doc.page.paymentTermsDaysLabel")}
                         </Label>
                         <Input
@@ -1829,46 +1814,46 @@ export function SalesOrderPage() {
                           step={1}
                           value={form.paymentTermsDays}
                           onChange={(e) => setForm((f) => ({ ...f, paymentTermsDays: e.target.value }))}
-                          placeholder={t("doc.page.paymentTermsInputPlaceholderCustomer")}
-                          className="h-8 text-sm"
+                          className="h-8 w-full text-right tabular-nums text-sm [appearance:textfield] focus-visible:border-input focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring/25 focus-visible:ring-offset-0 [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                         />
                       </div>
-                      <div className="flex min-w-0 flex-col gap-0.5">
+                      <div className="flex w-full max-w-[140px] min-w-0 flex-col gap-0.5">
                         <span className="text-sm leading-tight text-muted-foreground">{t("doc.page.dueDate")}</span>
-                        <div className="flex h-5 items-center text-sm leading-tight text-foreground/90 tabular-nums">
+                        <div className="flex min-h-8 items-center text-sm leading-tight text-foreground/90 tabular-nums">
                           {computedDueDateDisplay}
                         </div>
                       </div>
-                    </div>
-                    <div className="mt-0.5 space-y-0 px-0 py-0">
-                      <div className="grid grid-cols-[minmax(0,7.25rem)_minmax(0,1fr)] items-center gap-x-2">
-                        <span className="text-xs leading-tight text-muted-foreground whitespace-nowrap">{t("finance.orderTotal")}</span>
-                        <span className="text-xs font-semibold leading-tight tabular-nums text-foreground">
-                          {roundMoney(soDetailsPaymentSummary.totalAmount).toFixed(getCommercialMoneyDecimalPlaces())}
-                        </span>
-                      </div>
-                      <div className="grid grid-cols-[minmax(0,7.25rem)_minmax(0,1fr)] items-center gap-x-2">
-                        <span className="text-xs leading-tight text-muted-foreground whitespace-nowrap">{t("finance.paidTotal")}</span>
-                        <span className="text-xs font-medium leading-tight tabular-nums text-foreground">
-                          {roundMoney(soDetailsPaymentSummary.paidAmount).toFixed(getCommercialMoneyDecimalPlaces())}
-                        </span>
-                      </div>
-                      <div className="grid grid-cols-[minmax(0,7.25rem)_minmax(0,1fr)] items-center gap-x-2">
-                        <span className="text-xs leading-tight text-muted-foreground whitespace-nowrap">{t("finance.remaining")}</span>
-                        <span className="text-xs font-medium leading-tight tabular-nums text-foreground">
-                          {roundMoney(soDetailsPaymentSummary.remainingAmount).toFixed(getCommercialMoneyDecimalPlaces())}
-                        </span>
-                      </div>
-                      <div className="grid grid-cols-[minmax(0,7.25rem)_minmax(0,1fr)] items-center gap-x-2">
-                        <span className="text-xs leading-tight text-muted-foreground whitespace-nowrap">{t("finance.paymentStatusLabel")}</span>
-                        <Badge variant="outline" className="h-auto border-0 p-0 text-left text-xs leading-tight text-foreground">
-                          {t(`finance.paymentStatus.${soDetailsPaymentSummary.status}`)}
-                        </Badge>
-                      </div>
+                      <span className="text-xs leading-tight text-muted-foreground whitespace-nowrap">
+                        {t("finance.orderTotal")}
+                      </span>
+                      <span className="w-full max-w-[140px] text-xs font-semibold leading-tight tabular-nums text-foreground">
+                        {roundMoney(soDetailsPaymentSummary.totalAmount).toFixed(getCommercialMoneyDecimalPlaces())}
+                      </span>
+                      <span className="text-xs leading-tight text-muted-foreground whitespace-nowrap">
+                        {t("finance.paidTotal")}
+                      </span>
+                      <span className="w-full max-w-[140px] text-xs font-medium leading-tight tabular-nums text-foreground">
+                        {roundMoney(soDetailsPaymentSummary.paidAmount).toFixed(getCommercialMoneyDecimalPlaces())}
+                      </span>
+                      <span className="text-xs leading-tight text-muted-foreground whitespace-nowrap">
+                        {t("finance.remaining")}
+                      </span>
+                      <span className="w-full max-w-[140px] text-xs font-medium leading-tight tabular-nums text-foreground">
+                        {roundMoney(soDetailsPaymentSummary.remainingAmount).toFixed(getCommercialMoneyDecimalPlaces())}
+                      </span>
+                      <span className="text-xs leading-tight text-muted-foreground whitespace-nowrap">
+                        {t("finance.paymentStatusLabel")}
+                      </span>
+                      <Badge
+                        variant="outline"
+                        className="h-auto w-full max-w-[140px] justify-start border-0 p-0 text-left text-xs leading-tight text-foreground"
+                      >
+                        {t(`finance.paymentStatus.${soDetailsPaymentSummary.status}`)}
+                      </Badge>
                     </div>
                   </section>
                 </div>
-                <div className="flex min-h-0 min-w-0 flex-col p-3">
+                <div className="flex min-h-0 w-fit min-w-0 max-w-full shrink-0 flex-col p-3">
                   <section className="min-w-0" aria-labelledby="so-details-notes-heading">
                     <h3
                       id="so-details-notes-heading"
@@ -1884,9 +1869,8 @@ export function SalesOrderPage() {
                       id="so-comment"
                       value={form.comment}
                       onChange={(e) => setForm((f) => ({ ...f, comment: e.target.value }))}
-                      placeholder={t("common.optional")}
                       rows={3}
-                      className="min-h-[4rem] resize-y text-sm"
+                      className="min-h-[4rem] w-[min(24rem,100%)] min-w-[12rem] resize-y text-sm"
                     />
                   </section>
                 </div>
@@ -1899,8 +1883,8 @@ export function SalesOrderPage() {
               <CardTitle className="text-[0.9rem] font-semibold">{t("doc.page.details")}</CardTitle>
             </CardHeader>
             <CardContent className="px-3 pb-3 pt-0">
-              <div className="grid w-full min-w-0 grid-cols-1 gap-x-[1.5cm] gap-y-2 lg:grid-cols-[max-content_max-content_max-content_max-content] lg:justify-start lg:items-start">
-                <div className="flex min-w-0 flex-col gap-2.5 p-3">
+              <div className="flex w-full min-w-0 flex-col gap-y-2 overflow-x-auto lg:flex-row lg:flex-nowrap lg:justify-start lg:gap-x-[1.5cm] lg:gap-y-0 lg:items-start">
+                <div className="flex w-fit min-w-0 max-w-full shrink-0 flex-col gap-2.5 p-3">
                   <section className="min-w-0" aria-labelledby="so-ro-details-doc-heading">
                     <h3
                       id="so-ro-details-doc-heading"
@@ -1919,12 +1903,6 @@ export function SalesOrderPage() {
                         <dd className="doc-summary__value">{normalizeDateForSO(doc!.date)}</dd>
                       </div>
                       <div className="doc-summary__row py-0.5">
-                        <dt className="doc-summary__term">{t("doc.columns.status")}</dt>
-                        <dd className="doc-summary__value">
-                          <StatusBadge status={doc!.status} />
-                        </dd>
-                      </div>
-                      <div className="doc-summary__row py-0.5">
                         <dt className="doc-summary__term">{t("doc.columns.customer")}</dt>
                         <dd className="doc-summary__value">{customerName}</dd>
                       </div>
@@ -1935,8 +1913,8 @@ export function SalesOrderPage() {
                     </dl>
                   </section>
                 </div>
-                <div className="flex min-h-0 min-w-0 flex-col p-3">
-                  <section className="min-w-0" aria-labelledby="so-ro-details-delivery-heading">
+                <div className="flex min-h-0 w-fit min-w-0 max-w-full shrink-0 flex-col p-3">
+                  <section className="flex min-w-0 flex-col" aria-labelledby="so-ro-details-delivery-heading">
                     <h3
                       id="so-ro-details-delivery-heading"
                       className="mb-0.5 flex items-center gap-1 text-[0.7rem] font-semibold uppercase tracking-wide text-muted-foreground"
@@ -1944,7 +1922,7 @@ export function SalesOrderPage() {
                       <Truck className="h-3.5 w-3.5" aria-hidden />
                       {t("doc.so.sectionDelivery")}
                     </h3>
-                    <dl className="doc-summary doc-summary--compact doc-summary--dense so-doc-summary-compact">
+                    <dl className="doc-summary doc-summary--compact doc-summary--dense so-doc-summary-compact max-w-[20rem] min-w-0 self-start">
                       <div className="doc-summary__row py-0.5">
                         <dt className="doc-summary__term">{t("doc.so.carrier")}</dt>
                         <dd className="doc-summary__value">{carrierReadOnlyLabel}</dd>
@@ -1984,8 +1962,8 @@ export function SalesOrderPage() {
                     </dl>
                   </section>
                 </div>
-                <div className="flex min-h-0 min-w-0 flex-col p-3">
-                  <section className="min-w-0" aria-labelledby="so-ro-details-commercial-heading">
+                <div className="flex min-h-0 w-fit min-w-0 max-w-full shrink-0 flex-col p-3">
+                  <section className="flex min-w-0 flex-col" aria-labelledby="so-ro-details-commercial-heading">
                     <h3
                       id="so-ro-details-commercial-heading"
                       className="mb-0.5 flex items-center gap-1 text-[0.7rem] font-semibold uppercase tracking-wide text-muted-foreground"
@@ -1993,53 +1971,58 @@ export function SalesOrderPage() {
                       <Coins className="h-3.5 w-3.5" aria-hidden />
                       {t("doc.so.sectionCommercial")}
                     </h3>
-                    <dl className="doc-summary doc-summary--compact doc-summary--dense so-doc-summary-compact">
-                      <div className="doc-summary__row py-0.5">
-                        <dt className="doc-summary__term">{t("doc.summary.paymentTerms")}</dt>
-                        <dd className="doc-summary__value">
-                          {doc!.paymentTermsDays !== undefined
-                            ? t("doc.summary.paymentTermsDays", { days: doc!.paymentTermsDays })
-                            : t("domain.audit.summary.emDash")}
-                        </dd>
-                      </div>
-                      <div className="doc-summary__row py-0.5">
-                        <dt className="doc-summary__term">{t("doc.page.dueDate")}</dt>
-                        <dd className="doc-summary__value">
-                          {doc!.dueDate != null && doc!.dueDate !== ""
-                            ? doc!.dueDate
-                            : t("domain.audit.summary.emDash")}
-                        </dd>
-                      </div>
-                    </dl>
-                    <div className="mt-0.5 space-y-0 px-0 py-0">
-                      <div className="grid grid-cols-[minmax(0,7.25rem)_minmax(0,1fr)] items-center gap-x-2">
-                        <span className="text-xs leading-tight text-muted-foreground whitespace-nowrap">{t("finance.orderTotal")}</span>
-                        <span className="text-xs font-semibold leading-tight tabular-nums text-foreground">
-                          {roundMoney(soDetailsPaymentSummary.totalAmount).toFixed(getCommercialMoneyDecimalPlaces())}
-                        </span>
-                      </div>
-                      <div className="grid grid-cols-[minmax(0,7.25rem)_minmax(0,1fr)] items-center gap-x-2">
-                        <span className="text-xs leading-tight text-muted-foreground whitespace-nowrap">{t("finance.paidTotal")}</span>
-                        <span className="text-xs font-medium leading-tight tabular-nums text-foreground">
-                          {roundMoney(soDetailsPaymentSummary.paidAmount).toFixed(getCommercialMoneyDecimalPlaces())}
-                        </span>
-                      </div>
-                      <div className="grid grid-cols-[minmax(0,7.25rem)_minmax(0,1fr)] items-center gap-x-2">
-                        <span className="text-xs leading-tight text-muted-foreground whitespace-nowrap">{t("finance.remaining")}</span>
-                        <span className="text-xs font-medium leading-tight tabular-nums text-foreground">
-                          {roundMoney(soDetailsPaymentSummary.remainingAmount).toFixed(getCommercialMoneyDecimalPlaces())}
-                        </span>
-                      </div>
-                      <div className="grid grid-cols-[minmax(0,7.25rem)_minmax(0,1fr)] items-center gap-x-2">
-                        <span className="text-xs leading-tight text-muted-foreground whitespace-nowrap">{t("finance.paymentStatusLabel")}</span>
-                        <Badge variant="outline" className="h-auto border-0 p-0 text-left text-xs leading-tight text-foreground">
-                          {t(`finance.paymentStatus.${soDetailsPaymentSummary.status}`)}
-                        </Badge>
-                      </div>
+                    <div className="grid grid-cols-1 gap-x-2.5 gap-y-0.5 sm:grid-cols-2 sm:items-start sm:justify-items-start">
+                      <dl className="doc-summary doc-summary--compact doc-summary--dense so-doc-summary-compact m-0 min-w-0 max-w-full self-start">
+                        <div className="doc-summary__row py-0.5">
+                          <dt className="doc-summary__term">{t("doc.summary.paymentTerms")}</dt>
+                          <dd className="doc-summary__value">
+                            {doc!.paymentTermsDays !== undefined
+                              ? t("doc.summary.paymentTermsDays", { days: doc!.paymentTermsDays })
+                              : t("domain.audit.summary.emDash")}
+                          </dd>
+                        </div>
+                      </dl>
+                      <dl className="doc-summary doc-summary--compact doc-summary--dense so-doc-summary-compact m-0 min-w-0 max-w-[140px] self-start">
+                        <div className="doc-summary__row py-0.5">
+                          <dt className="doc-summary__term">{t("doc.page.dueDate")}</dt>
+                          <dd className="doc-summary__value tabular-nums">
+                            {doc!.dueDate != null && doc!.dueDate !== ""
+                              ? doc!.dueDate
+                              : t("domain.audit.summary.emDash")}
+                          </dd>
+                        </div>
+                      </dl>
+                      <span className="text-xs leading-tight text-muted-foreground whitespace-nowrap">
+                        {t("finance.orderTotal")}
+                      </span>
+                      <span className="w-full max-w-[140px] text-xs font-semibold leading-tight tabular-nums text-foreground">
+                        {roundMoney(soDetailsPaymentSummary.totalAmount).toFixed(getCommercialMoneyDecimalPlaces())}
+                      </span>
+                      <span className="text-xs leading-tight text-muted-foreground whitespace-nowrap">
+                        {t("finance.paidTotal")}
+                      </span>
+                      <span className="w-full max-w-[140px] text-xs font-medium leading-tight tabular-nums text-foreground">
+                        {roundMoney(soDetailsPaymentSummary.paidAmount).toFixed(getCommercialMoneyDecimalPlaces())}
+                      </span>
+                      <span className="text-xs leading-tight text-muted-foreground whitespace-nowrap">
+                        {t("finance.remaining")}
+                      </span>
+                      <span className="w-full max-w-[140px] text-xs font-medium leading-tight tabular-nums text-foreground">
+                        {roundMoney(soDetailsPaymentSummary.remainingAmount).toFixed(getCommercialMoneyDecimalPlaces())}
+                      </span>
+                      <span className="text-xs leading-tight text-muted-foreground whitespace-nowrap">
+                        {t("finance.paymentStatusLabel")}
+                      </span>
+                      <Badge
+                        variant="outline"
+                        className="h-auto w-full max-w-[140px] justify-start border-0 p-0 text-left text-xs leading-tight text-foreground"
+                      >
+                        {t(`finance.paymentStatus.${soDetailsPaymentSummary.status}`)}
+                      </Badge>
                     </div>
                   </section>
                 </div>
-                <div className="flex min-h-0 min-w-0 flex-col p-3">
+                <div className="flex min-h-0 w-fit min-w-0 max-w-full shrink-0 flex-col p-3">
                   <section className="min-w-0" aria-labelledby="so-ro-details-notes-heading">
                     <h3
                       id="so-ro-details-notes-heading"
@@ -2478,7 +2461,7 @@ export function SalesOrderPage() {
               </Card>
               </div>
             )}
-<div className="doc-lines__grid h-[22rem]">
+<div className="doc-lines__grid doc-lines__grid--fixed-h h-[22rem] min-h-[22rem]">
               <AgGridContainer themeClass="doc-lines-grid">
                 <AgGridReact<LineFormRow>
                   ref={linesGridRef}
@@ -2511,7 +2494,7 @@ export function SalesOrderPage() {
               <p className="doc-lines__empty">{t("doc.page.noLines")}</p>
             ) : (
               <>
-                <div className="doc-lines__grid h-[22rem]">
+                <div className="doc-lines__grid doc-lines__grid--fixed-h h-[22rem] min-h-[22rem]">
                   <AgGridContainer themeClass="doc-lines-grid">
                     <AgGridReact<LineWithItem>
                       {...agGridDefaultGridOptions}

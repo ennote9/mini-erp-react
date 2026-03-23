@@ -221,13 +221,12 @@ export const kkMessages: MessageTree = {
   dashboard: {
     title: "Басқару тақтасы",
     subtitle:
-      "Тікелей операциялық панель: назар аудару, құжат ағыны, қор жолдары, соңғы түсім мен жөнелту, күнделікті жұмысқа жылдам өту.",
+      "Тікелей операциялық панель: назар аудару, құжат ағыны, қор жолдары, соңғы түсім мен жөнелту.",
     sections: {
       priority: "Назар аудару керек",
       pipeline: "Құжат ағыны",
       inventory: "Қорлар мен анықтамалық",
       logistics: "Соңғы түсім мен жөнелту",
-      shortcuts: "Жылдам өту",
     },
     pipeline: {
       hint: "Күй санына басыңыз — тізім сол күйге сүзіледі. Карточкадағы сілтеме — толық тізім.",
@@ -266,19 +265,6 @@ export const kkMessages: MessageTree = {
     },
     recentReceipts: { title: "Соңғы түсімдер", empty: "Түсімдер әлі жоқ." },
     recentShipments: { title: "Соңғы жөнелтулер", empty: "Жөнелтулер әлі жоқ." },
-    quickLinks: {
-      title: "Жылдам өту",
-      po: "Сатып алу тапсырыстары",
-      so: "Сату тапсырыстары",
-      receipts: "Түсімдер",
-      shipments: "Жөнелтулер",
-      stockBalances: "Қалдықтар",
-      stockMovements: "Қозғалыстар",
-      customers: "Клиенттер",
-      suppliers: "Жеткізушілер",
-      warehouses: "Қоймалар",
-      carriers: "Тасымалдаушылар",
-    },
     signals: {
       title: "Операциялық тексерулер",
       subtitle: "Жергілікті деректерден есептелген — қарау немесе кезекті тазалау үшін сілтемеге өтіңіз.",
@@ -540,7 +526,6 @@ export const kkMessages: MessageTree = {
       selectCustomer: "Клиентті таңдаңыз",
       paymentTermsDaysLabel: "Төлем мерзімі (күн)",
       paymentTermsInputPlaceholder: "Карточкадан немесе қолмен",
-      paymentTermsInputPlaceholderCustomer: "Клиент карточкасынан немесе қолмен",
       allocateStock: "Қорды резервтеу",
       allocateStockTitle: "Қорды резервтеу (Alt+Shift+A)",
       dueDate: "Төлем мерзімі",
@@ -607,10 +592,6 @@ export const kkMessages: MessageTree = {
       importTemplateLabel: "Сату тапсырысы жолдарының үлгісі (Excel)",
       importWarning: "Қосылды: {{added}} тауар. Өткізілді: {{skipped}} жол.",
       carrier: "Тасымалдаушы",
-      carrierHint:
-        "Клиент өзгертілгенде клиенттің негізгі тасымалдаушысынан алынады; жөнелтуден бұрын өзгертуге болады.",
-      deliveryHint:
-        "Міндетті емес. Жөнелту жасағанда оған көшіріледі; жөнелтуде өзгертуге болады.",
       errors: {
         invalidItem: "Таңдалған тауар жарамсыз, қосуға болмайды.",
         inactiveItem: "Белсенді емес тауарларды қосуға болмайды.",
@@ -640,8 +621,6 @@ export const kkMessages: MessageTree = {
       titleNew: "Жаңа жөнелту",
       titleNumbered: "Жөнелту {{number}}",
       backToListAria: "Жөнелтулер тізіміне оралу",
-      detailsDescription:
-        "Сату тапсырысы, қойма, тасымалдаушы және бақылау, сондай-ақ міндетті емес жеткізу деректері.",
       relatedSalesOrder: "Байланысты сату тапсырысы",
       emptyLines: "Бұл жөнелтуде жолдар жоқ.",
       carrier: "Тасымалдаушы",

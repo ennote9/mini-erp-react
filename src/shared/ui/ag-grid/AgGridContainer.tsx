@@ -14,7 +14,7 @@ type AgGridContainerProps = {
 export function AgGridContainer({ themeClass, children }: AgGridContainerProps) {
   return (
     <div
-      className={`ag-theme-quartz-dark ${themeClass} min-h-0 w-full flex-1`.trim()}
+      className={`ag-theme-quartz-dark ${themeClass} flex min-h-0 w-full flex-1 flex-col`.trim()}
     >
       {children}
     </div>

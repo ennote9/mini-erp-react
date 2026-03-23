@@ -37,7 +37,6 @@ import { cn } from "@/lib/utils";
 import {
   Card,
   CardContent,
-  CardDescription,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
@@ -551,9 +550,6 @@ export function ShipmentPage() {
       <Card className="max-w-2xl border-0 shadow-none">
         <CardHeader className="p-4 pb-1">
           <CardTitle className="text-[0.9rem] font-semibold">{t("doc.page.details")}</CardTitle>
-          <CardDescription className="text-xs text-muted-foreground">
-            {t("doc.shipment.detailsDescription")}
-          </CardDescription>
         </CardHeader>
         <CardContent className="p-4 pt-2">
           <dl className="doc-summary doc-summary--compact">

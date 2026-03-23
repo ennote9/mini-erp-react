@@ -223,13 +223,12 @@ export const ruMessages: MessageTree = {
   dashboard: {
     title: "Панель",
     subtitle:
-      "Оперативная панель: на что обратить внимание, конвейер документов, строки запасов, последние поступления и отгрузки, быстрые переходы.",
+      "Оперативная панель: на что обратить внимание, конвейер документов, строки запасов, последние поступления и отгрузки.",
     sections: {
       priority: "Требуют внимания",
       pipeline: "Конвейер документов",
       inventory: "Запасы и НСИ",
       logistics: "Последние поступления и отгрузки",
-      shortcuts: "Быстрые переходы",
     },
     pipeline: {
       hint: "Нажмите на число по статусу, чтобы открыть список с этим фильтром. Ссылка на карточке — полный список.",
@@ -291,7 +290,6 @@ export const ruMessages: MessageTree = {
       masterDataHint: "НСИ",
       reviewAction: "Открыть список →",
     },
-    quickLinksSubtitle: "Сразу к спискам, которые чаще всего нужны в работе.",
     openList: "Открыть список →",
     openArrow: "Открыть →",
     totalLabel: "Всего",
@@ -542,7 +540,6 @@ export const ruMessages: MessageTree = {
       selectCustomer: "Выберите клиента",
       paymentTermsDaysLabel: "Срок оплаты (дни)",
       paymentTermsInputPlaceholder: "Из карточки или вручную",
-      paymentTermsInputPlaceholderCustomer: "Из карточки клиента или вручную",
       allocateStock: "Зарезервировать",
       allocateStockTitle: "Зарезервировать (Alt+Shift+A)",
       dueDate: "Срок оплаты",
@@ -609,10 +606,6 @@ export const ruMessages: MessageTree = {
       importTemplateLabel: "Шаблон строк заказа клиента (Excel)",
       importWarning: "Добавлено позиций: {{added}}. Пропущено строк: {{skipped}}.",
       carrier: "Перевозчик",
-      carrierHint:
-        "Подставляется из предпочтительного перевозчика клиента при смене клиента; можно изменить до отгрузки.",
-      deliveryHint:
-        "Необязательно. При создании отгрузки переносятся в неё; на отгрузке их можно изменить.",
       errors: {
         invalidItem: "Выбранная позиция недействительна и не может быть добавлена.",
         inactiveItem: "Неактивные позиции нельзя добавлять.",
@@ -642,8 +635,6 @@ export const ruMessages: MessageTree = {
       titleNew: "Новая отгрузка",
       titleNumbered: "Отгрузка {{number}}",
       backToListAria: "Назад к списку отгрузок",
-      detailsDescription:
-        "Заказ клиента, склад, перевозчик и трек, а также необязательные данные доставки.",
       relatedSalesOrder: "Связанный заказ клиента",
       emptyLines: "В этой отгрузке нет строк.",
       carrier: "Перевозчик",

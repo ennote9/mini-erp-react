@@ -1,13 +1,12 @@
 export const dashboardEn = {
   title: "Dashboard",
   subtitle:
-    "Live operational cockpit: what needs attention, document pipeline, inventory row counts, recent inbound and outbound documents, and shortcuts into daily work.",
+    "Live operational cockpit: what needs attention, document pipeline, inventory row counts, and recent inbound and outbound documents.",
   sections: {
     priority: "Needs attention",
     pipeline: "Document pipeline",
     inventory: "Inventory & master data",
     logistics: "Latest inbound & outbound",
-    shortcuts: "Shortcuts",
   },
   pipeline: {
     hint: "Tap a status count to open the list filtered to that state. Use the card link for the full list.",
@@ -69,7 +68,6 @@ export const dashboardEn = {
     masterDataHint: "Master data",
     reviewAction: "Open list →",
   },
-  quickLinksSubtitle: "Jump straight into the lists you use most often.",
   openList: "Open list →",
   openArrow: "Open →",
   totalLabel: "Total",

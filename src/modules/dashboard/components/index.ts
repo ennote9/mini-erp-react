@@ -7,5 +7,4 @@ export {
   type RecentActivityReceiptRow,
   type RecentActivityShipmentRow,
 } from "./RecentActivityPanel";
-export { DashboardQuickLinks } from "./DashboardQuickLinks";
 export { DashboardSignals } from "./DashboardSignals";
