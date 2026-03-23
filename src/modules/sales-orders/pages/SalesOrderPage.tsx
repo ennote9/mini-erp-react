@@ -2478,7 +2478,7 @@ export function SalesOrderPage() {
               </Card>
               </div>
             )}
-<div className="doc-lines__grid">
+<div className="doc-lines__grid h-[22rem]">
               <AgGridContainer themeClass="doc-lines-grid">
                 <AgGridReact<LineFormRow>
                   ref={linesGridRef}
@@ -2511,7 +2511,7 @@ export function SalesOrderPage() {
               <p className="doc-lines__empty">{t("doc.page.noLines")}</p>
             ) : (
               <>
-                <div className="doc-lines__grid">
+                <div className="doc-lines__grid h-[22rem]">
                   <AgGridContainer themeClass="doc-lines-grid">
                     <AgGridReact<LineWithItem>
                       {...agGridDefaultGridOptions}
@@ -2519,8 +2519,6 @@ export function SalesOrderPage() {
                       columnDefs={readOnlyLinesColumnDefs}
                       defaultColDef={agGridDefaultColDef}
                       getRowId={(p) => p.data.id}
-                      rowSelection={{ mode: "multiRow", checkboxes: true, headerCheckbox: true, enableClickSelection: true }}
-                      selectionColumnDef={agGridSelectionColumnDef}
                     />
                   </AgGridContainer>
                 </div>
