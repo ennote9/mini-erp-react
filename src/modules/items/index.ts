@@ -1,6 +1,6 @@
 export { ItemsListPage } from "./pages/ItemsListPage";
 export { ItemPage } from "./pages/ItemPage";
-export type { Item, ItemImage } from "./model";
+export type { Item, ItemImage, ItemBarcode, ItemBarcodeType, ItemBarcodePackagingLevel } from "./model";
 export {
   itemRepository,
   flushPendingItemsPersist,

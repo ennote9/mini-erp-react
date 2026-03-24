@@ -48,13 +48,14 @@ function searchItemsForSalesOrderLine(items: Item[], rawQuery: string): Item[] {
   for (const item of items) {
     const code = item.code.toLowerCase();
     const name = item.name.toLowerCase();
-    const barcode = (item.barcode ?? "").toLowerCase();
+    const barcodes = (item.barcodes ?? []).map((b) => b.codeValue.toLowerCase());
+    const legacyBarcode = (item.barcode ?? "").toLowerCase();
 
     if (code === q) {
       exactCode.push(item);
       continue;
     }
-    if (barcode && barcode === q) {
+    if (barcodes.some((x) => x === q) || (legacyBarcode !== "" && legacyBarcode === q)) {
       exactBarcode.push(item);
       continue;
     }
@@ -66,7 +67,7 @@ function searchItemsForSalesOrderLine(items: Item[], rawQuery: string): Item[] {
       startsWithName.push(item);
       continue;
     }
-    if (barcode && barcode.startsWith(q)) {
+    if (barcodes.some((x) => x.startsWith(q)) || (legacyBarcode !== "" && legacyBarcode.startsWith(q))) {
       startsWithBarcode.push(item);
       continue;
     }
@@ -78,7 +79,7 @@ function searchItemsForSalesOrderLine(items: Item[], rawQuery: string): Item[] {
       containsName.push(item);
       continue;
     }
-    if (barcode && barcode.includes(q)) {
+    if (barcodes.some((x) => x.includes(q)) || (legacyBarcode !== "" && legacyBarcode.includes(q))) {
       containsBarcode.push(item);
       continue;
     }

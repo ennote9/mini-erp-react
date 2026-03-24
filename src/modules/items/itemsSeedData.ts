@@ -5,6 +5,7 @@
 import { brandRepository } from "../brands/repository";
 import { categoryRepository } from "../categories/repository";
 import type { Item } from "./model";
+import { makeLegacyPrimaryUnitBarcode } from "./lib/itemBarcodes";
 
 function brandByCode(): Record<string, string> {
   const map: Record<string, string> = {};
@@ -26,7 +27,7 @@ function categoryByCode(): Record<string, string> {
 export function buildSeedItems(): Item[] {
   const b = brandByCode();
   const c = categoryByCode();
-  const rows: Omit<Item, "id">[] = [
+  const rows: Omit<Item, "id" | "barcodes">[] = [
     {
       code: "ITEM-001",
       name: "Widget A",
@@ -329,5 +330,13 @@ export function buildSeedItems(): Item[] {
   ];
 
   let n = 1;
-  return rows.map((row) => ({ ...row, id: String(n++) }));
+  return rows.map((row) => {
+    const id = String(n++);
+    const bridged = row.barcode ? makeLegacyPrimaryUnitBarcode(id, row.barcode) : null;
+    return {
+      ...row,
+      id,
+      barcodes: bridged ? [bridged] : [],
+    };
+  });
 }

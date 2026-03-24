@@ -586,6 +586,7 @@ export function SalesOrderPage() {
   const salesOrderPrintMenuItems = useMemo(() => {
     if (!id || !canOpenPreliminaryCustomerDoc) return [];
     return [
+      { to: `/sales-orders/${id}/preliminary-document`, label: t("doc.customerDocument.simplePreliminaryTitle") },
       { to: `/sales-orders/${id}/customer-document`, label: t("doc.customerDocument.preliminaryTitle") },
       { to: `/sales-orders/${id}/customer-invoice`, label: t("finance.openCustomerInvoiceShort") },
     ];

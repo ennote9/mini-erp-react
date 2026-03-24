@@ -8,7 +8,6 @@ import { SelectField } from "@/components/ui/select-field";
 import { cn } from "@/lib/utils";
 import {
   registryEntriesForSection,
-  settingsSectionsVisibleForWorkspace,
   useSettings,
   type AppSettings,
   type SettingReadiness,
@@ -181,13 +180,9 @@ export function SettingsPage() {
     corruptRestoredOnLoad,
     persistenceTechnicalDetail,
   } = useSettings();
-  const [activeSection, setActiveSection] = useState<SettingsSectionId>("workspaceProfile");
+  const [activeSection, setActiveSection] = useState<SettingsSectionId>("general");
   const workspaceMode = settings.general.workspaceMode;
-
-  const visibleSettingsSections = useMemo(
-    () => settingsSectionsVisibleForWorkspace(workspaceMode),
-    [workspaceMode],
-  );
+  const visibleSettingsSections = useMemo<SettingsSectionId[]>(() => ["general"], []);
 
   useEffect(() => {
     if (!visibleSettingsSections.includes(activeSection)) {

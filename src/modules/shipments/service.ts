@@ -362,9 +362,8 @@ export function post(shipmentId: string): PostResult {
   const prevStatus = shipment.status;
   shipmentRepository.update(shipmentId, { status: "posted" });
   const soFulfillment = computeSalesOrderFulfillment(shipment.salesOrderId);
-  const autoClose = getAppSettings().documents.autoClosePlanningOnFullFulfillment;
-  const nextSoStatus =
-    autoClose && soFulfillment.state === "complete" ? "closed" : "confirmed";
+  // Product rule: full fulfillment closes SO; partial/not-started stays confirmed.
+  const nextSoStatus = soFulfillment.state === "complete" ? "closed" : "confirmed";
   salesOrderRepository.update(shipment.salesOrderId, {
     status: nextSoStatus,
   });

@@ -241,8 +241,12 @@ export async function parseExcelLineImport(
   for (const item of options.items) {
     const code = item.code.trim().toLowerCase();
     if (code && !codeMap.has(code)) codeMap.set(code, item);
-    const barcode = item.barcode?.trim();
-    if (barcode && !barcodeMap.has(barcode)) barcodeMap.set(barcode, item);
+    for (const bc of item.barcodes ?? []) {
+      const barcode = bc.codeValue?.trim();
+      if (barcode && !barcodeMap.has(barcode)) barcodeMap.set(barcode, item);
+    }
+    const legacyBarcode = item.barcode?.trim();
+    if (legacyBarcode && !barcodeMap.has(legacyBarcode)) barcodeMap.set(legacyBarcode, item);
   }
 
   const rows: ExcelImportPreviewRow[] = [];

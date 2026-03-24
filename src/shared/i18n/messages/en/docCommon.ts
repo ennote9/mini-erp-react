@@ -199,6 +199,9 @@ export const docCommonEn = {
     deliverySheetCopied: "Copied",
   },
   customerDocument: {
+    simplePreliminaryTitle: "Preliminary document",
+    simplePreliminaryUnavailable:
+      "The preliminary document is not available for cancelled orders or for orders without lines.",
     preliminaryTitle: "Preliminary customer document",
     finalTitle: "Final customer document",
     preliminaryOpen: "Preliminary for customer",

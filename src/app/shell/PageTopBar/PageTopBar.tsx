@@ -47,6 +47,8 @@ function getPageTitleKey(pathname: string): string {
   if (pathname.match(/^\/carriers\/[^/]+$/)) return "routes.carrier";
   if (pathname.match(/^\/purchase-orders\/[^/]+$/)) return "routes.purchaseOrder";
   if (pathname.match(/^\/receipts\/[^/]+$/)) return "routes.receipt";
+  if (pathname.match(/^\/sales-orders\/[^/]+\/preliminary-document$/))
+    return "routes.salesOrderPreliminaryDocument";
   if (pathname.match(/^\/sales-orders\/[^/]+\/customer-document$/))
     return "routes.salesOrderCustomerDocument";
   if (pathname.match(/^\/sales-orders\/[^/]+\/customer-invoice$/))
@@ -85,6 +87,7 @@ function getPageIcon(
   if (
     pathname === "/sales-orders" ||
     pathname.match(/^\/sales-orders\/[^/]+$/) ||
+    pathname.match(/^\/sales-orders\/[^/]+\/preliminary-document$/) ||
     pathname.match(/^\/sales-orders\/[^/]+\/customer-document$/) ||
     pathname.match(/^\/sales-orders\/[^/]+\/customer-invoice$/)
   )

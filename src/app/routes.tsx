@@ -16,6 +16,7 @@ import { ReceiptsListPage, ReceiptPage } from "../modules/receipts";
 import {
   SalesOrdersListPage,
   SalesOrderPage,
+  SalesOrderPreliminaryDocumentPage,
   SalesOrderCustomerDocumentPage,
   SalesOrderCustomerInvoicePage,
 } from "../modules/sales-orders";
@@ -57,6 +58,7 @@ export function AppRoutes() {
         <Route path="receipts" element={<ReceiptsListPage />} />
         <Route path="receipts/:id" element={<ReceiptPage />} />
         <Route path="sales-orders" element={<SalesOrdersListPage />} />
+        <Route path="sales-orders/:id/preliminary-document" element={<SalesOrderPreliminaryDocumentPage />} />
         <Route path="sales-orders/:id/customer-document" element={<SalesOrderCustomerDocumentPage />} />
         <Route path="sales-orders/:id/customer-invoice" element={<SalesOrderCustomerInvoicePage />} />
         <Route path="sales-orders/:id" element={<SalesOrderPage />} />

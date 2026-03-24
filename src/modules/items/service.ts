@@ -1,4 +1,5 @@
 import { itemRepository, flushPendingItemsPersist } from "./repository";
+import type { ItemBarcode, ItemBarcodePackagingLevel, ItemBarcodeType } from "./model";
 import { brandRepository } from "../brands/repository";
 import { categoryRepository } from "../categories/repository";
 import {
@@ -10,6 +11,12 @@ import {
   normalizeUOM,
   NAME_MIN_LENGTH,
 } from "../../shared/validation";
+import {
+  barcodeCodeValueExistsGlobally,
+  normalizeItemBarcodeDraft,
+  validateItemBarcodeDraft,
+  type ItemBarcodeDraft,
+} from "./lib/itemBarcodes";
 
 export type SaveItemInput = {
   code: string;
@@ -25,6 +32,9 @@ export type SaveItemInput = {
 };
 export type SaveItemResult =
   | { success: true; id: string }
+  | { success: false; error: string };
+export type SaveItemBarcodeResult =
+  | { success: true; barcodeId: string }
   | { success: false; error: string };
 
 function validatePrice(value: number | undefined, fieldName: string): string | null {
@@ -110,6 +120,61 @@ export function saveItem(
   return { success: true, id: created.id };
 }
 
+function nextItemBarcodeId(itemId: string): string {
+  return `${itemId}-bc-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+}
+
+export function saveItemBarcode(
+  itemId: string,
+  draft: ItemBarcodeDraft,
+  existingBarcodeId?: string,
+): SaveItemBarcodeResult {
+  const item = itemRepository.getById(itemId);
+  if (!item) return { success: false, error: "Item not found." };
+  const err = validateItemBarcodeDraft(draft);
+  if (err) return { success: false, error: err };
+  const normalized = normalizeItemBarcodeDraft(draft);
+  const duplicate = barcodeCodeValueExistsGlobally(itemRepository.list(), normalized.codeValue, {
+    excludeItemId: itemId,
+    excludeBarcodeId: existingBarcodeId,
+  });
+  if (duplicate) {
+    return { success: false, error: "This barcode already exists for another item." };
+  }
+  const existing = item.barcodes ?? [];
+  const nextId = existingBarcodeId ?? nextItemBarcodeId(itemId);
+  const replacement: ItemBarcode = {
+    id: nextId,
+    itemId,
+    codeValue: normalized.codeValue,
+    barcodeType: normalized.barcodeType as ItemBarcodeType,
+    packagingLevel: normalized.packagingLevel as ItemBarcodePackagingLevel,
+    isPrimary: normalized.isPrimary,
+    isActive: normalized.isActive,
+    comment: normalized.comment,
+  };
+  const next =
+    existingBarcodeId == null
+      ? [...existing, replacement]
+      : existing.map((b) => (b.id === existingBarcodeId ? replacement : b));
+  const updated = itemRepository.update(itemId, { barcodes: next });
+  if (!updated) return { success: false, error: "Item not found." };
+  return { success: true, barcodeId: nextId };
+}
+
+export function removeItemBarcode(itemId: string, barcodeId: string): SaveItemBarcodeResult {
+  const item = itemRepository.getById(itemId);
+  if (!item) return { success: false, error: "Item not found." };
+  const existing = item.barcodes ?? [];
+  const next = existing.filter((b) => b.id !== barcodeId);
+  if (next.length === existing.length) {
+    return { success: false, error: "Barcode not found." };
+  }
+  const updated = itemRepository.update(itemId, { barcodes: next });
+  if (!updated) return { success: false, error: "Item not found." };
+  return { success: true, barcodeId };
+}
+
 /**
  * Validates and saves like {@link saveItem}, then waits until items.json persistence completes.
  * Use from Item save flow so navigation does not outrun disk write.
@@ -132,4 +197,6 @@ export async function saveItemAwaitPersist(
 export const itemService = {
   saveItem,
   saveItemAwaitPersist,
+  saveItemBarcode,
+  removeItemBarcode,
 };

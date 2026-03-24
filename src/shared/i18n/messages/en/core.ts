@@ -93,6 +93,7 @@ export const coreEn = {
     receipt: "Receipt",
     salesOrders: "Sales Orders",
     salesOrder: "Sales Order",
+    salesOrderPreliminaryDocument: "Preliminary document",
     salesOrderCustomerDocument: "Preliminary customer document",
     salesOrderCustomerInvoice: "Payment request (sales order)",
     shipments: "Shipments",

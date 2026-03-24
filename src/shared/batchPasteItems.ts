@@ -113,9 +113,15 @@ export function resolveBatchPastedItems(input: string, items: Item[]): BatchPast
     if (normalizedCode && !codeMap.has(normalizedCode)) {
       codeMap.set(normalizedCode, item);
     }
-    const barcode = item.barcode?.trim();
-    if (barcode && !barcodeMap.has(barcode)) {
-      barcodeMap.set(barcode, item);
+    for (const bc of item.barcodes ?? []) {
+      const barcode = bc.codeValue.trim();
+      if (barcode && !barcodeMap.has(barcode)) {
+        barcodeMap.set(barcode, item);
+      }
+    }
+    const legacyBarcode = item.barcode?.trim();
+    if (legacyBarcode && !barcodeMap.has(legacyBarcode)) {
+      barcodeMap.set(legacyBarcode, item);
     }
   }
 

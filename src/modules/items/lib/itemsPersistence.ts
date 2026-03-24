@@ -11,7 +11,12 @@ import {
   remove,
   rename,
 } from "@tauri-apps/plugin-fs";
-import type { Item, ItemImage } from "../model";
+import type { Item, ItemBarcode, ItemBarcodePackagingLevel, ItemBarcodeType, ItemImage } from "../model";
+import {
+  bridgeLegacyBarcodeValueFromCollection,
+  makeLegacyPrimaryUnitBarcode,
+  normalizeItemBarcodesCollection,
+} from "./itemBarcodes";
 
 const BD = BaseDirectory.AppLocalData;
 const ITEMS_DIR = "items";
@@ -90,6 +95,34 @@ function normalizeItem(raw: unknown): Item | null {
   const brandId = typeof o.brandId === "string" ? o.brandId : undefined;
   const categoryId = typeof o.categoryId === "string" ? o.categoryId : undefined;
   const barcode = typeof o.barcode === "string" ? o.barcode : undefined;
+  const rawBarcodes = Array.isArray(o.barcodes) ? o.barcodes : [];
+  const fromRaw: ItemBarcode[] = rawBarcodes
+    .map((x): ItemBarcode | null => {
+      if (!x || typeof x !== "object") return null;
+      const rec = x as Record<string, unknown>;
+      const id = typeof rec.id === "string" ? rec.id : null;
+      const itemId = typeof rec.itemId === "string" ? rec.itemId : o.id;
+      const codeValue = typeof rec.codeValue === "string" ? rec.codeValue : null;
+      const barcodeType = typeof rec.barcodeType === "string" ? (rec.barcodeType as ItemBarcodeType) : null;
+      const packagingLevel =
+        typeof rec.packagingLevel === "string" ? (rec.packagingLevel as ItemBarcodePackagingLevel) : null;
+      if (!id || !codeValue || !barcodeType || !packagingLevel) return null;
+      return {
+        id,
+        itemId: String(itemId),
+        codeValue,
+        barcodeType,
+        packagingLevel,
+        isPrimary: rec.isPrimary === true,
+        isActive: rec.isActive !== false,
+        comment: typeof rec.comment === "string" ? rec.comment : undefined,
+      };
+    })
+    .filter((x): x is ItemBarcode => x !== null);
+  const migratedLegacy = fromRaw.length === 0 && barcode ? makeLegacyPrimaryUnitBarcode(String(o.id), barcode) : null;
+  const barcodes = normalizeItemBarcodesCollection(
+    migratedLegacy ? [...fromRaw, migratedLegacy] : fromRaw,
+  );
   const purchasePrice =
     typeof o.purchasePrice === "number" && !Number.isNaN(o.purchasePrice) ? o.purchasePrice : undefined;
   const salePrice = typeof o.salePrice === "number" && !Number.isNaN(o.salePrice) ? o.salePrice : undefined;
@@ -102,10 +135,11 @@ function normalizeItem(raw: unknown): Item | null {
     description,
     brandId,
     categoryId,
-    barcode,
+    barcode: bridgeLegacyBarcodeValueFromCollection(barcodes) ?? barcode,
     purchasePrice,
     salePrice,
     images,
+    barcodes,
   };
 }
 

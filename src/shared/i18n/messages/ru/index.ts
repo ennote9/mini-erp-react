@@ -101,6 +101,7 @@ export const ruMessages: MessageTree = {
     receipt: "Поступление",
     salesOrders: "Заказы клиентов",
     salesOrder: "Заказ клиента",
+    salesOrderPreliminaryDocument: "Предварительный документ",
     salesOrderCustomerDocument: "Предварительный документ клиенту",
     salesOrderCustomerInvoice: "Счёт на оплату (заказ клиента)",
     shipments: "Отгрузки",
@@ -597,6 +598,9 @@ export const ruMessages: MessageTree = {
       deliverySheetCopied: "Скопировано",
     },
     customerDocument: {
+      simplePreliminaryTitle: "Предварительный документ",
+      simplePreliminaryUnavailable:
+        "Предварительный документ недоступен для отменённых заказов или заказов без строк.",
       preliminaryTitle: "Предварительный документ клиенту",
       finalTitle: "Итоговый документ клиенту",
       preliminaryOpen: "Предварительный для клиента",

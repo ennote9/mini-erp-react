@@ -7,8 +7,15 @@ import {
 } from "./lib/itemsPersistence";
 import { registerPersistenceFlush } from "../../shared/persistenceCoordinator";
 import { bumpAppReadModelRevision } from "../../shared/appReadModelRevision";
+import {
+  bridgeLegacyBarcodeValueFromCollection,
+  normalizeItemBarcodesCollection,
+} from "./lib/itemBarcodes";
 
-export type CreateItemInput = Omit<Item, "id" | "images"> & { images?: ItemImage[] };
+export type CreateItemInput = Omit<Item, "id" | "images" | "barcodes"> & {
+  images?: ItemImage[];
+  barcodes?: Item["barcodes"];
+};
 export type UpdateItemPatch = Partial<Omit<Item, "id">>;
 
 const store: Item[] = [];
@@ -92,10 +99,13 @@ export const itemRepository = {
   },
 
   create(input: CreateItemInput): Item {
+    const normalizedBarcodes = normalizeItemBarcodesCollection(input.barcodes ?? []);
     const item: Item = {
       ...input,
       id: nextIdStr(),
       images: input.images ?? [],
+      barcodes: normalizedBarcodes,
+      barcode: bridgeLegacyBarcodeValueFromCollection(normalizedBarcodes) ?? input.barcode,
     };
     store.push(item);
     schedulePersist();
@@ -105,7 +115,13 @@ export const itemRepository = {
   update(id: string, patch: UpdateItemPatch): Item | undefined {
     const i = store.findIndex((x) => x.id === id);
     if (i === -1) return undefined;
-    store[i] = { ...store[i], ...patch };
+    const merged = { ...store[i], ...patch };
+    const normalizedBarcodes = normalizeItemBarcodesCollection(merged.barcodes ?? []);
+    store[i] = {
+      ...merged,
+      barcodes: normalizedBarcodes,
+      barcode: bridgeLegacyBarcodeValueFromCollection(normalizedBarcodes) ?? merged.barcode,
+    };
     schedulePersist();
     return store[i];
   },
@@ -115,7 +131,9 @@ export const itemRepository = {
     if (!q) return [...store];
     return store.filter(
       (x) =>
-        x.code.toLowerCase().includes(q) || x.name.toLowerCase().includes(q),
+        x.code.toLowerCase().includes(q) ||
+        x.name.toLowerCase().includes(q) ||
+        (x.barcodes ?? []).some((b) => b.codeValue.toLowerCase().includes(q)),
     );
   },
 };

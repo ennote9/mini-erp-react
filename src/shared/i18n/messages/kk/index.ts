@@ -101,6 +101,7 @@ export const kkMessages: MessageTree = {
     receipt: "Түсім",
     salesOrders: "Сату тапсырыстары",
     salesOrder: "Сату тапсырысы",
+    salesOrderPreliminaryDocument: "Алдын ала құжат",
     salesOrderCustomerDocument: "Клиентке арналған алдын ала құжат",
     shipments: "Жөнелтулер",
     shipment: "Жөнелту",
@@ -595,6 +596,9 @@ export const kkMessages: MessageTree = {
       deliverySheetCopied: "Көшірілді",
     },
     customerDocument: {
+      simplePreliminaryTitle: "Алдын ала құжат",
+      simplePreliminaryUnavailable:
+        "Алдын ала құжат болдырылған тапсырыстарға немесе жолдары жоқ тапсырыстарға қолжетімсіз.",
       preliminaryTitle: "Клиентке арналған алдын ала құжат",
       finalTitle: "Клиентке арналған қорытынды құжат",
       preliminaryOpen: "Клиентке алдын ала",
