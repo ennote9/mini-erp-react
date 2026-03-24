@@ -1,4 +1,5 @@
 import type { Item } from "../modules/items/model";
+import { itemBarcodeTokensForOperationalLookup } from "../modules/items/lib/itemBarcodeLookup";
 import { roundMoney } from "./commercialMoney";
 
 export type ExcelImportRowStatus =
@@ -241,12 +242,10 @@ export async function parseExcelLineImport(
   for (const item of options.items) {
     const code = item.code.trim().toLowerCase();
     if (code && !codeMap.has(code)) codeMap.set(code, item);
-    for (const bc of item.barcodes ?? []) {
-      const barcode = bc.codeValue?.trim();
-      if (barcode && !barcodeMap.has(barcode)) barcodeMap.set(barcode, item);
+    for (const raw of itemBarcodeTokensForOperationalLookup(item)) {
+      const k = raw.trim().toLowerCase();
+      if (k && !barcodeMap.has(k)) barcodeMap.set(k, item);
     }
-    const legacyBarcode = item.barcode?.trim();
-    if (legacyBarcode && !barcodeMap.has(legacyBarcode)) barcodeMap.set(legacyBarcode, item);
   }
 
   const rows: ExcelImportPreviewRow[] = [];
@@ -300,7 +299,7 @@ export async function parseExcelLineImport(
     }
 
     const byCode = codeMap.get(sourceValue.toLowerCase());
-    const byBarcode = barcodeMap.get(sourceValue);
+    const byBarcode = barcodeMap.get(sourceValue.trim().toLowerCase());
     const matched = byCode ?? byBarcode;
     if (!matched) {
       rows.push({

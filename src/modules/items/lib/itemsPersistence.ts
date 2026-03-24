@@ -11,8 +11,18 @@ import {
   remove,
   rename,
 } from "@tauri-apps/plugin-fs";
-import type { Item, ItemBarcode, ItemBarcodePackagingLevel, ItemBarcodeType, ItemImage } from "../model";
+import type {
+  Item,
+  ItemBarcode,
+  ItemBarcodePackagingLevel,
+  ItemBarcodeRole,
+  ItemBarcodeSourceType,
+  ItemBarcodeSymbology,
+  ItemImage,
+  ItemKind,
+} from "../model";
 import {
+  ITEM_BARCODE_SYMBOLOGIES,
   bridgeLegacyBarcodeValueFromCollection,
   makeLegacyPrimaryUnitBarcode,
   normalizeItemBarcodesCollection,
@@ -103,16 +113,28 @@ function normalizeItem(raw: unknown): Item | null {
       const id = typeof rec.id === "string" ? rec.id : null;
       const itemId = typeof rec.itemId === "string" ? rec.itemId : o.id;
       const codeValue = typeof rec.codeValue === "string" ? rec.codeValue : null;
-      const barcodeType = typeof rec.barcodeType === "string" ? (rec.barcodeType as ItemBarcodeType) : null;
+      const symRaw =
+        (typeof rec.symbology === "string" ? rec.symbology : null) ??
+        (typeof rec.barcodeType === "string" ? rec.barcodeType : null);
+      const symbology: ItemBarcodeSymbology =
+        symRaw && (ITEM_BARCODE_SYMBOLOGIES as readonly string[]).includes(symRaw)
+          ? (symRaw as ItemBarcodeSymbology)
+          : "OTHER";
       const packagingLevel =
         typeof rec.packagingLevel === "string" ? (rec.packagingLevel as ItemBarcodePackagingLevel) : null;
-      if (!id || !codeValue || !barcodeType || !packagingLevel) return null;
+      const barcodeRole =
+        typeof rec.barcodeRole === "string" ? (rec.barcodeRole as ItemBarcodeRole) : "SELLABLE";
+      const sourceType =
+        typeof rec.sourceType === "string" ? (rec.sourceType as ItemBarcodeSourceType) : "OTHER";
+      if (!id || !codeValue || !packagingLevel) return null;
       return {
         id,
         itemId: String(itemId),
         codeValue,
-        barcodeType,
+        symbology,
         packagingLevel,
+        barcodeRole,
+        sourceType,
         isPrimary: rec.isPrimary === true,
         isActive: rec.isActive !== false,
         comment: typeof rec.comment === "string" ? rec.comment : undefined,
@@ -126,6 +148,12 @@ function normalizeItem(raw: unknown): Item | null {
   const purchasePrice =
     typeof o.purchasePrice === "number" && !Number.isNaN(o.purchasePrice) ? o.purchasePrice : undefined;
   const salePrice = typeof o.salePrice === "number" && !Number.isNaN(o.salePrice) ? o.salePrice : undefined;
+  const itemKind: ItemKind = o.itemKind === "TESTER" ? "TESTER" : "SELLABLE";
+  const baseItemId = typeof o.baseItemId === "string" ? o.baseItemId : undefined;
+  const testerCodeNextSeq =
+    typeof o.testerCodeNextSeq === "number" && Number.isFinite(o.testerCodeNextSeq) && o.testerCodeNextSeq >= 1
+      ? Math.floor(o.testerCodeNextSeq)
+      : undefined;
   return {
     id: o.id,
     code: o.code,
@@ -135,11 +163,14 @@ function normalizeItem(raw: unknown): Item | null {
     description,
     brandId,
     categoryId,
-    barcode: bridgeLegacyBarcodeValueFromCollection(barcodes) ?? barcode,
+    barcode: bridgeLegacyBarcodeValueFromCollection(barcodes),
     purchasePrice,
     salePrice,
     images,
     barcodes,
+    itemKind,
+    baseItemId,
+    testerCodeNextSeq,
   };
 }
 

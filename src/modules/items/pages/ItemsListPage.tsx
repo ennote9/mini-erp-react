@@ -3,7 +3,7 @@
  * Preserves search, All/Active/Inactive filters, New button, row navigation, empty state.
  */
 import React, { useMemo, useState, useRef, useCallback, useEffect } from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { useNavigate, useSearchParams, Link } from "react-router-dom";
 import { AgGridReact } from "ag-grid-react";
 import type { ColDef, ICellRendererParams, SelectionChangedEvent } from "ag-grid-community";
 import { itemRepository } from "../repository";
@@ -39,8 +39,20 @@ import { useTranslation } from "@/shared/i18n/context";
 import { buildReadableUniqueFilename, ensureUniqueExportPath } from "@/shared/export/filenameBuilder";
 import { itemsListExcelLabels } from "@/shared/i18n/excelListExportLabels";
 import { readOptionalItemLifecycleFromQuery } from "@/shared/navigation/listQueryStatus";
+import { useAppReadModelRevision } from "@/shared/inventoryMasterPageBlocks/useAppReadModelRevision";
+import {
+  isMarkdownCodeFormat,
+  resolveMarkdownRecordByScanInput,
+} from "@/modules/markdown-journal";
 
 type ActiveFilter = "all" | "active" | "inactive";
+type ItemKindFilter = "all" | "sellable" | "tester";
+
+function applyItemKindFilter(items: Item[], kindFilter: ItemKindFilter): Item[] {
+  if (kindFilter === "sellable") return items.filter((x) => x.itemKind === "SELLABLE");
+  if (kindFilter === "tester") return items.filter((x) => x.itemKind === "TESTER");
+  return items;
+}
 
 function applyActiveFilter(
   items: Item[],
@@ -115,6 +127,7 @@ export function ItemsListPage() {
   }, [searchParams]);
 
   const [searchQuery, setSearchQuery] = useState("");
+  const appReadRevision = useAppReadModelRevision();
   const [activeFilter, setActiveFilter] = useState<ActiveFilter>("all");
 
   const lifecycleFromQuery = useMemo(
@@ -128,6 +141,8 @@ export function ItemsListPage() {
   const [exportSuccess, setExportSuccess] = useState<{ path: string; filename: string } | null>(null);
   const [exportOpen, setExportOpen] = useState(false);
   const [selectedCount, setSelectedCount] = useState(0);
+  const [showCreateChoice, setShowCreateChoice] = useState(false);
+  const [itemKindFilter, setItemKindFilter] = useState<ItemKindFilter>("all");
   const gridRef = useRef<AgGridReact<Item> | null>(null);
   const listSearchInputRef = useRef<HTMLInputElement>(null);
   useListPageSearchHotkey(listSearchInputRef);
@@ -138,14 +153,29 @@ export function ItemsListPage() {
 
   const filteredItems = useMemo(() => {
     const searched = itemRepository.search(searchQuery);
-    const statusFiltered = applyActiveFilter(searched, activeFilter);
+    const kindFiltered = applyItemKindFilter(searched, itemKindFilter);
+    const statusFiltered = applyActiveFilter(kindFiltered, activeFilter);
     const brandFiltered = applyBrandIdFilter(statusFiltered, brandFilterId);
     return applyCategoryIdFilter(brandFiltered, categoryFilterId);
-  }, [searchQuery, activeFilter, brandFilterId, categoryFilterId]);
+  }, [searchQuery, activeFilter, brandFilterId, categoryFilterId, itemKindFilter, appReadRevision]);
+
+  const markdownScanMatch = useMemo(() => {
+    const q = searchQuery.trim();
+    if (!isMarkdownCodeFormat(q)) return null;
+    return resolveMarkdownRecordByScanInput(q);
+  }, [searchQuery, appReadRevision]);
+
+  /** MD-shaped code with no matching markdown record — avoids silent confusion with empty item search. */
+  const markdownCodeNoRecord = useMemo(() => {
+    const q = searchQuery.trim();
+    if (!isMarkdownCodeFormat(q)) return false;
+    return resolveMarkdownRecordByScanInput(q) == null;
+  }, [searchQuery, appReadRevision]);
 
   const isEmpty = filteredItems.length === 0;
   const hasActiveFilter =
     activeFilter !== "all" ||
+    itemKindFilter !== "all" ||
     searchQuery.trim() !== "" ||
     brandFilterId != null ||
     categoryFilterId != null;
@@ -276,6 +306,15 @@ export function ItemsListPage() {
         width: 130,
       },
       {
+        colId: "itemKind",
+        headerName: t("master.item.list.kindColumn"),
+        width: 100,
+        maxWidth: 120,
+        valueGetter: (params) => params.data?.itemKind ?? "SELLABLE",
+        valueFormatter: (params) =>
+          params.value === "TESTER" ? t("master.item.kind.tester") : t("master.item.kind.sellable"),
+      },
+      {
         field: "name",
         headerName: t("doc.columns.name"),
         minWidth: 160,
@@ -364,6 +403,25 @@ export function ItemsListPage() {
                     : value === "active"
                       ? t("ops.master.activeCell.active")
                       : t("ops.master.activeCell.inactive")}
+                </Button>
+              </React.Fragment>
+            ))}
+          </ButtonGroup>
+          <ButtonGroup className="list-page__filter-group" aria-label={t("ops.list.items.filterKindAria")}>
+            {(["all", "sellable", "tester"] as const).map((value, index) => (
+              <React.Fragment key={value}>
+                {index > 0 && <ButtonGroupSeparator />}
+                <Button
+                  type="button"
+                  variant={itemKindFilter === value ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => setItemKindFilter(value)}
+                >
+                  {value === "all"
+                    ? t("ops.list.items.kindAll")
+                    : value === "sellable"
+                      ? t("ops.list.items.kindSellable")
+                      : t("ops.list.items.kindTester")}
                 </Button>
               </React.Fragment>
             ))}
@@ -520,17 +578,73 @@ export function ItemsListPage() {
             variant="default"
             size="sm"
             className="list-page__create-btn rounded-md bg-white text-black hover:bg-gray-200"
-            onClick={() => navigate("/items/new")}
+            onClick={() => setShowCreateChoice((v) => !v)}
           >
             <svg className="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M12 5v14" /><path d="M5 12h14" /></svg> {t("doc.list.create")}
           </Button>
+          {showCreateChoice ? (
+            <div className="rounded-md border border-input bg-background p-1 text-xs shadow-sm">
+              <div className="mb-1 px-1.5 text-muted-foreground">{t("master.item.createChoice.title")}</div>
+              <div className="flex gap-1">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="h-7 px-2 text-xs"
+                  onClick={() => navigate("/items/new?kind=SELLABLE")}
+                >
+                  {t("master.item.createChoice.item")}
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="h-7 px-2 text-xs"
+                  onClick={() => navigate("/items/new?kind=TESTER")}
+                >
+                  {t("master.item.createChoice.tester")}
+                </Button>
+              </div>
+            </div>
+          ) : null}
         </>
       }
     >
-      {isEmpty ? (
-        <EmptyState title={emptyTitle} hint={emptyHint} />
-      ) : (
-        <AgGridContainer themeClass="items-grid">
+      <>
+        {markdownScanMatch ? (
+          <div
+            className="mb-2 flex flex-wrap items-center justify-between gap-2 rounded-md border border-primary/40 bg-primary/5 px-3 py-2 text-sm"
+            role="status"
+          >
+            <span className="text-foreground/90">
+              {t("ops.list.items.markdownScanBanner", { code: markdownScanMatch.markdownCode })}
+            </span>
+            <Link
+              className="list-table__link shrink-0 font-medium"
+              to={`/markdown-journal/${encodeURIComponent(markdownScanMatch.id)}`}
+            >
+              {t("common.open")}
+            </Link>
+          </div>
+        ) : markdownCodeNoRecord ? (
+          <div
+            className="mb-2 flex flex-wrap items-center gap-2 rounded-md border border-border/60 bg-muted/30 px-3 py-2 text-sm text-muted-foreground"
+            role="status"
+          >
+            <span>
+              {t("ops.list.items.markdownCodeNotFound", {
+                code: searchQuery.trim().toUpperCase(),
+              })}
+            </span>
+            <Link className="list-table__link shrink-0 font-medium text-foreground/90" to="/markdown-journal">
+              {t("markdown.journal.title")}
+            </Link>
+          </div>
+        ) : null}
+        {isEmpty ? (
+          <EmptyState title={emptyTitle} hint={emptyHint} />
+        ) : (
+          <AgGridContainer themeClass="items-grid">
           <AgGridReact<Item>
             {...agGridDefaultGridOptions}
             ref={gridRef}
@@ -546,8 +660,9 @@ export function ItemsListPage() {
             }}
             onSelectionChanged={onSelectionChanged}
           />
-        </AgGridContainer>
-      )}
+          </AgGridContainer>
+        )}
+      </>
     </ListPageLayout>
   );
 }

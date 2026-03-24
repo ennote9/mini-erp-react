@@ -138,6 +138,14 @@ export const kkOps: MessageTree = {
       hintCategory: "Санат сүзгісін алып тастаңыз немесе іздеуді өзгертіңіз.",
       searchAria: "Тауарларды іздеу",
       searchPlaceholder: "Іздеу",
+      markdownScanBanner:
+        "Іздеу уценка кодымен ({{code}}) сәйкес келеді. Тауарлар тізімі емес, уценка жазбасын ашыңыз.",
+      markdownCodeNotFound:
+        "{{code}} үшін уценка жазбасы жоқ. Бірлік жоқ болғанша тауар іздеуі уценка кодтарын сәйкестендірмейді.",
+      filterKindAria: "Тауар түрі бойынша сүзгі",
+      kindAll: "Барлық түрлер",
+      kindSellable: "Сатылатындар",
+      kindTester: "Тестерлер",
     },
     brands: {
       emptyFiltered: "Ағымдағы іздеу немесе сүзгілер бойынша брендтер жоқ",

@@ -7,6 +7,7 @@ import {
   PackageCheck,
   Receipt,
   Scale,
+  ScanBarcode,
   ShoppingBag,
   ShoppingCart,
   Tag,
@@ -74,6 +75,7 @@ const nav: ReadonlyArray<{ groupKey: string; links: readonly NavLinkItem[] }> = 
     links: [
       { labelKey: "shell.nav.stockBalances", to: "/stock-balances", icon: Scale },
       { labelKey: "shell.nav.stockMovements", to: "/stock-movements", icon: ArrowLeftRight, feature: "navStockMovements" },
+      { labelKey: "shell.nav.markdownJournal", to: "/markdown-journal", icon: ScanBarcode },
     ],
   },
 ];

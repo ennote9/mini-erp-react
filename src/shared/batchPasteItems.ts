@@ -1,4 +1,5 @@
 import type { Item } from "../modules/items/model";
+import { itemBarcodeTokensForOperationalLookup } from "../modules/items/lib/itemBarcodeLookup";
 
 export type BatchPasteResolutionStatus =
   | "valid"
@@ -113,15 +114,11 @@ export function resolveBatchPastedItems(input: string, items: Item[]): BatchPast
     if (normalizedCode && !codeMap.has(normalizedCode)) {
       codeMap.set(normalizedCode, item);
     }
-    for (const bc of item.barcodes ?? []) {
-      const barcode = bc.codeValue.trim();
-      if (barcode && !barcodeMap.has(barcode)) {
-        barcodeMap.set(barcode, item);
+    for (const raw of itemBarcodeTokensForOperationalLookup(item)) {
+      const k = raw.trim().toLowerCase();
+      if (k && !barcodeMap.has(k)) {
+        barcodeMap.set(k, item);
       }
-    }
-    const legacyBarcode = item.barcode?.trim();
-    if (legacyBarcode && !barcodeMap.has(legacyBarcode)) {
-      barcodeMap.set(legacyBarcode, item);
     }
   }
 
@@ -165,7 +162,7 @@ export function resolveBatchPastedItems(input: string, items: Item[]): BatchPast
     const qty = parsed.qty ?? 1;
 
     const byCode = codeMap.get(token.toLowerCase());
-    const byBarcode = barcodeMap.get(token);
+    const byBarcode = barcodeMap.get(token.toLowerCase());
     const matched = byCode ?? byBarcode;
 
     if (!matched) {

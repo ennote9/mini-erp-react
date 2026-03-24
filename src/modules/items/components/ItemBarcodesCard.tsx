@@ -2,7 +2,9 @@ import { useMemo, useState } from "react";
 import type { ItemBarcode } from "../model";
 import {
   ITEM_BARCODE_PACKAGING_LEVELS,
-  ITEM_BARCODE_TYPES,
+  ITEM_BARCODE_ROLES,
+  ITEM_BARCODE_SOURCE_TYPES,
+  ITEM_BARCODE_SYMBOLOGIES,
   type ItemBarcodeDraft,
 } from "../lib/itemBarcodes";
 import { removeItemBarcode, saveItemBarcode } from "../service";
@@ -25,8 +27,10 @@ type Props = {
 function defaultDraft(): ItemBarcodeDraft {
   return {
     codeValue: "",
-    barcodeType: "EAN_13",
+    symbology: "EAN_13",
     packagingLevel: "UNIT",
+    barcodeRole: "SELLABLE",
+    sourceType: "MANUFACTURER",
     isPrimary: true,
     isActive: true,
     comment: "",
@@ -51,8 +55,10 @@ export function ItemBarcodesCard({ isNew, itemId, barcodes, onBarcodesChanged }:
     setEditingId(row.id);
     setDraft({
       codeValue: row.codeValue,
-      barcodeType: row.barcodeType,
+      symbology: row.symbology,
       packagingLevel: row.packagingLevel,
+      barcodeRole: row.barcodeRole,
+      sourceType: row.sourceType,
       isPrimary: row.isPrimary,
       isActive: row.isActive,
       comment: row.comment ?? "",
@@ -132,12 +138,14 @@ export function ItemBarcodesCard({ isNew, itemId, barcodes, onBarcodesChanged }:
           </p>
         )}
         <div className="overflow-x-auto rounded border border-border/70">
-          <table className="w-full text-xs">
+          <table className="w-full min-w-[720px] text-xs">
             <thead className="bg-muted/20">
               <tr className="border-b border-border/70">
                 <th className="px-2 py-1 text-left font-medium">{t("master.item.barcodes.codeValue")}</th>
-                <th className="px-2 py-1 text-left font-medium">{t("master.item.barcodes.barcodeType")}</th>
+                <th className="px-2 py-1 text-left font-medium">{t("master.item.barcodes.symbology")}</th>
                 <th className="px-2 py-1 text-left font-medium">{t("master.item.barcodes.packagingLevel")}</th>
+                <th className="px-2 py-1 text-left font-medium">{t("master.item.barcodes.barcodeRole")}</th>
+                <th className="px-2 py-1 text-left font-medium">{t("master.item.barcodes.sourceType")}</th>
                 <th className="px-2 py-1 text-left font-medium">{t("master.item.barcodes.primary")}</th>
                 <th className="px-2 py-1 text-left font-medium">{t("master.item.barcodes.active")}</th>
                 <th className="px-2 py-1 text-right font-medium">{t("common.actions")}</th>
@@ -146,7 +154,7 @@ export function ItemBarcodesCard({ isNew, itemId, barcodes, onBarcodesChanged }:
             <tbody>
               {ordered.length === 0 ? (
                 <tr>
-                  <td className="px-2 py-2 text-muted-foreground" colSpan={6}>
+                  <td className="px-2 py-2 text-muted-foreground" colSpan={8}>
                     {t("master.item.barcodes.empty")}
                   </td>
                 </tr>
@@ -154,8 +162,10 @@ export function ItemBarcodesCard({ isNew, itemId, barcodes, onBarcodesChanged }:
                 ordered.map((row) => (
                   <tr key={row.id} className="border-b border-border/50 last:border-b-0">
                     <td className="px-2 py-1.5 font-mono">{row.codeValue}</td>
-                    <td className="px-2 py-1.5">{t(`master.item.barcodes.types.${row.barcodeType}`)}</td>
-                    <td className="px-2 py-1.5">{t(`master.item.barcodes.packaging.${row.packagingLevel}`)}</td>
+                    <td className="px-2 py-1.5 whitespace-nowrap">{t(`master.item.barcodes.types.${row.symbology}`)}</td>
+                    <td className="px-2 py-1.5 whitespace-nowrap">{t(`master.item.barcodes.packaging.${row.packagingLevel}`)}</td>
+                    <td className="px-2 py-1.5 whitespace-nowrap">{t(`master.item.barcodes.roles.${row.barcodeRole}`)}</td>
+                    <td className="px-2 py-1.5 whitespace-nowrap">{t(`master.item.barcodes.sources.${row.sourceType}`)}</td>
                     <td className="px-2 py-1.5">{row.isPrimary ? t("common.yes") : "—"}</td>
                     <td className="px-2 py-1.5">{row.isActive ? t("common.yes") : "—"}</td>
                     <td className="px-2 py-1.5 text-right">
@@ -185,13 +195,13 @@ export function ItemBarcodesCard({ isNew, itemId, barcodes, onBarcodesChanged }:
             />
           </div>
           <div className="flex flex-col gap-0.5">
-            <Label className="text-sm">{t("master.item.barcodes.barcodeType")}</Label>
+            <Label className="text-sm">{t("master.item.barcodes.symbology")}</Label>
             <select
-              value={draft.barcodeType}
-              onChange={(e) => setDraft((x) => ({ ...x, barcodeType: e.target.value as ItemBarcodeDraft["barcodeType"] }))}
+              value={draft.symbology}
+              onChange={(e) => setDraft((x) => ({ ...x, symbology: e.target.value as ItemBarcodeDraft["symbology"] }))}
               className="flex h-8 w-full rounded border border-input bg-background px-2 py-1 text-sm text-foreground"
             >
-              {ITEM_BARCODE_TYPES.map((v) => (
+              {ITEM_BARCODE_SYMBOLOGIES.map((v) => (
                 <option key={v} value={v}>{t(`master.item.barcodes.types.${v}`)}</option>
               ))}
             </select>
@@ -207,6 +217,34 @@ export function ItemBarcodesCard({ isNew, itemId, barcodes, onBarcodesChanged }:
             >
               {ITEM_BARCODE_PACKAGING_LEVELS.map((v) => (
                 <option key={v} value={v}>{t(`master.item.barcodes.packaging.${v}`)}</option>
+              ))}
+            </select>
+          </div>
+          <div className="flex flex-col gap-0.5">
+            <Label className="text-sm">{t("master.item.barcodes.barcodeRole")}</Label>
+            <select
+              value={draft.barcodeRole}
+              onChange={(e) =>
+                setDraft((x) => ({ ...x, barcodeRole: e.target.value as ItemBarcodeDraft["barcodeRole"] }))
+              }
+              className="flex h-8 w-full rounded border border-input bg-background px-2 py-1 text-sm text-foreground"
+            >
+              {ITEM_BARCODE_ROLES.map((v) => (
+                <option key={v} value={v}>{t(`master.item.barcodes.roles.${v}`)}</option>
+              ))}
+            </select>
+          </div>
+          <div className="flex flex-col gap-0.5">
+            <Label className="text-sm">{t("master.item.barcodes.sourceType")}</Label>
+            <select
+              value={draft.sourceType}
+              onChange={(e) =>
+                setDraft((x) => ({ ...x, sourceType: e.target.value as ItemBarcodeDraft["sourceType"] }))
+              }
+              className="flex h-8 w-full rounded border border-input bg-background px-2 py-1 text-sm text-foreground"
+            >
+              {ITEM_BARCODE_SOURCE_TYPES.map((v) => (
+                <option key={v} value={v}>{t(`master.item.barcodes.sources.${v}`)}</option>
               ))}
             </select>
           </div>

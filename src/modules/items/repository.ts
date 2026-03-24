@@ -1,5 +1,6 @@
 import type { Item, ItemImage } from "./model";
 import { buildSeedItems } from "./itemsSeedData";
+import { itemBarcodeTokensForMasterSearch } from "./lib/itemBarcodeLookup";
 import {
   loadItemsPersisted,
   writeItemsPayload,
@@ -105,7 +106,8 @@ export const itemRepository = {
       id: nextIdStr(),
       images: input.images ?? [],
       barcodes: normalizedBarcodes,
-      barcode: bridgeLegacyBarcodeValueFromCollection(normalizedBarcodes) ?? input.barcode,
+      barcode: bridgeLegacyBarcodeValueFromCollection(normalizedBarcodes),
+      itemKind: input.itemKind ?? "SELLABLE",
     };
     store.push(item);
     schedulePersist();
@@ -120,7 +122,7 @@ export const itemRepository = {
     store[i] = {
       ...merged,
       barcodes: normalizedBarcodes,
-      barcode: bridgeLegacyBarcodeValueFromCollection(normalizedBarcodes) ?? merged.barcode,
+      barcode: bridgeLegacyBarcodeValueFromCollection(normalizedBarcodes),
     };
     schedulePersist();
     return store[i];
@@ -133,7 +135,7 @@ export const itemRepository = {
       (x) =>
         x.code.toLowerCase().includes(q) ||
         x.name.toLowerCase().includes(q) ||
-        (x.barcodes ?? []).some((b) => b.codeValue.toLowerCase().includes(q)),
+        itemBarcodeTokensForMasterSearch(x).some((token) => token.includes(q)),
     );
   },
 };

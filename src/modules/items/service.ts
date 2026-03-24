@@ -1,5 +1,5 @@
 import { itemRepository, flushPendingItemsPersist } from "./repository";
-import type { ItemBarcode, ItemBarcodePackagingLevel, ItemBarcodeType } from "./model";
+import type { Item, ItemBarcode, ItemBarcodePackagingLevel, ItemBarcodeSymbology, ItemKind } from "./model";
 import { brandRepository } from "../brands/repository";
 import { categoryRepository } from "../categories/repository";
 import {
@@ -26,9 +26,10 @@ export type SaveItemInput = {
   description?: string;
   brandId?: string;
   categoryId?: string;
-  barcode?: string;
   purchasePrice?: number;
   salePrice?: number;
+  itemKind?: ItemKind;
+  baseItemId?: string;
 };
 export type SaveItemResult =
   | { success: true; id: string }
@@ -78,6 +79,16 @@ function validateSaveItem(data: SaveItemInput, existingId?: string): string | nu
     (x) => x.code.toUpperCase() === codeNormalized && x.id !== existingId,
   );
   if (duplicate) return "An item with this code already exists.";
+  const itemKind: ItemKind = data.itemKind ?? "SELLABLE";
+  const baseItemId = normalizeTrim(data.baseItemId);
+  if (itemKind === "TESTER") {
+    if (!baseItemId) return "Tester requires a base item.";
+    const baseItem = itemRepository.getById(baseItemId);
+    if (!baseItem) return "Base item not found.";
+    if (baseItem.itemKind !== "SELLABLE") return "Tester base item must be a sellable item.";
+  } else if (baseItemId !== "") {
+    return "Base item is allowed only for tester items.";
+  }
   return null;
 }
 
@@ -94,9 +105,10 @@ export function saveItem(
   const description = normalizeTrim(data.description) || undefined;
   const brandId = data.brandId && data.brandId.trim() !== "" ? data.brandId.trim() : undefined;
   const categoryId = data.categoryId && data.categoryId.trim() !== "" ? data.categoryId.trim() : undefined;
-  const barcode = normalizeTrim(data.barcode) || undefined;
   const purchasePrice = data.purchasePrice !== undefined ? Number(data.purchasePrice) : undefined;
   const salePrice = data.salePrice !== undefined ? Number(data.salePrice) : undefined;
+  const itemKind: ItemKind = data.itemKind ?? "SELLABLE";
+  const baseItemId = normalizeTrim(data.baseItemId) || undefined;
 
   const patch = {
     code,
@@ -106,9 +118,10 @@ export function saveItem(
     description,
     brandId,
     categoryId,
-    barcode,
     purchasePrice,
     salePrice,
+    itemKind,
+    baseItemId: itemKind === "TESTER" ? baseItemId : undefined,
   };
 
   if (existingId) {
@@ -116,7 +129,12 @@ export function saveItem(
     if (!updated) return { success: false, error: "Item not found." };
     return { success: true, id: existingId };
   }
+  const baseBeforeTester =
+    patch.itemKind === "TESTER" && patch.baseItemId ? itemRepository.getById(patch.baseItemId) : undefined;
   const created = itemRepository.create(patch);
+  if (patch.itemKind === "TESTER" && patch.baseItemId && baseBeforeTester) {
+    bumpBaseItemTesterSequenceAfterCreate(patch.baseItemId, created.code, baseBeforeTester);
+  }
   return { success: true, id: created.id };
 }
 
@@ -134,6 +152,15 @@ export function saveItemBarcode(
   const err = validateItemBarcodeDraft(draft);
   if (err) return { success: false, error: err };
   const normalized = normalizeItemBarcodeDraft(draft);
+  const existing = item.barcodes ?? [];
+  const normLower = normalized.codeValue.trim().toLowerCase();
+  const dupSameItem = existing.some(
+    (b) =>
+      b.id !== existingBarcodeId && normalizeTrim(b.codeValue).toLowerCase() === normLower,
+  );
+  if (dupSameItem) {
+    return { success: false, error: "This barcode is already on this item." };
+  }
   const duplicate = barcodeCodeValueExistsGlobally(itemRepository.list(), normalized.codeValue, {
     excludeItemId: itemId,
     excludeBarcodeId: existingBarcodeId,
@@ -141,14 +168,15 @@ export function saveItemBarcode(
   if (duplicate) {
     return { success: false, error: "This barcode already exists for another item." };
   }
-  const existing = item.barcodes ?? [];
   const nextId = existingBarcodeId ?? nextItemBarcodeId(itemId);
   const replacement: ItemBarcode = {
     id: nextId,
     itemId,
     codeValue: normalized.codeValue,
-    barcodeType: normalized.barcodeType as ItemBarcodeType,
+    symbology: normalized.symbology as ItemBarcodeSymbology,
     packagingLevel: normalized.packagingLevel as ItemBarcodePackagingLevel,
+    barcodeRole: normalized.barcodeRole,
+    sourceType: normalized.sourceType,
     isPrimary: normalized.isPrimary,
     isActive: normalized.isActive,
     comment: normalized.comment,
@@ -175,6 +203,59 @@ export function removeItemBarcode(itemId: string, barcodeId: string): SaveItemBa
   return { success: true, barcodeId };
 }
 
+function testerCodePrefixForBase(baseCode: string): string {
+  return `${normalizeCode(baseCode)}T`;
+}
+
+/** Largest numeric suffix among testers for this base that match `BASET` + two-digit number. */
+export function maxTesterSuffixFromExisting(baseItemId: string, baseCode: string): number {
+  const prefix = testerCodePrefixForBase(baseCode);
+  const pUpper = prefix.toUpperCase();
+  let max = 0;
+  for (const it of itemRepository.list()) {
+    if (it.itemKind !== "TESTER" || it.baseItemId !== baseItemId) continue;
+    const c = normalizeCode(it.code);
+    if (!c.toUpperCase().startsWith(pUpper)) continue;
+    const n = Number.parseInt(c.slice(prefix.length), 10);
+    if (Number.isFinite(n) && n > max) max = n;
+  }
+  return max;
+}
+
+function parseTesterSuffixFromCodes(itemCode: string, baseCode: string): number | null {
+  const prefix = testerCodePrefixForBase(baseCode);
+  const c = normalizeCode(itemCode);
+  if (!c.toUpperCase().startsWith(prefix.toUpperCase())) return null;
+  const n = Number.parseInt(c.slice(prefix.length), 10);
+  return Number.isFinite(n) && n >= 1 ? n : null;
+}
+
+/**
+ * Next suffix to use for a suggested tester code, honoring persisted sequence and existing rows.
+ */
+export function computeNextTesterSuffixNumber(base: { id: string; code: string; testerCodeNextSeq?: number }): number {
+  const minFromExisting = maxTesterSuffixFromExisting(base.id, base.code) + 1;
+  const c = base.testerCodeNextSeq;
+  if (c == null || c < 1) return Math.max(1, minFromExisting);
+  return Math.max(c, minFromExisting);
+}
+
+function bumpBaseItemTesterSequenceAfterCreate(baseItemId: string, createdCode: string, baseBefore: Item): void {
+  if (baseBefore.itemKind !== "SELLABLE") return;
+  const alloc = computeNextTesterSuffixNumber(baseBefore);
+  const used = parseTesterSuffixFromCodes(createdCode, baseBefore.code) ?? alloc;
+  const nextSeq = Math.max(alloc, used) + 1;
+  itemRepository.update(baseItemId, { testerCodeNextSeq: nextSeq });
+}
+
+/** Suggested unique tester code for a sellable base item (`BASET01`, `BASET02`, …). */
+export function nextTesterCodeForBaseItem(baseItemId: string): string | null {
+  const base = itemRepository.getById(baseItemId);
+  if (!base || base.itemKind !== "SELLABLE") return null;
+  const n = computeNextTesterSuffixNumber(base);
+  return `${testerCodePrefixForBase(base.code)}${String(n).padStart(2, "0")}`;
+}
+
 /**
  * Validates and saves like {@link saveItem}, then waits until items.json persistence completes.
  * Use from Item save flow so navigation does not outrun disk write.
@@ -199,4 +280,5 @@ export const itemService = {
   saveItemAwaitPersist,
   saveItemBarcode,
   removeItemBarcode,
+  nextTesterCodeForBaseItem,
 };

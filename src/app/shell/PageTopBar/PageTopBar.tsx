@@ -16,6 +16,7 @@ import {
   Users,
   Warehouse,
   Route,
+  ScanBarcode,
 } from "lucide-react";
 import { useTranslation } from "@/shared/i18n";
 
@@ -34,6 +35,7 @@ const PAGE_TITLES: Record<string, string> = {
   "/shipments": "routes.shipments",
   "/stock-balances": "routes.stockBalances",
   "/stock-movements": "routes.stockMovements",
+  "/markdown-journal": "routes.markdownJournal",
   "/settings": "routes.settings",
 };
 
@@ -59,6 +61,8 @@ function getPageTitleKey(pathname: string): string {
   if (pathname.match(/^\/shipments\/[^/]+\/customer-document$/))
     return "routes.shipmentCustomerDocument";
   if (pathname.match(/^\/shipments\/[^/]+$/)) return "routes.shipment";
+  if (pathname.match(/^\/markdown-journal\/new$/)) return "routes.markdownJournal";
+  if (pathname.match(/^\/markdown-journal\/[^/]+$/)) return "routes.markdownRecord";
   return PAGE_TITLES[pathname] ?? "routes.fallback";
 }
 
@@ -101,6 +105,12 @@ function getPageIcon(
     return PackageCheck;
   if (pathname === "/stock-balances") return Scale;
   if (pathname === "/stock-movements") return ArrowLeftRight;
+  if (
+    pathname === "/markdown-journal" ||
+    pathname.match(/^\/markdown-journal\/new$/) ||
+    pathname.match(/^\/markdown-journal\/[^/]+$/)
+  )
+    return ScanBarcode;
   if (pathname === "/settings") return Settings;
   return null;
 }

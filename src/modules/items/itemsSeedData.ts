@@ -27,7 +27,7 @@ function categoryByCode(): Record<string, string> {
 export function buildSeedItems(): Item[] {
   const b = brandByCode();
   const c = categoryByCode();
-  const rows: Omit<Item, "id" | "barcodes">[] = [
+const rows: Omit<Item, "id" | "barcodes" | "itemKind">[] = [
     {
       code: "ITEM-001",
       name: "Widget A",
@@ -337,6 +337,7 @@ export function buildSeedItems(): Item[] {
       ...row,
       id,
       barcodes: bridged ? [bridged] : [],
+      itemKind: "SELLABLE" as const,
     };
   });
 }

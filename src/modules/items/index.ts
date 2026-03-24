@@ -1,6 +1,16 @@
 export { ItemsListPage } from "./pages/ItemsListPage";
 export { ItemPage } from "./pages/ItemPage";
-export type { Item, ItemImage, ItemBarcode, ItemBarcodeType, ItemBarcodePackagingLevel } from "./model";
+export type {
+  Item,
+  ItemImage,
+  ItemBarcode,
+  ItemBarcodeType,
+  ItemBarcodeSymbology,
+  ItemBarcodePackagingLevel,
+  ItemBarcodeRole,
+  ItemBarcodeSourceType,
+  ItemKind,
+} from "./model";
 export {
   itemRepository,
   flushPendingItemsPersist,
@@ -8,4 +18,10 @@ export {
   getItemsPersistenceDiagnostics,
   getLastItemRepositoryPersistError,
 } from "./repository";
-export { saveItemAwaitPersist } from "./service";
+export {
+  saveItemAwaitPersist,
+  nextTesterCodeForBaseItem,
+  computeNextTesterSuffixNumber,
+  maxTesterSuffixFromExisting,
+} from "./service";
+export { listSellableItemsForDocumentLines } from "./orderLineItemsPolicy";

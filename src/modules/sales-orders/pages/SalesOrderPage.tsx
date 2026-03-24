@@ -9,6 +9,8 @@ import { carrierRepository } from "../../carriers/repository";
 import { translateCarrierType } from "../../carriers";
 import { warehouseRepository } from "../../warehouses/repository";
 import { itemRepository } from "../../items/repository";
+import { listSellableItemsForDocumentLines } from "../../items/orderLineItemsPolicy";
+import { useAppReadModelRevision } from "@/shared/inventoryMasterPageBlocks/useAppReadModelRevision";
 import { brandRepository } from "../../brands/repository";
 import { categoryRepository } from "../../categories/repository";
 import type { SalesOrderLine } from "../model";
@@ -576,6 +578,12 @@ export function SalesOrderPage() {
   const lines = useMemo(
     () => (id && !isNew ? salesOrderRepository.listLines(id) : []),
     [id, isNew, refresh],
+  );
+
+  const appReadRevision = useAppReadModelRevision();
+  const documentLineItems = useMemo(
+    () => listSellableItemsForDocumentLines(),
+    [appReadRevision],
   );
 
   const canOpenPreliminaryCustomerDoc = useMemo(
@@ -2279,7 +2287,7 @@ export function SalesOrderPage() {
                         id="line-entry-item"
                         value={lineEntryItemId}
                         onChange={handleLineEntryItemChange}
-                        items={itemRepository.list()}
+                        items={documentLineItems}
                         placeholder={t("doc.page.searchItemPlaceholder")}
                         className="w-[240px]"
                         dropdownRightEdgeRef={lineEntryDropdownRightEdgeRef}
@@ -2524,7 +2532,7 @@ export function SalesOrderPage() {
       <DocumentLineImportModal
         open={isLineImportModalOpen}
         initialTab={lineImportInitialTab}
-        items={itemRepository.list()}
+        items={documentLineItems}
         getDefaultUnitPrice={(item) =>
           roundMoney(
             typeof item.salePrice === "number" &&

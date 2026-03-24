@@ -1,8 +1,10 @@
 import type { Item } from "./model";
+import { itemBarcodeTokensForOperationalLookup } from "./lib/itemBarcodeLookup";
 
 /**
  * Ranks items for order-line entry search.
  * Order: exact code → exact barcode → startsWith code → startsWith name → partial name.
+ * Barcode matching uses **active** structured barcodes (+ legacy bridge when needed); inactive barcodes are ignored here.
  */
 export function searchItemsForOrderEntry(
   items: Item[],
@@ -20,14 +22,13 @@ export function searchItemsForOrderEntry(
   for (const item of items) {
     const code = item.code.toLowerCase();
     const name = item.name.toLowerCase();
-    const barcodes = (item.barcodes ?? []).map((b) => b.codeValue.toLowerCase());
-    const legacyBarcode = (item.barcode ?? "").toLowerCase();
+    const barcodeTokens = itemBarcodeTokensForOperationalLookup(item).map((x) => x.toLowerCase());
 
     if (code === q) {
       exactCode.push(item);
       continue;
     }
-    if (barcodes.some((x) => x === q) || (legacyBarcode !== "" && legacyBarcode === q)) {
+    if (barcodeTokens.some((x) => x === q)) {
       exactBarcode.push(item);
       continue;
     }

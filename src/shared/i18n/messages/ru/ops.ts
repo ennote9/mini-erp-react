@@ -138,6 +138,14 @@ export const ruOps: MessageTree = {
       hintCategory: "Снимите фильтр по категории или измените поиск.",
       searchAria: "Поиск номенклатуры",
       searchPlaceholder: "Поиск",
+      markdownScanBanner:
+        "Поиск совпадает с кодом единицы уценки ({{code}}). Откройте карточку уценки, а не список номенклатуры.",
+      markdownCodeNotFound:
+        "Нет записи уценки для {{code}}. Поиск номенклатуры не сопоставляет коды уценки, пока не создана единица.",
+      filterKindAria: "Фильтр по типу номенклатуры",
+      kindAll: "Все типы",
+      kindSellable: "Продаваемые",
+      kindTester: "Тестеры",
     },
     brands: {
       emptyFiltered: "Нет брендов по текущему поиску или фильтрам",

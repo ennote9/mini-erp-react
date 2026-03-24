@@ -8,10 +8,18 @@ import React, {
   useState,
 } from "react";
 import { createPortal } from "react-dom";
+import { useNavigate } from "react-router-dom";
 import type { Item } from "../../items/model";
+import { itemRepository } from "../../items/repository";
 import { brandRepository } from "../../brands/repository";
 import { categoryRepository } from "../../categories/repository";
 import { cn } from "@/lib/utils";
+import {
+  isMarkdownCodeFormat,
+  resolveMarkdownRecordByScanInput,
+} from "@/modules/markdown-journal/markdownLookup";
+import { useAppReadModelRevision } from "@/shared/inventoryMasterPageBlocks/useAppReadModelRevision";
+import { itemBarcodeTokensForOperationalLookup } from "@/modules/items/lib/itemBarcodeLookup";
 
 export type SalesOrderItemAutocompleteRef = { focus: () => void };
 
@@ -48,14 +56,13 @@ function searchItemsForSalesOrderLine(items: Item[], rawQuery: string): Item[] {
   for (const item of items) {
     const code = item.code.toLowerCase();
     const name = item.name.toLowerCase();
-    const barcodes = (item.barcodes ?? []).map((b) => b.codeValue.toLowerCase());
-    const legacyBarcode = (item.barcode ?? "").toLowerCase();
+    const barcodes = itemBarcodeTokensForOperationalLookup(item).map((x) => x.toLowerCase());
 
     if (code === q) {
       exactCode.push(item);
       continue;
     }
-    if (barcodes.some((x) => x === q) || (legacyBarcode !== "" && legacyBarcode === q)) {
+    if (barcodes.some((x) => x === q)) {
       exactBarcode.push(item);
       continue;
     }
@@ -67,7 +74,7 @@ function searchItemsForSalesOrderLine(items: Item[], rawQuery: string): Item[] {
       startsWithName.push(item);
       continue;
     }
-    if (barcodes.some((x) => x.startsWith(q)) || (legacyBarcode !== "" && legacyBarcode.startsWith(q))) {
+    if (barcodes.some((x) => x.startsWith(q))) {
       startsWithBarcode.push(item);
       continue;
     }
@@ -79,7 +86,7 @@ function searchItemsForSalesOrderLine(items: Item[], rawQuery: string): Item[] {
       containsName.push(item);
       continue;
     }
-    if (barcodes.some((x) => x.includes(q)) || (legacyBarcode !== "" && legacyBarcode.includes(q))) {
+    if (barcodes.some((x) => x.includes(q))) {
       containsBarcode.push(item);
       continue;
     }
@@ -121,6 +128,8 @@ export const SalesOrderItemAutocomplete = forwardRef<
   { id, value, onChange, items, placeholder, className, dropdownRightEdgeRef },
   ref,
 ) {
+  const navigate = useNavigate();
+  const appRevision = useAppReadModelRevision();
   const [inputValue, setInputValue] = useState("");
   const [isOpen, setIsOpen] = useState(false);
   const [highlightedIndex, setHighlightedIndex] = useState(0);
@@ -154,11 +163,20 @@ export const SalesOrderItemAutocomplete = forwardRef<
       : value
     : inputValue;
 
-  const options = useMemo(() => {
+  const itemOptions = useMemo(() => {
     const q = inputValue.trim();
     if (!q) return [];
     return searchItemsForSalesOrderLine(items, inputValue).slice(0, MAX_OPTIONS);
   }, [items, inputValue]);
+
+  const mdMatch = useMemo(() => {
+    const q = inputValue.trim();
+    if (!isMarkdownCodeFormat(q)) return null;
+    return resolveMarkdownRecordByScanInput(q);
+  }, [inputValue, appRevision]);
+
+  const totalSlots = (mdMatch ? 1 : 0) + itemOptions.length;
+  const mdBaseItem = mdMatch ? itemRepository.getById(mdMatch.itemId) : undefined;
 
   useEffect(() => {
     if (value) {
@@ -171,7 +189,7 @@ export const SalesOrderItemAutocomplete = forwardRef<
 
   useEffect(() => {
     setHighlightedIndex(0);
-  }, [options.length]);
+  }, [itemOptions.length, mdMatch?.id]);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -217,7 +235,7 @@ export const SalesOrderItemAutocomplete = forwardRef<
       window.removeEventListener("scroll", updatePosition, true);
       window.removeEventListener("resize", updatePosition);
     };
-  }, [isOpen, dropdownRightEdgeRef, options.length]);
+  }, [isOpen, dropdownRightEdgeRef, itemOptions.length, mdMatch?.id]);
 
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
@@ -284,20 +302,26 @@ export const SalesOrderItemAutocomplete = forwardRef<
     if (e.key === "ArrowDown") {
       e.preventDefault();
       setHighlightedIndex((i) =>
-        options.length > 0 ? Math.min(i + 1, options.length - 1) : 0,
+        totalSlots > 0 ? Math.min(i + 1, totalSlots - 1) : 0,
       );
       return;
     }
 
     if (e.key === "ArrowUp") {
       e.preventDefault();
-      setHighlightedIndex((i) => (options.length > 0 ? Math.max(i - 1, 0) : 0));
+      setHighlightedIndex((i) => (totalSlots > 0 ? Math.max(i - 1, 0) : 0));
       return;
     }
 
     if (e.key === "Enter") {
       e.preventDefault();
-      const item = options[highlightedIndex];
+      if (mdMatch && highlightedIndex === 0) {
+        navigate(`/markdown-journal/${mdMatch.id}`);
+        closeDropdown();
+        return;
+      }
+      const itemIdx = mdMatch ? highlightedIndex - 1 : highlightedIndex;
+      const item = itemIdx >= 0 ? itemOptions[itemIdx] : undefined;
       if (item) selectItem(item);
       else closeDropdown();
       return;
@@ -321,10 +345,14 @@ export const SalesOrderItemAutocomplete = forwardRef<
         aria-autocomplete="list"
         aria-controls={id ? `${id}-listbox` : undefined}
         aria-activedescendant={
-          isOpen && options[highlightedIndex]
-            ? id
-              ? `${id}-option-${options[highlightedIndex].id}`
-              : undefined
+          isOpen && totalSlots > 0 && id
+            ? mdMatch && highlightedIndex === 0
+              ? `${id}-option-md`
+              : (() => {
+                  const ii = mdMatch ? highlightedIndex - 1 : highlightedIndex;
+                  const it = itemOptions[ii];
+                  return it ? `${id}-option-${it.id}` : undefined;
+                })()
             : undefined
         }
         className={cn(
@@ -348,69 +376,96 @@ export const SalesOrderItemAutocomplete = forwardRef<
             }}
             className="so-item-autocomplete-listbox max-h-[min(14rem,40vh)] overflow-auto rounded border border-input bg-background py-1 shadow-md"
           >
-            {options.length === 0 ? (
+            {totalSlots === 0 ? (
               <li className="px-2 py-1.5 text-sm text-muted-foreground">
                 No items found
               </li>
             ) : (
-              options.map((item, idx) => {
-                const inactive = !item.isActive;
-                const brand =
-                  item.brandId != null ? brandRepository.getById(item.brandId) : undefined;
-                const category =
-                  item.categoryId != null ? categoryRepository.getById(item.categoryId) : undefined;
-                const brandName =
-                  brand?.name ?? brand?.code ?? "—";
-                const categoryName =
-                  category?.name ?? category?.code ?? "—";
-                const salePrice = formatSalePrice(item.salePrice);
-
-                const highlighted = highlightedIndex === idx;
-
-                return (
+              <>
+                {mdMatch ? (
                   <li
-                    key={item.id}
-                    id={id ? `${id}-option-${item.id}` : undefined}
+                    id={id ? `${id}-option-md` : undefined}
                     role="option"
-                    aria-selected={highlighted}
-                    aria-disabled={inactive}
+                    aria-selected={highlightedIndex === 0}
                     className={cn(
-                      "px-2 py-1.5 text-sm",
-                      inactive
-                        ? highlighted
-                          ? "cursor-not-allowed bg-muted/60 text-muted-foreground/90"
-                          : "cursor-not-allowed opacity-60"
-                        : highlighted
-                          ? "bg-accent text-accent-foreground"
-                          : "cursor-pointer hover:bg-accent/60",
+                      "px-2 py-1.5 text-sm cursor-pointer border-b border-border/50",
+                      highlightedIndex === 0
+                        ? "bg-accent text-accent-foreground"
+                        : "hover:bg-accent/60",
                     )}
-                    onMouseEnter={() => setHighlightedIndex(idx)}
+                    onMouseEnter={() => setHighlightedIndex(0)}
                     onMouseDown={(e) => {
-                      // Prevent input blur so the picker feels seamless.
                       e.preventDefault();
-                      selectItem(item);
+                      navigate(`/markdown-journal/${mdMatch.id}`);
+                      closeDropdown();
                     }}
                   >
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="min-w-0">
-                        <div className={cn("leading-tight truncate", inactive && "text-muted-foreground/90")}>
-                          <span className="font-mono text-xs tabular-nums">{item.code}</span>
-                          <span className="ml-2 text-sm truncate">{item.name}</span>
-                        </div>
-                        <div className="mt-0.5 flex items-center gap-2 text-xs text-muted-foreground leading-none">
-                          <span className="truncate">
-                            {brandName} / {categoryName}
-                          </span>
-                          {inactive && <span className="whitespace-nowrap">(Inactive)</span>}
-                        </div>
-                      </div>
-                      <div className="shrink-0 text-right tabular-nums">
-                        <div className="text-xs text-foreground/90">{salePrice}</div>
-                      </div>
+                    <div className="font-mono text-xs tabular-nums">{mdMatch.markdownCode}</div>
+                    <div className="text-xs text-muted-foreground">
+                      Markdown unit
+                      {mdBaseItem ? ` · ${mdBaseItem.code}` : null}
                     </div>
                   </li>
-                );
-              })
+                ) : null}
+                {itemOptions.map((item, idx) => {
+                  const rowIdx = (mdMatch ? 1 : 0) + idx;
+                  const inactive = !item.isActive;
+                  const brand =
+                    item.brandId != null ? brandRepository.getById(item.brandId) : undefined;
+                  const category =
+                    item.categoryId != null ? categoryRepository.getById(item.categoryId) : undefined;
+                  const brandName =
+                    brand?.name ?? brand?.code ?? "—";
+                  const categoryName =
+                    category?.name ?? category?.code ?? "—";
+                  const salePrice = formatSalePrice(item.salePrice);
+
+                  const highlighted = highlightedIndex === rowIdx;
+
+                  return (
+                    <li
+                      key={item.id}
+                      id={id ? `${id}-option-${item.id}` : undefined}
+                      role="option"
+                      aria-selected={highlighted}
+                      aria-disabled={inactive}
+                      className={cn(
+                        "px-2 py-1.5 text-sm",
+                        inactive
+                          ? highlighted
+                            ? "cursor-not-allowed bg-muted/60 text-muted-foreground/90"
+                            : "cursor-not-allowed opacity-60"
+                          : highlighted
+                            ? "bg-accent text-accent-foreground"
+                            : "cursor-pointer hover:bg-accent/60",
+                      )}
+                      onMouseEnter={() => setHighlightedIndex(rowIdx)}
+                      onMouseDown={(e) => {
+                        e.preventDefault();
+                        selectItem(item);
+                      }}
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <div className={cn("leading-tight truncate", inactive && "text-muted-foreground/90")}>
+                            <span className="font-mono text-xs tabular-nums">{item.code}</span>
+                            <span className="ml-2 text-sm truncate">{item.name}</span>
+                          </div>
+                          <div className="mt-0.5 flex items-center gap-2 text-xs text-muted-foreground leading-none">
+                            <span className="truncate">
+                              {brandName} / {categoryName}
+                            </span>
+                            {inactive && <span className="whitespace-nowrap">(Inactive)</span>}
+                          </div>
+                        </div>
+                        <div className="shrink-0 text-right tabular-nums">
+                          <div className="text-xs text-foreground/90">{salePrice}</div>
+                        </div>
+                      </div>
+                    </li>
+                  );
+                })}
+              </>
             )}
             {blockedMessage && (
               <li className="px-2 py-1.5 text-xs text-muted-foreground">

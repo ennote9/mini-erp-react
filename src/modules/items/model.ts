@@ -18,7 +18,8 @@ export interface ItemImage {
   createdAt: string;
 }
 
-export type ItemBarcodeType =
+/** Barcode symbology / format (not GS1 application semantics). */
+export type ItemBarcodeSymbology =
   | "EAN_13"
   | "EAN_8"
   | "UPC_A"
@@ -32,6 +33,9 @@ export type ItemBarcodeType =
   | "GS1_DATAMATRIX"
   | "OTHER";
 
+/** @deprecated Use {@link ItemBarcodeSymbology}; kept for gradual refactors. */
+export type ItemBarcodeType = ItemBarcodeSymbology;
+
 export type ItemBarcodePackagingLevel =
   | "UNIT"
   | "INNER"
@@ -40,16 +44,26 @@ export type ItemBarcodePackagingLevel =
   | "LOGISTICS"
   | "CUSTOM";
 
+/** Ordinary item barcode business role (not tester / markdown). */
+export type ItemBarcodeRole = "SELLABLE" | "INTERNAL" | "SUPPLIER" | "LOGISTICS" | "OTHER";
+
+/** Where the barcode value came from. */
+export type ItemBarcodeSourceType = "MANUFACTURER" | "INTERNAL" | "SUPPLIER" | "GENERATED" | "OTHER";
+
 export interface ItemBarcode {
   id: string;
   itemId: string;
   codeValue: string;
-  barcodeType: ItemBarcodeType;
+  symbology: ItemBarcodeSymbology;
   packagingLevel: ItemBarcodePackagingLevel;
+  barcodeRole: ItemBarcodeRole;
+  sourceType: ItemBarcodeSourceType;
   isPrimary: boolean;
   isActive: boolean;
   comment?: string;
 }
+
+export type ItemKind = "SELLABLE" | "TESTER";
 
 export interface Item {
   id: string;
@@ -60,10 +74,20 @@ export interface Item {
   description?: string;
   brandId?: string;
   categoryId?: string;
-  /** Legacy flat barcode field retained for compatibility; bridged from barcodes collection. */
+  /**
+   * Legacy flat barcode: derived summary from {@link Item.barcodes} for compatibility only.
+   * Not authoritative; do not treat as the source of truth for lookups after migration.
+   */
   barcode?: string;
   purchasePrice?: number;
   salePrice?: number;
   images: ItemImage[];
   barcodes: ItemBarcode[];
+  itemKind: ItemKind;
+  baseItemId?: string;
+  /**
+   * Next numeric suffix for generated tester codes ({@code <baseCode>T01}).
+   * Only meaningful for sellable (non-tester) base items; monotonic so codes are not reused after deletions.
+   */
+  testerCodeNextSeq?: number;
 }

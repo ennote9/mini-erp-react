@@ -137,6 +137,14 @@ export const opsEn = {
       hintCategory: "Try clearing the category filter or adjusting search.",
       searchAria: "Search items",
       searchPlaceholder: "Search",
+      markdownScanBanner:
+        "This search matches a markdown unit code ({{code}}). Open the markdown record instead of the item list.",
+      markdownCodeNotFound:
+        "No markdown record exists for {{code}}. Item search does not match markdown codes unless a unit exists.",
+      filterKindAria: "Filter by item kind",
+      kindAll: "All kinds",
+      kindSellable: "Sellable",
+      kindTester: "Testers",
     },
     brands: {
       emptyFiltered: "No brands match current search or filters",

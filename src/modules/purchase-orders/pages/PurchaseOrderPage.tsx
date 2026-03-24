@@ -7,6 +7,8 @@ import { confirm, cancelDocument, createReceipt, saveDraft } from "../service";
 import { supplierRepository } from "../../suppliers/repository";
 import { warehouseRepository } from "../../warehouses/repository";
 import { itemRepository } from "../../items/repository";
+import { listSellableItemsForDocumentLines } from "../../items/orderLineItemsPolicy";
+import { useAppReadModelRevision } from "@/shared/inventoryMasterPageBlocks/useAppReadModelRevision";
 import { brandRepository } from "../../brands/repository";
 import { categoryRepository } from "../../categories/repository";
 import type { PurchaseOrderLine } from "../model";
@@ -486,6 +488,12 @@ export function PurchaseOrderPage() {
   const lines = useMemo(
     () => (id && !isNew ? purchaseOrderRepository.listLines(id) : []),
     [id, isNew, refresh],
+  );
+
+  const appReadRevision = useAppReadModelRevision();
+  const documentLineItems = useMemo(
+    () => listSellableItemsForDocumentLines(),
+    [appReadRevision],
   );
 
   const nextLineIdRef = useRef(0);
@@ -1622,7 +1630,7 @@ export function PurchaseOrderPage() {
                         id="line-entry-item"
                         value={lineEntryItemId}
                         onChange={handleLineEntryItemChange}
-                        items={itemRepository.list()}
+                        items={documentLineItems}
                         placeholder={t("doc.page.searchItemPlaceholder")}
                         className="w-[240px]"
                         dropdownRightEdgeRef={lineEntryDropdownRightEdgeRef}
@@ -1911,7 +1919,7 @@ export function PurchaseOrderPage() {
       <DocumentLineImportModal
         open={isLineImportModalOpen}
         initialTab={lineImportInitialTab}
-        items={itemRepository.list()}
+        items={documentLineItems}
         getDefaultUnitPrice={(item) =>
           roundMoney(
             typeof item.purchasePrice === "number" &&
