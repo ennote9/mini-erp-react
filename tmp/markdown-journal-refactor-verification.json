@@ -1,0 +1,43 @@
+{
+  "salesOrders": {
+    "url": "/sales-orders",
+    "topBar": "Sales Orders",
+    "header": null,
+    "controlsText": "AllDraftConfirmedClosedCancelledSearchExport Create",
+    "hasGrid": true,
+    "hasEmptyState": false,
+    "hasDialog": false,
+    "hasSheet": false
+  },
+  "markdownJournal": {
+    "url": "/markdown-journal",
+    "topBar": "Markdown Journal",
+    "header": null,
+    "controlsText": "All statusesActiveSoldCancelledWritten offSupersededSearch by markdown code CreateAll reasonsDamaged packagingExpires soonFound old markdownDisplay wearNot sellable as regularOtherAll warehousesWH-001 — Main WarehouseWH-002 — North Distribution CenterWH-003 — South Distribution CenterWH-004 — East Coast HubWH-005 — West Coast HubWH-006 — Central StagingWH-007 — Receiving Dock AWH-008 — Receiving Dock BWH-009 — Finished Goods StoreWH-010 — Raw Materials StoreWH-011 — Spare Parts WarehouseWH-012 — Quarantine AreaWH-013 — Returns & RMAWH-014 — Cold StorageWH-015 — High-Value SecureWH-016 — Assembly Line FeedWH-017 — Shipping Prep ZoneWH-018 — Overflow StorageWH-019 — Regional Depot 1WH-020 — Regional Depot 2WH-021 — Consignment StoreWH-022 — Third-Party LogisticsWH-025 — Cross-Dock TerminalClear",
+    "hasGrid": false,
+    "hasEmptyState": true,
+    "hasDialog": false,
+    "hasSheet": false
+  },
+  "markdownCreate": {
+    "url": "/markdown-journal/new",
+    "topBar": "Create markdown operation",
+    "header": "Create markdown operation",
+    "controlsText": null,
+    "hasGrid": false,
+    "hasEmptyState": false,
+    "hasDialog": false,
+    "hasSheet": false,
+    "breadcrumb": "InventoryMarkdown JournalCreate markdown operation"
+  },
+  "afterCancel": {
+    "url": "/markdown-journal",
+    "topBar": "Markdown Journal",
+    "header": null,
+    "controlsText": "All statusesActiveSoldCancelledWritten offSupersededSearch by markdown code CreateAll reasonsDamaged packagingExpires soonFound old markdownDisplay wearNot sellable as regularOtherAll warehousesWH-001 — Main WarehouseWH-002 — North Distribution CenterWH-003 — South Distribution CenterWH-004 — East Coast HubWH-005 — West Coast HubWH-006 — Central StagingWH-007 — Receiving Dock AWH-008 — Receiving Dock BWH-009 — Finished Goods StoreWH-010 — Raw Materials StoreWH-011 — Spare Parts WarehouseWH-012 — Quarantine AreaWH-013 — Returns & RMAWH-014 — Cold StorageWH-015 — High-Value SecureWH-016 — Assembly Line FeedWH-017 — Shipping Prep ZoneWH-018 — Overflow StorageWH-019 — Regional Depot 1WH-020 — Regional Depot 2WH-021 — Consignment StoreWH-022 — Third-Party LogisticsWH-025 — Cross-Dock TerminalClear",
+    "hasGrid": false,
+    "hasEmptyState": true,
+    "hasDialog": false,
+    "hasSheet": false
+  }
+}

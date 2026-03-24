@@ -112,6 +112,7 @@ export const kkMessages: MessageTree = {
     stockBalances: "Қалдықтар",
     stockMovements: "Қозғалыстар",
     markdownJournal: "Уценка журналы",
+    markdownCreate: "Уценка операциясын жасау",
     markdownRecord: "Уценка карточкасы",
     settings: "Баптаулар",
     fallback: "Шағын ERP",
@@ -168,6 +169,7 @@ export const kkMessages: MessageTree = {
       title: "Уценка журналы",
       createTitle: "Уценка операциясын жасау",
       filtersTitle: "Сүзгілер",
+      backToListAria: "Уценка журналына оралу",
     },
     record: {
       title: "Уценка карточкасы",

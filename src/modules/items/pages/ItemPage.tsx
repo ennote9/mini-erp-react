@@ -67,8 +67,11 @@ function defaultForm(): FormState {
   };
 }
 
+const EN_BARCODE_SUMMARY_RULES = new Intl.PluralRules("en");
+const RU_BARCODE_SUMMARY_RULES = new Intl.PluralRules("ru");
+
 export function ItemPage() {
-  const { t } = useTranslation();
+  const { t, locale } = useTranslation();
   const { id } = useParams<{ id: string }>();
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
@@ -136,6 +139,32 @@ export function ItemPage() {
     const primary = bridgeLegacyBarcodeValueFromCollection(list);
     return { count, primary };
   }, [isNew, item, barcodesRevision]);
+
+  const barcodeSummaryCountText = useMemo(() => {
+    if (!barcodeMainSummary) return null;
+    const count = barcodeMainSummary.count;
+
+    if (locale === "ru") {
+      const category = RU_BARCODE_SUMMARY_RULES.select(count);
+      const key =
+        category === "one"
+          ? "master.item.barcodes.summaryCountOne"
+          : category === "few"
+            ? "master.item.barcodes.summaryCountFew"
+            : "master.item.barcodes.summaryCountMany";
+      return `${t(key, { count })}. ${t("master.item.barcodes.summaryManageHint")}`;
+    }
+
+    if (locale === "en") {
+      const key =
+        EN_BARCODE_SUMMARY_RULES.select(count) === "one"
+          ? "master.item.barcodes.summaryCountOne"
+          : "master.item.barcodes.summaryCountOther";
+      return `${t(key, { count })}. ${t("master.item.barcodes.summaryManageHint")}`;
+    }
+
+    return t("master.item.barcodes.summaryCount", { count });
+  }, [barcodeMainSummary, locale, t]);
 
   useEffect(() => {
     if (isNew) {
@@ -398,7 +427,7 @@ export function ItemPage() {
         <Tabs.Root defaultValue="main">
           <CardHeader className="p-2 pb-0.5 space-y-2">
             <Tabs.List
-              className="inline-flex h-9 w-full max-w-md flex-wrap items-center gap-0.5 rounded-lg border border-border/60 bg-muted/20 p-0.5 text-[13px] sm:w-auto"
+              className="inline-flex min-h-9 w-full max-w-full flex-wrap items-center gap-0.5 rounded-lg border border-border/60 bg-muted/20 p-0.5 text-[13px] sm:w-fit"
               aria-label={t("master.item.tabsAria")}
             >
               <Tabs.Trigger
@@ -642,7 +671,7 @@ export function ItemPage() {
                         {barcodeMainSummary.primary ?? t("master.item.barcodes.summaryNoPrimary")}
                       </p>
                       <p className="mt-0.5 text-xs text-muted-foreground">
-                        {t("master.item.barcodes.summaryCount", { count: barcodeMainSummary.count })}
+                        {barcodeSummaryCountText}
                       </p>
                     </div>
                   ) : null}

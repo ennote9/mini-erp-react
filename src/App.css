@@ -225,10 +225,16 @@ summary,
   flex-wrap: wrap;
   flex-shrink: 0;
 }
-.list-page__controls > * {
+.list-page__controls > *:not(.list-page__controls-stack) {
   height: 2rem !important;
   min-height: 2rem !important;
   box-sizing: border-box;
+}
+.list-page__controls > .list-page__controls-stack {
+  height: auto !important;
+  min-height: 0 !important;
+  box-sizing: border-box;
+  flex: 1 1 100%;
 }
 
 /* Filter group: same 2rem height, buttons fill and center content, same radius 8px */
@@ -685,6 +691,7 @@ summary,
 
 /* Clickable list grids: row pointer cursor */
 .list-page__content > .items-grid.ag-theme-quartz-dark .ag-row,
+.list-page__content > .markdown-journal-grid.ag-theme-quartz-dark .ag-row,
 .list-page__content > .customers-grid.ag-theme-quartz-dark .ag-row,
 .list-page__content > .suppliers-grid.ag-theme-quartz-dark .ag-row,
 .list-page__content > .warehouses-grid.ag-theme-quartz-dark .ag-row,
@@ -1552,4 +1559,3 @@ input[type="date"]::-webkit-calendar-picker-indicator {
     background: #fff !important;
   }
 }
-

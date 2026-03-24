@@ -1,0 +1,68 @@
+[
+  {
+    "locale": "en",
+    "screenshotPath": "/home/shaxr/code/mini-erp-react/tmp/item-page-en.png",
+    "topBar": "Catalog item",
+    "header": "Catalog item ITEM-001",
+    "tabs": [
+      {
+        "text": "Main",
+        "visible": true
+      },
+      {
+        "text": "Images",
+        "visible": true
+      },
+      {
+        "text": "Barcodes",
+        "visible": true
+      },
+      {
+        "text": "Testers",
+        "visible": true
+      },
+      {
+        "text": "Markdown",
+        "visible": true
+      }
+    ],
+    "barcodeSummary": {
+      "title": "Barcode summary",
+      "primary": "5901234123457",
+      "count": "1 barcode record. Manage on the Barcodes tab"
+    }
+  },
+  {
+    "locale": "ru",
+    "screenshotPath": "/home/shaxr/code/mini-erp-react/tmp/item-page-ru.png",
+    "topBar": "Номенклатура",
+    "header": "Номенклатура ITEM-001",
+    "tabs": [
+      {
+        "text": "Основное",
+        "visible": true
+      },
+      {
+        "text": "Изображения",
+        "visible": true
+      },
+      {
+        "text": "Штрихкоды",
+        "visible": true
+      },
+      {
+        "text": "Тестеры",
+        "visible": true
+      },
+      {
+        "text": "Уценки",
+        "visible": true
+      }
+    ],
+    "barcodeSummary": {
+      "title": "Сводка по штрихкодам",
+      "primary": "5901234123457",
+      "count": "1 запись штрихкода. Управление на вкладке «Штрихкоды»"
+    }
+  }
+]

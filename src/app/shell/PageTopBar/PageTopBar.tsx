@@ -61,7 +61,7 @@ function getPageTitleKey(pathname: string): string {
   if (pathname.match(/^\/shipments\/[^/]+\/customer-document$/))
     return "routes.shipmentCustomerDocument";
   if (pathname.match(/^\/shipments\/[^/]+$/)) return "routes.shipment";
-  if (pathname.match(/^\/markdown-journal\/new$/)) return "routes.markdownJournal";
+  if (pathname.match(/^\/markdown-journal\/new$/)) return "routes.markdownCreate";
   if (pathname.match(/^\/markdown-journal\/[^/]+$/)) return "routes.markdownRecord";
   return PAGE_TITLES[pathname] ?? "routes.fallback";
 }

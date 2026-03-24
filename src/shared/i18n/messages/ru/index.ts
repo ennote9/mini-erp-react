@@ -84,7 +84,7 @@ export const ruMessages: MessageTree = {
   routes: {
     dashboard: "Панель",
     items: "Номенклатура",
-    item: "Карточка номенклатуры",
+    item: "Номенклатура",
     brands: "Бренды",
     brand: "Бренд",
     categories: "Категории",
@@ -113,6 +113,7 @@ export const ruMessages: MessageTree = {
     stockBalances: "Остатки",
     stockMovements: "Движения",
     markdownJournal: "Журнал уценки",
+    markdownCreate: "Создать операцию уценки",
     markdownRecord: "Карточка уценки",
     settings: "Настройки",
     fallback: "Мини ERP",
@@ -169,6 +170,7 @@ export const ruMessages: MessageTree = {
       title: "Журнал уценки",
       createTitle: "Создать операцию уценки",
       filtersTitle: "Фильтры",
+      backToListAria: "Назад к журналу уценки",
     },
     record: {
       title: "Карточка уценки",

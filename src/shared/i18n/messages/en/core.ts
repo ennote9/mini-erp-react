@@ -76,7 +76,7 @@ export const coreEn = {
   routes: {
     dashboard: "Dashboard",
     items: "Items",
-    item: "Item",
+    item: "Catalog item",
     brands: "Brands",
     brand: "Brand",
     categories: "Categories",
@@ -105,6 +105,7 @@ export const coreEn = {
     stockBalances: "Stock Balances",
     stockMovements: "Stock Movements",
     markdownJournal: "Markdown Journal",
+    markdownCreate: "Create markdown operation",
     markdownRecord: "Markdown Record",
     settings: "Settings",
     fallback: "Mini ERP",
@@ -157,8 +158,9 @@ export const coreEn = {
   markdown: {
     journal: {
       title: "Markdown Journal",
-      createTitle: "Create markdown batch",
+      createTitle: "Create markdown operation",
       filtersTitle: "Filters",
+      backToListAria: "Back to markdown journal",
     },
     record: {
       title: "Markdown record",
