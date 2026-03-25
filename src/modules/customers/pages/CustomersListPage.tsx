@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useRef, useCallback } from "react";
+import { useMemo, useState, useRef, useCallback } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { AgGridReact } from "ag-grid-react";
 import type { ColDef, SelectionChangedEvent } from "ag-grid-community";
@@ -20,10 +20,6 @@ import { BackButton } from "../../../shared/ui/list/BackButton";
 import { ListPageSearch } from "../../../shared/ui/list/ListPageSearch";
 import { useListPageSearchHotkey } from "../../../shared/hotkeys";
 import { Button } from "@/components/ui/button";
-import {
-  ButtonGroup,
-  ButtonGroupSeparator,
-} from "@/components/ui/button-group";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { ChevronDown, FileSpreadsheet, File, FolderOpen, X } from "lucide-react";
 import { buildCustomersListXlsxBuffer, type CustomersExportRow } from "../customersListExport";
@@ -33,8 +29,6 @@ import { revealItemInDir } from "@tauri-apps/plugin-opener";
 import { useTranslation } from "@/shared/i18n/context";
 import { buildReadableUniqueFilename, ensureUniqueExportPath } from "@/shared/export/filenameBuilder";
 import { customersListExcelLabels } from "@/shared/i18n/excelListExportLabels";
-
-type ActiveFilter = "all" | "active" | "inactive";
 
 function parseQueryId(searchParams: URLSearchParams, key: string): string | null {
   const raw = searchParams.get(key);
@@ -54,15 +48,6 @@ function filterCustomersBySearch(list: Customer[], query: string): Customer[] {
   return list.filter(
     (x) => x.code.toLowerCase().includes(q) || x.name.toLowerCase().includes(q),
   );
-}
-
-function applyActiveFilter(
-  list: Customer[],
-  activeFilter: ActiveFilter,
-): Customer[] {
-  if (activeFilter === "active") return list.filter((x) => x.isActive);
-  if (activeFilter === "inactive") return list.filter((x) => !x.isActive);
-  return list;
 }
 
 function buildExportRowsFromCustomers(
@@ -89,7 +74,6 @@ export function CustomersListPage() {
     [searchParams],
   );
   const [searchQuery, setSearchQuery] = useState("");
-  const [activeFilter, setActiveFilter] = useState<ActiveFilter>("all");
   const [exportSuccess, setExportSuccess] = useState<{ path: string; filename: string } | null>(null);
   const [exportOpen, setExportOpen] = useState(false);
   const [selectedCount, setSelectedCount] = useState(0);
@@ -105,12 +89,12 @@ export function CustomersListPage() {
     let next = customerRepository.list();
     next = filterByPreferredCarrierId(next, preferredCarrierFilterId);
     next = filterCustomersBySearch(next, searchQuery);
-    return applyActiveFilter(next, activeFilter);
-  }, [searchQuery, activeFilter, preferredCarrierFilterId]);
+    return next;
+  }, [searchQuery, preferredCarrierFilterId]);
 
   const isEmpty = filteredRows.length === 0;
   const hasFilter =
-    activeFilter !== "all" || searchQuery.trim() !== "" || preferredCarrierFilterId != null;
+    searchQuery.trim() !== "" || preferredCarrierFilterId != null;
 
   const preferredCarrierFilterLabel = useMemo((): string => {
     if (preferredCarrierFilterId == null) return "";
@@ -202,13 +186,12 @@ export function CustomersListPage() {
     if (!hasFilter) return t("ops.list.customers.hintCreate");
     if (
       preferredCarrierFilterId != null &&
-      activeFilter === "all" &&
       searchQuery.trim() === ""
     ) {
       return t("ops.list.customers.hintPreferredCarrierOnly");
     }
     return t("ops.list.customers.hintFilter");
-  }, [hasFilter, preferredCarrierFilterId, activeFilter, searchQuery, t]);
+  }, [hasFilter, preferredCarrierFilterId, searchQuery, t]);
 
   const emDash = t("domain.audit.summary.emDash");
 
@@ -275,25 +258,6 @@ export function CustomersListPage() {
       controls={
         <>
           <BackButton to="/" aria-label={t("doc.list.backToDashboard")} />
-          <ButtonGroup className="list-page__filter-group" aria-label={t("ops.list.filterStatusAria")}>
-            {(["all", "active", "inactive"] as const).map((value, index) => (
-              <React.Fragment key={value}>
-                {index > 0 && <ButtonGroupSeparator />}
-                <Button
-                  type="button"
-                  variant={activeFilter === value ? "default" : "outline"}
-                  size="sm"
-                  onClick={() => setActiveFilter(value)}
-                >
-                  {value === "all"
-                    ? t("doc.list.all")
-                    : value === "active"
-                      ? t("ops.master.activeCell.active")
-                      : t("ops.master.activeCell.inactive")}
-                </Button>
-              </React.Fragment>
-            ))}
-          </ButtonGroup>
           <ListPageSearch
             inputRef={listSearchInputRef}
             placeholder={t("ops.list.customers.searchPlaceholder")}

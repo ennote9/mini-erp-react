@@ -1,5 +1,7 @@
 export type MarkdownStatus = "ACTIVE" | "SOLD" | "CANCELLED" | "WRITTEN_OFF" | "SUPERSEDED";
 
+export type MarkdownJournalStatus = "draft" | "posted";
+
 export type MarkdownReasonCode =
   | "DAMAGED_PACKAGING"
   | "EXPIRED_SOON"
@@ -10,6 +12,9 @@ export type MarkdownReasonCode =
 
 export interface MarkdownRecord {
   id: string;
+  journalId?: string;
+  journalNumber?: string;
+  journalLineId?: string;
   batchId?: string;
   /** 1-based index within batch (optional; for traceability / future labels). */
   batchSequenceIndex?: number;
@@ -23,7 +28,6 @@ export interface MarkdownRecord {
   createdAt: string;
   createdBy: string;
   warehouseId: string;
-  locationId?: string;
   originalBarcode?: string;
   comment?: string;
   basePriceAtMarkdown?: number;
@@ -34,5 +38,33 @@ export interface MarkdownRecord {
   /** When this record was created to replace another, links back to the superseded row. */
   supersedesMarkdownId?: string;
   quantity: 1;
+}
+
+export interface MarkdownJournal {
+  id: string;
+  number: string;
+  status: MarkdownJournalStatus;
+  warehouseId: string;
+  comment?: string;
+  createdAt: string;
+  createdBy: string;
+  postedAt?: string;
+  postedBy?: string;
+  /**
+   * Migration bridge for old pre-journal unit records. Values may contain old batch IDs
+   * and/or single-record IDs so migrated journals can still resolve their generated units.
+   * New journals should rely on journalId on generated unit records instead.
+   */
+  legacySourceIds?: string[];
+}
+
+export interface MarkdownJournalLine {
+  id: string;
+  journalId: string;
+  sortOrder: number;
+  itemId: string;
+  markdownPrice: number;
+  quantity: number;
+  reasonCode: MarkdownReasonCode;
 }
 

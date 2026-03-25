@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useRef, useCallback } from "react";
+import { useMemo, useState, useRef, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { AgGridReact } from "ag-grid-react";
 import type { ColDef, SelectionChangedEvent } from "ag-grid-community";
@@ -20,10 +20,6 @@ import { BackButton } from "../../../shared/ui/list/BackButton";
 import { ListPageSearch } from "../../../shared/ui/list/ListPageSearch";
 import { useListPageSearchHotkey } from "../../../shared/hotkeys";
 import { Button } from "@/components/ui/button";
-import {
-  ButtonGroup,
-  ButtonGroupSeparator,
-} from "@/components/ui/button-group";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { ChevronDown, FileSpreadsheet, File, FolderOpen, X } from "lucide-react";
 import { buildCarriersListXlsxBuffer, type CarriersExportRow } from "../carriersListExport";
@@ -35,14 +31,6 @@ import { buildReadableUniqueFilename, ensureUniqueExportPath } from "@/shared/ex
 import { carriersListExcelLabels } from "@/shared/i18n/excelListExportLabels";
 import type { TFunction } from "@/shared/i18n/resolve";
 import { translateCarrierType } from "../carrierLabels";
-
-type ActiveFilter = "all" | "active" | "inactive";
-
-function applyActiveFilter(list: Carrier[], activeFilter: ActiveFilter): Carrier[] {
-  if (activeFilter === "active") return list.filter((x) => x.isActive);
-  if (activeFilter === "inactive") return list.filter((x) => !x.isActive);
-  return list;
-}
 
 function buildExportRowsFromCarriers(
   carriers: Carrier[],
@@ -65,7 +53,6 @@ export function CarriersListPage() {
   const { t, locale } = useTranslation();
   const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState("");
-  const [activeFilter, setActiveFilter] = useState<ActiveFilter>("all");
   const [exportSuccess, setExportSuccess] = useState<{ path: string; filename: string } | null>(null);
   const [exportOpen, setExportOpen] = useState(false);
   const [selectedCount, setSelectedCount] = useState(0);
@@ -78,12 +65,11 @@ export function CarriersListPage() {
   }, []);
 
   const filteredRows = useMemo(() => {
-    const searched = carrierRepository.search(searchQuery);
-    return applyActiveFilter(searched, activeFilter);
-  }, [searchQuery, activeFilter]);
+    return carrierRepository.search(searchQuery);
+  }, [searchQuery]);
 
   const isEmpty = filteredRows.length === 0;
-  const hasFilter = activeFilter !== "all" || searchQuery.trim() !== "";
+  const hasFilter = searchQuery.trim() !== "";
 
   const getExportRowsCurrentView = useCallback((): CarriersExportRow[] => {
     const api = gridRef.current?.api;
@@ -207,25 +193,6 @@ export function CarriersListPage() {
       controls={
         <>
           <BackButton to="/" aria-label={t("doc.list.backToDashboard")} />
-          <ButtonGroup className="list-page__filter-group" aria-label={t("ops.list.filterStatusAria")}>
-            {(["all", "active", "inactive"] as const).map((value, index) => (
-              <React.Fragment key={value}>
-                {index > 0 && <ButtonGroupSeparator />}
-                <Button
-                  type="button"
-                  variant={activeFilter === value ? "default" : "outline"}
-                  size="sm"
-                  onClick={() => setActiveFilter(value)}
-                >
-                  {value === "all"
-                    ? t("doc.list.all")
-                    : value === "active"
-                      ? t("ops.master.activeCell.active")
-                      : t("ops.master.activeCell.inactive")}
-                </Button>
-              </React.Fragment>
-            ))}
-          </ButtonGroup>
           <ListPageSearch
             inputRef={listSearchInputRef}
             placeholder={t("ops.list.carriers.searchPlaceholder")}

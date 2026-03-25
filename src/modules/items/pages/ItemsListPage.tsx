@@ -1,8 +1,8 @@
 /**
  * Items list — AG Grid migration. Uses shared AgGridContainer and defaultColDef.
- * Preserves search, All/Active/Inactive filters, New button, row navigation, empty state.
+ * Preserves search, New button, row navigation, empty state.
  */
-import React, { useMemo, useState, useRef, useCallback, useEffect } from "react";
+import { useMemo, useState, useRef, useCallback } from "react";
 import { useNavigate, useSearchParams, Link } from "react-router-dom";
 import { AgGridReact } from "ag-grid-react";
 import type { ColDef, ICellRendererParams, SelectionChangedEvent } from "ag-grid-community";
@@ -25,10 +25,6 @@ import { BackButton } from "../../../shared/ui/list/BackButton";
 import { ListPageSearch } from "../../../shared/ui/list/ListPageSearch";
 import { useListPageSearchHotkey } from "../../../shared/hotkeys";
 import { Button } from "@/components/ui/button";
-import {
-  ButtonGroup,
-  ButtonGroupSeparator,
-} from "@/components/ui/button-group";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { ChevronDown, FileSpreadsheet, File, FolderOpen, X } from "lucide-react";
 import { buildItemsListXlsxBuffer, type ItemsExportRow } from "../itemsListExport";
@@ -38,30 +34,11 @@ import { revealItemInDir } from "@tauri-apps/plugin-opener";
 import { useTranslation } from "@/shared/i18n/context";
 import { buildReadableUniqueFilename, ensureUniqueExportPath } from "@/shared/export/filenameBuilder";
 import { itemsListExcelLabels } from "@/shared/i18n/excelListExportLabels";
-import { readOptionalItemLifecycleFromQuery } from "@/shared/navigation/listQueryStatus";
 import { useAppReadModelRevision } from "@/shared/inventoryMasterPageBlocks/useAppReadModelRevision";
 import {
   isMarkdownCodeFormat,
   resolveMarkdownRecordByScanInput,
 } from "@/modules/markdown-journal";
-
-type ActiveFilter = "all" | "active" | "inactive";
-type ItemKindFilter = "all" | "sellable" | "tester";
-
-function applyItemKindFilter(items: Item[], kindFilter: ItemKindFilter): Item[] {
-  if (kindFilter === "sellable") return items.filter((x) => x.itemKind === "SELLABLE");
-  if (kindFilter === "tester") return items.filter((x) => x.itemKind === "TESTER");
-  return items;
-}
-
-function applyActiveFilter(
-  items: Item[],
-  activeFilter: ActiveFilter,
-): Item[] {
-  if (activeFilter === "active") return items.filter((x) => x.isActive);
-  if (activeFilter === "inactive") return items.filter((x) => !x.isActive);
-  return items;
-}
 
 function applyBrandIdFilter(items: Item[], brandId: string | null): Item[] {
   if (brandId == null || brandId === "") return items;
@@ -128,21 +105,10 @@ export function ItemsListPage() {
 
   const [searchQuery, setSearchQuery] = useState("");
   const appReadRevision = useAppReadModelRevision();
-  const [activeFilter, setActiveFilter] = useState<ActiveFilter>("all");
-
-  const lifecycleFromQuery = useMemo(
-    () => readOptionalItemLifecycleFromQuery(searchParams),
-    [searchParams],
-  );
-  useEffect(() => {
-    if (lifecycleFromQuery === undefined) return;
-    setActiveFilter(lifecycleFromQuery);
-  }, [lifecycleFromQuery]);
   const [exportSuccess, setExportSuccess] = useState<{ path: string; filename: string } | null>(null);
   const [exportOpen, setExportOpen] = useState(false);
   const [selectedCount, setSelectedCount] = useState(0);
   const [showCreateChoice, setShowCreateChoice] = useState(false);
-  const [itemKindFilter, setItemKindFilter] = useState<ItemKindFilter>("all");
   const gridRef = useRef<AgGridReact<Item> | null>(null);
   const listSearchInputRef = useRef<HTMLInputElement>(null);
   useListPageSearchHotkey(listSearchInputRef);
@@ -153,11 +119,9 @@ export function ItemsListPage() {
 
   const filteredItems = useMemo(() => {
     const searched = itemRepository.search(searchQuery);
-    const kindFiltered = applyItemKindFilter(searched, itemKindFilter);
-    const statusFiltered = applyActiveFilter(kindFiltered, activeFilter);
-    const brandFiltered = applyBrandIdFilter(statusFiltered, brandFilterId);
+    const brandFiltered = applyBrandIdFilter(searched, brandFilterId);
     return applyCategoryIdFilter(brandFiltered, categoryFilterId);
-  }, [searchQuery, activeFilter, brandFilterId, categoryFilterId, itemKindFilter, appReadRevision]);
+  }, [searchQuery, brandFilterId, categoryFilterId, appReadRevision]);
 
   const markdownScanMatch = useMemo(() => {
     const q = searchQuery.trim();
@@ -174,8 +138,6 @@ export function ItemsListPage() {
 
   const isEmpty = filteredItems.length === 0;
   const hasActiveFilter =
-    activeFilter !== "all" ||
-    itemKindFilter !== "all" ||
     searchQuery.trim() !== "" ||
     brandFilterId != null ||
     categoryFilterId != null;
@@ -388,44 +350,6 @@ export function ItemsListPage() {
       controls={
         <>
           <BackButton to="/" aria-label={t("doc.list.backToDashboard")} />
-          <ButtonGroup className="list-page__filter-group" aria-label={t("ops.list.filterStatusAria")}>
-            {(["all", "active", "inactive"] as const).map((value, index) => (
-              <React.Fragment key={value}>
-                {index > 0 && <ButtonGroupSeparator />}
-                <Button
-                  type="button"
-                  variant={activeFilter === value ? "default" : "outline"}
-                  size="sm"
-                  onClick={() => setActiveFilter(value)}
-                >
-                  {value === "all"
-                    ? t("doc.list.all")
-                    : value === "active"
-                      ? t("ops.master.activeCell.active")
-                      : t("ops.master.activeCell.inactive")}
-                </Button>
-              </React.Fragment>
-            ))}
-          </ButtonGroup>
-          <ButtonGroup className="list-page__filter-group" aria-label={t("ops.list.items.filterKindAria")}>
-            {(["all", "sellable", "tester"] as const).map((value, index) => (
-              <React.Fragment key={value}>
-                {index > 0 && <ButtonGroupSeparator />}
-                <Button
-                  type="button"
-                  variant={itemKindFilter === value ? "default" : "outline"}
-                  size="sm"
-                  onClick={() => setItemKindFilter(value)}
-                >
-                  {value === "all"
-                    ? t("ops.list.items.kindAll")
-                    : value === "sellable"
-                      ? t("ops.list.items.kindSellable")
-                      : t("ops.list.items.kindTester")}
-                </Button>
-              </React.Fragment>
-            ))}
-          </ButtonGroup>
           <ListPageSearch
             inputRef={listSearchInputRef}
             placeholder={t("ops.list.items.searchPlaceholder")}
@@ -621,7 +545,7 @@ export function ItemsListPage() {
             </span>
             <Link
               className="list-table__link shrink-0 font-medium"
-              to={`/markdown-journal/${encodeURIComponent(markdownScanMatch.id)}`}
+              to={`/markdown-journal?view=codes&q=${encodeURIComponent(markdownScanMatch.markdownCode)}`}
             >
               {t("common.open")}
             </Link>

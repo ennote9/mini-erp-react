@@ -1,2 +1,1 @@
-/** Shipment-specific components. Do not implement real UI yet. */
-export {};
+export { ShipmentItemAutocomplete, type ShipmentItemAutocompleteRef } from "./ShipmentItemAutocomplete";

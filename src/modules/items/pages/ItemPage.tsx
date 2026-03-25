@@ -796,7 +796,6 @@ export function ItemPage() {
                           <th className="px-2 py-1 text-left">{t("markdown.fields.markdownPrice")}</th>
                           <th className="px-2 py-1 text-left">{t("markdown.fields.reason")}</th>
                           <th className="px-2 py-1 text-left">{t("common.warehouse")}</th>
-                          <th className="px-2 py-1 text-left">{t("markdown.fields.location")}</th>
                           <th className="px-2 py-1 text-left">{t("markdown.fields.createdAt")}</th>
                           <th className="px-2 py-1 text-left">{t("common.actions")}</th>
                         </tr>
@@ -811,10 +810,9 @@ export function ItemPage() {
                             <td className="px-2 py-1">{row.markdownPrice.toFixed(2)}</td>
                             <td className="px-2 py-1">{t(`markdown.reason.${row.reasonCode}`)}</td>
                             <td className="px-2 py-1">{wh ? wh.code : row.warehouseId}</td>
-                            <td className="px-2 py-1">{row.locationId ?? "—"}</td>
                             <td className="px-2 py-1">{row.createdAt}</td>
                             <td className="px-2 py-1">
-                              <Link className="list-table__link" to={`/markdown-journal/${row.id}`}>{t("common.open")}</Link>
+                              <Link className="list-table__link" to={`/markdown-journal?view=codes&q=${encodeURIComponent(row.markdownCode)}`}>{t("common.open")}</Link>
                             </td>
                           </tr>
                           );

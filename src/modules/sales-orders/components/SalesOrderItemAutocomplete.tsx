@@ -8,7 +8,6 @@ import React, {
   useState,
 } from "react";
 import { createPortal } from "react-dom";
-import { useNavigate } from "react-router-dom";
 import type { Item } from "../../items/model";
 import { itemRepository } from "../../items/repository";
 import { brandRepository } from "../../brands/repository";
@@ -18,6 +17,7 @@ import {
   isMarkdownCodeFormat,
   resolveMarkdownRecordByScanInput,
 } from "@/modules/markdown-journal/markdownLookup";
+import type { MarkdownRecord } from "@/modules/markdown-journal/model";
 import { useAppReadModelRevision } from "@/shared/inventoryMasterPageBlocks/useAppReadModelRevision";
 import { itemBarcodeTokensForOperationalLookup } from "@/modules/items/lib/itemBarcodeLookup";
 
@@ -28,6 +28,8 @@ type Props = {
   value: string; // selected itemId (empty means none)
   items: Item[];
   onChange: (itemId: string) => void;
+  onMarkdownSelect?: (record: MarkdownRecord) => void;
+  markdownSelectionState?: (record: MarkdownRecord) => { selectable: boolean; reason?: string };
   placeholder?: string;
   className?: string;
   /** Right edge for stretched dropdown (e.g. line-entry actions column with “Add line”). */
@@ -125,10 +127,19 @@ export const SalesOrderItemAutocomplete = forwardRef<
   SalesOrderItemAutocompleteRef,
   Props
 >(function SalesOrderItemAutocomplete(
-  { id, value, onChange, items, placeholder, className, dropdownRightEdgeRef },
+  {
+    id,
+    value,
+    onChange,
+    onMarkdownSelect,
+    markdownSelectionState,
+    items,
+    placeholder,
+    className,
+    dropdownRightEdgeRef,
+  },
   ref,
 ) {
-  const navigate = useNavigate();
   const appRevision = useAppReadModelRevision();
   const [inputValue, setInputValue] = useState("");
   const [isOpen, setIsOpen] = useState(false);
@@ -174,6 +185,11 @@ export const SalesOrderItemAutocomplete = forwardRef<
     if (!isMarkdownCodeFormat(q)) return null;
     return resolveMarkdownRecordByScanInput(q);
   }, [inputValue, appRevision]);
+  const mdState = useMemo(() => {
+    if (!mdMatch) return { selectable: false, reason: "Markdown unit is not selectable." };
+    if (!onMarkdownSelect) return { selectable: false, reason: "Markdown unit is not selectable." };
+    return markdownSelectionState?.(mdMatch) ?? { selectable: true };
+  }, [mdMatch, markdownSelectionState, onMarkdownSelect]);
 
   const totalSlots = (mdMatch ? 1 : 0) + itemOptions.length;
   const mdBaseItem = mdMatch ? itemRepository.getById(mdMatch.itemId) : undefined;
@@ -254,16 +270,27 @@ export const SalesOrderItemAutocomplete = forwardRef<
     if (selectedItem) setInputValue(getItemLabel(selectedItem));
   };
 
+  const showBlockedMessage = (message: string, timeoutMs = 1800) => {
+    setBlockedMessage(message);
+    if (blockedTimerRef.current) clearTimeout(blockedTimerRef.current);
+    blockedTimerRef.current = setTimeout(() => setBlockedMessage(null), timeoutMs);
+  };
+
   const selectItem = (item: Item) => {
     if (!item.isActive) {
-      setBlockedMessage("Inactive items cannot be added.");
-      if (blockedTimerRef.current) clearTimeout(blockedTimerRef.current);
-      blockedTimerRef.current = setTimeout(() => setBlockedMessage(null), 1600);
+      showBlockedMessage("Inactive items cannot be added.", 1600);
       return;
     }
     setBlockedMessage(null);
     onChange(item.id);
     setInputValue(getItemLabel(item));
+    setIsOpen(false);
+  };
+
+  const selectMarkdown = (record: MarkdownRecord) => {
+    onMarkdownSelect?.(record);
+    setBlockedMessage(null);
+    setInputValue(record.markdownCode);
     setIsOpen(false);
   };
 
@@ -316,8 +343,11 @@ export const SalesOrderItemAutocomplete = forwardRef<
     if (e.key === "Enter") {
       e.preventDefault();
       if (mdMatch && highlightedIndex === 0) {
-        navigate(`/markdown-journal/${mdMatch.id}`);
-        closeDropdown();
+        if (mdState.selectable) {
+          selectMarkdown(mdMatch);
+        } else {
+          showBlockedMessage(mdState.reason ?? "Markdown unit is not selectable in this document.");
+        }
         return;
       }
       const itemIdx = mdMatch ? highlightedIndex - 1 : highlightedIndex;
@@ -388,16 +418,23 @@ export const SalesOrderItemAutocomplete = forwardRef<
                     role="option"
                     aria-selected={highlightedIndex === 0}
                     className={cn(
-                      "px-2 py-1.5 text-sm cursor-pointer border-b border-border/50",
-                      highlightedIndex === 0
-                        ? "bg-accent text-accent-foreground"
-                        : "hover:bg-accent/60",
+                      "px-2 py-1.5 text-sm border-b border-border/50",
+                      mdState.selectable
+                        ? highlightedIndex === 0
+                          ? "cursor-pointer bg-accent text-accent-foreground"
+                          : "cursor-pointer hover:bg-accent/60"
+                        : highlightedIndex === 0
+                          ? "cursor-not-allowed bg-muted/60 text-muted-foreground/90"
+                          : "cursor-not-allowed opacity-60 text-muted-foreground/90",
                     )}
                     onMouseEnter={() => setHighlightedIndex(0)}
                     onMouseDown={(e) => {
                       e.preventDefault();
-                      navigate(`/markdown-journal/${mdMatch.id}`);
-                      closeDropdown();
+                      if (mdState.selectable) {
+                        selectMarkdown(mdMatch);
+                      } else {
+                        showBlockedMessage(mdState.reason ?? "Markdown unit is not selectable in this document.");
+                      }
                     }}
                   >
                     <div className="font-mono text-xs tabular-nums">{mdMatch.markdownCode}</div>
@@ -405,6 +442,9 @@ export const SalesOrderItemAutocomplete = forwardRef<
                       Markdown unit
                       {mdBaseItem ? ` · ${mdBaseItem.code}` : null}
                     </div>
+                    {!mdState.selectable && mdState.reason ? (
+                      <div className="text-[11px] text-destructive/90 mt-0.5">{mdState.reason}</div>
+                    ) : null}
                   </li>
                 ) : null}
                 {itemOptions.map((item, idx) => {

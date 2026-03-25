@@ -62,6 +62,7 @@ function getPageTitleKey(pathname: string): string {
     return "routes.shipmentCustomerDocument";
   if (pathname.match(/^\/shipments\/[^/]+$/)) return "routes.shipment";
   if (pathname.match(/^\/markdown-journal\/new$/)) return "routes.markdownCreate";
+  if (pathname.match(/^\/markdown-journal\/journals\/[^/]+$/)) return "routes.markdownJournalDocument";
   if (pathname.match(/^\/markdown-journal\/[^/]+$/)) return "routes.markdownRecord";
   return PAGE_TITLES[pathname] ?? "routes.fallback";
 }
@@ -108,6 +109,7 @@ function getPageIcon(
   if (
     pathname === "/markdown-journal" ||
     pathname.match(/^\/markdown-journal\/new$/) ||
+    pathname.match(/^\/markdown-journal\/journals\/[^/]+$/) ||
     pathname.match(/^\/markdown-journal\/[^/]+$/)
   )
     return ScanBarcode;

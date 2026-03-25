@@ -29,7 +29,7 @@ import {
 import { StockBalancesListPage } from "../modules/stock-balances";
 import { StockMovementsListPage } from "../modules/stock-movements";
 import { SettingsPage } from "../modules/settings";
-import { MarkdownCreatePage, MarkdownJournalPage, MarkdownRecordPage } from "../modules/markdown-journal";
+import { MarkdownCreatePage, MarkdownJournalPage } from "../modules/markdown-journal";
 
 /**
  * Route tree: shell layout with nested page routes.
@@ -71,7 +71,7 @@ export function AppRoutes() {
         <Route path="stock-movements" element={<StockMovementsListPage />} />
         <Route path="markdown-journal" element={<MarkdownJournalPage />} />
         <Route path="markdown-journal/new" element={<MarkdownCreatePage />} />
-        <Route path="markdown-journal/:id" element={<MarkdownRecordPage />} />
+        <Route path="markdown-journal/journals/:id" element={<MarkdownCreatePage />} />
         <Route path="settings" element={<SettingsPage />} />
       </Route>
     </Routes>

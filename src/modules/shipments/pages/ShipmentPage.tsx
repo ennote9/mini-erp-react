@@ -1,5 +1,5 @@
 import { useParams } from "react-router-dom";
-import { useMemo, useState, useCallback, useEffect } from "react";
+import { useMemo, useState, useCallback, useEffect, useRef } from "react";
 import { AgGridReact } from "ag-grid-react";
 import type { ColDef, SelectionChangedEvent } from "ag-grid-community";
 import { shipmentRepository } from "../repository";
@@ -15,14 +15,17 @@ import { buildCarrierTrackingUrl, translateCarrierType } from "../../carriers";
 import { salesOrderRepository } from "../../sales-orders/repository";
 import { warehouseRepository } from "../../warehouses/repository";
 import { itemRepository } from "../../items/repository";
+import { listSellableItemsForDocumentLines } from "../../items/orderLineItemsPolicy";
 import { brandRepository } from "../../brands/repository";
 import { categoryRepository } from "../../categories/repository";
 import type { ShipmentLine } from "../model";
+import { ShipmentItemAutocomplete, type ShipmentItemAutocompleteRef } from "../components";
 import { DocumentPageLayout } from "../../../shared/ui/object/DocumentPageLayout";
 import { BackButton } from "../../../shared/ui/list/BackButton";
 import { StatusBadge } from "../../../shared/ui/feedback/StatusBadge";
 import { DocumentIssueStrip } from "../../../shared/ui/feedback/DocumentIssueStrip";
 import {
+  actionIssue,
   actionIssueFromServiceMessage,
   hasErrors,
   hasWarnings,
@@ -73,6 +76,9 @@ import {
   type CancelDocumentReasonCode,
   type ReversalDocumentReasonCode,
 } from "../../../shared/reasonCodes";
+import {
+  markdownRepository,
+} from "@/modules/markdown-journal";
 
 type LineWithItem = ShipmentLine & { itemName: string; uom: string };
 
@@ -99,6 +105,19 @@ function shipmentLinesColumnDefs(t: TFunction): ColDef<LineWithItem>[] {
         const item = itemRepository.getById(itemId);
         return item?.code ?? itemId;
       },
+      cellRenderer: (p: any) => {
+        const code = p.value;
+        const markdownCode = p.data?.markdownCode;
+        if (markdownCode) {
+          return (
+            <div className="flex flex-col leading-tight">
+              <span>{code}</span>
+              <span className="text-[10px] text-muted-foreground font-mono">{markdownCode}</span>
+            </div>
+          );
+        }
+        return code;
+      }
     },
     { field: "itemName", headerName: t("doc.columns.itemName"), flex: 1, minWidth: 180 },
     {
@@ -148,6 +167,7 @@ function buildExportRowsFromLinesWithItem(lines: LineWithItem[]): ShipmentExport
       category,
       qty,
       uom: line.uom ?? item?.uom ?? "\u2014",
+      markdownCode: line.markdownCode,
     };
   });
 }
@@ -180,6 +200,10 @@ export function ShipmentPage() {
   const [draftDeliveryAddress, setDraftDeliveryAddress] = useState("");
   const [draftDeliveryComment, setDraftDeliveryComment] = useState("");
   const [logisticsIssues, setLogisticsIssues] = useState<Issue[]>([]);
+  const [lineEntryItemId, setLineEntryItemId] = useState("");
+  const [lineEntryQty, setLineEntryQty] = useState(1);
+  const [lineEntryMarkdownCode, setLineEntryMarkdownCode] = useState<string | null>(null);
+  const lineEntryItemPickerRef = useRef<ShipmentItemAutocompleteRef | null>(null);
   const doc = useMemo(
     () => (id ? shipmentRepository.getById(id) : undefined),
     [id, refresh],
@@ -326,6 +350,126 @@ export function ShipmentPage() {
     const ids = e.api.getSelectedRows().map((r) => r.id);
     setSelectedLineIds(ids);
   }, []);
+
+  const documentLineItems = useMemo(() => {
+    const base = listSellableItemsForDocumentLines();
+    const byId = new Map(base.map((x) => [x.id, x]));
+    if (doc) {
+      const soLines = salesOrderRepository.listLines(doc.salesOrderId);
+      for (const line of soLines) {
+        const item = itemRepository.getById(line.itemId);
+        if (item) byId.set(item.id, item);
+      }
+    }
+    return [...byId.values()];
+  }, [doc, refresh]);
+
+  const soOrderedItemIds = useMemo(() => {
+    if (!doc) return new Set<string>();
+    return new Set(salesOrderRepository.listLines(doc.salesOrderId).map((l) => l.itemId));
+  }, [doc, refresh]);
+
+  const postedMarkdownCodes = useMemo(() => {
+    const used = new Set<string>();
+    for (const shipment of shipmentRepository.list()) {
+      if (shipment.status !== "posted" || shipment.id === id) continue;
+      for (const line of shipmentRepository.listLines(shipment.id)) {
+        if (line.markdownCode) used.add(line.markdownCode.trim().toUpperCase());
+      }
+    }
+    return used;
+  }, [id, refresh]);
+
+  const getMarkdownSelectionIssue = useCallback(
+    (codeRaw: string) => {
+      if (!doc || doc.status !== "draft") return "Only draft shipments can add markdown units.";
+      const code = codeRaw.trim().toUpperCase();
+      const record = markdownRepository.getByCode(code);
+      if (!record) return `Markdown code ${code} not found.`;
+      if (record.status !== "ACTIVE") return `Markdown code ${code} is not available for shipment.`;
+      if (record.warehouseId !== doc.warehouseId) return `Markdown code ${code} belongs to another warehouse.`;
+      if (!soOrderedItemIds.has(record.itemId)) return `Markdown code ${code} item is not on related sales order.`;
+      if (lines.some((line) => line.markdownCode?.trim().toUpperCase() === code)) {
+        return `Markdown code ${code} is already added to this shipment.`;
+      }
+      if (postedMarkdownCodes.has(code)) return `Markdown code ${code} is already shipped in another posted shipment.`;
+      return null;
+    },
+    [doc, lines, postedMarkdownCodes, soOrderedItemIds],
+  );
+
+  const handleAddLineFromEntry = useCallback(() => {
+    if (!id || !doc || doc.status !== "draft") return;
+    const itemId = lineEntryItemId.trim();
+    if (!itemId) return;
+
+    if (lineEntryMarkdownCode) {
+      const code = lineEntryMarkdownCode.trim().toUpperCase();
+      const issue = getMarkdownSelectionIssue(code);
+      if (issue) {
+        setActionIssues([actionIssue(issue)]);
+        return;
+      }
+      const record = markdownRepository.getByCode(code);
+      if (!record) {
+        setActionIssues([actionIssue(`Markdown code ${code} not found.`)]);
+        return;
+      }
+      shipmentRepository.replaceLines(id, [
+        ...lines.map((line) => ({
+          itemId: line.itemId,
+          qty: line.qty,
+          markdownCode: line.markdownCode,
+        })),
+        { itemId: record.itemId, qty: 1, markdownCode: record.markdownCode },
+      ]);
+      setLineEntryItemId("");
+      setLineEntryQty(1);
+      setLineEntryMarkdownCode(null);
+      setActionIssues([]);
+      setRefresh((r) => r + 1);
+      setTimeout(() => lineEntryItemPickerRef.current?.focus(), 0);
+      return;
+    }
+
+    const item = itemRepository.getById(itemId);
+    if (!item) {
+      setActionIssues([actionIssue("Selected item is not found.")]);
+      return;
+    }
+    if (!item.isActive) {
+      setActionIssues([actionIssue("Selected item is inactive.")]);
+      return;
+    }
+    if (!soOrderedItemIds.has(itemId)) {
+      setActionIssues([actionIssue(`Item ${item.code} is not on related sales order.`)]);
+      return;
+    }
+    if (lines.some((line) => line.itemId === itemId && !line.markdownCode)) {
+      setActionIssues([actionIssue("Duplicate normal item lines are not allowed in one shipment.")]);
+      return;
+    }
+    const qty = Number(lineEntryQty);
+    if (!Number.isFinite(qty) || qty <= 0) {
+      setActionIssues([actionIssue("Quantity must be greater than zero.")]);
+      return;
+    }
+
+    shipmentRepository.replaceLines(id, [
+      ...lines.map((line) => ({
+        itemId: line.itemId,
+        qty: line.qty,
+        markdownCode: line.markdownCode,
+      })),
+      { itemId, qty },
+    ]);
+    setLineEntryItemId("");
+    setLineEntryQty(1);
+    setLineEntryMarkdownCode(null);
+    setActionIssues([]);
+    setRefresh((r) => r + 1);
+    setTimeout(() => lineEntryItemPickerRef.current?.focus(), 0);
+  }, [id, doc, lineEntryItemId, lineEntryQty, lineEntryMarkdownCode, lines, soOrderedItemIds, getMarkdownSelectionIssue]);
 
   const shipmentNumberForFile = doc?.number ?? "shipment";
 
@@ -814,6 +958,59 @@ export function ShipmentPage() {
       <div className="doc-lines mt-6">
         <h3 className="doc-lines__title">{t("doc.page.lines")}</h3>
         <div className="flex flex-row flex-wrap items-center justify-end gap-2 w-full mb-1.5">
+          {isDraft ? (
+            <div className="mr-auto flex items-end gap-2">
+              <div className="flex flex-col gap-0.5 min-w-[260px]">
+                <Label htmlFor="shipment-line-entry-item" className="text-xs text-muted-foreground">
+                  {t("doc.page.itemLabel")}
+                </Label>
+                <ShipmentItemAutocomplete
+                  ref={lineEntryItemPickerRef}
+                  id="shipment-line-entry-item"
+                  value={lineEntryItemId}
+                  items={documentLineItems}
+                  onChange={(itemId) => {
+                    setLineEntryItemId(itemId);
+                    setLineEntryMarkdownCode(null);
+                  }}
+                  onMarkdownSelect={(record) => {
+                    setLineEntryItemId(record.itemId);
+                    setLineEntryMarkdownCode(record.markdownCode);
+                    setLineEntryQty(1);
+                    setActionIssues([]);
+                  }}
+                  markdownSelectionState={(record) => {
+                    const issue = getMarkdownSelectionIssue(record.markdownCode);
+                    return { selectable: issue == null, reason: issue ?? undefined };
+                  }}
+                  placeholder={t("doc.page.searchItemPlaceholder")}
+                />
+              </div>
+              <div className="flex flex-col gap-0.5">
+                <Label htmlFor="shipment-line-entry-qty" className="text-xs text-muted-foreground">
+                  {t("doc.columns.qty")}
+                </Label>
+                <Input
+                  id="shipment-line-entry-qty"
+                  type="number"
+                  min={1}
+                  value={lineEntryMarkdownCode ? 1 : lineEntryQty}
+                  disabled={lineEntryMarkdownCode != null}
+                  onChange={(e) => setLineEntryQty(Number(e.target.value) || 1)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      handleAddLineFromEntry();
+                    }
+                  }}
+                  className="h-8 w-[84px] text-sm text-right"
+                />
+              </div>
+              <Button type="button" variant="outline" size="sm" className="h-8" onClick={handleAddLineFromEntry}>
+                {t("doc.page.addLine")}
+              </Button>
+            </div>
+          ) : null}
           <DocumentPrintActionsMenu
             items={shipmentPrintMenuItems}
             triggerLabel={t("doc.page.print")}

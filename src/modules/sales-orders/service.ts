@@ -6,7 +6,6 @@ import { warehouseRepository } from "../warehouses/repository";
 import { itemRepository } from "../items/repository";
 import { normalizeDateForSO, validateDateForSO } from "./dateUtils";
 import {
-  validateDocumentLines,
   parseDocumentLineQty,
   normalizeDocumentComment,
   validatePlanningLineUnitPrices,
@@ -41,6 +40,7 @@ import { stockBalanceRepository } from "../stock-balances/repository";
 import { reconcileSalesOrderReservations } from "../../shared/soReservationReconcile";
 import type { SalesOrder } from "./model";
 import { computeSalesOrderAllocationView } from "../../shared/soAllocation";
+import { markdownRepository } from "../markdown-journal/repository";
 
 export { reconcileSalesOrderReservations };
 export type {
@@ -73,6 +73,7 @@ export type SaveDraftInput = {
     itemId: string;
     qty: number;
     unitPrice?: number;
+    markdownCode?: string;
     zeroPriceReasonCode?: string;
   }>;
 };
@@ -83,6 +84,63 @@ export type SaveDraftResult =
 export type AllocateStockResult =
   | { success: true; linesTouched: number }
   | { success: false; error: string };
+
+function collectPostedShipmentMarkdownCodes(): Set<string> {
+  const used = new Set<string>();
+  for (const sh of shipmentRepository.list()) {
+    if (sh.status !== "posted") continue;
+    for (const line of shipmentRepository.listLines(sh.id)) {
+      const code = normalizeTrim(line.markdownCode);
+      if (code !== "") used.add(code.toUpperCase());
+    }
+  }
+  return used;
+}
+
+function validateSalesOrderLines(
+  lines: Array<{ itemId: string; qty: number; markdownCode?: string }>,
+  warehouseId: string,
+): string | null {
+  if (!lines || lines.length === 0) return "At least one line is required.";
+  const usedPostedMarkdownCodes = collectPostedShipmentMarkdownCodes();
+  const seenMarkdownCodes = new Set<string>();
+  const seenRegularItems = new Set<string>();
+  for (const line of lines) {
+    const itemIdTrimmed = normalizeTrim(line.itemId);
+    if (itemIdTrimmed === "") return "Each line must have an item.";
+    const qty = parseDocumentLineQty(line.qty);
+    if (qty === null) return "Quantity must be greater than zero.";
+    const item = itemRepository.getById(itemIdTrimmed);
+    if (!item) return "Each line must have an item.";
+    if (!item.isActive) return "Selected item is inactive.";
+
+    const markdownCode = normalizeTrim(line.markdownCode).toUpperCase();
+    if (markdownCode === "") {
+      if (seenRegularItems.has(itemIdTrimmed))
+        return "Duplicate items are not allowed in the same document.";
+      seenRegularItems.add(itemIdTrimmed);
+      continue;
+    }
+
+    if (qty !== 1) return "Markdown unit quantity must be 1.";
+    if (seenMarkdownCodes.has(markdownCode))
+      return "Duplicate markdown units are not allowed in the same document.";
+    if (usedPostedMarkdownCodes.has(markdownCode))
+      return "Selected markdown unit is already shipped.";
+
+    const mdRecord = markdownRepository.getByCode(markdownCode);
+    if (!mdRecord) return "Selected markdown unit does not exist.";
+    if (mdRecord.status !== "ACTIVE")
+      return "Only active markdown units can be selected.";
+    if (mdRecord.itemId !== itemIdTrimmed)
+      return "Selected markdown unit does not match the line item.";
+    if (normalizeTrim(mdRecord.warehouseId) !== normalizeTrim(warehouseId))
+      return "Selected markdown unit belongs to another warehouse.";
+
+    seenMarkdownCodes.add(markdownCode);
+  }
+  return null;
+}
 
 function validateSaveDraft(data: SaveDraftInput): string | null {
   const dateErr = validateDateForSO(data.date);
@@ -97,7 +155,7 @@ function validateSaveDraft(data: SaveDraftInput): string | null {
   const warehouse = warehouseRepository.getById(warehouseIdTrimmed);
   if (!warehouse) return "Warehouse is required.";
   if (!warehouse.isActive) return "Selected warehouse is inactive.";
-  const lineErr = validateDocumentLines(data.lines, itemRepository);
+  const lineErr = validateSalesOrderLines(data.lines, warehouseIdTrimmed);
   if (lineErr) return lineErr;
   const priceErr = validatePlanningLineUnitPrices(data.lines);
   if (priceErr) return priceErr;
@@ -115,18 +173,21 @@ function normalizeSOLines(
     itemId: string;
     qty: number;
     unitPrice?: number;
+    markdownCode?: string;
     zeroPriceReasonCode?: string;
   }>,
 ): Array<{
   itemId: string;
   qty: number;
   unitPrice: number;
+  markdownCode?: string;
   zeroPriceReasonCode?: string;
 }> | null {
   const out: Array<{
     itemId: string;
     qty: number;
     unitPrice: number;
+    markdownCode?: string;
     zeroPriceReasonCode?: string;
   }> = [];
   for (const l of lines) {
@@ -135,11 +196,19 @@ function normalizeSOLines(
     const unitPrice = parseCommercialUnitPrice(l.unitPrice);
     if (unitPrice === null) return null;
     const zpr = zeroPriceReasonCodeForStore(unitPrice, l.zeroPriceReasonCode);
-    const row: { itemId: string; qty: number; unitPrice: number; zeroPriceReasonCode?: string } = {
+    const row: {
+      itemId: string;
+      qty: number;
+      unitPrice: number;
+      markdownCode?: string;
+      zeroPriceReasonCode?: string;
+    } = {
       itemId: normalizeTrim(l.itemId),
       qty,
       unitPrice,
     };
+    const markdownCode = normalizeTrim(l.markdownCode);
+    if (markdownCode !== "") row.markdownCode = markdownCode.toUpperCase();
     if (zpr !== undefined) row.zeroPriceReasonCode = zpr;
     out.push(row);
   }
@@ -285,6 +354,7 @@ export function saveDraft(
         itemCode: itemCodeForAudit(l.itemId),
         qty: l.qty,
         unitPrice: l.unitPrice,
+        ...(l.markdownCode ? { markdownCode: l.markdownCode } : {}),
         ...(l.zeroPriceReasonCode ? { zeroPriceReasonCode: l.zeroPriceReasonCode } : {}),
       })),
     },
@@ -314,7 +384,7 @@ function validateConfirm(soId: string): string | null {
   }
 
   const lines = salesOrderRepository.listLines(soId);
-  const lineErr = validateDocumentLines(lines, itemRepository);
+  const lineErr = validateSalesOrderLines(lines, so.warehouseId);
   if (lineErr) return lineErr;
   const priceErr = validatePlanningLineUnitPrices(lines);
   if (priceErr) return priceErr;
@@ -501,10 +571,32 @@ export function createShipment(soId: string): CreateShipmentResult {
     }
   }
 
-  const fulfillment = computeSalesOrderFulfillment(soId);
-  const shipmentLines = fulfillment.lines
-    .filter((row) => row.remainingQty > 0)
-    .map((row) => ({ itemId: row.itemId, qty: row.remainingQty }));
+  const soLines = salesOrderRepository.listLines(soId);
+  const postedShipments = shipmentRepository
+    .list()
+    .filter((s) => s.salesOrderId === soId && s.status === "posted");
+  const shippedRegularByItem = new Map<string, number>();
+  const shippedMarkdownCodes = new Set<string>();
+  for (const sh of postedShipments) {
+    for (const line of shipmentRepository.listLines(sh.id)) {
+      const markdownCode = normalizeTrim(line.markdownCode).toUpperCase();
+      if (markdownCode !== "") {
+        shippedMarkdownCodes.add(markdownCode);
+        continue;
+      }
+      shippedRegularByItem.set(line.itemId, (shippedRegularByItem.get(line.itemId) ?? 0) + line.qty);
+    }
+  }
+  const shipmentLines = soLines.flatMap((line) => {
+    const markdownCode = normalizeTrim(line.markdownCode).toUpperCase();
+    if (markdownCode !== "") {
+      if (shippedMarkdownCodes.has(markdownCode)) return [];
+      return [{ itemId: line.itemId, qty: 1, markdownCode }];
+    }
+    const remainingQty = Math.max(0, line.qty - (shippedRegularByItem.get(line.itemId) ?? 0));
+    if (remainingQty < 1) return [];
+    return [{ itemId: line.itemId, qty: remainingQty }];
+  });
   if (shipmentLines.length === 0) {
     return {
       success: false,

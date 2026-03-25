@@ -28,6 +28,7 @@ export type SalesOrderLineInput = {
   itemId: string;
   qty: number;
   unitPrice: number;
+  markdownCode?: string;
   zeroPriceReasonCode?: string;
 };
 export type UpdateSalesOrderPatch = Partial<
@@ -113,6 +114,9 @@ function normalizeLine(raw: unknown): SalesOrderLine | null {
     qty: rec.qty,
     unitPrice,
   };
+  if (typeof rec.markdownCode === "string" && rec.markdownCode.trim() !== "") {
+    line.markdownCode = rec.markdownCode.trim().toUpperCase();
+  }
   if (zpr !== undefined) line.zeroPriceReasonCode = zpr;
   return line;
 }
@@ -288,6 +292,9 @@ export const salesOrderRepository = {
         qty: l.qty,
         unitPrice,
       };
+      if (typeof l.markdownCode === "string" && l.markdownCode.trim() !== "") {
+        row.markdownCode = l.markdownCode.trim().toUpperCase();
+      }
       if (zpr !== undefined) row.zeroPriceReasonCode = zpr;
       lineStore.push(row);
     }
@@ -323,6 +330,9 @@ export const salesOrderRepository = {
         qty: l.qty,
         unitPrice,
       };
+      if (typeof l.markdownCode === "string" && l.markdownCode.trim() !== "") {
+        line.markdownCode = l.markdownCode.trim().toUpperCase();
+      }
       if (zpr !== undefined) line.zeroPriceReasonCode = zpr;
       lineStore.push(line);
       newLines.push(line);

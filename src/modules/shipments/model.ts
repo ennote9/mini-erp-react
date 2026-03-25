@@ -40,4 +40,6 @@ export interface ShipmentLine {
   shipmentId: string;
   itemId: string;
   qty: number;
+  /** Optional markdown code if this line represents a specific markdown unit */
+  markdownCode?: string;
 }

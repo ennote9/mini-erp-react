@@ -1,61 +1,40 @@
 import { itemRepository } from "../items/repository";
+import { warehouseRepository } from "../warehouses/repository";
 import { markdownRepository } from "./repository";
-import type { MarkdownReasonCode, MarkdownRecord } from "./model";
+import { markdownJournalRepository } from "./journalRepository";
+import { markdownJournalLineRepository } from "./journalLineRepository";
+import type {
+  MarkdownJournal,
+  MarkdownJournalLine,
+  MarkdownReasonCode,
+  MarkdownRecord,
+} from "./model";
 import {
   assertMarkdownTransitionAllowed,
   isFinalMarkdownStatus,
   type MarkdownDirectTerminalTransition,
 } from "./markdownLifecycle";
 
-export type CreateMarkdownBatchInput = {
+export type MarkdownJournalDraftLineInput = {
   itemId: string;
   markdownPrice: number;
   reasonCode: MarkdownReasonCode;
-  warehouseId: string;
-  locationId?: string;
   quantity: number;
+};
+
+export type SaveMarkdownJournalDraftInput = {
+  warehouseId: string;
   comment?: string;
-  createdBy?: string;
+  lines: MarkdownJournalDraftLineInput[];
+  actorId?: string;
 };
 
 function newBatchId(): string {
   return `MB-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
 }
 
-export function createMarkdownBatch(
-  input: CreateMarkdownBatchInput,
-): { success: true; records: MarkdownRecord[] } | { success: false; error: string } {
-  const item = itemRepository.getById(input.itemId);
-  if (!item) return { success: false, error: "Item not found." };
-  if (item.itemKind === "TESTER") return { success: false, error: "Markdown creation expects a sellable item." };
-  if (!(input.markdownPrice > 0)) return { success: false, error: "Markdown price must be greater than zero." };
-  const qty = Math.max(1, Math.floor(input.quantity || 1));
-  const createdAt = new Date().toISOString();
-  const createdBy = (input.createdBy ?? "system").trim() || "system";
-  const records: MarkdownRecord[] = [];
-  const batchId = newBatchId();
-  for (let i = 0; i < qty; i++) {
-    records.push(
-      markdownRepository.create({
-        batchId,
-        batchSequenceIndex: i + 1,
-        batchSequenceTotal: qty,
-        itemId: item.id,
-        markdownPrice: input.markdownPrice,
-        reasonCode: input.reasonCode,
-        status: "ACTIVE",
-        createdAt,
-        createdBy,
-        warehouseId: input.warehouseId,
-        locationId: input.locationId || undefined,
-        originalBarcode: item.barcode,
-        comment: input.comment || undefined,
-        basePriceAtMarkdown: item.salePrice,
-        quantity: 1,
-      }),
-    );
-  }
-  return { success: true, records };
+function normalizeActor(actorId: string | undefined): string {
+  return (actorId ?? "system").trim() || "system";
 }
 
 export type TransitionMarkdownInput = {
@@ -63,6 +42,233 @@ export type TransitionMarkdownInput = {
   transition: MarkdownDirectTerminalTransition;
   actorId: string;
 };
+
+function validateJournalLine(
+  line: MarkdownJournalDraftLineInput,
+): { success: true; line: MarkdownJournalDraftLineInput } | { success: false; error: string } {
+  const item = itemRepository.getById(line.itemId);
+  if (!item) return { success: false, error: "Item not found." };
+  if (item.itemKind === "TESTER") {
+    return { success: false, error: "Markdown journal expects sellable items only." };
+  }
+  if (!item.isActive) {
+    return { success: false, error: "Inactive items cannot be added." };
+  }
+  if (!(line.markdownPrice > 0)) {
+    return { success: false, error: "Markdown price must be greater than zero." };
+  }
+  if (!(line.quantity > 0)) {
+    return { success: false, error: "Quantity must be greater than zero." };
+  }
+  return {
+    success: true,
+    line: {
+      ...line,
+      quantity: Math.max(1, Math.floor(line.quantity)),
+    },
+  };
+}
+
+function buildJournalLineEntities(
+  journalId: string,
+  lines: MarkdownJournalDraftLineInput[],
+): { success: true; lines: Omit<MarkdownJournalLine, "id">[] } | { success: false; error: string } {
+  if (lines.length === 0) {
+    return { success: false, error: "Add at least one markdown line." };
+  }
+
+  const normalized: Omit<MarkdownJournalLine, "id">[] = [];
+  for (let index = 0; index < lines.length; index++) {
+    const validated = validateJournalLine(lines[index]);
+    if (!validated.success) return validated;
+    normalized.push({
+      journalId,
+      sortOrder: index + 1,
+      itemId: validated.line.itemId,
+      markdownPrice: validated.line.markdownPrice,
+      quantity: validated.line.quantity,
+      reasonCode: validated.line.reasonCode,
+    });
+  }
+  return { success: true, lines: normalized };
+}
+
+export function createMarkdownJournalDraft(
+  input: SaveMarkdownJournalDraftInput,
+): { success: true; journal: MarkdownJournal } | { success: false; error: string } {
+  if (!input.warehouseId.trim()) {
+    return { success: false, error: "Warehouse is required." };
+  }
+  const warehouse = warehouseRepository.getById(input.warehouseId);
+  if (!warehouse) {
+    return { success: false, error: "Warehouse not found." };
+  }
+
+  const createdAt = new Date().toISOString();
+  const actor = normalizeActor(input.actorId);
+  const journal = markdownJournalRepository.create({
+    status: "draft",
+    warehouseId: input.warehouseId.trim(),
+    comment: input.comment?.trim() || undefined,
+    createdAt,
+    createdBy: actor,
+  });
+
+  const builtLines = buildJournalLineEntities(journal.id, input.lines);
+  if (!builtLines.success) return builtLines;
+  markdownJournalLineRepository.replaceForJournal(journal.id, builtLines.lines);
+  return { success: true, journal };
+}
+
+export function updateMarkdownJournalDraft(
+  journalId: string,
+  input: SaveMarkdownJournalDraftInput,
+): { success: true; journal: MarkdownJournal } | { success: false; error: string } {
+  const journal = markdownJournalRepository.getById(journalId);
+  if (!journal) return { success: false, error: "Markdown journal not found." };
+  if (journal.status !== "draft") {
+    return { success: false, error: "Only draft journals can be edited." };
+  }
+  if (!input.warehouseId.trim()) {
+    return { success: false, error: "Warehouse is required." };
+  }
+  const warehouse = warehouseRepository.getById(input.warehouseId);
+  if (!warehouse) {
+    return { success: false, error: "Warehouse not found." };
+  }
+
+  const builtLines = buildJournalLineEntities(journal.id, input.lines);
+  if (!builtLines.success) return builtLines;
+
+  markdownJournalLineRepository.replaceForJournal(journal.id, builtLines.lines);
+  const updated = markdownJournalRepository.update(journal.id, {
+    warehouseId: input.warehouseId.trim(),
+    comment: input.comment?.trim() || undefined,
+  });
+  if (!updated) return { success: false, error: "Failed to save draft journal." };
+  return { success: true, journal: updated };
+}
+
+export function listMarkdownLinesForJournal(journalId: string): MarkdownJournalLine[] {
+  return markdownJournalLineRepository.listByJournalId(journalId);
+}
+
+export function listMarkdownUnitsForJournal(journalId: string): MarkdownRecord[] {
+  const journal = markdownJournalRepository.getById(journalId);
+  if (!journal) return [];
+  return markdownRepository.list().filter((record) => {
+    if (record.journalId === journalId) return true;
+    if (!journal.legacySourceIds || journal.legacySourceIds.length === 0) return false;
+    const batchId = record.batchId?.trim();
+    return journal.legacySourceIds.includes(record.id) || (!!batchId && journal.legacySourceIds.includes(batchId));
+  });
+}
+
+export function postMarkdownJournal(
+  journalId: string,
+  actorId: string,
+): { success: true; journal: MarkdownJournal; records: MarkdownRecord[] } | { success: false; error: string } {
+  const journal = markdownJournalRepository.getById(journalId);
+  if (!journal) return { success: false, error: "Markdown journal not found." };
+  if (journal.status !== "draft") {
+    return { success: false, error: "Only draft journals can be posted." };
+  }
+
+  const lines = markdownJournalLineRepository.listByJournalId(journalId);
+  if (lines.length === 0) {
+    return { success: false, error: "Add at least one markdown line before posting." };
+  }
+
+  const actor = normalizeActor(actorId);
+  const postedAt = new Date().toISOString();
+  const records: MarkdownRecord[] = [];
+
+  for (const line of lines) {
+    const item = itemRepository.getById(line.itemId);
+    if (!item) return { success: false, error: "Item not found." };
+    if (item.itemKind === "TESTER") return { success: false, error: "Markdown journal expects sellable items only." };
+    const batchId = newBatchId();
+    for (let index = 0; index < line.quantity; index++) {
+      records.push(
+        markdownRepository.create({
+          journalId: journal.id,
+          journalNumber: journal.number,
+          journalLineId: line.id,
+          batchId,
+          batchSequenceIndex: index + 1,
+          batchSequenceTotal: line.quantity,
+          itemId: line.itemId,
+          markdownPrice: line.markdownPrice,
+          reasonCode: line.reasonCode,
+          status: "ACTIVE",
+          createdAt: postedAt,
+          createdBy: actor,
+          warehouseId: journal.warehouseId,
+          originalBarcode: item.barcode,
+          comment: journal.comment,
+          basePriceAtMarkdown: item.salePrice,
+          quantity: 1,
+        }),
+      );
+    }
+  }
+
+  const updated = markdownJournalRepository.update(journal.id, {
+    status: "posted",
+    postedAt,
+    postedBy: actor,
+  });
+  if (!updated) return { success: false, error: "Failed to post markdown journal." };
+  return { success: true, journal: updated, records };
+}
+
+export function printMarkdownJournalStickers(journalId: string): { success: true } | { success: false; error: string } {
+  const journal = markdownJournalRepository.getById(journalId);
+  if (!journal) return { success: false, error: "Markdown journal not found." };
+  if (journal.status !== "posted") return { success: false, error: "Print is available only for posted journals." };
+  const records = listMarkdownUnitsForJournal(journalId);
+  if (records.length === 0) return { success: false, error: "No generated markdown units available for printing." };
+
+  const html = records
+    .map((record) => {
+      const item = itemRepository.getById(record.itemId);
+      const itemLabel = item ? `${item.code} — ${item.name}` : record.itemId;
+      return `
+        <article class="sticker">
+          <div class="sticker__code">${record.markdownCode}</div>
+          <div class="sticker__item">${itemLabel}</div>
+          <div class="sticker__meta">Price: ${record.markdownPrice.toFixed(2)}</div>
+          <div class="sticker__meta">Reason: ${record.reasonCode}</div>
+          <div class="sticker__meta">Journal: ${journal.number}</div>
+        </article>
+      `;
+    })
+    .join("");
+
+  const popup = window.open("", "_blank", "noopener,noreferrer,width=960,height=720");
+  if (!popup) return { success: false, error: "Could not open print window." };
+  popup.document.write(`<!doctype html>
+    <html>
+      <head>
+        <title>${journal.number}</title>
+        <style>
+          body { font-family: Arial, sans-serif; margin: 16px; color: #111; }
+          .sheet { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+          .sticker { border: 1px solid #111; padding: 12px; page-break-inside: avoid; }
+          .sticker__code { font-size: 20px; font-weight: 700; margin-bottom: 8px; }
+          .sticker__item { font-size: 14px; margin-bottom: 6px; }
+          .sticker__meta { font-size: 12px; margin-bottom: 2px; }
+        </style>
+      </head>
+      <body>
+        <div class="sheet">${html}</div>
+      </body>
+    </html>`);
+  popup.document.close();
+  popup.focus();
+  popup.print();
+  return { success: true };
+}
 
 export function transitionMarkdownRecord(
   input: TransitionMarkdownInput,
@@ -106,6 +312,9 @@ export function supersedeMarkdownRecord(
   const batchId = newBatchId();
 
   const newRecord = markdownRepository.create({
+    journalId: old.journalId,
+    journalNumber: old.journalNumber,
+    journalLineId: old.journalLineId,
     batchId,
     batchSequenceIndex: 1,
     batchSequenceTotal: 1,
@@ -116,7 +325,6 @@ export function supersedeMarkdownRecord(
     createdAt: now,
     createdBy: actor,
     warehouseId: old.warehouseId,
-    locationId: old.locationId,
     originalBarcode: old.originalBarcode ?? item.barcode,
     comment: old.comment,
     basePriceAtMarkdown: old.basePriceAtMarkdown ?? item.salePrice,

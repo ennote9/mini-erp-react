@@ -9,7 +9,10 @@ import { carrierRepository } from "../../carriers/repository";
 import { translateCarrierType } from "../../carriers";
 import { warehouseRepository } from "../../warehouses/repository";
 import { itemRepository } from "../../items/repository";
+import { shipmentRepository } from "../../shipments/repository";
 import { listSellableItemsForDocumentLines } from "../../items/orderLineItemsPolicy";
+import { markdownRepository } from "../../markdown-journal/repository";
+import type { MarkdownRecord } from "../../markdown-journal/model";
 import { useAppReadModelRevision } from "@/shared/inventoryMasterPageBlocks/useAppReadModelRevision";
 import { brandRepository } from "../../brands/repository";
 import { categoryRepository } from "../../categories/repository";
@@ -109,6 +112,7 @@ import {
   type CancelDocumentReasonCode,
   type ZeroPriceLineReasonCode,
 } from "../../../shared/reasonCodes";
+import { normalizeTrim } from "../../../shared/validation";
 import {
   computeSalesOrderFulfillment,
   type SalesOrderFulfillment,
@@ -126,6 +130,7 @@ type LineFormRow = {
   itemId: string;
   qty: number;
   unitPrice: number;
+  markdownCode?: string;
   zeroPriceReasonCode: string;
   _lineId: number;
 };
@@ -220,6 +225,8 @@ function soLinesDisplayColumnDefs(
       maxWidth: 140,
       editable: false,
       valueGetter: (p) => {
+        const markdownCode = p.data?.markdownCode?.trim();
+        if (markdownCode) return markdownCode.toUpperCase();
         const itemId = p.data?.itemId;
         if (!itemId) return "";
         const item = itemRepository.getById(itemId);
@@ -409,6 +416,8 @@ function soLinesReadOnlyColumnDefs(
       minWidth: 120,
       maxWidth: 140,
       valueGetter: (p) => {
+        const markdownCode = p.data?.markdownCode?.trim();
+        if (markdownCode) return markdownCode.toUpperCase();
         const itemId = p.data?.itemId;
         if (!itemId) return "";
         const item = itemRepository.getById(itemId);
@@ -529,7 +538,7 @@ function buildExportRowsFromFormLines(lines: LineFormRow[]): SoExportLineRow[] {
     const category = item?.categoryId ? categoryRepository.getById(item.categoryId)?.code ?? "" : "";
     return {
       no: idx + 1,
-      itemCode: item?.code ?? line.itemId,
+      itemCode: line.markdownCode?.trim().toUpperCase() || item?.code || line.itemId,
       itemName: item?.name ?? line.itemId,
       brand,
       category,
@@ -553,7 +562,7 @@ function buildExportRowsFromLinesWithItem(lines: LineWithItem[]): SoExportLineRo
     const category = item?.categoryId ? categoryRepository.getById(item.categoryId)?.code ?? "" : "";
     return {
       no: idx + 1,
-      itemCode: item?.code ?? line.itemId,
+      itemCode: line.markdownCode?.trim().toUpperCase() || item?.code || line.itemId,
       itemName: line.itemName ?? item?.name ?? line.itemId,
       brand,
       category,
@@ -606,6 +615,7 @@ export function SalesOrderPage() {
   const [lineEntryItemId, setLineEntryItemId] = useState("");
   const [lineEntryQty, setLineEntryQty] = useState(1);
   const [lineEntryUnitPrice, setLineEntryUnitPrice] = useState(0);
+  const [lineEntryMarkdownCode, setLineEntryMarkdownCode] = useState<string | null>(null);
   const [lineEntryZeroPriceReason, setLineEntryZeroPriceReason] = useState("");
   const [cancelReasonDialogOpen, setCancelReasonDialogOpen] = useState(false);
   const [duplicateChoicePending, setDuplicateChoicePending] = useState<{
@@ -625,6 +635,35 @@ export function SalesOrderPage() {
   const lineEntryQtyInputRef = useRef<HTMLInputElement | null>(null);
   const lineEntryDropdownRightEdgeRef = useRef<HTMLDivElement | null>(null);
   const prevCustomerIdRef = useRef<string | null>(null);
+  const postedMarkdownCodes = useMemo(() => {
+    const used = new Set<string>();
+    for (const shipment of shipmentRepository.list()) {
+      if (shipment.status !== "posted") continue;
+      for (const line of shipmentRepository.listLines(shipment.id)) {
+        const code = line.markdownCode?.trim().toUpperCase();
+        if (code) used.add(code);
+      }
+    }
+    return used;
+  }, [appReadRevision]);
+  const getMarkdownSelectionIssue = useCallback(
+    (codeRaw: string) => {
+      const warehouseId = normalizeTrim(form.warehouseId);
+      if (warehouseId === "") return "Warehouse is required before selecting markdown unit.";
+      const code = codeRaw.trim().toUpperCase();
+      const record = markdownRepository.getByCode(code);
+      if (!record) return `Markdown code ${code} not found.`;
+      if (record.status !== "ACTIVE") return `Markdown code ${code} is not available for sale.`;
+      if (normalizeTrim(record.warehouseId) !== warehouseId)
+        return `Markdown code ${code} belongs to another warehouse.`;
+      if (postedMarkdownCodes.has(code))
+        return `Markdown code ${code} is already shipped in another posted shipment.`;
+      if (form.lines.some((line) => line.markdownCode?.trim().toUpperCase() === code))
+        return `Markdown code ${code} is already added to this sales order.`;
+      return null;
+    },
+    [form.warehouseId, form.lines, postedMarkdownCodes],
+  );
 
   const zeroPriceReasonOptions = useMemo(
     () =>
@@ -662,6 +701,7 @@ export function SalesOrderPage() {
       setLineEntryItemId("");
       setLineEntryQty(1);
       setLineEntryUnitPrice(0);
+      setLineEntryMarkdownCode(null);
       setLineEntryZeroPriceReason("");
       setDuplicateChoicePending(null);
       return;
@@ -677,6 +717,7 @@ export function SalesOrderPage() {
                 typeof l.unitPrice === "number" && !Number.isNaN(l.unitPrice)
                   ? roundMoney(l.unitPrice)
                   : 0,
+              markdownCode: l.markdownCode,
               zeroPriceReasonCode: l.zeroPriceReasonCode ?? "",
               _lineId: idx,
             }))
@@ -702,6 +743,7 @@ export function SalesOrderPage() {
       setLineEntryItemId("");
       setLineEntryQty(1);
       setLineEntryUnitPrice(0);
+      setLineEntryMarkdownCode(null);
       setLineEntryZeroPriceReason("");
       setDuplicateChoicePending(null);
     }
@@ -883,7 +925,7 @@ export function SalesOrderPage() {
       .filter(
         (l) => l.itemId.trim() !== "" && typeof l.qty === "number" && l.qty > 0,
       )
-      .map(({ itemId, qty, unitPrice, zeroPriceReasonCode }) => {
+      .map(({ itemId, qty, unitPrice, markdownCode, zeroPriceReasonCode }) => {
         const up = roundMoney(
           typeof unitPrice === "number" && !Number.isNaN(unitPrice) && unitPrice >= 0 ? unitPrice : 0,
         );
@@ -891,6 +933,9 @@ export function SalesOrderPage() {
           itemId,
           qty,
           unitPrice: up,
+          ...(typeof markdownCode === "string" && markdownCode.trim() !== ""
+            ? { markdownCode: markdownCode.trim().toUpperCase() }
+            : {}),
           ...(up === 0 && zeroPriceReasonCode.trim() !== ""
             ? { zeroPriceReasonCode: zeroPriceReasonCode.trim() }
             : {}),
@@ -938,6 +983,7 @@ export function SalesOrderPage() {
       setLineEntryItemId("");
       setLineEntryQty(1);
       setLineEntryUnitPrice(0);
+      setLineEntryMarkdownCode(null);
       setLineEntryZeroPriceReason("");
       linesGridRef.current?.api?.deselectAll();
     }
@@ -945,7 +991,8 @@ export function SalesOrderPage() {
 
   const addLineFromEntry = () => {
     const itemId = lineEntryItemId.trim();
-    const qty = Number(lineEntryQty);
+    const markdownCode = lineEntryMarkdownCode?.trim().toUpperCase() ?? "";
+    const qty = markdownCode ? 1 : Number(lineEntryQty);
     if (!itemId || !Number.isFinite(qty) || qty <= 0) return;
 
     const item = itemRepository.getById(itemId);
@@ -960,8 +1007,21 @@ export function SalesOrderPage() {
 
     const rawPrice = Number(lineEntryUnitPrice);
     const unitPrice = roundMoney(Number.isFinite(rawPrice) && rawPrice >= 0 ? rawPrice : 0);
-    const isDuplicate = form.lines.some((l) => l.itemId === itemId);
+    if (markdownCode) {
+      const issue = getMarkdownSelectionIssue(markdownCode);
+      if (issue) {
+        setActionIssues([actionIssue(issue)]);
+        return;
+      }
+    }
+    const isDuplicate = markdownCode
+      ? form.lines.some((l) => l.markdownCode?.trim().toUpperCase() === markdownCode)
+      : form.lines.some((l) => l.itemId === itemId && !l.markdownCode);
     if (isDuplicate) {
+      if (markdownCode) {
+        setActionIssues([actionIssue(`Markdown code ${markdownCode} is already in this order.`)]);
+        return;
+      }
       setDuplicateChoicePending({ itemId, qty, unitPrice });
       return;
     }
@@ -970,11 +1030,22 @@ export function SalesOrderPage() {
       unitPrice === 0 && lineEntryZeroPriceReason.trim() !== "" ? lineEntryZeroPriceReason.trim() : "";
     setForm((f) => ({
       ...f,
-      lines: [...f.lines, { itemId, qty, unitPrice, zeroPriceReasonCode: zp, _lineId }],
+      lines: [
+        ...f.lines,
+        {
+          itemId,
+          qty,
+          unitPrice,
+          ...(markdownCode ? { markdownCode } : {}),
+          zeroPriceReasonCode: zp,
+          _lineId,
+        },
+      ],
     }));
     setLineEntryItemId("");
     setLineEntryQty(1);
     setLineEntryUnitPrice(0);
+    setLineEntryMarkdownCode(null);
     setLineEntryZeroPriceReason("");
     setTimeout(() => lineEntryItemPickerRef.current?.focus(), 0);
   };
@@ -988,6 +1059,7 @@ export function SalesOrderPage() {
       setLineEntryItemId("");
       setLineEntryQty(1);
       setLineEntryUnitPrice(0);
+      setLineEntryMarkdownCode(null);
       setLineEntryZeroPriceReason("");
       return;
     }
@@ -1001,6 +1073,7 @@ export function SalesOrderPage() {
     setLineEntryItemId("");
     setLineEntryQty(1);
     setLineEntryUnitPrice(0);
+    setLineEntryMarkdownCode(null);
     setLineEntryZeroPriceReason("");
     setTimeout(() => lineEntryItemPickerRef.current?.focus(), 0);
   };
@@ -1013,22 +1086,45 @@ export function SalesOrderPage() {
   const updateLineFromEntry = () => {
     if (editingLineId === null) return;
     const itemId = lineEntryItemId.trim();
-    const qty = Number(lineEntryQty);
+    const markdownCode = lineEntryMarkdownCode?.trim().toUpperCase() ?? "";
+    const qty = markdownCode ? 1 : Number(lineEntryQty);
     if (!itemId || !Number.isFinite(qty) || qty <= 0) return;
     const rawPrice = Number(lineEntryUnitPrice);
     const unitPrice = roundMoney(Number.isFinite(rawPrice) && rawPrice >= 0 ? rawPrice : 0);
     const zp =
       unitPrice === 0 && lineEntryZeroPriceReason.trim() !== "" ? lineEntryZeroPriceReason.trim() : "";
+    if (markdownCode) {
+      const issue = getMarkdownSelectionIssue(markdownCode);
+      if (issue) {
+        const editingLine = form.lines.find((l) => l._lineId === editingLineId);
+        const sameCode =
+          editingLine?.markdownCode?.trim().toUpperCase() === markdownCode;
+        if (!sameCode) {
+          setActionIssues([actionIssue(issue)]);
+          return;
+        }
+      }
+    }
     setForm((f) => ({
       ...f,
       lines: f.lines.map((l) =>
-        l._lineId === editingLineId ? { ...l, itemId, qty, unitPrice, zeroPriceReasonCode: zp } : l,
+        l._lineId === editingLineId
+          ? {
+              ...l,
+              itemId,
+              qty,
+              unitPrice,
+              markdownCode: markdownCode || undefined,
+              zeroPriceReasonCode: zp,
+            }
+          : l,
       ),
     }));
     setEditingLineId(null);
     setLineEntryItemId("");
     setLineEntryQty(1);
     setLineEntryUnitPrice(0);
+    setLineEntryMarkdownCode(null);
     setLineEntryZeroPriceReason("");
     linesGridRef.current?.api?.deselectAll();
   };
@@ -1038,6 +1134,7 @@ export function SalesOrderPage() {
     setLineEntryItemId("");
     setLineEntryQty(1);
     setLineEntryUnitPrice(0);
+    setLineEntryMarkdownCode(null);
     setLineEntryZeroPriceReason("");
     setDuplicateChoicePending(null);
     linesGridRef.current?.api?.deselectAll();
@@ -1060,6 +1157,7 @@ export function SalesOrderPage() {
             : 0,
         ),
       );
+      setLineEntryMarkdownCode(row.markdownCode ?? null);
       setLineEntryZeroPriceReason(
         typeof row.zeroPriceReasonCode === "string" ? row.zeroPriceReasonCode : "",
       );
@@ -1068,6 +1166,7 @@ export function SalesOrderPage() {
       setLineEntryItemId("");
       setLineEntryQty(1);
       setLineEntryUnitPrice(0);
+      setLineEntryMarkdownCode(null);
       setLineEntryZeroPriceReason("");
     }
   }, []);
@@ -1086,12 +1185,14 @@ export function SalesOrderPage() {
       setLineEntryItemId("");
       setLineEntryQty(1);
       setLineEntryUnitPrice(0);
+      setLineEntryMarkdownCode(null);
       setLineEntryZeroPriceReason("");
     }
   }, [selectedLineIds, editingLineId]);
 
   const handleLineEntryItemChange = (itemId: string) => {
     setLineEntryItemId(itemId);
+    setLineEntryMarkdownCode(null);
     const item = itemId ? itemRepository.getById(itemId) : undefined;
     const price = item?.salePrice;
     const up = roundMoney(
@@ -1106,6 +1207,28 @@ export function SalesOrderPage() {
       }, 0);
     }
   };
+
+  const handleLineEntryMarkdownSelect = useCallback((record: MarkdownRecord) => {
+    const issue = getMarkdownSelectionIssue(record.markdownCode);
+    if (issue) {
+      setActionIssues([actionIssue(issue)]);
+      return;
+    }
+    setLineEntryItemId(record.itemId);
+    setLineEntryMarkdownCode(record.markdownCode);
+    setLineEntryQty(1);
+    setLineEntryUnitPrice(
+      roundMoney(
+        typeof record.markdownPrice === "number" && !Number.isNaN(record.markdownPrice) && record.markdownPrice >= 0
+          ? record.markdownPrice
+          : 0,
+      ),
+    );
+    setLineEntryZeroPriceReason("");
+    if (editingLineId === null) {
+      setTimeout(() => lineEntryQtyInputRef.current?.focus(), 0);
+    }
+  }, [editingLineId, getMarkdownSelectionIssue]);
 
   const handleApplyImportedLines = ({ lines, skippedRows }: { lines: ResolvedImportLine[]; skippedRows: number }) => {
     if (lines.length === 0) return;
@@ -2287,6 +2410,11 @@ export function SalesOrderPage() {
                         id="line-entry-item"
                         value={lineEntryItemId}
                         onChange={handleLineEntryItemChange}
+                        onMarkdownSelect={handleLineEntryMarkdownSelect}
+                        markdownSelectionState={(record) => {
+                          const issue = getMarkdownSelectionIssue(record.markdownCode);
+                          return issue ? { selectable: false, reason: issue } : { selectable: true };
+                        }}
                         items={documentLineItems}
                         placeholder={t("doc.page.searchItemPlaceholder")}
                         className="w-[240px]"
@@ -2303,6 +2431,7 @@ export function SalesOrderPage() {
                         type="number"
                         min={1}
                         value={lineEntryQty}
+                        disabled={Boolean(lineEntryMarkdownCode)}
                         onChange={(e) =>
                           setLineEntryQty(Number(e.target.value) || 1)
                         }

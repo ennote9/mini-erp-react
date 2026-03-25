@@ -9,6 +9,7 @@ export type ShipmentExportLineRow = {
   category: string;
   qty: number;
   uom: string;
+  markdownCode?: string;
 };
 
 export type ShipmentDocumentSummary = {
@@ -75,7 +76,8 @@ function applyLinesSheetColumnWidths(
   for (let c = 0; c < headers.length; c++) {
     const headerLen = headers[c].length;
     const valueLengths = lineRows.map((r) => {
-      const row = [r.no, r.itemCode, r.itemName, r.brand, r.category, r.qty, r.uom];
+      const itemCodeCell = r.markdownCode ? `${r.itemCode}\n${r.markdownCode}` : r.itemCode;
+      const row = [r.no, itemCodeCell, r.itemName, r.brand, r.category, r.qty, r.uom];
       return cellDisplayLength(row[c]);
     });
     const bounds = LINES_WIDTH_BOUNDS[c] ?? { min: DEFAULT_MIN_WIDTH, max: DEFAULT_MAX_WIDTH };
@@ -100,7 +102,10 @@ function addLinesSheetWithTable(
   }
 
   const columns = headers.map((name) => ({ name, filterButton: true }));
-  const rows = lineRows.map((r) => [r.no, r.itemCode, r.itemName, r.brand, r.category, r.qty, r.uom]);
+  const rows = lineRows.map((r) => {
+    const itemCodeCell = r.markdownCode ? `${r.itemCode}\n${r.markdownCode}` : r.itemCode;
+    return [r.no, itemCodeCell, r.itemName, r.brand, r.category, r.qty, r.uom];
+  });
 
   const tableName = sanitizeTableName(LINES_TABLE_NAME_BASE);
   sheet.addTable({

@@ -7,7 +7,6 @@ import React, {
   useRef,
   useState,
 } from "react";
-import { useNavigate } from "react-router-dom";
 import type { Item } from "../../items/model";
 import { itemRepository } from "../../items/repository";
 import { brandRepository } from "../../brands/repository";
@@ -127,7 +126,6 @@ export const PurchaseOrderItemAutocomplete = forwardRef<
   { id, value, onChange, items, placeholder, className, dropdownRightEdgeRef },
   ref,
 ) {
-  const navigate = useNavigate();
   const appRevision = useAppReadModelRevision();
   const [inputValue, setInputValue] = useState("");
   const [isOpen, setIsOpen] = useState(false);
@@ -322,8 +320,9 @@ export const PurchaseOrderItemAutocomplete = forwardRef<
     if (e.key === "Enter") {
       e.preventDefault();
       if (mdMatch && highlightedIndex === 0) {
-        navigate(`/markdown-journal/${mdMatch.id}`);
-        closeDropdown();
+        setBlockedMessage("Markdown units are visible but not selectable in this document.");
+        if (blockedTimerRef.current) clearTimeout(blockedTimerRef.current);
+        blockedTimerRef.current = setTimeout(() => setBlockedMessage(null), 1800);
         return;
       }
       const itemIdx = mdMatch ? highlightedIndex - 1 : highlightedIndex;
@@ -392,16 +391,15 @@ export const PurchaseOrderItemAutocomplete = forwardRef<
                     role="option"
                     aria-selected={highlightedIndex === 0}
                     className={cn(
-                      "px-2 py-1.5 text-sm cursor-pointer border-b border-border/50",
-                      highlightedIndex === 0
-                        ? "bg-accent text-accent-foreground"
-                        : "hover:bg-accent/60",
+                      "px-2 py-1.5 text-sm border-b border-border/50 cursor-not-allowed opacity-60",
+                      highlightedIndex === 0 ? "bg-muted/60 text-muted-foreground/90" : "text-muted-foreground/90",
                     )}
                     onMouseEnter={() => setHighlightedIndex(0)}
                     onMouseDown={(e) => {
                       e.preventDefault();
-                      navigate(`/markdown-journal/${mdMatch.id}`);
-                      closeDropdown();
+                      setBlockedMessage("Markdown units are visible but not selectable in this document.");
+                      if (blockedTimerRef.current) clearTimeout(blockedTimerRef.current);
+                      blockedTimerRef.current = setTimeout(() => setBlockedMessage(null), 1800);
                     }}
                   >
                     <div className="font-mono text-xs tabular-nums">{mdMatch.markdownCode}</div>

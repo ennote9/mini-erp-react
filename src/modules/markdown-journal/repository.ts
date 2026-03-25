@@ -96,6 +96,9 @@ function normalizeRecord(raw: unknown): MarkdownRecord | null {
       : undefined;
   return {
     id: r.id,
+    journalId: typeof r.journalId === "string" ? r.journalId : undefined,
+    journalNumber: typeof r.journalNumber === "string" ? r.journalNumber : undefined,
+    journalLineId: typeof r.journalLineId === "string" ? r.journalLineId : undefined,
     batchId: typeof r.batchId === "string" ? r.batchId : undefined,
     batchSequenceIndex,
     batchSequenceTotal,
@@ -107,7 +110,6 @@ function normalizeRecord(raw: unknown): MarkdownRecord | null {
     createdAt: r.createdAt,
     createdBy: r.createdBy,
     warehouseId: r.warehouseId,
-    locationId: typeof r.locationId === "string" ? r.locationId : undefined,
     originalBarcode: typeof r.originalBarcode === "string" ? r.originalBarcode : undefined,
     comment: typeof r.comment === "string" ? r.comment : undefined,
     basePriceAtMarkdown: typeof r.basePriceAtMarkdown === "number" ? r.basePriceAtMarkdown : undefined,

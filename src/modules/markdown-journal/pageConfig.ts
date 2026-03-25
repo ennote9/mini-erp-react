@@ -1,4 +1,4 @@
-import type { MarkdownReasonCode, MarkdownStatus } from "./model";
+import type { MarkdownJournalStatus, MarkdownReasonCode, MarkdownStatus } from "./model";
 
 export const MARKDOWN_REASONS: MarkdownReasonCode[] = [
   "DAMAGED_PACKAGING",
@@ -16,6 +16,12 @@ export const MARKDOWN_STATUS_FILTERS: Array<MarkdownStatus | "all"> = [
   "CANCELLED",
   "WRITTEN_OFF",
   "SUPERSEDED",
+];
+
+export const MARKDOWN_JOURNAL_STATUS_FILTERS: Array<MarkdownJournalStatus | "all"> = [
+  "all",
+  "draft",
+  "posted",
 ];
 
 function parseIsoDatePrefix(iso: string): string {

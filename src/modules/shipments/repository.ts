@@ -18,7 +18,7 @@ import {
 } from "../../shared/reasonCodes";
 
 export type CreateShipmentHeaderInput = Omit<Shipment, "id" | "number">;
-export type ShipmentLineInput = { itemId: string; qty: number };
+export type ShipmentLineInput = { itemId: string; qty: number; markdownCode?: string };
 export type UpdateShipmentPatch = Partial<Omit<Shipment, "id" | "number">>;
 
 const headerStore: Shipment[] = [];
@@ -87,6 +87,7 @@ function normalizeLine(raw: unknown): ShipmentLine | null {
     shipmentId: rec.shipmentId,
     itemId: rec.itemId,
     qty: rec.qty,
+    markdownCode: typeof rec.markdownCode === "string" ? rec.markdownCode : undefined,
   };
 }
 
@@ -240,6 +241,7 @@ export const shipmentRepository = {
         shipmentId: id,
         itemId: l.itemId,
         qty: l.qty,
+        markdownCode: l.markdownCode,
       });
     }
     schedulePersist();
@@ -268,6 +270,7 @@ export const shipmentRepository = {
         shipmentId: documentId,
         itemId: l.itemId,
         qty: l.qty,
+        markdownCode: l.markdownCode,
       };
       lineStore.push(line);
       newLines.push(line);

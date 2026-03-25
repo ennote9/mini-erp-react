@@ -2,7 +2,7 @@
  * Suppliers list — AG Grid migration. Uses shared AgGridContainer and defaultColDef.
  * Preserves search, All/Active/Inactive filters, New button, row navigation, empty state.
  */
-import React, { useMemo, useState, useRef, useCallback } from "react";
+import { useMemo, useState, useRef, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { AgGridReact } from "ag-grid-react";
 import type { ColDef, SelectionChangedEvent } from "ag-grid-community";
@@ -23,10 +23,6 @@ import { BackButton } from "../../../shared/ui/list/BackButton";
 import { ListPageSearch } from "../../../shared/ui/list/ListPageSearch";
 import { useListPageSearchHotkey } from "../../../shared/hotkeys";
 import { Button } from "@/components/ui/button";
-import {
-  ButtonGroup,
-  ButtonGroupSeparator,
-} from "@/components/ui/button-group";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { ChevronDown, FileSpreadsheet, File, FolderOpen, X } from "lucide-react";
 import { buildSuppliersListXlsxBuffer, type SuppliersExportRow } from "../suppliersListExport";
@@ -36,17 +32,6 @@ import { revealItemInDir } from "@tauri-apps/plugin-opener";
 import { useTranslation } from "@/shared/i18n/context";
 import { buildReadableUniqueFilename, ensureUniqueExportPath } from "@/shared/export/filenameBuilder";
 import { suppliersListExcelLabels } from "@/shared/i18n/excelListExportLabels";
-
-type ActiveFilter = "all" | "active" | "inactive";
-
-function applyActiveFilter(
-  list: Supplier[],
-  activeFilter: ActiveFilter,
-): Supplier[] {
-  if (activeFilter === "active") return list.filter((x) => x.isActive);
-  if (activeFilter === "inactive") return list.filter((x) => !x.isActive);
-  return list;
-}
 
 function buildExportRowsFromSuppliers(
   suppliers: Supplier[],
@@ -67,7 +52,6 @@ export function SuppliersListPage() {
   const { t, locale } = useTranslation();
   const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState("");
-  const [activeFilter, setActiveFilter] = useState<ActiveFilter>("all");
   const [exportSuccess, setExportSuccess] = useState<{ path: string; filename: string } | null>(null);
   const [exportOpen, setExportOpen] = useState(false);
   const [selectedCount, setSelectedCount] = useState(0);
@@ -80,12 +64,11 @@ export function SuppliersListPage() {
   }, []);
 
   const filteredRows = useMemo(() => {
-    const searched = supplierRepository.search(searchQuery);
-    return applyActiveFilter(searched, activeFilter);
-  }, [searchQuery, activeFilter]);
+    return supplierRepository.search(searchQuery);
+  }, [searchQuery]);
 
   const isEmpty = filteredRows.length === 0;
-  const hasFilter = activeFilter !== "all" || searchQuery.trim() !== "";
+  const hasFilter = searchQuery.trim() !== "";
 
   const getExportRowsCurrentView = useCallback((): SuppliersExportRow[] => {
     const api = gridRef.current?.api;
@@ -227,25 +210,6 @@ export function SuppliersListPage() {
       controls={
         <>
           <BackButton to="/" aria-label={t("doc.list.backToDashboard")} />
-          <ButtonGroup className="list-page__filter-group" aria-label={t("ops.list.filterStatusAria")}>
-            {(["all", "active", "inactive"] as const).map((value, index) => (
-              <React.Fragment key={value}>
-                {index > 0 && <ButtonGroupSeparator />}
-                <Button
-                  type="button"
-                  variant={activeFilter === value ? "default" : "outline"}
-                  size="sm"
-                  onClick={() => setActiveFilter(value)}
-                >
-                  {value === "all"
-                    ? t("doc.list.all")
-                    : value === "active"
-                      ? t("ops.master.activeCell.active")
-                      : t("ops.master.activeCell.inactive")}
-                </Button>
-              </React.Fragment>
-            ))}
-          </ButtonGroup>
           <ListPageSearch
             inputRef={listSearchInputRef}
             placeholder={t("ops.list.suppliers.searchPlaceholder")}

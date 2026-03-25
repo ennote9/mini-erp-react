@@ -6,6 +6,7 @@ import { stockReservationRepository } from "../stock-reservations/repository";
 import { warehouseRepository } from "../warehouses/repository";
 import { carrierRepository } from "../carriers/repository";
 import { itemRepository } from "../items/repository";
+import { markdownRepository } from "../markdown-journal/repository";
 import { stockMovementRepository } from "../stock-movements/repository";
 import { stockBalanceRepository } from "../stock-balances/repository";
 import { parseDocumentLineQty } from "../../shared/documentValidation";
@@ -141,6 +142,16 @@ export function validateShipmentFull(shipmentId: string): Issue[] {
     );
   } else {
     const itemIds = new Set<string>();
+    const markdownCodesInDocument = new Set<string>();
+    const markdownCodesInPostedShipments = new Set<string>();
+    for (const doc of shipmentRepository.list()) {
+      if (doc.id === shipmentId || doc.status !== "posted") continue;
+      for (const shippedLine of shipmentRepository.listLines(doc.id)) {
+        if (shippedLine.markdownCode) {
+          markdownCodesInPostedShipments.add(shippedLine.markdownCode.trim().toUpperCase());
+        }
+      }
+    }
     for (const line of lines) {
       const itemIdTrimmed = normalizeTrim(line.itemId);
       if (itemIdTrimmed === "") {
@@ -159,6 +170,13 @@ export function validateShipmentFull(shipmentId: string): Issue[] {
           }),
         );
       }
+      if (line.markdownCode && qty !== 1) {
+        issues.push(
+          actionIssue("Markdown unit quantity must be exactly 1.", {
+            key: "issues.shipment.markdownQtyMustBeOne",
+          }),
+        );
+      }
       const item = itemRepository.getById(itemIdTrimmed);
       if (!item) {
         issues.push(
@@ -173,14 +191,71 @@ export function validateShipmentFull(shipmentId: string): Issue[] {
           }),
         );
       }
-      if (itemIds.has(itemIdTrimmed)) {
+      if (itemIds.has(itemIdTrimmed) && !line.markdownCode) {
         issues.push(
           actionIssue("Duplicate items are not allowed in the same document.", {
             key: "issues.shipment.duplicateItems",
           }),
         );
       }
-      itemIds.add(itemIdTrimmed);
+      if (!line.markdownCode) {
+        itemIds.add(itemIdTrimmed);
+      }
+      if (line.markdownCode) {
+        const normalizedMdCode = line.markdownCode.trim().toUpperCase();
+        const markdownRecord = markdownRepository.getByCode(normalizedMdCode);
+        if (!markdownRecord) {
+          issues.push(
+            actionIssue("Selected markdown code is not found.", {
+              key: "issues.shipment.markdownCodeNotFound",
+              params: { code: normalizedMdCode },
+            }),
+          );
+          continue;
+        }
+        if (markdownRecord.status !== "ACTIVE") {
+          issues.push(
+            actionIssue("Selected markdown code is not available for shipment.", {
+              key: "issues.shipment.markdownUnavailable",
+              params: { code: normalizedMdCode, status: markdownRecord.status },
+            }),
+          );
+        }
+        if (markdownRecord.itemId !== itemIdTrimmed) {
+          issues.push(
+            actionIssue("Markdown code does not match selected item.", {
+              key: "issues.shipment.markdownItemMismatch",
+              params: { code: normalizedMdCode },
+            }),
+          );
+        }
+        if (normalizeTrim(markdownRecord.warehouseId) !== normalizeTrim(shipment.warehouseId)) {
+          issues.push(
+            actionIssue("Markdown code belongs to another warehouse.", {
+              key: "issues.shipment.markdownWarehouseMismatch",
+              params: { code: normalizedMdCode },
+            }),
+          );
+        }
+        if (markdownCodesInDocument.has(normalizedMdCode)) {
+          issues.push(
+            actionIssue("Duplicate markdown codes are not allowed in one shipment.", {
+              key: "issues.shipment.markdownDuplicateInDocument",
+              params: { code: normalizedMdCode },
+            }),
+          );
+        } else {
+          markdownCodesInDocument.add(normalizedMdCode);
+        }
+        if (markdownCodesInPostedShipments.has(normalizedMdCode)) {
+          issues.push(
+            actionIssue("Markdown code is already shipped in a posted shipment.", {
+              key: "issues.shipment.markdownAlreadyShipped",
+              params: { code: normalizedMdCode },
+            }),
+          );
+        }
+      }
     }
 
     if (shipment) {

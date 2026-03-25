@@ -36,5 +36,7 @@ export interface SalesOrderLine {
   itemId: string;
   qty: number;
   unitPrice: number;
+  /** Optional markdown unit code when this line targets a specific markdown unit. */
+  markdownCode?: string;
   zeroPriceReasonCode?: string;
 }

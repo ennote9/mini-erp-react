@@ -84,6 +84,7 @@ export function ShipmentCustomerDocumentPage() {
         itemName: item?.name ?? line.itemId,
         qty: line.qty,
         uom: item?.uom?.trim() ? item.uom : emDash,
+        markdownCode: line.markdownCode,
       };
     });
 
@@ -298,7 +299,12 @@ export function ShipmentCustomerDocumentPage() {
               ) : (
                 view.lines.map((row, idx) => (
                   <tr key={`${row.itemCode}-${idx}`} className="customer-doc__tr">
-                    <td className="customer-doc__td font-mono text-xs">{row.itemCode}</td>
+                    <td className="customer-doc__td font-mono text-xs">
+                      {row.itemCode}
+                      {row.markdownCode ? (
+                        <div className="text-[10px] text-muted-foreground font-mono mt-0.5">{row.markdownCode}</div>
+                      ) : null}
+                    </td>
                     <td className="customer-doc__td">{row.itemName}</td>
                     <td className="customer-doc__td customer-doc__td--numeric">{row.qty}</td>
                     <td className="customer-doc__td text-muted-foreground print:text-black/75">{row.uom}</td>
