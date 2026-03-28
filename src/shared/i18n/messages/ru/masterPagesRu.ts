@@ -57,10 +57,10 @@ export const ruMasterPages: MessageTree = {
       item: "Номенклатура",
       tester: "Тестер",
     },
-    baseItemSectionTitle: "Связанная базовая номенклатура (продаваемая)",
+    baseItemSectionTitle: "Связанная базовая номенклатура (товар)",
     openBaseItem: "Открыть базовую номенклатуру",
     kind: {
-      sellable: "Продаваемая",
+      sellable: "Товар",
       tester: "Тестер",
     },
     list: {
@@ -365,6 +365,7 @@ export const ruMasterPages: MessageTree = {
       MARKDOWN_ONLY: "Только уценка",
       DEFECT_ONLY: "Только брак",
     },
+    stylePolicyGoodsHint: "Допустимые стили запаса GOODS здесь: {{styles}}.",
     addressContactTitle: "Адрес и контакты",
     addressContactDescription: "Адрес, город, страна и контактные данные.",
     settingsTitle: "Настройки склада",

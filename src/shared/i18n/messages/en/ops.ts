@@ -112,6 +112,10 @@ export const opsEn = {
       incomingEmpty: "No expected receipts on confirmed purchase orders.",
       nonGoodStyleHint:
         "Reservations and planning demand stay on good stock only. This row shows stock held in the selected style bucket.",
+      markdownStyleHint:
+        "Markdown stock stays separate from good stock. In GOODS matrix v1 it remains storable, printable, and shippable through markdown-unit flow.",
+      defectStyleHint:
+        "Defect stock stays separate from good stock. In GOODS matrix v1 it may be stored, but normal shipment is blocked.",
       mismatchReserved:
         "Line detail ({{sum}}) differs from grid Reserved ({{grid}}). Check warehouse and item on each reservation.",
       mismatchOutgoing:
@@ -150,7 +154,7 @@ export const opsEn = {
         "No markdown record exists for {{code}}. Item search does not match markdown codes unless a unit exists.",
       filterKindAria: "Filter by item kind",
       kindAll: "All kinds",
-      kindSellable: "Sellable",
+      kindSellable: "Goods",
       kindTester: "Testers",
     },
     barcodeRegistry: {

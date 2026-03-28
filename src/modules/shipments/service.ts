@@ -27,6 +27,11 @@ import {
 } from "../../shared/planningFulfillment";
 import { reconcileSalesOrderReservations } from "../../shared/soReservationReconcile";
 import { DEFAULT_STOCK_STYLE, type StockStyle } from "@/shared/inventoryStyle";
+import {
+  goodsStyleAllowedInWarehousePolicy,
+  goodsStyleSupportsProcess,
+  itemUsesGoodsProcessMatrix,
+} from "@/shared/inventoryProcessMatrix";
 
 export type PostResult = { success: true } | { success: false; issues: Issue[] };
 export type CancelDocumentResult =
@@ -38,7 +43,9 @@ export type ReverseDocumentResult =
   | { success: false; error: string };
 
 function lineStockStyle(markdownCode: string | undefined): StockStyle {
-  return markdownCode ? "MARKDOWN" : DEFAULT_STOCK_STYLE;
+  if (!markdownCode) return DEFAULT_STOCK_STYLE;
+  const markdownRecord = markdownRepository.getByCode(markdownCode.trim().toUpperCase());
+  return markdownRecord?.style ?? "MARKDOWN";
 }
 
 /**
@@ -139,6 +146,8 @@ export function validateShipmentFull(shipmentId: string): Issue[] {
   }
 
   const lines = shipmentRepository.listLines(shipmentId);
+  const shipmentWarehouse =
+    warehouseIdTrimmed !== "" ? warehouseRepository.getById(warehouseIdTrimmed) : undefined;
   if (!lines || lines.length === 0) {
     issues.push(
       actionIssue("At least one line is required.", {
@@ -183,6 +192,7 @@ export function validateShipmentFull(shipmentId: string): Issue[] {
         );
       }
       const item = itemRepository.getById(itemIdTrimmed);
+      const lineStyle = lineStockStyle(line.markdownCode);
       if (!item) {
         issues.push(
           actionIssue("Each line must have an item.", {
@@ -194,6 +204,22 @@ export function validateShipmentFull(shipmentId: string): Issue[] {
           actionIssue("Selected item is inactive.", {
             key: "issues.shipment.itemInactive",
           }),
+        );
+      } else if (itemUsesGoodsProcessMatrix(item) && !goodsStyleSupportsProcess(lineStyle, "shipment")) {
+        issues.push(
+          actionIssue(
+            `Item ${item.code}: ${lineStyle} stock is not supported for normal shipment in GOODS matrix v1.`,
+          ),
+        );
+      } else if (
+        itemUsesGoodsProcessMatrix(item) &&
+        shipmentWarehouse &&
+        !goodsStyleAllowedInWarehousePolicy(lineStyle, shipmentWarehouse.stylePolicy)
+      ) {
+        issues.push(
+          actionIssue(
+            `Item ${item.code}: warehouse ${shipmentWarehouse.code} style policy does not allow ${lineStyle} stock for shipment.`,
+          ),
         );
       }
       if (itemIds.has(itemIdTrimmed) && !line.markdownCode) {

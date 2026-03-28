@@ -77,7 +77,7 @@ export function ItemPage() {
   const [activeTab, setActiveTab] = useState("main");
   const requestedKind = (searchParams.get("kind") ?? "").toUpperCase();
   const requestedBaseItemId = searchParams.get("baseItemId") ?? "";
-  const isValidCreateKind = requestedKind === "SELLABLE" || requestedKind === "TESTER";
+  const createKind: "SELLABLE" | "TESTER" = requestedKind === "TESTER" ? "TESTER" : "SELLABLE";
   const item = useMemo(
     () => (id && !isNew ? itemRepository.getById(id) : undefined),
     [id, isNew, imagesRevision, barcodesRevision],
@@ -131,7 +131,7 @@ export function ItemPage() {
 
   useEffect(() => {
     if (isNew) {
-      if (requestedKind === "TESTER" && requestedBaseItemId) {
+      if (createKind === "TESTER" && requestedBaseItemId) {
         const base = itemRepository.getById(requestedBaseItemId);
         if (base && base.itemKind === "SELLABLE") {
           const suggested = nextTesterCodeForBaseItem(base.id);
@@ -183,7 +183,7 @@ export function ItemPage() {
     item?.categoryId,
     item?.purchasePrice,
     item?.salePrice,
-    requestedKind,
+    createKind,
     requestedBaseItemId,
   ]);
 
@@ -198,7 +198,7 @@ export function ItemPage() {
     setActionIssues([]);
     void (async () => {
       const itemKindForSave: "SELLABLE" | "TESTER" = isNew
-        ? requestedKind === "TESTER"
+        ? createKind === "TESTER"
           ? "TESTER"
           : "SELLABLE"
         : item!.itemKind;
@@ -273,40 +273,6 @@ export function ItemPage() {
     );
   }
 
-  if (isNew && !isValidCreateKind) {
-    return (
-      <div className="doc-page">
-        <div className="doc-page__breadcrumb">
-          <BackButton to="/items" aria-label={t("master.item.backToListAria")} />
-          <Breadcrumb
-            items={[
-              { label: t("master.breadcrumb.masterData"), to: "/items" },
-              { label: t("master.item.listBreadcrumb"), to: "/items" },
-              { label: t("master.common.newLabel") },
-            ]}
-          />
-        </div>
-        <div className="doc-page__header">
-          <h2 className="doc-header__title">{t("master.item.createChoice.title")}</h2>
-          <p className="mt-2 max-w-md text-sm text-muted-foreground">{t("master.item.createChoice.subtitle")}</p>
-        </div>
-        <Card className="mt-4 max-w-md border-border/70">
-          <CardContent className="flex flex-col gap-2 p-4">
-            <Button type="button" onClick={() => navigate("/items/new?kind=SELLABLE")}>
-              {t("master.item.createChoice.item")}
-            </Button>
-            <Button type="button" variant="outline" onClick={() => navigate("/items/new?kind=TESTER")}>
-              {t("master.item.createChoice.tester")}
-            </Button>
-            <Button type="button" variant="ghost" className="text-muted-foreground" onClick={() => navigate("/items")}>
-              {t("common.cancel")}
-            </Button>
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
-
   if (!isNew && !item) {
     return (
       <div className="doc-page doc-page--not-found">
@@ -320,7 +286,7 @@ export function ItemPage() {
     { label: t("master.item.listBreadcrumb"), to: "/items" },
     {
       label: isNew
-        ? requestedKind === "TESTER"
+        ? createKind === "TESTER"
           ? t("master.item.breadcrumbNewTester")
           : t("master.item.breadcrumbNewSellable")
         : item!.code,
@@ -328,12 +294,12 @@ export function ItemPage() {
   ];
 
   const displayTitle = isNew
-    ? requestedKind === "TESTER"
+    ? createKind === "TESTER"
       ? t("master.item.titleNewTester")
       : t("master.item.titleNewSellable")
     : t("master.item.titleWithCode", { code: item!.code });
 
-  const showTestersTab = isNew ? requestedKind !== "TESTER" : item!.itemKind === "SELLABLE";
+  const showTestersTab = isNew ? createKind !== "TESTER" : item!.itemKind === "SELLABLE";
   const tabItems = [
     { value: "main", label: t("master.item.tabMain") },
     { value: "images", label: t("master.item.tabImages") },
@@ -347,7 +313,7 @@ export function ItemPage() {
 
   useEffect(() => {
     setActiveTab("main");
-  }, [id, requestedKind, requestedBaseItemId]);
+  }, [id, createKind, requestedBaseItemId]);
 
   useEffect(() => {
     if (!availableTabValues.includes(activeTab)) {
@@ -466,7 +432,7 @@ export function ItemPage() {
                       className="h-8 text-sm"
                     />
                   </div>
-                  {requestedKind === "TESTER" && (
+                  {createKind === "TESTER" && (
                     <div className="flex flex-col gap-0.5 sm:col-span-2">
                       <Label htmlFor="item-base" className="text-sm">
                         {t("master.item.baseItem")} <span className="text-destructive">{t("doc.page.requiredStar")}</span>
@@ -631,7 +597,7 @@ export function ItemPage() {
                       className="resize-none h-auto min-h-[4.5rem] text-sm"
                     />
                   </div>
-                  {((isNew && requestedKind === "TESTER") || (!isNew && item!.itemKind === "TESTER")) && (
+                  {((isNew && createKind === "TESTER") || (!isNew && item!.itemKind === "TESTER")) && (
                     <div className="sm:col-span-2 rounded-md border border-border/60 bg-muted/20 p-2 text-xs">
                       <div className="font-medium text-foreground/90">{t("master.item.baseItemSectionTitle")}</div>
                       {baseItemForTesterView ? (

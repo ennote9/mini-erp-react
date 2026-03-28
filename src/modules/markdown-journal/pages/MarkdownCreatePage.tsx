@@ -159,6 +159,88 @@ function escapeHtml(value: string): string {
     .replace(/'/g, "&#39;");
 }
 
+const CODE39_PATTERNS: Record<string, string> = {
+  "0": "nnnwwnwnn",
+  "1": "wnnwnnnnw",
+  "2": "nnwwnnnnw",
+  "3": "wnwwnnnnn",
+  "4": "nnnwwnnnw",
+  "5": "wnnwwnnnn",
+  "6": "nnwwwnnnn",
+  "7": "nnnwnnwnw",
+  "8": "wnnwnnwnn",
+  "9": "nnwwnnwnn",
+  A: "wnnnnwnnw",
+  B: "nnwnnwnnw",
+  C: "wnwnnwnnn",
+  D: "nnnnwwnnw",
+  E: "wnnnwwnnn",
+  F: "nnwnwwnnn",
+  G: "nnnnnwwnw",
+  H: "wnnnnwwnn",
+  I: "nnwnnwwnn",
+  J: "nnnnwwwnn",
+  K: "wnnnnnnww",
+  L: "nnwnnnnww",
+  M: "wnwnnnnwn",
+  N: "nnnnwnnww",
+  O: "wnnnwnnwn",
+  P: "nnwnwnnwn",
+  Q: "nnnnnnwww",
+  R: "wnnnnnwwn",
+  S: "nnwnnnwwn",
+  T: "nnnnwnwwn",
+  U: "wwnnnnnnw",
+  V: "nwwnnnnnw",
+  W: "wwwnnnnnn",
+  X: "nwnnwnnnw",
+  Y: "wwnnwnnnn",
+  Z: "nwwnwnnnn",
+  "-": "nwnnnnwnw",
+  ".": "wwnnnnwnn",
+  " ": "nwwnnnwnn",
+  $: "nwnwnwnnn",
+  "/": "nwnwnnnwn",
+  "+": "nwnnnwnwn",
+  "%": "nnnwnwnwn",
+  "*": "nwnnwnwnn",
+};
+
+function buildCode39BarcodeSvg(value: string): string {
+  const encoded = value.trim().toUpperCase();
+  if (!encoded) return "";
+  if ([...encoded].some((char) => !CODE39_PATTERNS[char] || char === "*")) {
+    return "";
+  }
+
+  const narrow = 2;
+  const wide = 6;
+  const interCharacterGap = 2;
+  const quietZone = 12;
+  const height = 56;
+  let x = quietZone;
+  const rects: string[] = [];
+  const fullValue = ["*", ...encoded.split(""), "*"];
+
+  for (const char of fullValue) {
+    const pattern = CODE39_PATTERNS[char];
+    for (let i = 0; i < pattern.length; i += 1) {
+      const width = pattern[i] === "w" ? wide : narrow;
+      if (i % 2 === 0) {
+        rects.push(`<rect x="${x}" y="0" width="${width}" height="${height}" fill="#111111" />`);
+      }
+      x += width;
+    }
+    x += interCharacterGap;
+  }
+
+  const width = x + quietZone - interCharacterGap;
+  return `<svg class="sticker__barcode-svg" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${width} ${height}" preserveAspectRatio="none" role="img" aria-label="${escapeHtml(`Barcode ${value}`)}" shape-rendering="crispEdges">
+    <rect width="${width}" height="${height}" fill="#ffffff" />
+    ${rects.join("")}
+  </svg>`;
+}
+
 function buildMarkdownPrintSheetHtml(params: {
   journalNumber: string;
   rows: MarkdownCodeRow[];
@@ -167,12 +249,13 @@ function buildMarkdownPrintSheetHtml(params: {
   const { journalNumber, rows, t } = params;
   const html = rows
     .map((row) => {
+      const barcodeSvg = buildCode39BarcodeSvg(row.markdownCode);
       return `
         <article class="sticker">
+          <div class="sticker__barcode">${barcodeSvg}</div>
           <div class="sticker__code">${escapeHtml(row.markdownCode)}</div>
           <div class="sticker__item">${escapeHtml(`${row.itemCode} — ${row.itemName}`)}</div>
           <div class="sticker__meta">${escapeHtml(`${t("markdown.fields.markdownPrice")}: ${row.markdownPrice.toFixed(2)}`)}</div>
-          <div class="sticker__meta">${escapeHtml(`${t("markdown.fields.journalNumber")}: ${journalNumber}`)}</div>
         </article>
       `;
     })
@@ -186,15 +269,65 @@ function buildMarkdownPrintSheetHtml(params: {
           body { font-family: Arial, sans-serif; margin: 16px; color: #111; }
           .sheet { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
           .sticker { border: 1px solid #111; padding: 12px; page-break-inside: avoid; }
-          .sticker__code { font-size: 20px; font-weight: 700; margin-bottom: 8px; }
+          .sticker__barcode { margin-bottom: 10px; }
+          .sticker__barcode-svg { display: block; width: 100%; height: 56px; }
+          .sticker__code { font-size: 20px; font-weight: 700; margin-bottom: 8px; letter-spacing: 0.04em; }
           .sticker__item { font-size: 14px; margin-bottom: 6px; }
           .sticker__meta { font-size: 12px; margin-bottom: 2px; }
         </style>
+        <script>
+          window.addEventListener("load", () => {
+            window.setTimeout(() => {
+              window.focus();
+              window.print();
+            }, 50);
+          });
+        </script>
       </head>
       <body>
         <div class="sheet">${html}</div>
       </body>
     </html>`;
+}
+
+function openMarkdownPrintPopupShell(title: string, loadingText: string): Window | null {
+  const popup = window.open("", "_blank", "width=960,height=720");
+  if (!popup) return null;
+  popup.document.write(`<!doctype html>
+    <html>
+      <head>
+        <title>${escapeHtml(title)}</title>
+        <style>
+          body {
+            font-family: Arial, sans-serif;
+            margin: 24px;
+            color: #111;
+          }
+          .print-loading {
+            border: 1px solid #d4d4d8;
+            border-radius: 8px;
+            padding: 16px;
+            max-width: 32rem;
+          }
+          .print-loading__title {
+            font-size: 16px;
+            font-weight: 600;
+            margin-bottom: 8px;
+          }
+          .print-loading__body {
+            font-size: 14px;
+          }
+        </style>
+      </head>
+      <body>
+        <section class="print-loading">
+          <div class="print-loading__title">${escapeHtml(title)}</div>
+          <div class="print-loading__body">${escapeHtml(loadingText)}</div>
+        </section>
+      </body>
+    </html>`);
+  popup.document.close();
+  return popup;
 }
 
 function journalStatusLabel(
@@ -584,11 +717,20 @@ export function MarkdownCreatePage() {
     (mode: PrintMode) => {
       if (!id || !journal) return;
       setCreateError(null);
+      const popup = openMarkdownPrintPopupShell(
+        t("markdown.journal.printDialogTitle"),
+        t("markdown.journal.printPopupPreparing"),
+      );
+      if (!popup) {
+        setCreateError("Could not open print window.");
+        return;
+      }
       const printResult = resolveMarkdownJournalPrintRecords(
         id,
         mode === "selected" ? { recordIds: selectedCodeIds } : undefined,
       );
       if (!printResult.success) {
+        popup.close();
         setCreateError(printResult.error);
         return;
       }
@@ -611,12 +753,7 @@ export function MarkdownCreatePage() {
         } satisfies MarkdownCodeRow;
       });
 
-      const popup = window.open("", "_blank", "noopener,noreferrer,width=960,height=720");
-      if (!popup) {
-        setCreateError("Could not open print window.");
-        return;
-      }
-
+      popup.document.open();
       popup.document.write(
         buildMarkdownPrintSheetHtml({
           journalNumber: printResult.journal.number,
@@ -630,6 +767,7 @@ export function MarkdownCreatePage() {
 
       const auditResult = recordMarkdownPrintAudit(printResult.records.map((record) => record.id));
       if (!auditResult.success) {
+        popup.close();
         setCreateError(auditResult.error);
         return;
       }

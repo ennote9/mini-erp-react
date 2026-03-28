@@ -19,6 +19,10 @@ import { appendAuditEvent } from "../../shared/audit/eventLogRepository";
 import { AUDIT_ACTOR_LOCAL_USER } from "../../shared/audit/eventLogTypes";
 import { DEFAULT_STOCK_STYLE } from "@/shared/inventoryStyle";
 import {
+  goodsStyleAllowedInWarehousePolicy,
+  itemUsesGoodsProcessMatrix,
+} from "@/shared/inventoryProcessMatrix";
+import {
   aggregateReceivedQtyByItemForPurchaseOrder,
   computePurchaseOrderFulfillment,
   getPurchaseOrderOrderedQtyByItemId,
@@ -104,6 +108,8 @@ export function validateReceiptFull(receiptId: string): Issue[] {
   }
 
   const lines = receiptRepository.listLines(receiptId);
+  const warehouse =
+    warehouseIdTrimmed !== "" ? warehouseRepository.getById(warehouseIdTrimmed) : undefined;
   if (!lines || lines.length === 0) {
     issues.push(
       actionIssue("At least one line is required.", {
@@ -142,6 +148,16 @@ export function validateReceiptFull(receiptId: string): Issue[] {
           actionIssue("Selected item is inactive.", {
             key: "issues.receipt.itemInactive",
           }),
+        );
+      } else if (
+        warehouse &&
+        itemUsesGoodsProcessMatrix(item) &&
+        !goodsStyleAllowedInWarehousePolicy(DEFAULT_STOCK_STYLE, warehouse.stylePolicy)
+      ) {
+        issues.push(
+          actionIssue(
+            `Item ${item.code}: warehouse ${warehouse.code} style policy does not allow receiving GOODS as GOOD stock.`,
+          ),
         );
       }
       if (itemIds.has(itemIdTrimmed)) {

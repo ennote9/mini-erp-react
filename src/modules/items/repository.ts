@@ -75,6 +75,18 @@ function nextIdStr(): string {
   return String(nextId++);
 }
 
+function buildCreatedItem(input: CreateItemInput): Item {
+  const normalizedBarcodes = normalizeItemBarcodesCollection(input.barcodes ?? []);
+  return {
+    ...input,
+    id: nextIdStr(),
+    images: input.images ?? [],
+    barcodes: normalizedBarcodes,
+    barcode: bridgeLegacyBarcodeValueFromCollection(normalizedBarcodes),
+    itemKind: input.itemKind ?? "SELLABLE",
+  };
+}
+
 async function bootstrapFromDisk(): Promise<void> {
   const { items, nextId: loadedNext } = await loadItemsPersisted(buildSeedItems);
   store.splice(0, store.length, ...items);
@@ -100,18 +112,28 @@ export const itemRepository = {
   },
 
   create(input: CreateItemInput): Item {
-    const normalizedBarcodes = normalizeItemBarcodesCollection(input.barcodes ?? []);
-    const item: Item = {
-      ...input,
-      id: nextIdStr(),
-      images: input.images ?? [],
-      barcodes: normalizedBarcodes,
-      barcode: bridgeLegacyBarcodeValueFromCollection(normalizedBarcodes),
-      itemKind: input.itemKind ?? "SELLABLE",
-    };
+    const item = buildCreatedItem(input);
     store.push(item);
     schedulePersist();
     return item;
+  },
+
+  createTesterWithBaseSequence(
+    input: CreateItemInput,
+    baseItemId: string,
+    nextTesterCodeNextSeq: number,
+  ): Item | undefined {
+    const baseIndex = store.findIndex((x) => x.id === baseItemId);
+    if (baseIndex === -1) return undefined;
+    const base = store[baseIndex];
+    const created = buildCreatedItem(input);
+    store.push(created);
+    store[baseIndex] = {
+      ...base,
+      testerCodeNextSeq: nextTesterCodeNextSeq,
+    };
+    schedulePersist();
+    return created;
   },
 
   update(id: string, patch: UpdateItemPatch): Item | undefined {

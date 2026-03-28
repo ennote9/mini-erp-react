@@ -78,6 +78,12 @@ export function StockBalanceDetailContent({ row }: Props) {
 
   const coverageLabel = (s: StockBalanceCoverageStatus) => t(`ops.stock.coverage.${s}`);
   const isOperationalStyle = row.style === "GOOD";
+  const nonOperationalStyleHint =
+    row.style === "MARKDOWN"
+      ? t("ops.stock.drilldown.markdownStyleHint")
+      : row.style === "DEFECT"
+        ? t("ops.stock.drilldown.defectStyleHint")
+        : t("ops.stock.drilldown.nonGoodStyleHint");
 
   const reservations = useMemo(
     () =>
@@ -142,7 +148,7 @@ export function StockBalanceDetailContent({ row }: Props) {
           </div>
           {!isOperationalStyle ? (
             <p className="mt-2 text-[0.6875rem] leading-snug text-muted-foreground">
-              {t("ops.stock.drilldown.nonGoodStyleHint")}
+              {nonOperationalStyleHint}
             </p>
           ) : null}
         </CardContent>

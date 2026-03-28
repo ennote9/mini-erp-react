@@ -12,8 +12,13 @@ import type {
 } from "./model";
 import {
   DEFAULT_STOCK_STYLE,
-  warehouseStylePolicyAllowsStyle,
 } from "@/shared/inventoryStyle";
+import {
+  goodsStyleAllowedInWarehousePolicy,
+  goodsStyleSupportsProcess,
+  itemUsesGoodsProcessMatrix,
+  resolveItemAccountingProfileCode,
+} from "@/shared/inventoryProcessMatrix";
 import {
   assertMarkdownTransitionAllowed,
   isFinalMarkdownStatus,
@@ -60,6 +65,12 @@ function validateJournalLine(
   if (!item) return { success: false, error: "Item not found." };
   if (item.itemKind === "TESTER") {
     return { success: false, error: "Markdown journal expects sellable items only." };
+  }
+  if (!itemUsesGoodsProcessMatrix(item)) {
+    return {
+      success: false,
+      error: `Markdown journal supports GOODS profile items only (item ${item.code} profile: ${resolveItemAccountingProfileCode(item)}).`,
+    };
   }
   if (!item.isActive) {
     return { success: false, error: "Inactive items cannot be added." };
@@ -238,13 +249,19 @@ export function postMarkdownJournal(
   if (!targetWarehouse) {
     return { success: false, error: "Target warehouse not found." };
   }
-  if (!warehouseStylePolicyAllowsStyle(sourceWarehouse.stylePolicy, DEFAULT_STOCK_STYLE)) {
+  if (
+    !goodsStyleSupportsProcess(DEFAULT_STOCK_STYLE, "markdownTransition") ||
+    !goodsStyleAllowedInWarehousePolicy(DEFAULT_STOCK_STYLE, sourceWarehouse.stylePolicy)
+  ) {
     return {
       success: false,
       error: `Warehouse ${sourceWarehouse.code}: source warehouse style policy does not allow GOOD stock for markdown posting.`,
     };
   }
-  if (!warehouseStylePolicyAllowsStyle(targetWarehouse.stylePolicy, "MARKDOWN")) {
+  if (
+    !goodsStyleSupportsProcess("MARKDOWN", "storage") ||
+    !goodsStyleAllowedInWarehousePolicy("MARKDOWN", targetWarehouse.stylePolicy)
+  ) {
     return {
       success: false,
       error: `Warehouse ${targetWarehouse.code}: target warehouse style policy does not allow MARKDOWN stock.`,
@@ -279,6 +296,12 @@ export function postMarkdownJournal(
     const item = itemRepository.getById(line.itemId);
     if (!item) return { success: false, error: "Item not found." };
     if (item.itemKind === "TESTER") return { success: false, error: "Markdown journal expects sellable items only." };
+    if (!itemUsesGoodsProcessMatrix(item)) {
+      return {
+        success: false,
+        error: `Item ${item.code}: markdown transition is supported only for GOODS profile stock.`,
+      };
+    }
     const batchId = newBatchId();
     for (let index = 0; index < line.quantity; index++) {
       records.push(

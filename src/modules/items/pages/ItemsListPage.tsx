@@ -108,7 +108,6 @@ export function ItemsListPage() {
   const [exportSuccess, setExportSuccess] = useState<{ path: string; filename: string } | null>(null);
   const [exportOpen, setExportOpen] = useState(false);
   const [selectedCount, setSelectedCount] = useState(0);
-  const [showCreateChoice, setShowCreateChoice] = useState(false);
   const gridRef = useRef<AgGridReact<Item> | null>(null);
   const listSearchInputRef = useRef<HTMLInputElement>(null);
   useListPageSearchHotkey(listSearchInputRef);
@@ -502,35 +501,10 @@ export function ItemsListPage() {
             variant="default"
             size="sm"
             className="list-page__create-btn rounded-md bg-white text-black hover:bg-gray-200"
-            onClick={() => setShowCreateChoice((v) => !v)}
+            onClick={() => navigate("/items/new")}
           >
             <svg className="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M12 5v14" /><path d="M5 12h14" /></svg> {t("doc.list.create")}
           </Button>
-          {showCreateChoice ? (
-            <div className="rounded-md border border-input bg-background p-1 text-xs shadow-sm">
-              <div className="mb-1 px-1.5 text-muted-foreground">{t("master.item.createChoice.title")}</div>
-              <div className="flex gap-1">
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  className="h-7 px-2 text-xs"
-                  onClick={() => navigate("/items/new?kind=SELLABLE")}
-                >
-                  {t("master.item.createChoice.item")}
-                </Button>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  className="h-7 px-2 text-xs"
-                  onClick={() => navigate("/items/new?kind=TESTER")}
-                >
-                  {t("master.item.createChoice.tester")}
-                </Button>
-              </div>
-            </div>
-          ) : null}
         </>
       }
     >

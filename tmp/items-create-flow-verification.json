@@ -1,0 +1,236 @@
+{
+  "listCreateButtonCount": 1,
+  "listTesterButtonCount": 0,
+  "listCreateChooserVisible": 0,
+  "newItemUrl": "http://127.0.0.1:1420/items/new",
+  "newItemTopBar": "Items",
+  "newItemHeader": "New catalog item",
+  "newItemCreateChooserVisible": 0,
+  "newItemTesterButtonCount": 0,
+  "baseItemListRows": [
+    {
+      "code": "ITEM-001",
+      "kind": "Goods"
+    },
+    {
+      "code": "ITEM-002",
+      "kind": "Goods"
+    },
+    {
+      "code": "ITEM-003",
+      "kind": "Goods"
+    },
+    {
+      "code": "ITEM-004",
+      "kind": "Goods"
+    },
+    {
+      "code": "ITEM-005",
+      "kind": "Goods"
+    },
+    {
+      "code": "ITEM-006",
+      "kind": "Goods"
+    },
+    {
+      "code": "ITEM-007",
+      "kind": "Goods"
+    },
+    {
+      "code": "ITEM-008",
+      "kind": "Goods"
+    },
+    {
+      "code": "ITEM-009",
+      "kind": "Goods"
+    },
+    {
+      "code": "ITEM-010",
+      "kind": "Goods"
+    },
+    {
+      "code": "ITEM-011",
+      "kind": "Goods"
+    },
+    {
+      "code": "ITEM-012",
+      "kind": "Goods"
+    },
+    {
+      "code": "ITEM-013",
+      "kind": "Goods"
+    },
+    {
+      "code": "ITEM-014",
+      "kind": "Goods"
+    },
+    {
+      "code": "ITEM-015",
+      "kind": "Goods"
+    },
+    {
+      "code": "ITEM-016",
+      "kind": "Goods"
+    },
+    {
+      "code": "ITEM-017",
+      "kind": "Goods"
+    },
+    {
+      "code": "ITEM-018",
+      "kind": "Goods"
+    },
+    {
+      "code": "ITEM-019",
+      "kind": "Goods"
+    },
+    {
+      "code": "ITEM-020",
+      "kind": "Goods"
+    },
+    {
+      "code": "ITEM-021",
+      "kind": "Goods"
+    },
+    {
+      "code": "ITEM-022",
+      "kind": "Goods"
+    },
+    {
+      "code": "ITEM-023",
+      "kind": "Goods"
+    },
+    {
+      "code": "ITEM-024",
+      "kind": "Goods"
+    },
+    {
+      "code": "ITEM-025",
+      "kind": "Goods"
+    }
+  ],
+  "itemCardCreateTesterVisible": 1,
+  "testerCreateInitialUrl": "http://127.0.0.1:1420/items/new?kind=TESTER&baseItemId=1",
+  "testerCreateInitialHeader": "Catalog item ITEM-001",
+  "baseItemSectionVisible": 0,
+  "prefilledTesterCode": "ITEM-001T01",
+  "testerSaveUrlAfterClick": "http://127.0.0.1:1420/items",
+  "testerSaveAlertText": null,
+  "testerSaveIssueStripText": null,
+  "testerSaveHeaderAfterClick": null,
+  "testerSaveTopBarAfterClick": "Items",
+  "createdTesterRows": [
+    {
+      "code": "ITEM-001T01",
+      "kind": "Tester"
+    }
+  ],
+  "createdTesterDetailUrl": "http://127.0.0.1:1420/items/26",
+  "createdTesterDetailHeader": null,
+  "createdTesterBaseItemSectionTitle": [
+    "Active"
+  ],
+  "createdTesterOpenBaseItemVisible": 0,
+  "baseItemListRowsRu": [
+    {
+      "code": "ITEM-001",
+      "kind": "Goods"
+    },
+    {
+      "code": "ITEM-002",
+      "kind": "Goods"
+    },
+    {
+      "code": "ITEM-003",
+      "kind": "Goods"
+    },
+    {
+      "code": "ITEM-004",
+      "kind": "Goods"
+    },
+    {
+      "code": "ITEM-005",
+      "kind": "Goods"
+    },
+    {
+      "code": "ITEM-006",
+      "kind": "Goods"
+    },
+    {
+      "code": "ITEM-007",
+      "kind": "Goods"
+    },
+    {
+      "code": "ITEM-008",
+      "kind": "Goods"
+    },
+    {
+      "code": "ITEM-009",
+      "kind": "Goods"
+    },
+    {
+      "code": "ITEM-010",
+      "kind": "Goods"
+    },
+    {
+      "code": "ITEM-011",
+      "kind": "Goods"
+    },
+    {
+      "code": "ITEM-012",
+      "kind": "Goods"
+    },
+    {
+      "code": "ITEM-013",
+      "kind": "Goods"
+    },
+    {
+      "code": "ITEM-014",
+      "kind": "Goods"
+    },
+    {
+      "code": "ITEM-015",
+      "kind": "Goods"
+    },
+    {
+      "code": "ITEM-016",
+      "kind": "Goods"
+    },
+    {
+      "code": "ITEM-017",
+      "kind": "Goods"
+    },
+    {
+      "code": "ITEM-018",
+      "kind": "Goods"
+    },
+    {
+      "code": "ITEM-019",
+      "kind": "Goods"
+    },
+    {
+      "code": "ITEM-020",
+      "kind": "Goods"
+    },
+    {
+      "code": "ITEM-021",
+      "kind": "Goods"
+    },
+    {
+      "code": "ITEM-022",
+      "kind": "Goods"
+    },
+    {
+      "code": "ITEM-023",
+      "kind": "Goods"
+    },
+    {
+      "code": "ITEM-024",
+      "kind": "Goods"
+    },
+    {
+      "code": "ITEM-025",
+      "kind": "Goods"
+    }
+  ]
+}

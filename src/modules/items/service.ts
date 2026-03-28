@@ -86,7 +86,7 @@ function validateSaveItem(data: SaveItemInput, existingId?: string): string | nu
     if (!baseItemId) return "Tester requires a base item.";
     const baseItem = itemRepository.getById(baseItemId);
     if (!baseItem) return "Base item not found.";
-    if (baseItem.itemKind !== "SELLABLE") return "Tester base item must be a sellable item.";
+    if (baseItem.itemKind !== "SELLABLE") return "Tester base item must be a goods item.";
   } else if (baseItemId !== "") {
     return "Base item is allowed only for tester items.";
   }
@@ -134,10 +134,17 @@ export function saveItem(
   }
   const baseBeforeTester =
     patch.itemKind === "TESTER" && patch.baseItemId ? itemRepository.getById(patch.baseItemId) : undefined;
-  const created = itemRepository.create(patch);
   if (patch.itemKind === "TESTER" && patch.baseItemId && baseBeforeTester) {
-    bumpBaseItemTesterSequenceAfterCreate(patch.baseItemId, created.code, baseBeforeTester);
+    const nextSeq = nextBaseItemTesterSequenceAfterCreate(patch.code, baseBeforeTester);
+    const created = itemRepository.createTesterWithBaseSequence(
+      patch,
+      patch.baseItemId,
+      nextSeq,
+    );
+    if (!created) return { success: false, error: "Base item not found." };
+    return { success: true, id: created.id };
   }
+  const created = itemRepository.create(patch);
   return { success: true, id: created.id };
 }
 
@@ -243,12 +250,10 @@ export function computeNextTesterSuffixNumber(base: { id: string; code: string; 
   return Math.max(c, minFromExisting);
 }
 
-function bumpBaseItemTesterSequenceAfterCreate(baseItemId: string, createdCode: string, baseBefore: Item): void {
-  if (baseBefore.itemKind !== "SELLABLE") return;
+function nextBaseItemTesterSequenceAfterCreate(createdCode: string, baseBefore: Item): number {
   const alloc = computeNextTesterSuffixNumber(baseBefore);
   const used = parseTesterSuffixFromCodes(createdCode, baseBefore.code) ?? alloc;
-  const nextSeq = Math.max(alloc, used) + 1;
-  itemRepository.update(baseItemId, { testerCodeNextSeq: nextSeq });
+  return Math.max(alloc, used) + 1;
 }
 
 /** Suggested unique tester code for a sellable base item (`BASET01`, `BASET02`, …). */

@@ -36,6 +36,7 @@ import {
   WAREHOUSE_STYLE_POLICY_VALUES,
   type WarehouseStylePolicy,
 } from "@/shared/inventoryStyle";
+import { listAllowedGoodsStylesForWarehousePolicy } from "@/shared/inventoryProcessMatrix";
 
 type FormState = {
   code: string;
@@ -100,6 +101,13 @@ export function WarehousePage() {
   const combinedIssues = useMemo(
     () => combineIssues(health.issues, actionIssues),
     [health.issues, actionIssues],
+  );
+  const allowedGoodsStyleLabels = useMemo(
+    () =>
+      listAllowedGoodsStylesForWarehousePolicy(form.stylePolicy)
+        .map((style) => t(`ops.stock.styles.${style}`))
+        .join(", "),
+    [form.stylePolicy, t],
   );
 
   useEffect(() => {
@@ -493,6 +501,11 @@ export function WarehousePage() {
                       aria-label={t("master.warehouse.stylePolicy")}
                       className="w-full"
                     />
+                    <p className="text-xs text-muted-foreground">
+                      {t("master.warehouse.stylePolicyGoodsHint", {
+                        styles: allowedGoodsStyleLabels,
+                      })}
+                    </p>
                   </div>
                 </div>
               </div>

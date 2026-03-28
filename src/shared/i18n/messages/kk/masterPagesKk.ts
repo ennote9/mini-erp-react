@@ -58,10 +58,10 @@ export const kkMasterPages: MessageTree = {
       item: "Номенклатура",
       tester: "Тестер",
     },
-    baseItemSectionTitle: "Байланысты негізгі тауар (сатылатын)",
+    baseItemSectionTitle: "Байланысты негізгі тауар (тауар)",
     openBaseItem: "Негізгі тауарды ашу",
     kind: {
-      sellable: "Сатылатын",
+      sellable: "Тауар",
       tester: "Тестер",
     },
     list: {
@@ -363,6 +363,7 @@ export const kkMasterPages: MessageTree = {
       MARKDOWN_ONLY: "Тек уценка",
       DEFECT_ONLY: "Тек брак",
     },
+    stylePolicyGoodsHint: "Бұл жерде GOODS қоры үшін рұқсат етілген стильдер: {{styles}}.",
     addressContactTitle: "Мекенжай және байланыс",
     addressContactDescription: "Мекенжай, қала, ел және байланыс.",
     settingsTitle: "Қойма баптаулары",

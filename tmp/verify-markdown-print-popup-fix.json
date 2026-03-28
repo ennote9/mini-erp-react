@@ -1,0 +1,115 @@
+{
+  "receiptUrl": "http://127.0.0.1:1420/receipts/1",
+  "receiptPostError": null,
+  "draftJournalUrl": "http://127.0.0.1:1420/markdown-journal/journals/1",
+  "draftPrintButtonCount": 0,
+  "cancelledPrintButtonCount": 0,
+  "postedJournalUrl": "http://127.0.0.1:1420/markdown-journal/journals/2",
+  "postError": null,
+  "postedPrintButtonCount": 1,
+  "codeRowsBeforePrint": [
+    {
+      "markdownCode": "MD00000002",
+      "quantity": "1"
+    },
+    {
+      "markdownCode": "MD00000003",
+      "quantity": "1"
+    },
+    {
+      "markdownCode": "MD00000001",
+      "quantity": "1"
+    }
+  ],
+  "auditBeforePrint": [
+    {
+      "printCount": "0",
+      "printedAt": "—"
+    },
+    {
+      "printCount": "0",
+      "printedAt": "—"
+    },
+    {
+      "printCount": "0",
+      "printedAt": "—"
+    }
+  ],
+  "stockRowsBeforePrint": [
+    {
+      "warehouseName": "Main Warehouse",
+      "style": "Good",
+      "qtyOnHand": "7"
+    },
+    {
+      "warehouseName": "Main Warehouse",
+      "style": "Markdown",
+      "qtyOnHand": "3"
+    }
+  ],
+  "errorBeforePrintAll": 0,
+  "printDialogAllSummary": "Print all generated labels: 3",
+  "printDialogSelectedSummary": "Print selected labels: 1",
+  "printAllPopupTitle": "MJ00000002",
+  "printAllPopupBody": "MD00000001\n          ITEM-001 — Widget A\n          Markdown price: 1.00\n        \n      \n        \n          \n    \n    \n  \n          MD00000002\n          ITEM-001 — Widget A\n          Markdown price: 1.00\n        \n      \n        \n          \n    \n    \n  \n          MD00000003\n          ITEM-001 — Widget A\n          Markdown price: 1.00",
+  "printAllPopupHasSticker": true,
+  "printAllPopupBarcodeCount": 3,
+  "printAllPopupHasJournalLabel": false,
+  "printAllPopupVisibleCodes": [
+    "MD00000001",
+    "MD00000002",
+    "MD00000003"
+  ],
+  "printAllPopupPrintCalls": 2,
+  "errorAfterPrintAll": null,
+  "auditAfterPrintAll": [
+    {
+      "printCount": "1",
+      "printedAt": "2026-03-28T18:31:17.502Z"
+    },
+    {
+      "printCount": "1",
+      "printedAt": "2026-03-28T18:31:17.502Z"
+    },
+    {
+      "printCount": "1",
+      "printedAt": "2026-03-28T18:31:17.502Z"
+    }
+  ],
+  "printSelectedPopupTitle": "MJ00000002",
+  "printSelectedPopupBody": "MD00000002\n          ITEM-001 — Widget A\n          Markdown price: 1.00",
+  "printSelectedPopupStickerCount": 1,
+  "printSelectedPopupBarcodeCount": 1,
+  "printSelectedPopupHasJournalLabel": false,
+  "printSelectedPopupVisibleCodes": [
+    "MD00000002"
+  ],
+  "printSelectedPopupPrintCalls": 2,
+  "errorAfterPrintSelected": null,
+  "auditAfterPrintSelected": [
+    {
+      "printCount": "2",
+      "printedAt": "2026-03-28T18:31:19.690Z"
+    },
+    {
+      "printCount": "1",
+      "printedAt": "2026-03-28T18:31:17.502Z"
+    },
+    {
+      "printCount": "1",
+      "printedAt": "2026-03-28T18:31:17.502Z"
+    }
+  ],
+  "stockRowsAfterPrint": [
+    {
+      "warehouseName": "Main Warehouse",
+      "style": "Good",
+      "qtyOnHand": "7"
+    },
+    {
+      "warehouseName": "Main Warehouse",
+      "style": "Markdown",
+      "qtyOnHand": "3"
+    }
+  ]
+}

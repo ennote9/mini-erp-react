@@ -186,6 +186,7 @@ export const ruMessages: MessageTree = {
       cancelledClosedHint: "Отменённый журнал закрыт. Проведение, печать и редактирование недоступны.",
       printDialogTitle: "Печать этикеток уценки",
       printDialogDescription: "Выберите, печатать все сгенерированные этикетки журнала или только выбранные коды.",
+      printPopupPreparing: "Подготовка этикеток…",
       printAllSummary: "Печать всех сгенерированных этикеток: {{count}}",
       printSelectedSummary: "Печать выбранных этикеток: {{count}}",
       notFound: "Журнал уценки не найден.",

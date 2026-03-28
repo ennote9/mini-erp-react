@@ -32,6 +32,8 @@ const BD = BaseDirectory.AppLocalData;
 const ITEMS_DIR = "items";
 export const ITEMS_JSON_RELATIVE = "items/items.json";
 const ITEMS_JSON_TMP = "items/items.json.tmp";
+const ITEMS_LS_KEY = "mini-erp-items-v1";
+const ITEMS_LS_PROBE_KEY = "__mini_erp_items_ls_probe__";
 
 export const ITEMS_PERSIST_VERSION = 1 as const;
 
@@ -195,6 +197,37 @@ function parseItemsFileContent(text: string): ParseResult {
   return { ok: true, items };
 }
 
+function probeLocalStorageWritable(): boolean {
+  try {
+    localStorage.setItem(ITEMS_LS_PROBE_KEY, "1");
+    localStorage.removeItem(ITEMS_LS_PROBE_KEY);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function loadItemsFromLocalStorage(): Item[] | null {
+  try {
+    const text = localStorage.getItem(ITEMS_LS_KEY);
+    if (!text) return null;
+    const parsed = parseItemsFileContent(text);
+    return parsed.ok ? parsed.items : null;
+  } catch {
+    return null;
+  }
+}
+
+function saveItemsToLocalStorage(items: Item[]): boolean {
+  try {
+    const payload: ItemsPersistedPayload = { version: ITEMS_PERSIST_VERSION, items };
+    localStorage.setItem(ITEMS_LS_KEY, JSON.stringify(payload));
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 async function archiveCorruptMainFile(): Promise<void> {
   const corruptName = `${ITEMS_DIR}/items.corrupt.${Date.now()}.json`;
   await rename(ITEMS_JSON_RELATIVE, corruptName, { oldPathBaseDir: BD, newPathBaseDir: BD });
@@ -213,13 +246,26 @@ export async function writeItemsPayload(items: Item[]): Promise<void> {
   const payload: ItemsPersistedPayload = { version: ITEMS_PERSIST_VERSION, items };
   const json = JSON.stringify(payload, null, 2);
   const bytes = new TextEncoder().encode(json);
-  await mkdir(ITEMS_DIR, { recursive: true, baseDir: BD });
-  await writeFile(ITEMS_JSON_TMP, bytes, { baseDir: BD });
-  const mainExists = await exists(ITEMS_JSON_RELATIVE, { baseDir: BD });
-  if (mainExists) {
-    await remove(ITEMS_JSON_RELATIVE, { baseDir: BD });
+  try {
+    await mkdir(ITEMS_DIR, { recursive: true, baseDir: BD });
+    await writeFile(ITEMS_JSON_TMP, bytes, { baseDir: BD });
+    const mainExists = await exists(ITEMS_JSON_RELATIVE, { baseDir: BD });
+    if (mainExists) {
+      await remove(ITEMS_JSON_RELATIVE, { baseDir: BD });
+    }
+    await rename(ITEMS_JSON_TMP, ITEMS_JSON_RELATIVE, { oldPathBaseDir: BD, newPathBaseDir: BD });
+    saveItemsToLocalStorage(items);
+    return;
+  } catch (e) {
+    if (saveItemsToLocalStorage(items)) {
+      if (import.meta.env.DEV) {
+        const msg = e instanceof Error ? e.message : String(e);
+        console.warn("[itemsPersistence] File write failed; using localStorage fallback.", msg);
+      }
+      return;
+    }
+    throw e;
   }
-  await rename(ITEMS_JSON_TMP, ITEMS_JSON_RELATIVE, { oldPathBaseDir: BD, newPathBaseDir: BD });
 }
 
 export type ItemsLoadResult = {
@@ -233,10 +279,15 @@ export type ItemsLoadResult = {
  */
 export async function loadItemsPersisted(buildSeedItems: () => Item[]): Promise<ItemsLoadResult> {
   setDiagnostics(null);
+  const lsReadable = probeLocalStorageWritable();
   try {
     await mkdir(ITEMS_DIR, { recursive: true, baseDir: BD });
     const fileExists = await exists(ITEMS_JSON_RELATIVE, { baseDir: BD });
     if (!fileExists) {
+      const fromLs = loadItemsFromLocalStorage();
+      if (fromLs) {
+        return { items: fromLs, nextId: computeNextNumericId(fromLs) };
+      }
       const seed = buildSeedItems();
       try {
         await writeItemsPayload(seed);
@@ -275,7 +326,16 @@ export async function loadItemsPersisted(buildSeedItems: () => Item[]): Promise<
     return { items: parsed.items, nextId: computeNextNumericId(parsed.items) };
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
-    setDiagnostics(`Items load failed (in-memory seed only): ${msg}`);
+    const fromLs = loadItemsFromLocalStorage();
+    if (fromLs) {
+      setDiagnostics(`Items load failed from file; using localStorage fallback: ${msg}`);
+      return { items: fromLs, nextId: computeNextNumericId(fromLs) };
+    }
+    setDiagnostics(
+      lsReadable
+        ? `Items load failed from file; using in-memory seed: ${msg}`
+        : `Items load failed (in-memory seed only): ${msg}`,
+    );
     const seed = buildSeedItems();
     return { items: seed, nextId: computeNextNumericId(seed) };
   }

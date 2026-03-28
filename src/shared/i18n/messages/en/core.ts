@@ -176,6 +176,7 @@ export const coreEn = {
       cancelledClosedHint: "Cancelled journals are closed. Posting, printing, and editing are no longer available.",
       printDialogTitle: "Print markdown labels",
       printDialogDescription: "Choose whether to print all generated labels or only the selected codes from this journal.",
+      printPopupPreparing: "Preparing labels…",
       printAllSummary: "Print all generated labels: {{count}}",
       printSelectedSummary: "Print selected labels: {{count}}",
       notFound: "Markdown journal not found.",

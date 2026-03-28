@@ -56,10 +56,10 @@ export const masterPagesEn = {
       item: "Item",
       tester: "Tester",
     },
-    baseItemSectionTitle: "Linked base item (sellable)",
+    baseItemSectionTitle: "Linked base item (goods)",
     openBaseItem: "Open base item",
     kind: {
-      sellable: "Sellable",
+      sellable: "Goods",
       tester: "Tester",
     },
     list: {
@@ -360,6 +360,7 @@ export const masterPagesEn = {
       MARKDOWN_ONLY: "Markdown only",
       DEFECT_ONLY: "Defect only",
     },
+    stylePolicyGoodsHint: "Allowed GOODS stock styles here: {{styles}}.",
     addressContactTitle: "Address & contact",
     addressContactDescription: "Address, city, country and contact details.",
     settingsTitle: "Warehouse settings",

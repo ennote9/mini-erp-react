@@ -185,6 +185,7 @@ export const kkMessages: MessageTree = {
       cancelledClosedHint: "Болдырылған журнал жабық. Жүргізу, басып шығару және өңдеу енді қолжетімсіз.",
       printDialogTitle: "Уценка жапсырмаларын басып шығару",
       printDialogDescription: "Осы журналдағы барлық жасалған жапсырмаларды немесе тек таңдалған кодтарды басып шығаруды таңдаңыз.",
+      printPopupPreparing: "Жапсырмалар дайындалуда…",
       printAllSummary: "Барлық жасалған жапсырмаларды басып шығару: {{count}}",
       printSelectedSummary: "Таңдалған жапсырмаларды басып шығару: {{count}}",
       notFound: "Уценка журналы табылмады.",
