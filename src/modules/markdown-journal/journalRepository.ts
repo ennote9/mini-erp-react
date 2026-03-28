@@ -32,11 +32,24 @@ function normalizeJournal(raw: unknown): MarkdownJournal | null {
   if (!raw || typeof raw !== "object") return null;
   const x = raw as Record<string, unknown>;
   const status = asStatus(x.status);
+  const sourceWarehouseId =
+    typeof x.sourceWarehouseId === "string"
+      ? x.sourceWarehouseId
+      : typeof x.warehouseId === "string"
+        ? x.warehouseId
+        : null;
+  const targetWarehouseId =
+    typeof x.targetWarehouseId === "string"
+      ? x.targetWarehouseId
+      : typeof x.warehouseId === "string"
+        ? x.warehouseId
+        : null;
   if (
     typeof x.id !== "string" ||
     typeof x.number !== "string" ||
     !status ||
-    typeof x.warehouseId !== "string" ||
+    typeof sourceWarehouseId !== "string" ||
+    typeof targetWarehouseId !== "string" ||
     typeof x.createdAt !== "string" ||
     typeof x.createdBy !== "string"
   ) {
@@ -47,7 +60,8 @@ function normalizeJournal(raw: unknown): MarkdownJournal | null {
     id: x.id,
     number: x.number,
     status,
-    warehouseId: x.warehouseId,
+    sourceWarehouseId,
+    targetWarehouseId,
     comment: typeof x.comment === "string" ? x.comment : undefined,
     createdAt: x.createdAt,
     createdBy: x.createdBy,
@@ -123,7 +137,8 @@ export const markdownJournalRepository = {
     return store.filter((journal) => {
       if (journal.number.toLowerCase().includes(q)) return true;
       if ((journal.comment ?? "").toLowerCase().includes(q)) return true;
-      return journal.warehouseId.toLowerCase().includes(q);
+      if (journal.sourceWarehouseId.toLowerCase().includes(q)) return true;
+      return journal.targetWarehouseId.toLowerCase().includes(q);
     });
   },
 };

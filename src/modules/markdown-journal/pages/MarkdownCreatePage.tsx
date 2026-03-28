@@ -60,6 +60,8 @@ type MarkdownCodeRow = {
   quantity: number;
   markdownPrice: number;
   reason: string;
+  warehouse: string;
+  status: string;
   postedAt: string;
 };
 
@@ -124,9 +126,16 @@ function journalUnitsToCodeRows(
       quantity: 1,
       markdownPrice: record.markdownPrice,
       reason: t(`markdown.reason.${record.reasonCode}`),
+      warehouse: warehouseLabelFor(record.warehouseId),
+      status: t(`markdown.status.${record.status}`),
       postedAt: record.createdAt,
     };
   });
+}
+
+function warehouseLabelFor(id: string): string {
+  const warehouse = warehouseRepository.getById(id);
+  return warehouse ? `${warehouse.code} — ${warehouse.name}` : id;
 }
 
 export function MarkdownCreatePage() {
@@ -144,7 +153,8 @@ export function MarkdownCreatePage() {
   );
 
   const [lines, setLines] = useState<LineFormRow[]>([]);
-  const [warehouseId, setWarehouseId] = useState(DEFAULT_WAREHOUSE_ID);
+  const [sourceWarehouseId, setSourceWarehouseId] = useState(DEFAULT_WAREHOUSE_ID);
+  const [targetWarehouseId, setTargetWarehouseId] = useState(DEFAULT_WAREHOUSE_ID);
   const [comment, setComment] = useState("");
   const [createError, setCreateError] = useState<string | null>(null);
   const [itemEntryId, setItemEntryId] = useState(prefillItemId);
@@ -167,7 +177,10 @@ export function MarkdownCreatePage() {
 
   useEffect(() => {
     if (!isNew || warehouses.length === 0) return;
-    setWarehouseId((prev) =>
+    setSourceWarehouseId((prev) =>
+      warehouses.some((warehouse) => warehouse.id === prev) ? prev : warehouses[0].id,
+    );
+    setTargetWarehouseId((prev) =>
       warehouses.some((warehouse) => warehouse.id === prev) ? prev : warehouses[0].id,
     );
   }, [isNew, warehouses]);
@@ -178,7 +191,8 @@ export function MarkdownCreatePage() {
       return;
     }
     if (!journal) return;
-    setWarehouseId(journal.warehouseId);
+    setSourceWarehouseId(journal.sourceWarehouseId);
+    setTargetWarehouseId(journal.targetWarehouseId);
     setComment(journal.comment ?? "");
     setLines(journalLinesToForm(listMarkdownLinesForJournal(journal.id)));
   }, [isNew, journal, prefillItemId, appRevision]);
@@ -273,7 +287,10 @@ export function MarkdownCreatePage() {
   const handleSave = useCallback(() => {
     setCreateError(null);
     const payload = {
-      warehouseId: warehouseId.trim() || (warehouses[0]?.id ?? DEFAULT_WAREHOUSE_ID),
+      sourceWarehouseId:
+        sourceWarehouseId.trim() || (warehouses[0]?.id ?? DEFAULT_WAREHOUSE_ID),
+      targetWarehouseId:
+        targetWarehouseId.trim() || (warehouses[0]?.id ?? DEFAULT_WAREHOUSE_ID),
       comment: comment.trim() || undefined,
       lines: linesToDraftInput(lines),
       actorId: LOCAL_ACTOR,
@@ -289,7 +306,16 @@ export function MarkdownCreatePage() {
       return;
     }
     navigate(`/markdown-journal/journals/${result.journal.id}`, { replace: true });
-  }, [comment, id, isNew, lines, navigate, warehouseId, warehouses]);
+  }, [
+    comment,
+    id,
+    isNew,
+    lines,
+    navigate,
+    sourceWarehouseId,
+    targetWarehouseId,
+    warehouses,
+  ]);
 
   const handlePost = useCallback(() => {
     if (!id) return;
@@ -406,6 +432,18 @@ export function MarkdownCreatePage() {
         headerName: t("markdown.fields.reason"),
         minWidth: 180,
         width: 220,
+      },
+      {
+        field: "warehouse",
+        headerName: t("markdown.fields.targetWarehouse"),
+        minWidth: 150,
+        width: 170,
+      },
+      {
+        field: "status",
+        headerName: t("common.status"),
+        minWidth: 120,
+        width: 130,
       },
       {
         field: "postedAt",
@@ -525,23 +563,23 @@ export function MarkdownCreatePage() {
                       </div>
                     ) : null}
                     <div className="flex w-full max-w-[220px] min-w-0 flex-col gap-0.5">
-                      <Label htmlFor="markdown-warehouse" className="text-xs leading-none">
-                        {t("markdown.fields.warehouse")}
+                      <Label htmlFor="markdown-source-warehouse" className="text-xs leading-none">
+                        {t("markdown.fields.sourceWarehouse")}
                       </Label>
                       {journal?.status === "posted" ? (
                         <div className="flex h-8 items-center rounded border border-input bg-background px-1.5 text-sm leading-tight text-foreground">
-                          {warehouseRepository.getById(warehouseId)?.code ?? warehouseId}
+                          {warehouseLabelFor(sourceWarehouseId)}
                         </div>
                       ) : warehouses.length > 0 ? (
                         <select
-                          id="markdown-warehouse"
+                          id="markdown-source-warehouse"
                           className={cn(
                             "flex h-8 w-full rounded border border-input bg-background px-1.5 py-0 text-sm leading-tight text-foreground",
                             "focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50",
                           )}
-                          value={warehouseId}
-                          onChange={(e) => setWarehouseId(e.target.value)}
-                          aria-label={t("markdown.fields.warehouse")}
+                          value={sourceWarehouseId}
+                          onChange={(e) => setSourceWarehouseId(e.target.value)}
+                          aria-label={t("markdown.fields.sourceWarehouse")}
                         >
                           {warehouses.map((warehouse) => (
                             <option key={warehouse.id} value={warehouse.id}>
@@ -551,9 +589,43 @@ export function MarkdownCreatePage() {
                         </select>
                       ) : (
                         <Input
-                          value={warehouseId}
-                          onChange={(e) => setWarehouseId(e.target.value)}
-                          placeholder={t("markdown.fields.warehouse")}
+                          value={sourceWarehouseId}
+                          onChange={(e) => setSourceWarehouseId(e.target.value)}
+                          placeholder={t("markdown.fields.sourceWarehouse")}
+                          className="h-8 px-1.5 py-0 text-sm leading-tight"
+                        />
+                      )}
+                    </div>
+                    <div className="flex w-full max-w-[220px] min-w-0 flex-col gap-0.5">
+                      <Label htmlFor="markdown-target-warehouse" className="text-xs leading-none">
+                        {t("markdown.fields.targetWarehouse")}
+                      </Label>
+                      {journal?.status === "posted" ? (
+                        <div className="flex h-8 items-center rounded border border-input bg-background px-1.5 text-sm leading-tight text-foreground">
+                          {warehouseLabelFor(targetWarehouseId)}
+                        </div>
+                      ) : warehouses.length > 0 ? (
+                        <select
+                          id="markdown-target-warehouse"
+                          className={cn(
+                            "flex h-8 w-full rounded border border-input bg-background px-1.5 py-0 text-sm leading-tight text-foreground",
+                            "focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50",
+                          )}
+                          value={targetWarehouseId}
+                          onChange={(e) => setTargetWarehouseId(e.target.value)}
+                          aria-label={t("markdown.fields.targetWarehouse")}
+                        >
+                          {warehouses.map((warehouse) => (
+                            <option key={warehouse.id} value={warehouse.id}>
+                              {warehouse.code} — {warehouse.name}
+                            </option>
+                          ))}
+                        </select>
+                      ) : (
+                        <Input
+                          value={targetWarehouseId}
+                          onChange={(e) => setTargetWarehouseId(e.target.value)}
+                          placeholder={t("markdown.fields.targetWarehouse")}
                           className="h-8 px-1.5 py-0 text-sm leading-tight"
                         />
                       )}

@@ -62,27 +62,9 @@ async function seedSettings(context) {
   );
 }
 
-async function readAgGridStyleCells(page) {
-  await page.waitForTimeout(500);
-  const rowCount = await page.locator(".ag-center-cols-container .ag-row").count();
-  if (rowCount === 0) return [];
-  return page
-    .locator('.ag-center-cols-container .ag-row [col-id="style"]')
-    .evaluateAll((nodes) =>
-      nodes
-        .map((node) => node.textContent?.trim() ?? "")
-        .filter(Boolean),
-    );
-}
-
-async function openSelectAndPick(page, triggerSelector, optionLabel) {
-  await page.locator(triggerSelector).click();
-  await page.getByRole("option", { name: optionLabel, exact: true }).click();
-}
-
 async function spaNavigate(page, nextPath) {
-  await page.evaluate((path) => {
-    window.history.pushState({}, "", path);
+  await page.evaluate((next) => {
+    window.history.pushState({}, "", next);
     window.dispatchEvent(new PopStateEvent("popstate"));
   }, nextPath);
 }
@@ -96,25 +78,54 @@ async function waitUntilEnabled(locator, timeoutMs = 10000) {
   throw new Error("Timed out waiting for control to become enabled.");
 }
 
+async function openSelectAndPick(page, triggerSelector, optionLabel) {
+  await page.locator(triggerSelector).click();
+  await page.getByRole("option", { name: optionLabel, exact: true }).click();
+}
+
+async function readGridRows(page, fieldNames) {
+  await page.waitForTimeout(500);
+  const rowCount = await page.locator(".ag-center-cols-container .ag-row").count();
+  if (rowCount === 0) return [];
+  return page.locator(".ag-center-cols-container .ag-row").evaluateAll(
+    (rows, fields) =>
+      rows.map((row) => {
+        const out = {};
+        for (const field of fields) {
+          const cell = row.querySelector(`[col-id="${field}"]`);
+          out[field] = (cell?.textContent || "").trim();
+        }
+        return out;
+      }),
+    fieldNames,
+  );
+}
+
+async function readHeaderTexts(page) {
+  await page.waitForTimeout(300);
+  return page
+    .locator(".ag-header-cell-text")
+    .evaluateAll((nodes) => nodes.map((node) => (node.textContent || "").trim()).filter(Boolean));
+}
+
 async function main() {
   const browser = await chromium.launch({ headless: true });
   const context = await browser.newContext({
-    viewport: { width: 1440, height: 1100 },
+    viewport: { width: 1480, height: 1200 },
     colorScheme: "dark",
   });
   await seedSettings(context);
   const page = await context.newPage();
-
   const result = {};
 
-  await page.goto(`${BASE}/warehouses/1`, { waitUntil: "networkidle" });
+  await page.goto(`${BASE}/warehouses/2`, { waitUntil: "networkidle" });
   await page.getByRole("tab", { name: "Настройки склада" }).click();
-  result.warehouseStylePolicyLabel = (
-    await page.locator('label[for="warehouse-style-policy"]').textContent()
-  )?.trim();
-  result.warehouseStylePolicyValue = (
+  result.targetWarehousePolicyBefore = (
     await page.locator("#warehouse-style-policy").textContent()
   )?.trim();
+  await openSelectAndPick(page, '[aria-label="Политика стилей склада"]', "Только уценка");
+  await page.getByRole("button", { name: "Сохранить", exact: true }).click();
+  await page.waitForURL(/\/warehouses$/);
 
   await page.goto(`${BASE}/purchase-orders/1`, { waitUntil: "networkidle" });
   const confirmButton = page.getByRole("button", { name: "Подтвердить", exact: true });
@@ -123,8 +134,10 @@ async function main() {
     await page.waitForTimeout(500);
   }
   const createReceiptButton = page.getByRole("button", { name: "Создать поступление" });
+  if (!(await createReceiptButton.isEnabled())) {
+    await page.goto(`${BASE}/purchase-orders/1`, { waitUntil: "networkidle" });
+  }
   await waitUntilEnabled(createReceiptButton);
-  result.createReceiptEnabled = await createReceiptButton.isEnabled();
   await createReceiptButton.click();
   await page.waitForURL(/\/receipts\/\d+/, { timeout: 10000 });
   result.receiptUrl = page.url();
@@ -138,48 +151,91 @@ async function main() {
 
   await spaNavigate(page, "/markdown-journal/new?itemId=1");
   await page.waitForSelector("#markdown-line-price");
+  result.printButtonBeforePost = await page.getByRole("button", { name: "Печать стикеров" }).count();
+  await page.selectOption("#markdown-source-warehouse", "1");
+  await page.selectOption("#markdown-target-warehouse", "2");
+  await page.locator("#markdown-line-qty").fill("2");
   await page.locator("#markdown-line-price").fill("1");
   await page.getByRole("button", { name: "Добавить строку" }).click();
-  await page.getByRole("button", { name: "Сохранить" }).click();
+  await page.getByRole("button", { name: "Сохранить", exact: true }).click();
   await page.waitForURL(/\/markdown-journal\/journals\/\d+/, { timeout: 10000 });
-  result.journalUrlAfterSave = page.url();
-  result.journalNumber = (await page.locator("#markdown-number").count())
-    ? ((await page.locator("#markdown-number").textContent()) || "").trim()
-    : ((await page.locator(".doc-header__title").textContent()) || "").trim();
-  await page.getByRole("button", { name: "Провести" }).click();
-  await page.waitForTimeout(1000);
-  const postAlert = page.getByRole("alert");
-  result.postError = (await postAlert.count())
-    ? ((await postAlert.textContent()) || "").trim()
+  result.journalUrl = page.url();
+  await page.getByRole("button", { name: "Провести", exact: true }).click();
+  await page.waitForTimeout(500);
+  result.postError = (await page.getByRole("alert").count())
+    ? ((await page.getByRole("alert").textContent()) || "").trim()
     : null;
-  if (!result.postError) {
-    await page.getByRole("button", { name: "Печать стикеров" }).waitFor({
-      timeout: 10000,
-    });
-  }
-  result.journalUrlAfterPost = page.url();
-  result.codesTabVisible = await page.getByRole("tab", { name: "Коды уценки" }).count();
+  result.printButtonAfterPost = await page.getByRole("button", { name: "Печать стикеров" }).count();
+  result.lineEditorAfterPost = await page.locator("#markdown-line-price").count();
+
+  const lineRows = await readGridRows(page, [
+    "itemCode",
+    "itemName",
+    "quantity",
+    "markdownPrice",
+    "reason",
+  ]);
+  result.documentLineRows = lineRows;
+
+  await page.getByRole("tab", { name: "Коды уценки" }).click();
+  await page.waitForTimeout(300);
+  const codeRows = await readGridRows(page, [
+    "markdownCode",
+    "itemCode",
+    "quantity",
+    "markdownPrice",
+    "warehouse",
+    "status",
+  ]);
+  result.documentCodeRows = codeRows;
+
+  await spaNavigate(page, "/markdown-journal");
+  await page.waitForSelector(".ag-root-wrapper");
+  result.journalRegisterHeaders = await readHeaderTexts(page);
+  result.journalRegisterRows = await readGridRows(page, [
+    "number",
+    "status",
+    "sourceWarehouseLabel",
+    "targetWarehouseLabel",
+    "lineCount",
+    "totalQty",
+  ]);
+  await page.getByRole("button", { name: "Коды уценки" }).click();
+  await page.waitForTimeout(300);
+  result.codesRegisterHeaders = await readHeaderTexts(page);
+  result.codesRegisterRows = await readGridRows(page, [
+    "markdownCode",
+    "journalNumber",
+    "itemCode",
+    "quantity",
+    "warehouseLabel",
+    "statusLabel",
+  ]);
 
   await spaNavigate(page, "/stock-balances?itemId=1");
   await page.waitForSelector(".ag-root-wrapper");
-  result.stockBalancesStyleHeaderVisible = await page.getByText("Стиль", { exact: true }).count();
-  result.styleFilterVisible = await page.getByText("Все стили", { exact: true }).count();
-  result.styleCellsBeforeFilter = await readAgGridStyleCells(page);
-
+  result.stockBalanceRowsBeforeFilter = await readGridRows(page, [
+    "itemCode",
+    "warehouseName",
+    "style",
+    "qtyOnHand",
+  ]);
   await openSelectAndPick(page, '[aria-label="Фильтр по стилю остатка"]', "Уценка");
   await page.waitForTimeout(300);
-  result.styleFilterSelected = (
-    await page.locator('[aria-label="Фильтр по стилю остатка"]').textContent()
-  )?.trim();
-  result.styleCellsAfterFilter = await readAgGridStyleCells(page);
+  result.stockBalanceRowsAfterMarkdownFilter = await readGridRows(page, [
+    "itemCode",
+    "warehouseName",
+    "style",
+    "qtyOnHand",
+  ]);
 
   await page.screenshot({
-    path: path.join(process.cwd(), "tmp", "verify-style-model-proof.png"),
+    path: path.join(process.cwd(), "tmp", "verify-markdown-deep-process.png"),
     fullPage: true,
   });
 
   await fs.writeFile(
-    path.join(process.cwd(), "tmp", "style-model-proof.json"),
+    path.join(process.cwd(), "tmp", "verify-markdown-deep-process.json"),
     JSON.stringify(result, null, 2),
   );
   console.log(JSON.stringify(result, null, 2));

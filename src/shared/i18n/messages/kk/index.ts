@@ -215,6 +215,8 @@ export const kkMessages: MessageTree = {
       markdownPrice: "Уценка бағасы",
       reason: "Себеп",
       warehouse: "Қойма",
+      sourceWarehouse: "Бастапқы қойма",
+      targetWarehouse: "Уценка қоймасы",
       location: "Ұяшық",
       lineCount: "Жолдар",
       totalQty: "Жалпы сан",

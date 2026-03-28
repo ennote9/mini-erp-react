@@ -65,7 +65,6 @@ function getPageTitleKey(pathname: string): string {
   if (pathname.match(/^\/stock-balances\/[^/]+$/)) return "routes.stockBalance";
   if (pathname.match(/^\/markdown-journal\/new$/)) return "routes.markdownCreate";
   if (pathname.match(/^\/markdown-journal\/journals\/[^/]+$/)) return "routes.markdownJournalDocument";
-  if (pathname.match(/^\/markdown-journal\/[^/]+$/)) return "routes.markdownRecord";
   return PAGE_TITLES[pathname] ?? "routes.fallback";
 }
 
@@ -113,8 +112,7 @@ function getPageIcon(
   if (
     pathname === "/markdown-journal" ||
     pathname.match(/^\/markdown-journal\/new$/) ||
-    pathname.match(/^\/markdown-journal\/journals\/[^/]+$/) ||
-    pathname.match(/^\/markdown-journal\/[^/]+$/)
+    pathname.match(/^\/markdown-journal\/journals\/[^/]+$/)
   )
     return ScanBarcode;
   if (pathname === "/settings") return Settings;

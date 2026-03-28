@@ -53,3 +53,14 @@ export function normalizeWarehouseStylePolicy(
 ): WarehouseStylePolicy {
   return isWarehouseStylePolicy(value) ? value : fallback;
 }
+
+export function warehouseStylePolicyAllowsStyle(
+  policy: WarehouseStylePolicy | undefined,
+  style: StockStyle,
+): boolean {
+  const effective = normalizeWarehouseStylePolicy(policy);
+  if (effective === "ANY") return true;
+  if (effective === "GOOD_ONLY") return style === "GOOD";
+  if (effective === "MARKDOWN_ONLY") return style === "MARKDOWN";
+  return style === "DEFECT";
+}

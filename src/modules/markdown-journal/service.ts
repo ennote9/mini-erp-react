@@ -10,7 +10,10 @@ import type {
   MarkdownReasonCode,
   MarkdownRecord,
 } from "./model";
-import { DEFAULT_STOCK_STYLE } from "@/shared/inventoryStyle";
+import {
+  DEFAULT_STOCK_STYLE,
+  warehouseStylePolicyAllowsStyle,
+} from "@/shared/inventoryStyle";
 import {
   assertMarkdownTransitionAllowed,
   isFinalMarkdownStatus,
@@ -25,7 +28,8 @@ export type MarkdownJournalDraftLineInput = {
 };
 
 export type SaveMarkdownJournalDraftInput = {
-  warehouseId: string;
+  sourceWarehouseId: string;
+  targetWarehouseId: string;
   comment?: string;
   lines: MarkdownJournalDraftLineInput[];
   actorId?: string;
@@ -95,22 +99,40 @@ function buildJournalLineEntities(
   return { success: true, lines: normalized };
 }
 
+function validateWarehouseSelection(
+  sourceWarehouseId: string,
+  targetWarehouseId: string,
+): { success: true } | { success: false; error: string } {
+  if (!sourceWarehouseId.trim()) {
+    return { success: false, error: "Source warehouse is required." };
+  }
+  if (!targetWarehouseId.trim()) {
+    return { success: false, error: "Target warehouse is required." };
+  }
+  if (!warehouseRepository.getById(sourceWarehouseId)) {
+    return { success: false, error: "Source warehouse not found." };
+  }
+  if (!warehouseRepository.getById(targetWarehouseId)) {
+    return { success: false, error: "Target warehouse not found." };
+  }
+  return { success: true };
+}
+
 export function createMarkdownJournalDraft(
   input: SaveMarkdownJournalDraftInput,
 ): { success: true; journal: MarkdownJournal } | { success: false; error: string } {
-  if (!input.warehouseId.trim()) {
-    return { success: false, error: "Warehouse is required." };
-  }
-  const warehouse = warehouseRepository.getById(input.warehouseId);
-  if (!warehouse) {
-    return { success: false, error: "Warehouse not found." };
-  }
+  const warehouseSelection = validateWarehouseSelection(
+    input.sourceWarehouseId,
+    input.targetWarehouseId,
+  );
+  if (!warehouseSelection.success) return warehouseSelection;
 
   const createdAt = new Date().toISOString();
   const actor = normalizeActor(input.actorId);
   const journal = markdownJournalRepository.create({
     status: "draft",
-    warehouseId: input.warehouseId.trim(),
+    sourceWarehouseId: input.sourceWarehouseId.trim(),
+    targetWarehouseId: input.targetWarehouseId.trim(),
     comment: input.comment?.trim() || undefined,
     createdAt,
     createdBy: actor,
@@ -131,20 +153,19 @@ export function updateMarkdownJournalDraft(
   if (journal.status !== "draft") {
     return { success: false, error: "Only draft journals can be edited." };
   }
-  if (!input.warehouseId.trim()) {
-    return { success: false, error: "Warehouse is required." };
-  }
-  const warehouse = warehouseRepository.getById(input.warehouseId);
-  if (!warehouse) {
-    return { success: false, error: "Warehouse not found." };
-  }
+  const warehouseSelection = validateWarehouseSelection(
+    input.sourceWarehouseId,
+    input.targetWarehouseId,
+  );
+  if (!warehouseSelection.success) return warehouseSelection;
 
   const builtLines = buildJournalLineEntities(journal.id, input.lines);
   if (!builtLines.success) return builtLines;
 
   markdownJournalLineRepository.replaceForJournal(journal.id, builtLines.lines);
   const updated = markdownJournalRepository.update(journal.id, {
-    warehouseId: input.warehouseId.trim(),
+    sourceWarehouseId: input.sourceWarehouseId.trim(),
+    targetWarehouseId: input.targetWarehouseId.trim(),
     comment: input.comment?.trim() || undefined,
   });
   if (!updated) return { success: false, error: "Failed to save draft journal." };
@@ -184,6 +205,26 @@ export function postMarkdownJournal(
   const actor = normalizeActor(actorId);
   const postedAt = new Date().toISOString();
   const records: MarkdownRecord[] = [];
+  const sourceWarehouse = warehouseRepository.getById(journal.sourceWarehouseId);
+  if (!sourceWarehouse) {
+    return { success: false, error: "Source warehouse not found." };
+  }
+  const targetWarehouse = warehouseRepository.getById(journal.targetWarehouseId);
+  if (!targetWarehouse) {
+    return { success: false, error: "Target warehouse not found." };
+  }
+  if (!warehouseStylePolicyAllowsStyle(sourceWarehouse.stylePolicy, DEFAULT_STOCK_STYLE)) {
+    return {
+      success: false,
+      error: `Warehouse ${sourceWarehouse.code}: source warehouse style policy does not allow GOOD stock for markdown posting.`,
+    };
+  }
+  if (!warehouseStylePolicyAllowsStyle(targetWarehouse.stylePolicy, "MARKDOWN")) {
+    return {
+      success: false,
+      error: `Warehouse ${targetWarehouse.code}: target warehouse style policy does not allow MARKDOWN stock.`,
+    };
+  }
   const requiredGoodByItem = new Map<string, number>();
 
   for (const line of lines) {
@@ -196,7 +237,7 @@ export function postMarkdownJournal(
   for (const [itemId, requiredQty] of requiredGoodByItem) {
     const goodBalance = stockBalanceRepository.getByItemAndWarehouse(
       itemId,
-      journal.warehouseId,
+      journal.sourceWarehouseId,
     );
     const available = goodBalance?.qtyOnHand ?? 0;
     if (available < requiredQty) {
@@ -229,7 +270,7 @@ export function postMarkdownJournal(
           status: "ACTIVE",
           createdAt: postedAt,
           createdBy: actor,
-          warehouseId: journal.warehouseId,
+          warehouseId: journal.targetWarehouseId,
           style: "MARKDOWN",
           originalBarcode: item.barcode,
           comment: journal.comment,
@@ -240,13 +281,13 @@ export function postMarkdownJournal(
     }
     stockBalanceRepository.adjustQty({
       itemId: line.itemId,
-      warehouseId: journal.warehouseId,
+      warehouseId: journal.sourceWarehouseId,
       style: DEFAULT_STOCK_STYLE,
       qtyDelta: -line.quantity,
     });
     stockBalanceRepository.adjustQty({
       itemId: line.itemId,
-      warehouseId: journal.warehouseId,
+      warehouseId: journal.targetWarehouseId,
       style: "MARKDOWN",
       qtyDelta: line.quantity,
     });

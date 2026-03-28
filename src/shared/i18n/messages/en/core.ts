@@ -206,6 +206,8 @@ export const coreEn = {
       markdownPrice: "Markdown price",
       reason: "Reason",
       warehouse: "Warehouse",
+      sourceWarehouse: "Source warehouse",
+      targetWarehouse: "Target warehouse",
       location: "Location",
       lineCount: "Lines",
       totalQty: "Total qty",

@@ -216,6 +216,8 @@ export const ruMessages: MessageTree = {
       markdownPrice: "Цена уценки",
       reason: "Причина",
       warehouse: "Склад",
+      sourceWarehouse: "Склад-источник",
+      targetWarehouse: "Склад уценки",
       location: "Ячейка",
       lineCount: "Строк",
       totalQty: "Итого кол-во",

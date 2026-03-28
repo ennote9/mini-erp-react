@@ -34,7 +34,8 @@ type JournalRow = {
   id: string;
   number: string;
   status: MarkdownJournalStatus;
-  warehouseLabel: string;
+  sourceWarehouseLabel: string;
+  targetWarehouseLabel: string;
   lineCount: number;
   totalQty: number;
   createdAt: string;
@@ -53,9 +54,15 @@ type MarkdownCodeRow = {
   quantity: number;
   markdownPrice: number;
   warehouseLabel: string;
+  statusLabel: string;
   reasonLabel: string;
   postedAt: string;
 };
+
+function warehouseLabelFor(id: string): string {
+  const warehouse = warehouseRepository.getById(id);
+  return warehouse ? `${warehouse.code} — ${warehouse.name}` : id;
+}
 
 export function MarkdownJournalPage() {
   const { t } = useTranslation();
@@ -88,12 +95,12 @@ export function MarkdownJournalPage() {
       .list()
       .map((journal) => {
         const lines = markdownJournalLineRepository.listByJournalId(journal.id);
-        const warehouse = warehouseRepository.getById(journal.warehouseId);
         return {
           id: journal.id,
           number: journal.number,
           status: journal.status,
-          warehouseLabel: warehouse ? `${warehouse.code} — ${warehouse.name}` : journal.warehouseId,
+          sourceWarehouseLabel: warehouseLabelFor(journal.sourceWarehouseId),
+          targetWarehouseLabel: warehouseLabelFor(journal.targetWarehouseId),
           lineCount: lines.length,
           totalQty: lines.reduce((sum, line) => sum + line.quantity, 0),
           createdAt: journal.createdAt,
@@ -122,7 +129,8 @@ export function MarkdownJournalPage() {
     if (q) {
       base = base.filter((row) => {
         if (row.number.toLowerCase().includes(q)) return true;
-        if (row.warehouseLabel.toLowerCase().includes(q)) return true;
+        if (row.sourceWarehouseLabel.toLowerCase().includes(q)) return true;
+        if (row.targetWarehouseLabel.toLowerCase().includes(q)) return true;
         if (row.comment.toLowerCase().includes(q)) return true;
         return false;
       });
@@ -135,7 +143,6 @@ export function MarkdownJournalPage() {
       .list()
       .filter((journal) => journal.status === "posted")
       .flatMap((journal) => {
-        const warehouse = warehouseRepository.getById(journal.warehouseId);
         return markdownRepository.list()
           .filter((record) => {
             if (record.journalId === journal.id) return true;
@@ -155,7 +162,8 @@ export function MarkdownJournalPage() {
               itemName: item?.name ?? record.itemId,
               quantity: 1,
               markdownPrice: record.markdownPrice,
-              warehouseLabel: warehouse ? `${warehouse.code} — ${warehouse.name}` : journal.warehouseId,
+              warehouseLabel: warehouseLabelFor(record.warehouseId),
+              statusLabel: t(`markdown.status.${record.status}`),
               reasonLabel: t(`markdown.reason.${record.reasonCode}`),
               postedAt: journal.postedAt ?? record.createdAt,
             };
@@ -177,6 +185,7 @@ export function MarkdownJournalPage() {
         if (row.itemCode.toLowerCase().includes(q)) return true;
         if (row.itemName.toLowerCase().includes(q)) return true;
         if (row.warehouseLabel.toLowerCase().includes(q)) return true;
+        if (row.statusLabel.toLowerCase().includes(q)) return true;
         if (row.reasonLabel.toLowerCase().includes(q)) return true;
         return false;
       });
@@ -213,8 +222,14 @@ export function MarkdownJournalPage() {
           params.value === "draft" ? t("status.factual.draft") : t("status.factual.posted"),
       },
       {
-        field: "warehouseLabel",
-        headerName: t("common.warehouse"),
+        field: "sourceWarehouseLabel",
+        headerName: t("markdown.fields.sourceWarehouse"),
+        minWidth: 180,
+        width: 190,
+      },
+      {
+        field: "targetWarehouseLabel",
+        headerName: t("markdown.fields.targetWarehouse"),
         minWidth: 180,
         flex: 1,
       },
@@ -289,9 +304,15 @@ export function MarkdownJournalPage() {
       },
       {
         field: "warehouseLabel",
-        headerName: t("common.warehouse"),
+        headerName: t("markdown.fields.targetWarehouse"),
         minWidth: 160,
         width: 180,
+      },
+      {
+        field: "statusLabel",
+        headerName: t("common.status"),
+        minWidth: 120,
+        width: 130,
       },
       {
         field: "reasonLabel",

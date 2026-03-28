@@ -1,0 +1,110 @@
+{
+  "targetWarehousePolicyBefore": "Любой стиль",
+  "receiptUrl": "http://127.0.0.1:1420/receipts/1",
+  "receiptPostError": null,
+  "printButtonBeforePost": 0,
+  "journalUrl": "http://127.0.0.1:1420/markdown-journal/journals/1",
+  "postError": null,
+  "printButtonAfterPost": 1,
+  "lineEditorAfterPost": 0,
+  "documentLineRows": [
+    {
+      "itemCode": "ITEM-001",
+      "itemName": "Widget A",
+      "quantity": "2",
+      "markdownPrice": "1.00",
+      "reason": "Другое"
+    }
+  ],
+  "documentCodeRows": [
+    {
+      "markdownCode": "MD00000001",
+      "itemCode": "ITEM-001",
+      "quantity": "1",
+      "markdownPrice": "1.00",
+      "warehouse": "WH-002 — North Distribution Center",
+      "status": "Активна"
+    },
+    {
+      "markdownCode": "MD00000002",
+      "itemCode": "ITEM-001",
+      "quantity": "1",
+      "markdownPrice": "1.00",
+      "warehouse": "WH-002 — North Distribution Center",
+      "status": "Активна"
+    }
+  ],
+  "journalRegisterHeaders": [
+    "№",
+    "Номер",
+    "Статус",
+    "Склад-источник",
+    "Склад уценки",
+    "Строк",
+    "Итого кол-во",
+    "Создано",
+    "Проведено"
+  ],
+  "journalRegisterRows": [
+    {
+      "number": "MJ00000001",
+      "status": "Проведён",
+      "sourceWarehouseLabel": "WH-001 — Main Warehouse",
+      "targetWarehouseLabel": "WH-002 — North Distribution Center",
+      "lineCount": "1",
+      "totalQty": "2"
+    }
+  ],
+  "codesRegisterHeaders": [
+    "№",
+    "Код уценки",
+    "Журнал",
+    "Код",
+    "Наименование",
+    "Кол-во",
+    "Цена уценки",
+    "Склад уценки",
+    "Статус",
+    "Причина"
+  ],
+  "codesRegisterRows": [
+    {
+      "markdownCode": "MD00000001",
+      "journalNumber": "MJ00000001",
+      "itemCode": "ITEM-001",
+      "quantity": "1",
+      "warehouseLabel": "WH-002 — North Distribution Center",
+      "statusLabel": "Активна"
+    },
+    {
+      "markdownCode": "MD00000002",
+      "journalNumber": "MJ00000001",
+      "itemCode": "ITEM-001",
+      "quantity": "1",
+      "warehouseLabel": "WH-002 — North Distribution Center",
+      "statusLabel": "Активна"
+    }
+  ],
+  "stockBalanceRowsBeforeFilter": [
+    {
+      "itemCode": "ITEM-001",
+      "warehouseName": "Main Warehouse",
+      "style": "Годный",
+      "qtyOnHand": "8"
+    },
+    {
+      "itemCode": "ITEM-001",
+      "warehouseName": "North Distribution Center",
+      "style": "Уценка",
+      "qtyOnHand": "2"
+    }
+  ],
+  "stockBalanceRowsAfterMarkdownFilter": [
+    {
+      "itemCode": "ITEM-001",
+      "warehouseName": "North Distribution Center",
+      "style": "Уценка",
+      "qtyOnHand": "2"
+    }
+  ]
+}

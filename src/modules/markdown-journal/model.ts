@@ -47,7 +47,8 @@ export interface MarkdownJournal {
   id: string;
   number: string;
   status: MarkdownJournalStatus;
-  warehouseId: string;
+  sourceWarehouseId: string;
+  targetWarehouseId: string;
   comment?: string;
   createdAt: string;
   createdBy: string;
