@@ -348,6 +348,7 @@ export const docCommonEn = {
     shortage: "Shortage",
     coverage: "Coverage",
     warehouse: "Warehouse",
+    style: "Style",
     movementDate: "Date",
     movementType: "Movement type",
     movementTypeShort: "Type",

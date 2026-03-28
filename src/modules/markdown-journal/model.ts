@@ -1,3 +1,5 @@
+import type { StockStyle } from "@/shared/inventoryStyle";
+
 export type MarkdownStatus = "ACTIVE" | "SOLD" | "CANCELLED" | "WRITTEN_OFF" | "SUPERSEDED";
 
 export type MarkdownJournalStatus = "draft" | "posted";
@@ -28,6 +30,7 @@ export interface MarkdownRecord {
   createdAt: string;
   createdBy: string;
   warehouseId: string;
+  style: StockStyle;
   originalBarcode?: string;
   comment?: string;
   basePriceAtMarkdown?: number;
@@ -67,4 +70,3 @@ export interface MarkdownJournalLine {
   quantity: number;
   reasonCode: MarkdownReasonCode;
 }
-

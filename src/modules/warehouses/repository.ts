@@ -1,5 +1,8 @@
 import type { Warehouse } from "./model";
 import {
+  normalizeWarehouseStylePolicy,
+} from "@/shared/inventoryStyle";
+import {
   getMasterDataFilePath,
   loadMasterDataPersisted,
   writeMasterDataPayload,
@@ -40,6 +43,7 @@ function normalizeWarehouse(raw: unknown): Warehouse | null {
     isActive: rec.isActive,
     comment: asOptionalString(rec.comment),
     accountingProfile: asOptionalString(rec.accountingProfile),
+    stylePolicy: normalizeWarehouseStylePolicy(rec.stylePolicy),
     warehouseType: asOptionalString(rec.warehouseType),
     address: asOptionalString(rec.address),
     city: asOptionalString(rec.city),
@@ -50,7 +54,11 @@ function normalizeWarehouse(raw: unknown): Warehouse | null {
 }
 
 function buildSeedWarehouses(): Warehouse[] {
-  return seed.map((s, i) => ({ ...s, id: String(i + 1) }));
+  return seed.map((s, i) => ({
+    ...s,
+    id: String(i + 1),
+    stylePolicy: normalizeWarehouseStylePolicy(s.stylePolicy),
+  }));
 }
 
 function schedulePersist(): void {

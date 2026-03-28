@@ -88,6 +88,11 @@ export const kkOps: MessageTree = {
     },
   },
   stock: {
+    styles: {
+      GOOD: "Жарамды",
+      MARKDOWN: "Уценка",
+      DEFECT: "Брак",
+    },
     coverage: {
       covered: "Қамтылған",
       at_risk: "Тәуекелде",
@@ -106,6 +111,8 @@ export const kkOps: MessageTree = {
       outgoingEmpty: "Расталған сату тапсырыстары бойынша қалған сұраныс жоқ.",
       incomingTitle: "Кіріс жеткізу",
       incomingEmpty: "Расталған сатып алу тапсырыстары бойынша күтілетін түсім жоқ.",
+      nonGoodStyleHint:
+        "Резервтер мен жоспарлы сұраныс тек жарамды қор үшін есептеледі. Бұл жол таңдалған стиль күйіндегі қорды көрсетеді.",
       mismatchReserved:
         "Жол мәліметі ({{sum}}) тордағы «Резервте» ({{grid}}) мәнінен өзгеше. Әр резервтегі қойма мен тауарды тексеріңіз.",
       mismatchOutgoing:
@@ -347,6 +354,8 @@ export const kkOps: MessageTree = {
     quickFiltersAria: "Жылдам сүзгілер",
     searchAria: "Қалдықтарды іздеу",
     searchPlaceholder: "Іздеу",
+    styleFilterAria: "Қор стилі бойынша сүзу",
+    filterAllStyles: "Барлық стильдер",
     warehouseFilterAria: "Қойма сүзгісі белсенді",
     itemFilterAria: "Тауар сүзгісі белсенді",
     itemFilterPrefix: "Тауар",

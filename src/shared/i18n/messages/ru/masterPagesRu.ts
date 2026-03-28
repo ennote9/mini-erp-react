@@ -358,6 +358,13 @@ export const ruMasterPages: MessageTree = {
     typeLabel: "Тип",
     warehouseTypePlaceholder: "напр. Основной, Распределительный",
     accountingProfile: "Учетный профиль склада",
+    stylePolicy: "Политика стилей склада",
+    stylePolicyOptions: {
+      ANY: "Любой стиль",
+      GOOD_ONLY: "Только годный",
+      MARKDOWN_ONLY: "Только уценка",
+      DEFECT_ONLY: "Только брак",
+    },
     addressContactTitle: "Адрес и контакты",
     addressContactDescription: "Адрес, город, страна и контактные данные.",
     settingsTitle: "Настройки склада",

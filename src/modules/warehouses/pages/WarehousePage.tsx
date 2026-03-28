@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Textarea } from "@/components/ui/textarea";
+import { SelectField } from "@/components/ui/select-field";
 import {
   Card,
   CardContent,
@@ -31,6 +32,10 @@ import { Save, X } from "lucide-react";
 import { useTranslation } from "@/shared/i18n/context";
 import { cn } from "@/lib/utils";
 import { Tabs } from "radix-ui";
+import {
+  WAREHOUSE_STYLE_POLICY_VALUES,
+  type WarehouseStylePolicy,
+} from "@/shared/inventoryStyle";
 
 type FormState = {
   code: string;
@@ -38,6 +43,7 @@ type FormState = {
   isActive: boolean;
   comment: string;
   accountingProfile: string;
+  stylePolicy: WarehouseStylePolicy;
   warehouseType: string;
   address: string;
   city: string;
@@ -53,6 +59,7 @@ function defaultForm(): FormState {
     isActive: true,
     comment: "",
     accountingProfile: "",
+    stylePolicy: "ANY",
     warehouseType: "",
     address: "",
     city: "",
@@ -107,6 +114,7 @@ export function WarehousePage() {
         isActive: warehouse.isActive,
         comment: warehouse.comment ?? "",
         accountingProfile: warehouse.accountingProfile ?? "",
+        stylePolicy: warehouse.stylePolicy ?? "ANY",
         warehouseType: warehouse.warehouseType ?? "",
         address: warehouse.address ?? "",
         city: warehouse.city ?? "",
@@ -130,6 +138,7 @@ export function WarehousePage() {
         isActive: form.isActive,
         comment: form.comment || undefined,
         accountingProfile: form.accountingProfile || undefined,
+        stylePolicy: form.stylePolicy,
         warehouseType: form.warehouseType || undefined,
         address: form.address || undefined,
         city: form.city || undefined,
@@ -461,6 +470,28 @@ export function WarehousePage() {
                       onChange={(e) => setForm((f) => ({ ...f, accountingProfile: e.target.value }))}
                       placeholder={t("master.common.optionalPlaceholder")}
                       className="h-8 text-sm"
+                    />
+                  </div>
+                  <div className="flex flex-col gap-0.5">
+                    <Label htmlFor="warehouse-style-policy" className="text-sm">
+                      {t("master.warehouse.stylePolicy")}
+                    </Label>
+                    <SelectField
+                      id="warehouse-style-policy"
+                      value={form.stylePolicy}
+                      onChange={(value) =>
+                        setForm((f) => ({
+                          ...f,
+                          stylePolicy: (value || "ANY") as WarehouseStylePolicy,
+                        }))
+                      }
+                      options={WAREHOUSE_STYLE_POLICY_VALUES.map((value) => ({
+                        value,
+                        label: t(`master.warehouse.stylePolicyOptions.${value}`),
+                      }))}
+                      placeholder={t("master.warehouse.stylePolicyOptions.ANY")}
+                      aria-label={t("master.warehouse.stylePolicy")}
+                      className="w-full"
                     />
                   </div>
                 </div>

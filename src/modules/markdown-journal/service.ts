@@ -3,12 +3,14 @@ import { warehouseRepository } from "../warehouses/repository";
 import { markdownRepository } from "./repository";
 import { markdownJournalRepository } from "./journalRepository";
 import { markdownJournalLineRepository } from "./journalLineRepository";
+import { stockBalanceRepository } from "../stock-balances/repository";
 import type {
   MarkdownJournal,
   MarkdownJournalLine,
   MarkdownReasonCode,
   MarkdownRecord,
 } from "./model";
+import { DEFAULT_STOCK_STYLE } from "@/shared/inventoryStyle";
 import {
   assertMarkdownTransitionAllowed,
   isFinalMarkdownStatus,
@@ -182,6 +184,30 @@ export function postMarkdownJournal(
   const actor = normalizeActor(actorId);
   const postedAt = new Date().toISOString();
   const records: MarkdownRecord[] = [];
+  const requiredGoodByItem = new Map<string, number>();
+
+  for (const line of lines) {
+    requiredGoodByItem.set(
+      line.itemId,
+      (requiredGoodByItem.get(line.itemId) ?? 0) + line.quantity,
+    );
+  }
+
+  for (const [itemId, requiredQty] of requiredGoodByItem) {
+    const goodBalance = stockBalanceRepository.getByItemAndWarehouse(
+      itemId,
+      journal.warehouseId,
+    );
+    const available = goodBalance?.qtyOnHand ?? 0;
+    if (available < requiredQty) {
+      const item = itemRepository.getById(itemId);
+      const code = item?.code ?? itemId;
+      return {
+        success: false,
+        error: `Item ${code}: insufficient GOOD stock to post markdown journal (available ${available}, required ${requiredQty}).`,
+      };
+    }
+  }
 
   for (const line of lines) {
     const item = itemRepository.getById(line.itemId);
@@ -204,6 +230,7 @@ export function postMarkdownJournal(
           createdAt: postedAt,
           createdBy: actor,
           warehouseId: journal.warehouseId,
+          style: "MARKDOWN",
           originalBarcode: item.barcode,
           comment: journal.comment,
           basePriceAtMarkdown: item.salePrice,
@@ -211,6 +238,18 @@ export function postMarkdownJournal(
         }),
       );
     }
+    stockBalanceRepository.adjustQty({
+      itemId: line.itemId,
+      warehouseId: journal.warehouseId,
+      style: DEFAULT_STOCK_STYLE,
+      qtyDelta: -line.quantity,
+    });
+    stockBalanceRepository.adjustQty({
+      itemId: line.itemId,
+      warehouseId: journal.warehouseId,
+      style: "MARKDOWN",
+      qtyDelta: line.quantity,
+    });
   }
 
   const updated = markdownJournalRepository.update(journal.id, {
@@ -291,6 +330,12 @@ export function transitionMarkdownRecord(
     closedBy: actor,
   });
   if (!updated) return { success: false, error: "Update failed." };
+  stockBalanceRepository.adjustQty({
+    itemId: rec.itemId,
+    warehouseId: rec.warehouseId,
+    style: "MARKDOWN",
+    qtyDelta: -1,
+  });
   return { success: true, record: updated };
 }
 
@@ -325,6 +370,7 @@ export function supersedeMarkdownRecord(
     createdAt: now,
     createdBy: actor,
     warehouseId: old.warehouseId,
+    style: "MARKDOWN",
     originalBarcode: old.originalBarcode ?? item.barcode,
     comment: old.comment,
     basePriceAtMarkdown: old.basePriceAtMarkdown ?? item.salePrice,

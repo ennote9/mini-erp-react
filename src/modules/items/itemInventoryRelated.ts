@@ -10,6 +10,7 @@ import {
   buildIncomingRemainingByWarehouseItem,
   computeOperationalFieldsForBalance,
 } from "@/shared/stockBalancesOperationalMetrics";
+import { DEFAULT_STOCK_STYLE } from "@/shared/inventoryStyle";
 
 export const ITEM_RECENT_MOVEMENTS_LIMIT = 15;
 
@@ -36,21 +37,35 @@ export function buildItemPageBalanceRows(itemId: string): ItemPageBalanceRow[] {
   const outgoing = buildOutgoingRemainingByWarehouseItem();
   const incoming = buildIncomingRemainingByWarehouseItem();
   const list = stockBalanceRepository.list().filter((b) => b.itemId === itemId);
-  return list
-    .map((b) => {
-      const wh = warehouseRepository.getById(b.warehouseId);
-      const op = computeOperationalFieldsForBalance(b, outgoing, incoming);
-      return {
+  const acc = new Map<string, ItemPageBalanceRow>();
+  for (const b of list) {
+    const wh = warehouseRepository.getById(b.warehouseId);
+    const op = computeOperationalFieldsForBalance(b, outgoing, incoming);
+    const current = acc.get(b.warehouseId);
+    if (!current) {
+      acc.set(b.warehouseId, {
         warehouseId: b.warehouseId,
         warehouseName: wh?.name ?? b.warehouseId,
         qtyOnHand: b.qtyOnHand,
         reservedQty: op.reservedQty,
-        availableQty: op.availableQty,
+        availableQty: b.style === DEFAULT_STOCK_STYLE ? op.availableQty : b.qtyOnHand,
         outgoingQty: op.outgoingQty,
         incomingQty: op.incomingQty,
-      };
-    })
-    .sort((a, b) => a.warehouseName.localeCompare(b.warehouseName, undefined, { sensitivity: "base" }));
+      });
+      continue;
+    }
+    current.qtyOnHand += b.qtyOnHand;
+    current.availableQty +=
+      b.style === DEFAULT_STOCK_STYLE ? op.availableQty : b.qtyOnHand;
+    current.reservedQty += op.reservedQty;
+    current.outgoingQty += op.outgoingQty;
+    current.incomingQty += op.incomingQty;
+  }
+  return [...acc.values()].sort((a, b) =>
+    a.warehouseName.localeCompare(b.warehouseName, undefined, {
+      sensitivity: "base",
+    }),
+  );
 }
 
 export function summarizeItemPageBalances(rows: ItemPageBalanceRow[]): ItemPageBalanceSummary {

@@ -6,6 +6,7 @@ export type StockBalancesExportRow = {
   itemCode: string;
   itemName: string;
   warehouse: string;
+  style: string;
   totalQty: number;
   reservedQty: number;
   availableQty: number;
@@ -42,6 +43,7 @@ const WIDTH_BOUNDS = [
   { min: 10, max: 24 },
   { min: 10, max: 42 },
   { min: 10, max: 24 },
+  { min: 10, max: 18 },
   { min: 10, max: 14 },
   { min: 10, max: 14 },
   { min: 10, max: 14 },
@@ -67,6 +69,7 @@ function addSheet(workbook: Workbook, rows: StockBalancesExportRow[], labels: Ex
     r.itemCode,
     r.itemName,
     r.warehouse,
+    r.style,
     r.totalQty,
     r.reservedQty,
     r.availableQty,
@@ -92,6 +95,7 @@ function addSheet(workbook: Workbook, rows: StockBalancesExportRow[], labels: Ex
           r.itemCode,
           r.itemName,
           r.warehouse,
+          r.style,
           r.totalQty,
           r.reservedQty,
           r.availableQty,

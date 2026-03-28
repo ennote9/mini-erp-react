@@ -837,6 +837,7 @@ export const ruMessages: MessageTree = {
       shortage: "Дефицит",
       coverage: "Покрытие",
       warehouse: "Склад",
+      style: "Стиль",
       movementDate: "Дата",
       movementType: "Тип движения",
       movementTypeShort: "Тип",

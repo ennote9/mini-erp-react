@@ -1,5 +1,10 @@
 import { warehouseRepository } from "./repository";
 import {
+  normalizeWarehouseStylePolicy,
+  isWarehouseStylePolicy,
+  type WarehouseStylePolicy,
+} from "@/shared/inventoryStyle";
+import {
   validateRequired,
   validatePhone,
   normalizeTrim,
@@ -13,6 +18,7 @@ export type SaveWarehouseInput = {
   isActive: boolean;
   comment?: string;
   accountingProfile?: string;
+  stylePolicy?: WarehouseStylePolicy;
   warehouseType?: string;
   address?: string;
   city?: string;
@@ -41,6 +47,12 @@ function validateSaveWarehouse(
 
   const phoneErr = validatePhone(data.phone);
   if (phoneErr) return phoneErr;
+  if (
+    data.stylePolicy !== undefined &&
+    !isWarehouseStylePolicy(data.stylePolicy)
+  ) {
+    return "Warehouse style policy is invalid.";
+  }
 
   const codeNormalized = normalizeCode(data.code);
   const duplicate = warehouseRepository.list().find(
@@ -61,6 +73,7 @@ export function saveWarehouse(
   const name = normalizeTrim(data.name);
   const comment = normalizeTrim(data.comment) || undefined;
   const accountingProfile = normalizeTrim(data.accountingProfile) || undefined;
+  const stylePolicy = normalizeWarehouseStylePolicy(data.stylePolicy);
   const warehouseType = normalizeTrim(data.warehouseType) || undefined;
   const address = normalizeTrim(data.address) || undefined;
   const city = normalizeTrim(data.city) || undefined;
@@ -74,6 +87,7 @@ export function saveWarehouse(
     isActive: data.isActive,
     comment,
     accountingProfile,
+    stylePolicy,
     warehouseType,
     address,
     city,

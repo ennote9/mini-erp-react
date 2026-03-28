@@ -66,6 +66,7 @@ export const ruExportExcel: MessageTree = {
     colSupplier: "Поставщик",
     colCustomer: "Клиент",
     colWarehouse: "Склад",
+    colStyle: "Стиль",
     colCarrier: "Перевозчик",
     colRecipient: "Получатель",
     colRecipientPhone: "Телефон получателя",

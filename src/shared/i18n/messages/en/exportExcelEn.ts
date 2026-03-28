@@ -67,6 +67,7 @@ export const exportExcelEn: MessageTree = {
     colSupplier: "Supplier",
     colCustomer: "Customer",
     colWarehouse: "Warehouse",
+    colStyle: "Style",
     colCarrier: "Carrier",
     colRecipient: "Recipient",
     colRecipientPhone: "Recipient phone",

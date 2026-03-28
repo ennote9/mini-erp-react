@@ -47,6 +47,7 @@ export function StockBalanceDetailPage() {
     return {
       itemId: balance.itemId,
       warehouseId: balance.warehouseId,
+      style: balance.style,
       itemCode: item?.code ?? balance.itemId,
       itemName: item?.name ?? balance.itemId,
       warehouseName: warehouse?.name ?? balance.warehouseId,
@@ -76,9 +77,10 @@ export function StockBalanceDetailPage() {
   }
 
   const coverageLabel = t(`ops.stock.coverage.${row.coverageStatus}`);
+  const styleLabel = t(`ops.stock.styles.${row.style}`);
   const breadcrumbItems = [
     { label: t("routes.stockBalances"), to: backHref },
-    { label: `${row.itemCode} — ${row.warehouseName}` },
+    { label: `${row.itemCode} — ${row.warehouseName} — ${styleLabel}` },
   ];
 
   return (
@@ -106,6 +108,9 @@ export function StockBalanceDetailPage() {
                 {t("ops.stock.drilldown.warehouseLabel")}
               </span>{" "}
               <span className="text-foreground/90">{row.warehouseName}</span>
+              <span className="mx-2 text-muted-foreground/60">•</span>
+              <span className="text-muted-foreground/80">{t("doc.columns.style")}</span>{" "}
+              <span className="text-foreground/90">{styleLabel}</span>
             </p>
           </div>
           <div className="doc-header__right">

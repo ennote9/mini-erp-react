@@ -1,5 +1,10 @@
 import type { StockBalance } from "./model";
 import {
+  DEFAULT_STOCK_STYLE,
+  normalizeStockStyle,
+  type StockStyle,
+} from "@/shared/inventoryStyle";
+import {
   getInventoryFilePath,
   loadInventoryPersisted,
   writeInventoryPayload,
@@ -7,7 +12,15 @@ import {
 import { registerPersistenceFlush } from "../../shared/persistenceCoordinator";
 import { bumpAppReadModelRevision } from "../../shared/appReadModelRevision";
 
-export type UpsertStockBalanceInput = Omit<StockBalance, "id">;
+export type UpsertStockBalanceInput = Omit<StockBalance, "id" | "style"> & {
+  style?: StockStyle;
+};
+export type AdjustStockBalanceInput = {
+  itemId: string;
+  warehouseId: string;
+  style?: StockStyle;
+  qtyDelta: number;
+};
 
 const store: StockBalance[] = [];
 let nextId = 1;
@@ -37,12 +50,21 @@ function normalizeStockBalance(raw: unknown): StockBalance | null {
     id: rec.id,
     itemId: rec.itemId,
     warehouseId: rec.warehouseId,
+    style: normalizeStockStyle(rec.style),
     qtyOnHand,
   };
 }
 
 function buildSeedRecords(): StockBalance[] {
-  return [{ id: "1", itemId: "1", warehouseId: "1", qtyOnHand: 0 }];
+  return [
+    {
+      id: "1",
+      itemId: "1",
+      warehouseId: "1",
+      style: DEFAULT_STOCK_STYLE,
+      qtyOnHand: 0,
+    },
+  ];
 }
 
 function computeNextNumericId(records: Array<{ id: string }>): number {
@@ -119,24 +141,61 @@ export const stockBalanceRepository = {
     warehouseId: string,
   ): StockBalance | undefined {
     return store.find(
-      (x) => x.itemId === itemId && x.warehouseId === warehouseId,
+      (x) =>
+        x.itemId === itemId &&
+        x.warehouseId === warehouseId &&
+        x.style === DEFAULT_STOCK_STYLE,
     );
   },
 
-  /** Insert or replace balance for item+warehouse. Foundation for future post logic. */
+  getByItemWarehouseAndStyle(
+    itemId: string,
+    warehouseId: string,
+    style: StockStyle,
+  ): StockBalance | undefined {
+    return store.find(
+      (x) =>
+        x.itemId === itemId &&
+        x.warehouseId === warehouseId &&
+        x.style === style,
+    );
+  },
+
+  /** Insert or replace balance for item+warehouse+style. */
   upsert(data: UpsertStockBalanceInput): StockBalance {
+    const style = normalizeStockStyle(data.style);
     const i = store.findIndex(
-      (x) => x.itemId === data.itemId && x.warehouseId === data.warehouseId,
+      (x) =>
+        x.itemId === data.itemId &&
+        x.warehouseId === data.warehouseId &&
+        x.style === style,
     );
     if (i >= 0) {
-      store[i] = { ...data, id: store[i].id };
+      store[i] = { ...data, style, id: store[i].id };
       schedulePersist();
       return store[i];
     }
-    const balance: StockBalance = { ...data, id: nextIdStr() };
+    const balance: StockBalance = { ...data, style, id: nextIdStr() };
     store.push(balance);
     schedulePersist();
     return balance;
+  },
+
+  adjustQty(input: AdjustStockBalanceInput): StockBalance {
+    const style = normalizeStockStyle(input.style);
+    const existing = store.find(
+      (x) =>
+        x.itemId === input.itemId &&
+        x.warehouseId === input.warehouseId &&
+        x.style === style,
+    );
+    const qtyOnHand = Math.max(0, (existing?.qtyOnHand ?? 0) + input.qtyDelta);
+    return this.upsert({
+      itemId: input.itemId,
+      warehouseId: input.warehouseId,
+      style,
+      qtyOnHand,
+    });
   },
 };
 

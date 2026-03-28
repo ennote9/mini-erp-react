@@ -66,6 +66,7 @@ export const kkExportExcel: MessageTree = {
     colSupplier: "Жеткізуші",
     colCustomer: "Клиент",
     colWarehouse: "Қойма",
+    colStyle: "Стиль",
     colCarrier: "Тасымалдаушы",
     colRecipient: "Алушы",
     colRecipientPhone: "Алушы телефоны",

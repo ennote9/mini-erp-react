@@ -2,10 +2,11 @@ import { getMasterDataFilePath, loadMasterDataPersisted, writeMasterDataPayload 
 import { registerPersistenceFlush } from "@/shared/persistenceCoordinator";
 import { bumpAppReadModelRevision } from "@/shared/appReadModelRevision";
 import type { MarkdownRecord, MarkdownReasonCode, MarkdownStatus } from "./model";
+import { normalizeStockStyle } from "@/shared/inventoryStyle";
 
 type CreateMarkdownRecordInput = Omit<MarkdownRecord, "id" | "markdownCode">;
 type UpdateMarkdownRecordPatch = Partial<
-  Omit<MarkdownRecord, "id" | "markdownCode" | "itemId" | "quantity">
+  Omit<MarkdownRecord, "id" | "markdownCode" | "itemId" | "quantity" | "style">
 >;
 
 const store: MarkdownRecord[] = [];
@@ -110,6 +111,7 @@ function normalizeRecord(raw: unknown): MarkdownRecord | null {
     createdAt: r.createdAt,
     createdBy: r.createdBy,
     warehouseId: r.warehouseId,
+    style: normalizeStockStyle(r.style, "MARKDOWN"),
     originalBarcode: typeof r.originalBarcode === "string" ? r.originalBarcode : undefined,
     comment: typeof r.comment === "string" ? r.comment : undefined,
     basePriceAtMarkdown: typeof r.basePriceAtMarkdown === "number" ? r.basePriceAtMarkdown : undefined,
@@ -194,4 +196,3 @@ registerPersistenceFlush({
   flush: flushPendingMarkdownPersist,
   isBusy: getMarkdownPersistBusy,
 });
-

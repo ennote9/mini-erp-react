@@ -353,6 +353,13 @@ export const masterPagesEn = {
     typeLabel: "Type",
     warehouseTypePlaceholder: "e.g. Main, Distribution",
     accountingProfile: "Warehouse Accounting Profile",
+    stylePolicy: "Warehouse Style Policy",
+    stylePolicyOptions: {
+      ANY: "Any style",
+      GOOD_ONLY: "Good only",
+      MARKDOWN_ONLY: "Markdown only",
+      DEFECT_ONLY: "Defect only",
+    },
     addressContactTitle: "Address & contact",
     addressContactDescription: "Address, city, country and contact details.",
     settingsTitle: "Warehouse settings",

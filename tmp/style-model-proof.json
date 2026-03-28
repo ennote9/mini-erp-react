@@ -1,0 +1,22 @@
+{
+  "warehouseStylePolicyLabel": "Политика стилей склада",
+  "warehouseStylePolicyValue": "Любой стиль",
+  "createReceiptEnabled": true,
+  "receiptUrl": "http://127.0.0.1:1420/receipts/1",
+  "receiptPostError": null,
+  "journalUrlAfterSave": "http://127.0.0.1:1420/markdown-journal/journals/1",
+  "journalNumber": "Новый журнал уценки",
+  "postError": null,
+  "journalUrlAfterPost": "http://127.0.0.1:1420/markdown-journal/journals/1",
+  "codesTabVisible": 1,
+  "stockBalancesStyleHeaderVisible": 0,
+  "styleFilterVisible": 1,
+  "styleCellsBeforeFilter": [
+    "Годный",
+    "Уценка"
+  ],
+  "styleFilterSelected": "Уценка",
+  "styleCellsAfterFilter": [
+    "Уценка"
+  ]
+}

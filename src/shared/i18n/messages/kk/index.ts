@@ -834,6 +834,7 @@ export const kkMessages: MessageTree = {
       shortage: "Тапшылық",
       coverage: "Қамту",
       warehouse: "Қойма",
+      style: "Стиль",
       movementDate: "Күні",
       movementType: "Қозғалыс түрі",
       movementTypeShort: "Түрі",

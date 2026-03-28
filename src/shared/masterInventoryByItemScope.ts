@@ -15,6 +15,7 @@ import {
   buildIncomingRemainingByWarehouseItem,
   computeOperationalFieldsForBalance,
 } from "@/shared/stockBalancesOperationalMetrics";
+import { DEFAULT_STOCK_STYLE } from "@/shared/inventoryStyle";
 
 type Acc = {
   warehouseId: string;
@@ -41,14 +42,15 @@ export function buildAggregatedWarehouseBalancesForItemIds(
         warehouseId: b.warehouseId,
         qtyOnHand: b.qtyOnHand,
         reservedQty: op.reservedQty,
-        availableQty: op.availableQty,
+        availableQty: b.style === DEFAULT_STOCK_STYLE ? op.availableQty : b.qtyOnHand,
         outgoingQty: op.outgoingQty,
         incomingQty: op.incomingQty,
       });
     } else {
       cur.qtyOnHand += b.qtyOnHand;
       cur.reservedQty += op.reservedQty;
-      cur.availableQty += op.availableQty;
+      cur.availableQty +=
+        b.style === DEFAULT_STOCK_STYLE ? op.availableQty : b.qtyOnHand;
       cur.outgoingQty += op.outgoingQty;
       cur.incomingQty += op.incomingQty;
     }

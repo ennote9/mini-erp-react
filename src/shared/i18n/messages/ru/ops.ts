@@ -88,6 +88,11 @@ export const ruOps: MessageTree = {
     },
   },
   stock: {
+    styles: {
+      GOOD: "Годный",
+      MARKDOWN: "Уценка",
+      DEFECT: "Брак",
+    },
     coverage: {
       covered: "Покрыто",
       at_risk: "Под риском",
@@ -106,6 +111,8 @@ export const ruOps: MessageTree = {
       outgoingEmpty: "Нет невыполненного спроса по подтверждённым заказам клиентов.",
       incomingTitle: "Входящие поставки",
       incomingEmpty: "Нет ожидаемых поступлений по подтверждённым заказам поставщикам.",
+      nonGoodStyleHint:
+        "Резервы и плановый спрос учитываются только для годного остатка. Эта строка показывает запас в выбранном стилевом состоянии.",
       mismatchReserved:
         "Детализация строк ({{sum}}) отличается от «В резерве» в сетке ({{grid}}). Проверьте склад и номенклатуру в каждом резерве.",
       mismatchOutgoing:
@@ -347,6 +354,8 @@ export const ruOps: MessageTree = {
     quickFiltersAria: "Быстрые фильтры",
     searchAria: "Поиск остатков",
     searchPlaceholder: "Поиск",
+    styleFilterAria: "Фильтр по стилю остатка",
+    filterAllStyles: "Все стили",
     warehouseFilterAria: "Активен фильтр по складу",
     itemFilterAria: "Активен фильтр по номенклатуре",
     itemFilterPrefix: "Номенклатура",

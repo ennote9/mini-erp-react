@@ -11,6 +11,7 @@ import {
   computePurchaseOrderFulfillment,
 } from "./planningFulfillment";
 import { normalizeTrim } from "./validation";
+import { DEFAULT_STOCK_STYLE, type StockStyle } from "./inventoryStyle";
 
 export function warehouseItemKey(warehouseId: string, itemId: string): string {
   return `${normalizeTrim(warehouseId)}\t${normalizeTrim(itemId)}`;
@@ -120,11 +121,23 @@ export type StockBalanceOperationalFields = {
 };
 
 export function computeOperationalFieldsForBalance(
-  balance: { itemId: string; warehouseId: string; qtyOnHand: number },
+  balance: { itemId: string; warehouseId: string; qtyOnHand: number; style: StockStyle },
   outgoingByWhItem: Map<string, number>,
   incomingByWhItem: Map<string, number>,
 ): StockBalanceOperationalFields {
   const totalQty = balance.qtyOnHand;
+  if (balance.style !== DEFAULT_STOCK_STYLE) {
+    return {
+      totalQty,
+      reservedQty: 0,
+      availableQty: totalQty,
+      outgoingQty: 0,
+      incomingQty: 0,
+      deficitQty: 0,
+      netShortageQty: 0,
+      coverageStatus: "covered",
+    };
+  }
   const reservedQty = stockReservationRepository.sumActiveQtyForWarehouseItem(
     balance.warehouseId,
     balance.itemId,

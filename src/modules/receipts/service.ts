@@ -17,6 +17,7 @@ import {
 import { getAppSettings } from "../../shared/settings/store";
 import { appendAuditEvent } from "../../shared/audit/eventLogRepository";
 import { AUDIT_ACTOR_LOCAL_USER } from "../../shared/audit/eventLogTypes";
+import { DEFAULT_STOCK_STYLE } from "@/shared/inventoryStyle";
 import {
   aggregateReceivedQtyByItemForPurchaseOrder,
   computePurchaseOrderFulfillment,
@@ -217,20 +218,17 @@ export function post(receiptId: string): PostResult {
       movementType: "receipt",
       itemId: line.itemId,
       warehouseId: receipt.warehouseId,
+      style: DEFAULT_STOCK_STYLE,
       qtyDelta: line.qty,
       sourceDocumentType: "receipt",
       sourceDocumentId: receiptId,
     });
 
-    const existing = stockBalanceRepository.getByItemAndWarehouse(
-      line.itemId,
-      receipt.warehouseId,
-    );
-    const newQty = (existing?.qtyOnHand ?? 0) + line.qty;
-    stockBalanceRepository.upsert({
+    stockBalanceRepository.adjustQty({
       itemId: line.itemId,
       warehouseId: receipt.warehouseId,
-      qtyOnHand: newQty,
+      style: DEFAULT_STOCK_STYLE,
+      qtyDelta: line.qty,
     });
   }
 
@@ -354,20 +352,17 @@ export function reverseDocument(
       movementType: "receipt_reversal",
       itemId: line.itemId,
       warehouseId: receipt.warehouseId,
+      style: DEFAULT_STOCK_STYLE,
       qtyDelta: -qty,
       sourceDocumentType: "receipt",
       sourceDocumentId: receiptId,
       comment: "Receipt reversal (compensating movement)",
     });
-    const existing = stockBalanceRepository.getByItemAndWarehouse(
-      line.itemId,
-      receipt.warehouseId,
-    );
-    const newQty = Math.max(0, (existing?.qtyOnHand ?? 0) - qty);
-    stockBalanceRepository.upsert({
+    stockBalanceRepository.adjustQty({
       itemId: line.itemId,
       warehouseId: receipt.warehouseId,
-      qtyOnHand: newQty,
+      style: DEFAULT_STOCK_STYLE,
+      qtyDelta: -qty,
     });
   }
 

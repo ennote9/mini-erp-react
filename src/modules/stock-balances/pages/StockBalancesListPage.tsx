@@ -30,6 +30,7 @@ import { useListPageSearchHotkey } from "../../../shared/hotkeys";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Button } from "@/components/ui/button";
 import { ButtonGroup, ButtonGroupSeparator } from "@/components/ui/button-group";
+import { SelectField } from "@/components/ui/select-field";
 import { ChevronDown, FileSpreadsheet, File, FolderOpen, X } from "lucide-react";
 import { buildStockBalancesListXlsxBuffer, type StockBalancesExportRow } from "../stockBalancesListExport";
 import {
@@ -47,6 +48,7 @@ import { revealItemInDir } from "@tauri-apps/plugin-opener";
 import { useSettings } from "../../../shared/settings/SettingsContext";
 import { getEffectiveWorkspaceFeatureEnabled } from "../../../shared/workspace";
 import { normalizeTrim } from "../../../shared/validation";
+import { STOCK_STYLE_VALUES, type StockStyle } from "@/shared/inventoryStyle";
 
 type RowData = StockBalance & {
   itemCode: string;
@@ -61,6 +63,11 @@ type RowData = StockBalance & {
   coverageStatus: StockBalanceCoverageStatus;
 };
 
+function filterByStyle(rows: RowData[], style: StockStyle | ""): RowData[] {
+  if (style === "") return rows;
+  return rows.filter((r) => r.style === style);
+}
+
 type StockBalanceQuickFilter =
   | "all"
   | "shortage"
@@ -74,6 +81,7 @@ function filterBySearch(
   rows: RowData[],
   query: string,
   coverageLabel: (s: StockBalanceCoverageStatus) => string,
+  styleLabel: (s: StockStyle) => string,
 ): RowData[] {
   const q = query.trim().toLowerCase();
   if (!q) return rows;
@@ -82,6 +90,7 @@ function filterBySearch(
       r.itemCode.toLowerCase().includes(q) ||
       r.itemName.toLowerCase().includes(q) ||
       r.warehouseName.toLowerCase().includes(q) ||
+      styleLabel(r.style).toLowerCase().includes(q) ||
       coverageLabel(r.coverageStatus).toLowerCase().includes(q),
   );
 }
@@ -132,12 +141,14 @@ function filterByQuickFilter(rows: RowData[], f: StockBalanceQuickFilter): RowDa
 function buildExportRowsFromBalances(
   rows: RowData[],
   coverageLabel: (s: StockBalanceCoverageStatus) => string,
+  styleLabel: (s: StockStyle) => string,
 ): StockBalancesExportRow[] {
   return rows.map((r, idx) => ({
     no: idx + 1,
     itemCode: r.itemCode,
     itemName: r.itemName,
     warehouse: r.warehouseName,
+    style: styleLabel(r.style),
     totalQty: r.qtyOnHand,
     reservedQty: r.reservedQty,
     availableQty: r.availableQty,
@@ -158,6 +169,7 @@ export function StockBalancesListPage() {
     (s: StockBalanceCoverageStatus) => t(`ops.stock.coverage.${s}`),
     [t],
   );
+  const styleLabel = useCallback((s: StockStyle) => t(`ops.stock.styles.${s}`), [t]);
 
   const quickFilterOptions = useMemo(
     (): Array<{ value: StockBalanceQuickFilter; label: string; aria: string }> => [
@@ -234,6 +246,7 @@ export function StockBalancesListPage() {
   }, [searchParams]);
 
   const [searchQuery, setSearchQuery] = useState("");
+  const [styleFilter, setStyleFilter] = useState<StockStyle | "">("");
   const [quickFilter, setQuickFilter] = useState<StockBalanceQuickFilter>("all");
   const [exportSuccess, setExportSuccess] = useState<{ path: string; filename: string } | null>(null);
   const [exportOpen, setExportOpen] = useState(false);
@@ -298,6 +311,10 @@ export function StockBalancesListPage() {
     () => filterByWarehouseId(rowsAfterItem, warehouseFilterId),
     [rowsAfterItem, warehouseFilterId],
   );
+  const rowsAfterStyle = useMemo(
+    () => filterByStyle(rowsAfterWarehouse, styleFilter),
+    [rowsAfterWarehouse, styleFilter],
+  );
 
   const quickFilterCounts = useMemo((): Record<StockBalanceQuickFilter, number> => {
     let shortage = 0;
@@ -306,7 +323,7 @@ export function StockBalancesListPage() {
     let availLteZero = 0;
     let needsRepl = 0;
     let atRisk = 0;
-    for (const r of rowsAfterWarehouse) {
+    for (const r of rowsAfterStyle) {
       if (r.deficitQty > 0) shortage++;
       if (r.outgoingQty > 0) outgoing++;
       if (r.incomingQty > 0) incoming++;
@@ -320,7 +337,7 @@ export function StockBalancesListPage() {
         atRisk++;
     }
     return {
-      all: rowsAfterWarehouse.length,
+      all: rowsAfterStyle.length,
       shortage,
       outgoing,
       incoming,
@@ -328,12 +345,17 @@ export function StockBalancesListPage() {
       needs_replenishment: needsRepl,
       coverage_at_risk: atRisk,
     };
-  }, [rowsAfterWarehouse]);
+  }, [rowsAfterStyle]);
 
   const filteredRows = useMemo(() => {
-    const bySearch = filterBySearch(rowsAfterWarehouse, searchQuery, coverageLabel);
+    const bySearch = filterBySearch(
+      rowsAfterStyle,
+      searchQuery,
+      coverageLabel,
+      styleLabel,
+    );
     return filterByQuickFilter(bySearch, quickFilter);
-  }, [rowsAfterWarehouse, searchQuery, quickFilter, coverageLabel]);
+  }, [rowsAfterStyle, searchQuery, quickFilter, coverageLabel, styleLabel]);
 
   const isEmpty = filteredRows.length === 0;
 
@@ -359,6 +381,7 @@ export function StockBalancesListPage() {
     itemFilterId != null ||
     brandFilterId != null ||
     categoryFilterId != null ||
+    styleFilter !== "" ||
     quickFilter !== "all";
 
   const brandFilterLabel = useMemo((): string => {
@@ -424,19 +447,21 @@ export function StockBalancesListPage() {
 
   const getExportRowsCurrentView = useCallback((): StockBalancesExportRow[] => {
     const api = gridRef.current?.api;
-    if (!api) return buildExportRowsFromBalances(filteredRows, coverageLabel);
+    if (!api) {
+      return buildExportRowsFromBalances(filteredRows, coverageLabel, styleLabel);
+    }
     const rows: RowData[] = [];
     api.forEachNodeAfterFilterAndSort((rowNode) => {
       if (rowNode.data) rows.push(rowNode.data);
     });
-    return buildExportRowsFromBalances(rows, coverageLabel);
-  }, [filteredRows, coverageLabel]);
+    return buildExportRowsFromBalances(rows, coverageLabel, styleLabel);
+  }, [filteredRows, coverageLabel, styleLabel]);
 
   const getExportRowsSelected = useCallback((): StockBalancesExportRow[] => {
     const api = gridRef.current?.api;
     const rows: RowData[] = api ? (api.getSelectedRows() as RowData[]) : [];
-    return buildExportRowsFromBalances(rows, coverageLabel);
-  }, [coverageLabel]);
+    return buildExportRowsFromBalances(rows, coverageLabel, styleLabel);
+  }, [coverageLabel, styleLabel]);
 
   const runExportWithSaveAs = useCallback(
     async (defaultFilename: string, buildBuffer: () => Promise<ArrayBuffer>) => {
@@ -585,6 +610,15 @@ export function StockBalancesListPage() {
         minWidth: 120,
         width: 140,
       },
+      {
+        field: "style",
+        headerName: t("doc.columns.style"),
+        width: 118,
+        minWidth: 108,
+        sortable: true,
+        valueFormatter: (p) =>
+          p.value != null ? styleLabel(p.value as StockStyle) : "—",
+      },
       qtyCol("qtyOnHand", t("doc.columns.totalQuantity"), 112),
     ];
     if (!showOperationalGrid) return base;
@@ -610,7 +644,7 @@ export function StockBalancesListPage() {
         cellRenderer: AgGridStockCoverageCellRenderer,
       },
     ];
-  }, [showOperationalGrid, t, locale, coverageLabel]);
+  }, [showOperationalGrid, t, locale, coverageLabel, styleLabel]);
 
   return (
     <ListPageLayout
@@ -654,6 +688,17 @@ export function StockBalancesListPage() {
             onChange={setSearchQuery}
             aria-label={t("ops.stockBalances.searchAria")}
             resultCount={filteredRows.length}
+          />
+          <SelectField
+            value={styleFilter}
+            onChange={(value) => setStyleFilter(value as StockStyle | "")}
+            options={STOCK_STYLE_VALUES.map((value) => ({
+              value,
+              label: styleLabel(value),
+            }))}
+            placeholder={t("ops.stockBalances.filterAllStyles")}
+            aria-label={t("ops.stockBalances.styleFilterAria")}
+            className="w-[180px]"
           />
           <div className="flex flex-row items-center gap-2 shrink-0 ml-auto">
             {brandFilterId != null && (

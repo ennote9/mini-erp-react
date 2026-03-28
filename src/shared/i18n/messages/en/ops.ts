@@ -87,6 +87,11 @@ export const opsEn = {
     },
   },
   stock: {
+    styles: {
+      GOOD: "Good",
+      MARKDOWN: "Markdown",
+      DEFECT: "Defect",
+    },
     coverage: {
       covered: "Covered",
       at_risk: "At risk",
@@ -105,6 +110,8 @@ export const opsEn = {
       outgoingEmpty: "No remaining demand on confirmed sales orders.",
       incomingTitle: "Incoming supply",
       incomingEmpty: "No expected receipts on confirmed purchase orders.",
+      nonGoodStyleHint:
+        "Reservations and planning demand stay on good stock only. This row shows stock held in the selected style bucket.",
       mismatchReserved:
         "Line detail ({{sum}}) differs from grid Reserved ({{grid}}). Check warehouse and item on each reservation.",
       mismatchOutgoing:
@@ -352,6 +359,8 @@ export const opsEn = {
     quickFiltersAria: "Quick filters",
     searchAria: "Search stock balances",
     searchPlaceholder: "Search",
+    styleFilterAria: "Filter by stock style",
+    filterAllStyles: "All styles",
     warehouseFilterAria: "Warehouse filter active",
     itemFilterAria: "Item filter active",
     itemFilterPrefix: "Item",

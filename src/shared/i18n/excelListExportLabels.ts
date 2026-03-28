@@ -189,6 +189,7 @@ export function stockBalancesListExcelLabels(t: TFunction): ExcelListSheetLabels
       t("exportExcel.list.colItemCode"),
       t("exportExcel.list.colItemName"),
       t("exportExcel.list.colWarehouse"),
+      t("exportExcel.list.colStyle"),
       t("exportExcel.list.colTotalQuantity"),
       t("exportExcel.list.colReserved"),
       t("exportExcel.list.colAvailable"),

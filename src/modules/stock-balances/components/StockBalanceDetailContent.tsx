@@ -11,10 +11,12 @@ import {
 } from "../../../shared/stockBalancesDrillDownContributors";
 import { type StockBalanceCoverageStatus } from "../../../shared/stockBalancesOperationalMetrics";
 import { useTranslation } from "@/shared/i18n/context";
+import type { StockStyle } from "@/shared/inventoryStyle";
 
 export type StockBalanceDrillDownSnapshot = {
   itemId: string;
   warehouseId: string;
+  style: StockStyle;
   itemCode: string;
   itemName: string;
   warehouseName: string;
@@ -75,18 +77,28 @@ export function StockBalanceDetailContent({ row }: Props) {
   const navigate = useNavigate();
 
   const coverageLabel = (s: StockBalanceCoverageStatus) => t(`ops.stock.coverage.${s}`);
+  const isOperationalStyle = row.style === "GOOD";
 
   const reservations = useMemo(
-    () => listReservationContributorsForWarehouseItem(row.warehouseId, row.itemId),
-    [row.warehouseId, row.itemId],
+    () =>
+      isOperationalStyle
+        ? listReservationContributorsForWarehouseItem(row.warehouseId, row.itemId)
+        : [],
+    [isOperationalStyle, row.warehouseId, row.itemId],
   );
   const outgoing = useMemo(
-    () => listOutgoingContributorsForWarehouseItem(row.warehouseId, row.itemId),
-    [row.warehouseId, row.itemId],
+    () =>
+      isOperationalStyle
+        ? listOutgoingContributorsForWarehouseItem(row.warehouseId, row.itemId)
+        : [],
+    [isOperationalStyle, row.warehouseId, row.itemId],
   );
   const incoming = useMemo(
-    () => listIncomingContributorsForWarehouseItem(row.warehouseId, row.itemId),
-    [row.warehouseId, row.itemId],
+    () =>
+      isOperationalStyle
+        ? listIncomingContributorsForWarehouseItem(row.warehouseId, row.itemId)
+        : [],
+    [isOperationalStyle, row.warehouseId, row.itemId],
   );
 
   const sumRes = sumReservations(reservations);
@@ -118,6 +130,7 @@ export function StockBalanceDetailContent({ row }: Props) {
         </CardHeader>
         <CardContent className="pt-0">
           <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-4">
+            <StatTile label={t("doc.columns.style")} value={t(`ops.stock.styles.${row.style}`)} />
             <StatTile label={t("doc.columns.totalQuantity")} value={row.qtyOnHand} />
             <StatTile label={t("doc.columns.reserved")} value={row.reservedQty} />
             <StatTile label={t("doc.columns.available")} value={row.availableQty} />
@@ -127,6 +140,11 @@ export function StockBalanceDetailContent({ row }: Props) {
             <StatTile label={t("doc.columns.netShortage")} value={row.netShortageQty} />
             <StatTile label={t("doc.columns.coverage")} value={coverageLabel(row.coverageStatus)} />
           </div>
+          {!isOperationalStyle ? (
+            <p className="mt-2 text-[0.6875rem] leading-snug text-muted-foreground">
+              {t("ops.stock.drilldown.nonGoodStyleHint")}
+            </p>
+          ) : null}
         </CardContent>
       </Card>
 

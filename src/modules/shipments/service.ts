@@ -26,6 +26,7 @@ import {
   getSalesOrderOrderedQtyByItemId,
 } from "../../shared/planningFulfillment";
 import { reconcileSalesOrderReservations } from "../../shared/soReservationReconcile";
+import { DEFAULT_STOCK_STYLE, type StockStyle } from "@/shared/inventoryStyle";
 
 export type PostResult = { success: true } | { success: false; issues: Issue[] };
 export type CancelDocumentResult =
@@ -35,6 +36,10 @@ export type CancelDocumentResult =
 export type ReverseDocumentResult =
   | { success: true }
   | { success: false; error: string };
+
+function lineStockStyle(markdownCode: string | undefined): StockStyle {
+  return markdownCode ? "MARKDOWN" : DEFAULT_STOCK_STYLE;
+}
 
 /**
  * Full-pass validation: collect all errors (and warnings) for the shipment without stopping at the first.
@@ -327,9 +332,10 @@ export function validateShipmentFull(shipmentId: string): Issue[] {
 
       for (const line of lines) {
         const qty = parseDocumentLineQty(line.qty) ?? 0;
-        const balance = stockBalanceRepository.getByItemAndWarehouse(
+        const balance = stockBalanceRepository.getByItemWarehouseAndStyle(
           line.itemId,
           shipment.warehouseId,
+          lineStockStyle(line.markdownCode),
         );
         const onHand = balance?.qtyOnHand ?? 0;
         const item = itemRepository.getById(line.itemId);
@@ -417,20 +423,17 @@ export function post(shipmentId: string): PostResult {
       movementType: "shipment",
       itemId: line.itemId,
       warehouseId: shipment.warehouseId,
+      style: lineStockStyle(line.markdownCode),
       qtyDelta: -line.qty,
       sourceDocumentType: "shipment",
       sourceDocumentId: shipmentId,
     });
 
-    const existing = stockBalanceRepository.getByItemAndWarehouse(
-      line.itemId,
-      shipment.warehouseId,
-    );
-    const newQty = Math.max(0, (existing?.qtyOnHand ?? 0) - line.qty);
-    stockBalanceRepository.upsert({
+    stockBalanceRepository.adjustQty({
       itemId: line.itemId,
       warehouseId: shipment.warehouseId,
-      qtyOnHand: newQty,
+      style: lineStockStyle(line.markdownCode),
+      qtyDelta: -line.qty,
     });
   }
 
@@ -546,20 +549,17 @@ export function reverseDocument(
       movementType: "shipment_reversal",
       itemId: line.itemId,
       warehouseId: shipment.warehouseId,
+      style: lineStockStyle(line.markdownCode),
       qtyDelta: qty,
       sourceDocumentType: "shipment",
       sourceDocumentId: shipmentId,
       comment: "Shipment reversal (compensating movement)",
     });
-    const existing = stockBalanceRepository.getByItemAndWarehouse(
-      line.itemId,
-      shipment.warehouseId,
-    );
-    const newQty = (existing?.qtyOnHand ?? 0) + qty;
-    stockBalanceRepository.upsert({
+    stockBalanceRepository.adjustQty({
       itemId: line.itemId,
       warehouseId: shipment.warehouseId,
-      qtyOnHand: newQty,
+      style: lineStockStyle(line.markdownCode),
+      qtyDelta: qty,
     });
   }
 

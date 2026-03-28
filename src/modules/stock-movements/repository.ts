@@ -1,6 +1,10 @@
 import type { StockMovement } from "./model";
 import type { MovementType, SourceDocumentType } from "../../shared/domain";
 import {
+  normalizeStockStyle,
+  type StockStyle,
+} from "@/shared/inventoryStyle";
+import {
   getInventoryFilePath,
   loadInventoryPersisted,
   writeInventoryPayload,
@@ -8,7 +12,9 @@ import {
 import { registerPersistenceFlush } from "../../shared/persistenceCoordinator";
 import { bumpAppReadModelRevision } from "../../shared/appReadModelRevision";
 
-export type CreateStockMovementInput = Omit<StockMovement, "id">;
+export type CreateStockMovementInput = Omit<StockMovement, "id" | "style"> & {
+  style?: StockStyle;
+};
 
 const store: StockMovement[] = [];
 let nextId = 1;
@@ -61,6 +67,7 @@ function normalizeStockMovement(raw: unknown): StockMovement | null {
     movementType: rec.movementType,
     itemId: rec.itemId,
     warehouseId: rec.warehouseId,
+    style: normalizeStockStyle(rec.style),
     qtyDelta,
     sourceDocumentType: rec.sourceDocumentType,
     sourceDocumentId: rec.sourceDocumentId,
@@ -139,7 +146,11 @@ export const stockMovementRepository = {
 
   /** Append a movement. Foundation for future post logic. */
   create(input: CreateStockMovementInput): StockMovement {
-    const movement: StockMovement = { ...input, id: nextIdStr() };
+    const movement: StockMovement = {
+      ...input,
+      style: normalizeStockStyle(input.style),
+      id: nextIdStr(),
+    };
     store.push(movement);
     schedulePersist();
     return movement;

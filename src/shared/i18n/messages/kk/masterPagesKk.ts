@@ -356,6 +356,13 @@ export const kkMasterPages: MessageTree = {
     typeLabel: "Түрі",
     warehouseTypePlaceholder: "мысалы Негізгі, Тарату",
     accountingProfile: "Қойманың есептік профилі",
+    stylePolicy: "Қойма стиль саясаты",
+    stylePolicyOptions: {
+      ANY: "Кез келген стиль",
+      GOOD_ONLY: "Тек жарамды",
+      MARKDOWN_ONLY: "Тек уценка",
+      DEFECT_ONLY: "Тек брак",
+    },
     addressContactTitle: "Мекенжай және байланыс",
     addressContactDescription: "Мекенжай, қала, ел және байланыс.",
     settingsTitle: "Қойма баптаулары",
