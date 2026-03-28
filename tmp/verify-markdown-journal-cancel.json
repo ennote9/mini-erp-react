@@ -1,0 +1,81 @@
+{
+  "baseUrl": "http://127.0.0.1:1420",
+  "stockBalancesBefore": [
+    [
+      "",
+      "1",
+      "ITEM-001",
+      "Widget A",
+      "Main Warehouse",
+      "Good",
+      "0",
+      "0",
+      "0",
+      "0",
+      "0",
+      "0",
+      "0",
+      "Covered"
+    ]
+  ],
+  "draftUrl": "http://127.0.0.1:1420/markdown-journal/journals/1",
+  "journalNumber": "MJ00000001",
+  "statusBeforeCancel": "Draft",
+  "postButtonBeforeCancel": 1,
+  "printButtonBeforeCancel": 0,
+  "statusAfterCancel": "Cancelled",
+  "cancelledHintVisible": 1,
+  "postButtonAfterCancel": 0,
+  "printButtonAfterCancel": 0,
+  "lineEditorAfterCancel": 0,
+  "cancelledTimestampVisible": 1,
+  "registerTextsBeforeFilter": [
+    "1",
+    "MJ00000001",
+    "Cancelled",
+    "WH-001 — Main Warehouse",
+    "WH-002 — North Distribution Center",
+    "1",
+    "1",
+    "2026-03-28T17:20:50.913Z",
+    "—"
+  ],
+  "registerRowCountBeforeFilter": 1,
+  "registerContainsJournalNumber": true,
+  "registerContainsCancelled": true,
+  "filteredJournalRowsAfterCancel": [
+    [
+      "1",
+      "MJ00000001",
+      "Cancelled",
+      "WH-001 — Main Warehouse",
+      "WH-002 — North Distribution Center",
+      "1",
+      "1",
+      "2026-03-28T17:20:50.913Z",
+      "—"
+    ]
+  ],
+  "filteredRegisterContainsJournalNumber": true,
+  "filteredRegisterContainsCancelled": true,
+  "codesRowCount": 0,
+  "codesContainJournalNumber": false,
+  "stockBalancesAfter": [
+    [
+      "",
+      "1",
+      "ITEM-001",
+      "Widget A",
+      "Main Warehouse",
+      "Good",
+      "0",
+      "0",
+      "0",
+      "0",
+      "0",
+      "0",
+      "0",
+      "Covered"
+    ]
+  ]
+}

@@ -115,6 +115,11 @@ function normalizeRecord(raw: unknown): MarkdownRecord | null {
     originalBarcode: typeof r.originalBarcode === "string" ? r.originalBarcode : undefined,
     comment: typeof r.comment === "string" ? r.comment : undefined,
     basePriceAtMarkdown: typeof r.basePriceAtMarkdown === "number" ? r.basePriceAtMarkdown : undefined,
+    printCount:
+      typeof r.printCount === "number" && Number.isFinite(r.printCount)
+        ? Math.max(0, Math.floor(r.printCount))
+        : 0,
+    printedAt: typeof r.printedAt === "string" ? r.printedAt : undefined,
     closedAt: typeof r.closedAt === "string" ? r.closedAt : undefined,
     closedBy: typeof r.closedBy === "string" ? r.closedBy : undefined,
     supersededByMarkdownId:
@@ -159,6 +164,7 @@ export const markdownRepository = {
       ...input,
       id: nextIdStr(),
       markdownCode: allocateMarkdownCode(),
+      printCount: input.printCount ?? 0,
       quantity: 1,
     };
     store.push(entity);

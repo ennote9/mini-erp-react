@@ -22,6 +22,7 @@ export const MARKDOWN_JOURNAL_STATUS_FILTERS: Array<MarkdownJournalStatus | "all
   "all",
   "draft",
   "posted",
+  "cancelled",
 ];
 
 function parseIsoDatePrefix(iso: string): string {

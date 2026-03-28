@@ -59,6 +59,22 @@ type MarkdownCodeRow = {
   postedAt: string;
 };
 
+function journalStatusLabel(
+  status: MarkdownJournalStatus,
+  t: (key: string) => string,
+): string {
+  switch (status) {
+    case "draft":
+      return t("status.factual.draft");
+    case "posted":
+      return t("status.factual.posted");
+    case "cancelled":
+      return t("status.factual.cancelled");
+    default:
+      return status;
+  }
+}
+
 function warehouseLabelFor(id: string): string {
   const warehouse = warehouseRepository.getById(id);
   return warehouse ? `${warehouse.code} — ${warehouse.name}` : id;
@@ -218,8 +234,7 @@ export function MarkdownJournalPage() {
         headerName: t("common.status"),
         minWidth: 120,
         width: 130,
-        valueFormatter: (params) =>
-          params.value === "draft" ? t("status.factual.draft") : t("status.factual.posted"),
+        valueFormatter: (params) => (params.value ? journalStatusLabel(params.value, t) : ""),
       },
       {
         field: "sourceWarehouseLabel",
@@ -372,9 +387,7 @@ export function MarkdownJournalPage() {
                   >
                     {value === "all"
                       ? t("markdown.filters.allStatuses")
-                      : value === "draft"
-                        ? t("status.factual.draft")
-                        : t("status.factual.posted")}
+                      : journalStatusLabel(value, t)}
                   </Button>
                 </div>
               ))}

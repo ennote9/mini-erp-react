@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { AgGridReact } from "ag-grid-react";
-import type { ColDef } from "ag-grid-community";
-import { ClipboardList, File, List, Printer, Save, X } from "lucide-react";
+import { Dialog } from "radix-ui";
+import type { ColDef, SelectionChangedEvent } from "ag-grid-community";
+import { CheckSquare, ClipboardList, File, List, Printer, Save, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -15,17 +16,23 @@ import { useTranslation } from "@/shared/i18n/context";
 import { itemRepository } from "@/modules/items/repository";
 import { warehouseRepository } from "@/modules/warehouses/repository";
 import { useAppReadModelRevision } from "@/shared/inventoryMasterPageBlocks/useAppReadModelRevision";
-import { AgGridContainer } from "@/shared/ui/ag-grid/AgGridContainer";
-import { agGridDefaultColDef, agGridDefaultGridOptions } from "@/shared/ui/ag-grid/agGridDefaults";
+import {
+  AgGridContainer,
+  agGridDefaultColDef,
+  agGridDefaultGridOptions,
+  agGridSelectionColumnDef,
+} from "@/shared/ui/ag-grid";
 import type { Item } from "@/modules/items/model";
 import type { MarkdownJournal, MarkdownReasonCode } from "../model";
 import { markdownJournalRepository } from "../journalRepository";
 import {
+  cancelMarkdownJournalDraft,
   createMarkdownJournalDraft,
   listMarkdownLinesForJournal,
   listMarkdownUnitsForJournal,
   postMarkdownJournal,
-  printMarkdownJournalStickers,
+  recordMarkdownPrintAudit,
+  resolveMarkdownJournalPrintRecords,
   updateMarkdownJournalDraft,
   type MarkdownJournalDraftLineInput,
 } from "../service";
@@ -63,9 +70,12 @@ type MarkdownCodeRow = {
   warehouse: string;
   status: string;
   postedAt: string;
+  printCount: number;
+  printedAt: string;
 };
 
 type JournalDetailTab = "lines" | "codes";
+type PrintMode = "all" | "selected";
 
 function buildCancelTarget(itemId: string): string {
   if (!itemId) return "/markdown-journal";
@@ -129,6 +139,8 @@ function journalUnitsToCodeRows(
       warehouse: warehouseLabelFor(record.warehouseId),
       status: t(`markdown.status.${record.status}`),
       postedAt: record.createdAt,
+      printCount: record.printCount,
+      printedAt: record.printedAt ?? t("domain.audit.summary.emDash"),
     };
   });
 }
@@ -136,6 +148,69 @@ function journalUnitsToCodeRows(
 function warehouseLabelFor(id: string): string {
   const warehouse = warehouseRepository.getById(id);
   return warehouse ? `${warehouse.code} — ${warehouse.name}` : id;
+}
+
+function escapeHtml(value: string): string {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+function buildMarkdownPrintSheetHtml(params: {
+  journalNumber: string;
+  rows: MarkdownCodeRow[];
+  t: (key: string) => string;
+}): string {
+  const { journalNumber, rows, t } = params;
+  const html = rows
+    .map((row) => {
+      return `
+        <article class="sticker">
+          <div class="sticker__code">${escapeHtml(row.markdownCode)}</div>
+          <div class="sticker__item">${escapeHtml(`${row.itemCode} — ${row.itemName}`)}</div>
+          <div class="sticker__meta">${escapeHtml(`${t("markdown.fields.markdownPrice")}: ${row.markdownPrice.toFixed(2)}`)}</div>
+          <div class="sticker__meta">${escapeHtml(`${t("markdown.fields.journalNumber")}: ${journalNumber}`)}</div>
+        </article>
+      `;
+    })
+    .join("");
+
+  return `<!doctype html>
+    <html>
+      <head>
+        <title>${escapeHtml(journalNumber)}</title>
+        <style>
+          body { font-family: Arial, sans-serif; margin: 16px; color: #111; }
+          .sheet { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+          .sticker { border: 1px solid #111; padding: 12px; page-break-inside: avoid; }
+          .sticker__code { font-size: 20px; font-weight: 700; margin-bottom: 8px; }
+          .sticker__item { font-size: 14px; margin-bottom: 6px; }
+          .sticker__meta { font-size: 12px; margin-bottom: 2px; }
+        </style>
+      </head>
+      <body>
+        <div class="sheet">${html}</div>
+      </body>
+    </html>`;
+}
+
+function journalStatusLabel(
+  status: MarkdownJournal["status"],
+  t: (key: string) => string,
+): string {
+  switch (status) {
+    case "draft":
+      return t("status.factual.draft");
+    case "posted":
+      return t("status.factual.posted");
+    case "cancelled":
+      return t("status.factual.cancelled");
+    default:
+      return status;
+  }
 }
 
 export function MarkdownCreatePage() {
@@ -163,6 +238,8 @@ export function MarkdownCreatePage() {
   const [lineEntryReason, setLineEntryReason] = useState<MarkdownReasonCode>("OTHER");
   const [editingLineId, setEditingLineId] = useState<string | null>(null);
   const [detailTab, setDetailTab] = useState<JournalDetailTab>("lines");
+  const [printDialogOpen, setPrintDialogOpen] = useState(false);
+  const [selectedCodeIds, setSelectedCodeIds] = useState<string[]>([]);
   const lineEntryItemPickerRef = useRef<{ focus: () => void } | null>(null);
   const lineEntryDropdownRightEdgeRef = useRef<HTMLDivElement | null>(null);
 
@@ -202,6 +279,11 @@ export function MarkdownCreatePage() {
       setDetailTab("lines");
     }
   }, [detailTab, journal?.status]);
+
+  const isDraft = isNew || journal?.status === "draft";
+  const isPosted = journal?.status === "posted";
+  const isCancelled = journal?.status === "cancelled";
+  const isReadOnly = !isNew && !isDraft;
 
   const cancelTarget = useMemo(() => buildCancelTarget(prefillItemId), [prefillItemId]);
 
@@ -328,14 +410,25 @@ export function MarkdownCreatePage() {
     navigate(`/markdown-journal/journals/${result.journal.id}`, { replace: true });
   }, [id, navigate]);
 
-  const handlePrint = useCallback(() => {
+  const handleCancelJournal = useCallback(() => {
     if (!id) return;
     setCreateError(null);
-    const result = printMarkdownJournalStickers(id);
+    const result = cancelMarkdownJournalDraft(id, LOCAL_ACTOR);
     if (!result.success) {
       setCreateError(result.error);
+      return;
     }
-  }, [id]);
+    navigate(`/markdown-journal/journals/${result.journal.id}`, { replace: true });
+  }, [id, navigate]);
+
+  const handlePrint = useCallback(() => {
+    setCreateError(null);
+    setPrintDialogOpen(true);
+  }, []);
+
+  const handleCodeSelectionChanged = useCallback((event: SelectionChangedEvent<MarkdownCodeRow>) => {
+    setSelectedCodeIds(event.api.getSelectedRows().map((row) => row.id));
+  }, []);
 
   const lineColumnDefs = useMemo<ColDef<GridRow>[]>(
     () => [
@@ -451,6 +544,18 @@ export function MarkdownCreatePage() {
         minWidth: 180,
         width: 200,
       },
+      {
+        field: "printCount",
+        headerName: t("markdown.fields.printCount"),
+        width: 100,
+        minWidth: 90,
+      },
+      {
+        field: "printedAt",
+        headerName: t("markdown.fields.printedAt"),
+        minWidth: 180,
+        width: 200,
+      },
     ],
     [t],
   );
@@ -468,6 +573,69 @@ export function MarkdownCreatePage() {
   const unitsCount = useMemo(
     () => (journal ? listMarkdownUnitsForJournal(journal.id).length : 0),
     [journal, appRevision],
+  );
+  const selectedPrintableCount = useMemo(() => {
+    if (selectedCodeIds.length === 0) return 0;
+    const selectedSet = new Set(selectedCodeIds);
+    return codeRows.filter((row) => selectedSet.has(row.id)).length;
+  }, [codeRows, selectedCodeIds]);
+
+  const handlePrintMode = useCallback(
+    (mode: PrintMode) => {
+      if (!id || !journal) return;
+      setCreateError(null);
+      const printResult = resolveMarkdownJournalPrintRecords(
+        id,
+        mode === "selected" ? { recordIds: selectedCodeIds } : undefined,
+      );
+      if (!printResult.success) {
+        setCreateError(printResult.error);
+        return;
+      }
+
+      const printableRows = printResult.records.map((record) => {
+        const item = itemRepository.getById(record.itemId);
+        return {
+          id: record.id,
+          markdownCode: record.markdownCode,
+          itemCode: item?.code ?? record.itemId,
+          itemName: item?.name ?? record.itemId,
+          quantity: 1,
+          markdownPrice: record.markdownPrice,
+          reason: t(`markdown.reason.${record.reasonCode}`),
+          warehouse: warehouseLabelFor(record.warehouseId),
+          status: t(`markdown.status.${record.status}`),
+          postedAt: record.createdAt,
+          printCount: record.printCount,
+          printedAt: record.printedAt ?? t("domain.audit.summary.emDash"),
+        } satisfies MarkdownCodeRow;
+      });
+
+      const popup = window.open("", "_blank", "noopener,noreferrer,width=960,height=720");
+      if (!popup) {
+        setCreateError("Could not open print window.");
+        return;
+      }
+
+      popup.document.write(
+        buildMarkdownPrintSheetHtml({
+          journalNumber: printResult.journal.number,
+          rows: printableRows,
+          t,
+        }),
+      );
+      popup.document.close();
+      popup.focus();
+      popup.print();
+
+      const auditResult = recordMarkdownPrintAudit(printResult.records.map((record) => record.id));
+      if (!auditResult.success) {
+        setCreateError(auditResult.error);
+        return;
+      }
+      setPrintDialogOpen(false);
+    },
+    [id, journal, selectedCodeIds, t],
   );
 
   const breadcrumbItems = useMemo(
@@ -506,16 +674,22 @@ export function MarkdownCreatePage() {
                   {t("common.save")}
                 </Button>
               )}
-              {!isNew && journal?.status === "draft" && (
-                <Button type="button" onClick={handlePost}>
-                  <Save aria-hidden />
-                  {t("doc.factual.post")}
-                </Button>
-              )}
+              {!isNew && journal?.status === "draft" ? (
+                <>
+                  <Button type="button" onClick={handlePost}>
+                    <Save aria-hidden />
+                    {t("doc.factual.post")}
+                  </Button>
+                  <Button type="button" variant="outline" onClick={handleCancelJournal}>
+                    <X aria-hidden />
+                    {t("markdown.actions.cancelJournal")}
+                  </Button>
+                </>
+              ) : null}
               {!isNew && journal?.status === "posted" && (
                 <Button type="button" onClick={handlePrint}>
                   <Printer aria-hidden />
-                  {t("markdown.actions.printStickers")}
+                  {t("markdown.actions.printLabels")}
                 </Button>
               )}
               <Button type="button" variant="outline" onClick={handleCancel}>
@@ -539,7 +713,7 @@ export function MarkdownCreatePage() {
                 className="mb-3 rounded-md border border-destructive/50 bg-destructive/10 px-3 py-2 text-sm text-destructive"
                 role="alert"
               >
-                {t("markdown.messages.createFailed", { message: createError })}
+                {t("markdown.messages.actionFailed", { message: createError })}
               </div>
             ) : null}
 
@@ -566,7 +740,7 @@ export function MarkdownCreatePage() {
                       <Label htmlFor="markdown-source-warehouse" className="text-xs leading-none">
                         {t("markdown.fields.sourceWarehouse")}
                       </Label>
-                      {journal?.status === "posted" ? (
+                      {isReadOnly ? (
                         <div className="flex h-8 items-center rounded border border-input bg-background px-1.5 text-sm leading-tight text-foreground">
                           {warehouseLabelFor(sourceWarehouseId)}
                         </div>
@@ -600,7 +774,7 @@ export function MarkdownCreatePage() {
                       <Label htmlFor="markdown-target-warehouse" className="text-xs leading-none">
                         {t("markdown.fields.targetWarehouse")}
                       </Label>
-                      {journal?.status === "posted" ? (
+                      {isReadOnly ? (
                         <div className="flex h-8 items-center rounded border border-input bg-background px-1.5 text-sm leading-tight text-foreground">
                           {warehouseLabelFor(targetWarehouseId)}
                         </div>
@@ -634,7 +808,7 @@ export function MarkdownCreatePage() {
                       <div className="flex w-full max-w-[180px] min-w-0 flex-col gap-0.5">
                         <Label className="text-xs leading-none">{t("common.status")}</Label>
                         <div className="flex h-8 items-center rounded border border-input bg-background px-1.5 text-sm leading-tight text-foreground">
-                          {journal.status === "draft" ? t("status.factual.draft") : t("status.factual.posted")}
+                          {journalStatusLabel(journal.status, t)}
                         </div>
                       </div>
                     ) : null}
@@ -643,6 +817,14 @@ export function MarkdownCreatePage() {
                         <Label className="text-xs leading-none">{t("markdown.fields.postedAt")}</Label>
                         <div className="flex h-8 items-center rounded border border-input bg-background px-1.5 text-sm leading-tight text-foreground">
                           {journal.postedAt}
+                        </div>
+                      </div>
+                    ) : null}
+                    {!isNew && journal?.cancelledAt ? (
+                      <div className="flex w-full max-w-[220px] min-w-0 flex-col gap-0.5">
+                        <Label className="text-xs leading-none">{t("markdown.fields.cancelledAt")}</Label>
+                        <div className="flex h-8 items-center rounded border border-input bg-background px-1.5 text-sm leading-tight text-foreground">
+                          {journal.cancelledAt}
                         </div>
                       </div>
                     ) : null}
@@ -668,11 +850,11 @@ export function MarkdownCreatePage() {
                     placeholder={t("common.optional")}
                     rows={3}
                     className="min-h-[4rem] w-[min(28rem,100%)] min-w-[16rem] resize-y text-sm"
-                    disabled={journal?.status === "posted"}
+                    disabled={isReadOnly}
                   />
                 </section>
               </div>
-              {!isNew && journal?.status === "posted" ? (
+              {!isNew && isPosted ? (
                 <div className="flex min-h-0 w-fit min-w-0 max-w-full shrink-0 flex-col p-3">
                   <section className="min-w-0" aria-labelledby="markdown-details-result-heading">
                     <h3
@@ -690,6 +872,10 @@ export function MarkdownCreatePage() {
                       <div className="flex w-full max-w-[140px] min-w-0 flex-col gap-0.5">
                         <span className="text-xs leading-tight text-muted-foreground">{t("markdown.fields.totalQty")}</span>
                         <span className="text-sm leading-tight text-foreground">{unitsCount}</span>
+                      </div>
+                      <div className="flex w-full max-w-[140px] min-w-0 flex-col gap-0.5">
+                        <span className="text-xs leading-tight text-muted-foreground">{t("markdown.journal.selectedCodesCount")}</span>
+                        <span className="text-sm leading-tight text-foreground">{selectedPrintableCount}</span>
                       </div>
                     </div>
                   </section>
@@ -722,18 +908,18 @@ export function MarkdownCreatePage() {
               type="button"
               role="tab"
               aria-selected={detailTab === "codes"}
-              aria-disabled={journal?.status !== "posted"}
-              disabled={journal?.status !== "posted"}
-              title={journal?.status !== "posted" ? t("markdown.journal.markdownCodesAvailableAfterPosting") : undefined}
+              aria-disabled={!isPosted}
+              disabled={!isPosted}
+              title={!isPosted ? t("markdown.journal.markdownCodesAvailableAfterPosting") : undefined}
               className={cn(
                 "-mb-px px-3 py-2 text-sm font-medium",
                 detailTab === "codes"
                   ? "border-b-2 border-primary text-foreground"
                   : "border-b-2 border-transparent text-muted-foreground hover:text-foreground",
-                journal?.status !== "posted" && "cursor-not-allowed opacity-50 hover:text-muted-foreground",
+                !isPosted && "cursor-not-allowed opacity-50 hover:text-muted-foreground",
               )}
               onClick={() => {
-                if (journal?.status === "posted") setDetailTab("codes");
+                if (isPosted) setDetailTab("codes");
               }}
             >
               <span className="inline-flex items-center gap-1.5">
@@ -743,14 +929,20 @@ export function MarkdownCreatePage() {
             </button>
           </div>
 
-          {journal?.status !== "posted" ? (
+          {!isPosted && !isCancelled ? (
             <p className="mb-2 text-xs text-muted-foreground">
               {t("markdown.journal.markdownCodesAvailableAfterPosting")}
             </p>
           ) : null}
 
+          {isCancelled ? (
+            <p className="mb-2 text-xs text-muted-foreground">
+              {t("markdown.journal.cancelledClosedHint")}
+            </p>
+          ) : null}
+
           <div className="doc-lines mt-0">
-            {detailTab === "lines" && journal?.status !== "posted" ? (
+            {detailTab === "lines" && isDraft ? (
               <div className="mb-1.5 flex w-full items-end gap-2">
                 <Card className="flex-1 min-w-0 border-0 shadow-none">
                   <CardContent className="p-2 pb-0">
@@ -782,6 +974,7 @@ export function MarkdownCreatePage() {
                           value={lineEntryQty}
                           onChange={(e) => setLineEntryQty(Number(e.target.value) || 1)}
                           className="h-8 w-[96px] text-right text-sm [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                          disabled={isReadOnly}
                         />
                       </div>
                       <div className="flex flex-col gap-0.5">
@@ -796,6 +989,7 @@ export function MarkdownCreatePage() {
                           value={lineEntryPrice}
                           onChange={(e) => setLineEntryPrice(Number(e.target.value) || 0)}
                           className="h-8 w-[110px] text-right text-sm [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                          disabled={isReadOnly}
                         />
                       </div>
                       <div className="flex flex-col gap-0.5">
@@ -810,6 +1004,7 @@ export function MarkdownCreatePage() {
                           )}
                           value={lineEntryReason}
                           onChange={(e) => setLineEntryReason(e.target.value as MarkdownReasonCode)}
+                          disabled={isReadOnly}
                         >
                           {MARKDOWN_REASONS.map((reasonCode) => (
                             <option key={reasonCode} value={reasonCode}>
@@ -819,17 +1014,17 @@ export function MarkdownCreatePage() {
                         </select>
                       </div>
                       <div ref={lineEntryDropdownRightEdgeRef} className="flex flex-shrink-0 items-center gap-1.5">
-                        <Button type="button" variant="outline" size="sm" className="h-8 gap-1.5" onClick={handleAddOrUpdateLine}>
+                        <Button type="button" variant="outline" size="sm" className="h-8 gap-1.5" onClick={handleAddOrUpdateLine} disabled={isReadOnly}>
                           <Save className="h-4 w-4 shrink-0" aria-hidden />
                           {editingLineId ? t("doc.page.updateLine") : t("doc.page.addLine")}
                         </Button>
                         {editingLineId ? (
                           <>
-                            <Button type="button" variant="outline" size="sm" className="h-8 gap-1.5" onClick={handleRemoveLine}>
+                            <Button type="button" variant="outline" size="sm" className="h-8 gap-1.5" onClick={handleRemoveLine} disabled={isReadOnly}>
                               <X className="h-4 w-4 shrink-0" aria-hidden />
                               {t("doc.page.remove")}
                             </Button>
-                            <Button type="button" variant="outline" size="sm" className="h-8 gap-1.5" onClick={resetLineEntry}>
+                            <Button type="button" variant="outline" size="sm" className="h-8 gap-1.5" onClick={resetLineEntry} disabled={isReadOnly}>
                               <X className="h-4 w-4 shrink-0" aria-hidden />
                               {t("doc.page.cancelEdit")}
                             </Button>
@@ -855,7 +1050,7 @@ export function MarkdownCreatePage() {
                       defaultColDef={agGridDefaultColDef}
                       getRowId={(params) => params.data.id}
                       onRowClicked={
-                        journal?.status === "posted"
+                        isReadOnly
                           ? undefined
                           : (event) => {
                               if (event.data) handleEditLine(event.data.id);
@@ -875,7 +1070,10 @@ export function MarkdownCreatePage() {
                     rowData={codeRows}
                     columnDefs={codeColumnDefs}
                     defaultColDef={agGridDefaultColDef}
+                    rowSelection={{ mode: "multiRow", checkboxes: true, headerCheckbox: true, enableClickSelection: true }}
+                    selectionColumnDef={agGridSelectionColumnDef}
                     getRowId={(params) => params.data.id}
+                    onSelectionChanged={handleCodeSelectionChanged}
                   />
                 </AgGridContainer>
               </div>
@@ -883,6 +1081,48 @@ export function MarkdownCreatePage() {
           </div>
         </div>
       </div>
+
+      <Dialog.Root open={printDialogOpen} onOpenChange={setPrintDialogOpen}>
+        <Dialog.Portal>
+          <Dialog.Overlay className="fixed inset-0 z-50 bg-black/50 backdrop-blur-[1px]" />
+          <Dialog.Content className="fixed left-1/2 top-1/2 z-50 w-[min(32rem,calc(100vw-2rem))] -translate-x-1/2 -translate-y-1/2 rounded-lg border bg-background p-5 shadow-lg focus:outline-none">
+            <Dialog.Title className="text-base font-semibold text-foreground">
+              {t("markdown.journal.printDialogTitle")}
+            </Dialog.Title>
+            <Dialog.Description className="mt-1 text-sm text-muted-foreground">
+              {t("markdown.journal.printDialogDescription")}
+            </Dialog.Description>
+
+            <div className="mt-4 space-y-2 text-sm">
+              <div className="rounded-md border border-border/60 bg-muted/20 px-3 py-2">
+                {t("markdown.journal.printAllSummary", { count: unitsCount })}
+              </div>
+              <div className="rounded-md border border-border/60 bg-muted/20 px-3 py-2">
+                {t("markdown.journal.printSelectedSummary", { count: selectedPrintableCount })}
+              </div>
+            </div>
+
+            <div className="mt-5 flex flex-wrap justify-end gap-2">
+              <Button type="button" variant="outline" onClick={() => setPrintDialogOpen(false)}>
+                {t("common.cancel")}
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => handlePrintMode("selected")}
+                disabled={selectedPrintableCount === 0}
+              >
+                <CheckSquare aria-hidden />
+                {t("markdown.actions.printSelected")}
+              </Button>
+              <Button type="button" onClick={() => handlePrintMode("all")}>
+                <Printer aria-hidden />
+                {t("markdown.actions.printAll")}
+              </Button>
+            </div>
+          </Dialog.Content>
+        </Dialog.Portal>
+      </Dialog.Root>
     </DocumentPageLayout>
   );
 }

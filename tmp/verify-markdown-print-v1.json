@@ -1,0 +1,113 @@
+{
+  "receiptUrl": "http://127.0.0.1:1420/receipts/1",
+  "receiptPostError": null,
+  "draftJournalUrl": "http://127.0.0.1:1420/markdown-journal/journals/1",
+  "draftPrintButtonCount": 0,
+  "cancelledStatusVisible": 1,
+  "cancelledPrintButtonCount": 0,
+  "postedJournalUrl": "http://127.0.0.1:1420/markdown-journal/journals/2",
+  "postError": null,
+  "postedPrintButtonCount": 1,
+  "codeRowsBeforePrint": [
+    {
+      "markdownCode": "",
+      "quantity": "1",
+      "printCount": "0",
+      "printedAt": "—"
+    },
+    {
+      "markdownCode": "",
+      "quantity": "1",
+      "printCount": "0",
+      "printedAt": "—"
+    },
+    {
+      "markdownCode": "",
+      "quantity": "1",
+      "printCount": "0",
+      "printedAt": "—"
+    }
+  ],
+  "stockRowsBeforePrint": [
+    {
+      "warehouseName": "Main Warehouse",
+      "style": "Good",
+      "qtyOnHand": "7"
+    },
+    {
+      "warehouseName": "Main Warehouse",
+      "style": "Markdown",
+      "qtyOnHand": "3"
+    }
+  ],
+  "printDialogAllSummary": "Print all generated labels: 3",
+  "printDialogSelectedSummary": "Print selected labels: 1",
+  "printLogAfterAll": [
+    {
+      "labelCount": 3,
+      "html": "<!doctype html>\n    <html>\n      <head>\n        <title>MJ00000002</title>\n        <style>\n          body { font-family: Arial, sans-serif; margin: 16px; color: #111; }\n          .sheet { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }\n          .sticker { border: 1px solid #111; padding: 12px; page-break-inside: avoid; }\n          .sticker__code { font-size: 20px; font-weight: 700; margin-bottom: 8px; }\n          .sticker__item { font-size: 14px; margin-bottom: 6px; }\n          .sticker__meta { font-size: 12px; margin-bottom: 2px; }\n        </style>\n      </head>\n      <body>\n        <div class=\"sheet\">\n        <article class=\"sticker\">\n          <div class=\"sticker__code\">MD00000001</div>\n          <div class=\"sticker__item\">ITEM-001 — Widget A</div>\n          <div class=\"sticker__meta\">Markdown price: 1.00</div>\n          <div class=\"sticker__meta\">Journal: MJ00000002</div>\n        </article>\n      \n        <article class=\"sticker\">\n          <div class=\"sticker__code\">MD00000002</div>\n          <div class=\"sticker__item\">ITEM-001 — Widget A</div>\n          <div class=\"sticker__meta\">Markdown price: 1.00</div>\n          <div class=\"sticker__meta\">Journal: MJ00000002</div>\n        </article>\n      \n        <article class=\"sticker\">\n          <div class=\"sticker__code\">MD00000003</div>\n          <div class=\"sticker__item\">ITEM-001 — Widget A</div>\n          <div class=\"sticker__meta\">Markdown price: 1.00</div>\n          <div class=\"sticker__meta\">Journal: MJ00000002</div>\n        </article>\n      </div>\n      </body>\n    </html>"
+    }
+  ],
+  "codeRowsAfterPrintAll": [
+    {
+      "markdownCode": "",
+      "quantity": "1",
+      "printCount": "1",
+      "printedAt": "2026-03-28T18:04:31.257Z"
+    },
+    {
+      "markdownCode": "",
+      "quantity": "1",
+      "printCount": "1",
+      "printedAt": "2026-03-28T18:04:31.257Z"
+    },
+    {
+      "markdownCode": "",
+      "quantity": "1",
+      "printCount": "1",
+      "printedAt": "2026-03-28T18:04:31.257Z"
+    }
+  ],
+  "printLogAfterSelected": [
+    {
+      "labelCount": 3,
+      "html": "<!doctype html>\n    <html>\n      <head>\n        <title>MJ00000002</title>\n        <style>\n          body { font-family: Arial, sans-serif; margin: 16px; color: #111; }\n          .sheet { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }\n          .sticker { border: 1px solid #111; padding: 12px; page-break-inside: avoid; }\n          .sticker__code { font-size: 20px; font-weight: 700; margin-bottom: 8px; }\n          .sticker__item { font-size: 14px; margin-bottom: 6px; }\n          .sticker__meta { font-size: 12px; margin-bottom: 2px; }\n        </style>\n      </head>\n      <body>\n        <div class=\"sheet\">\n        <article class=\"sticker\">\n          <div class=\"sticker__code\">MD00000001</div>\n          <div class=\"sticker__item\">ITEM-001 — Widget A</div>\n          <div class=\"sticker__meta\">Markdown price: 1.00</div>\n          <div class=\"sticker__meta\">Journal: MJ00000002</div>\n        </article>\n      \n        <article class=\"sticker\">\n          <div class=\"sticker__code\">MD00000002</div>\n          <div class=\"sticker__item\">ITEM-001 — Widget A</div>\n          <div class=\"sticker__meta\">Markdown price: 1.00</div>\n          <div class=\"sticker__meta\">Journal: MJ00000002</div>\n        </article>\n      \n        <article class=\"sticker\">\n          <div class=\"sticker__code\">MD00000003</div>\n          <div class=\"sticker__item\">ITEM-001 — Widget A</div>\n          <div class=\"sticker__meta\">Markdown price: 1.00</div>\n          <div class=\"sticker__meta\">Journal: MJ00000002</div>\n        </article>\n      </div>\n      </body>\n    </html>"
+    },
+    {
+      "labelCount": 1,
+      "html": "<!doctype html>\n    <html>\n      <head>\n        <title>MJ00000002</title>\n        <style>\n          body { font-family: Arial, sans-serif; margin: 16px; color: #111; }\n          .sheet { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }\n          .sticker { border: 1px solid #111; padding: 12px; page-break-inside: avoid; }\n          .sticker__code { font-size: 20px; font-weight: 700; margin-bottom: 8px; }\n          .sticker__item { font-size: 14px; margin-bottom: 6px; }\n          .sticker__meta { font-size: 12px; margin-bottom: 2px; }\n        </style>\n      </head>\n      <body>\n        <div class=\"sheet\">\n        <article class=\"sticker\">\n          <div class=\"sticker__code\">MD00000002</div>\n          <div class=\"sticker__item\">ITEM-001 — Widget A</div>\n          <div class=\"sticker__meta\">Markdown price: 1.00</div>\n          <div class=\"sticker__meta\">Journal: MJ00000002</div>\n        </article>\n      </div>\n      </body>\n    </html>"
+    }
+  ],
+  "codeRowsAfterPrintSelected": [
+    {
+      "markdownCode": "",
+      "quantity": "1",
+      "printCount": "2",
+      "printedAt": "2026-03-28T18:04:32.989Z"
+    },
+    {
+      "markdownCode": "",
+      "quantity": "1",
+      "printCount": "1",
+      "printedAt": "2026-03-28T18:04:31.257Z"
+    },
+    {
+      "markdownCode": "",
+      "quantity": "1",
+      "printCount": "1",
+      "printedAt": "2026-03-28T18:04:31.257Z"
+    }
+  ],
+  "stockRowsAfterPrint": [
+    {
+      "warehouseName": "Main Warehouse",
+      "style": "Good",
+      "qtyOnHand": "7"
+    },
+    {
+      "warehouseName": "Main Warehouse",
+      "style": "Markdown",
+      "qtyOnHand": "3"
+    }
+  ]
+}

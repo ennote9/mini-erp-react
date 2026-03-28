@@ -2,7 +2,7 @@ import type { StockStyle } from "@/shared/inventoryStyle";
 
 export type MarkdownStatus = "ACTIVE" | "SOLD" | "CANCELLED" | "WRITTEN_OFF" | "SUPERSEDED";
 
-export type MarkdownJournalStatus = "draft" | "posted";
+export type MarkdownJournalStatus = "draft" | "posted" | "cancelled";
 
 export type MarkdownReasonCode =
   | "DAMAGED_PACKAGING"
@@ -34,6 +34,8 @@ export interface MarkdownRecord {
   originalBarcode?: string;
   comment?: string;
   basePriceAtMarkdown?: number;
+  printCount: number;
+  printedAt?: string;
   closedAt?: string;
   closedBy?: string;
   /** When status is SUPERSEDED, points to the replacement ACTIVE (or later) unit. */
@@ -54,6 +56,8 @@ export interface MarkdownJournal {
   createdBy: string;
   postedAt?: string;
   postedBy?: string;
+  cancelledAt?: string;
+  cancelledBy?: string;
   /**
    * Migration bridge for old pre-journal unit records. Values may contain old batch IDs
    * and/or single-record IDs so migrated journals can still resolve their generated units.

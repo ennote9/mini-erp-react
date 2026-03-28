@@ -20,7 +20,7 @@ function nextIdStr(): string {
 }
 
 function asStatus(value: unknown): MarkdownJournalStatus | null {
-  if (value === "draft" || value === "posted") return value;
+  if (value === "draft" || value === "posted" || value === "cancelled") return value;
   return null;
 }
 
@@ -67,6 +67,8 @@ function normalizeJournal(raw: unknown): MarkdownJournal | null {
     createdBy: x.createdBy,
     postedAt: typeof x.postedAt === "string" ? x.postedAt : undefined,
     postedBy: typeof x.postedBy === "string" ? x.postedBy : undefined,
+    cancelledAt: typeof x.cancelledAt === "string" ? x.cancelledAt : undefined,
+    cancelledBy: typeof x.cancelledBy === "string" ? x.cancelledBy : undefined,
     legacySourceIds: Array.isArray(x.legacySourceIds)
       ? x.legacySourceIds.filter((v): v is string => typeof v === "string")
       : undefined,
