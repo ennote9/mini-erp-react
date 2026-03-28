@@ -23,6 +23,7 @@ import { useTranslation } from "@/shared/i18n";
 const PAGE_TITLES: Record<string, string> = {
   "/": "routes.dashboard",
   "/items": "routes.items",
+  "/barcodes": "routes.barcodes",
   "/brands": "routes.brands",
   "/categories": "routes.categories",
   "/suppliers": "routes.suppliers",
@@ -61,6 +62,7 @@ function getPageTitleKey(pathname: string): string {
   if (pathname.match(/^\/shipments\/[^/]+\/customer-document$/))
     return "routes.shipmentCustomerDocument";
   if (pathname.match(/^\/shipments\/[^/]+$/)) return "routes.shipment";
+  if (pathname.match(/^\/stock-balances\/[^/]+$/)) return "routes.stockBalance";
   if (pathname.match(/^\/markdown-journal\/new$/)) return "routes.markdownCreate";
   if (pathname.match(/^\/markdown-journal\/journals\/[^/]+$/)) return "routes.markdownJournalDocument";
   if (pathname.match(/^\/markdown-journal\/[^/]+$/)) return "routes.markdownRecord";
@@ -72,6 +74,7 @@ function getPageIcon(
 ): ComponentType<{ className?: string }> | null {
   if (pathname === "/") return LayoutDashboard;
   if (pathname === "/items" || pathname.match(/^\/items\/[^/]+$/)) return Package;
+  if (pathname === "/barcodes") return ScanBarcode;
   if (pathname === "/brands" || pathname.match(/^\/brands\/[^/]+$/)) return Tag;
   if (pathname === "/categories" || pathname.match(/^\/categories\/[^/]+$/))
     return FolderOpen;
@@ -104,7 +107,8 @@ function getPageIcon(
     pathname.match(/^\/shipments\/[^/]+\/customer-document$/)
   )
     return PackageCheck;
-  if (pathname === "/stock-balances") return Scale;
+  if (pathname === "/stock-balances" || pathname.match(/^\/stock-balances\/[^/]+$/))
+    return Scale;
   if (pathname === "/stock-movements") return ArrowLeftRight;
   if (
     pathname === "/markdown-journal" ||

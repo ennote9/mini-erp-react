@@ -1,68 +1,74 @@
-[
-  {
-    "locale": "en",
-    "screenshotPath": "/home/shaxr/code/mini-erp-react/tmp/item-page-en.png",
+{
+  "mainState": {
     "topBar": "Catalog item",
     "header": "Catalog item ITEM-001",
     "tabs": [
       {
         "text": "Main",
-        "visible": true
+        "selected": true
       },
       {
         "text": "Images",
-        "visible": true
+        "selected": false
       },
       {
         "text": "Barcodes",
-        "visible": true
+        "selected": false
       },
       {
         "text": "Testers",
-        "visible": true
-      },
-      {
-        "text": "Markdown",
-        "visible": true
+        "selected": false
       }
     ],
-    "barcodeSummary": {
-      "title": "Barcode summary",
-      "primary": "5901234123457",
-      "count": "1 barcode record. Manage on the Barcodes tab"
+    "labels": [
+      "Code *",
+      "Name *",
+      "UOM *",
+      "Accounting Profile",
+      "Brand",
+      "Category",
+      "Purchase price",
+      "Sale price",
+      "Active",
+      "Description"
+    ],
+    "headerButtons": [
+      "Open stock balances",
+      "Open stock movements",
+      "Open markdown records",
+      "Save",
+      "Cancel"
+    ],
+    "barcodeSummaryVisible": false
+  },
+  "barcodesState": {
+    "beforeDialog": {
+      "hasTable": true,
+      "createButtonVisible": true,
+      "inlineBarcodeEditorVisible": false,
+      "dialogVisible": false
+    },
+    "dialogState": {
+      "createDialogTitle": "Create barcode",
+      "barcodeValueLabelVisible": true
     }
   },
-  {
-    "locale": "ru",
-    "screenshotPath": "/home/shaxr/code/mini-erp-react/tmp/item-page-ru.png",
-    "topBar": "Номенклатура",
-    "header": "Номенклатура ITEM-001",
-    "tabs": [
-      {
-        "text": "Основное",
-        "visible": true
-      },
-      {
-        "text": "Изображения",
-        "visible": true
-      },
-      {
-        "text": "Штрихкоды",
-        "visible": true
-      },
-      {
-        "text": "Тестеры",
-        "visible": true
-      },
-      {
-        "text": "Уценки",
-        "visible": true
-      }
-    ],
-    "barcodeSummary": {
-      "title": "Сводка по штрихкодам",
-      "primary": "5901234123457",
-      "count": "1 запись штрихкода. Управление на вкладке «Штрихкоды»"
-    }
+  "testerCreateState": {
+    "url": "http://127.0.0.1:1420/items/new?kind=TESTER&baseItemId=1",
+    "topBar": "Catalog item",
+    "header": "New tester",
+    "labels": [
+      "Code *",
+      "Base item *",
+      "Name *",
+      "UOM *",
+      "Accounting Profile",
+      "Brand",
+      "Category",
+      "Purchase price",
+      "Sale price",
+      "Active",
+      "Description"
+    ]
   }
-]
+}

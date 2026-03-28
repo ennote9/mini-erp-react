@@ -58,6 +58,7 @@ export const coreEn = {
     },
     nav: {
       items: "Items",
+      barcodes: "Barcodes",
       brands: "Brands",
       categories: "Categories",
       suppliers: "Suppliers",
@@ -76,6 +77,7 @@ export const coreEn = {
   routes: {
     dashboard: "Dashboard",
     items: "Items",
+    barcodes: "Barcode Registry",
     item: "Catalog item",
     brands: "Brands",
     brand: "Brand",
@@ -103,6 +105,7 @@ export const coreEn = {
     shipmentCustomerDocument: "Final customer document",
     shipmentDeliverySheet: "Delivery sheet",
     stockBalances: "Stock Balances",
+    stockBalance: "Stock Balance",
     stockMovements: "Stock Movements",
     markdownJournal: "Markdown Journal",
     markdownCreate: "Create markdown operation",

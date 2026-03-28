@@ -39,6 +39,7 @@ function normalizeWarehouse(raw: unknown): Warehouse | null {
     name: rec.name,
     isActive: rec.isActive,
     comment: asOptionalString(rec.comment),
+    accountingProfile: asOptionalString(rec.accountingProfile),
     warehouseType: asOptionalString(rec.warehouseType),
     address: asOptionalString(rec.address),
     city: asOptionalString(rec.city),

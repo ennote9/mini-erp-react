@@ -110,6 +110,10 @@ export const stockBalanceRepository = {
     return [...store];
   },
 
+  getById(id: string): StockBalance | undefined {
+    return store.find((x) => x.id === id);
+  },
+
   getByItemAndWarehouse(
     itemId: string,
     warehouseId: string,

@@ -48,6 +48,7 @@ const nav: ReadonlyArray<{ groupKey: string; links: readonly NavLinkItem[] }> = 
     groupKey: "shell.masterData",
     links: [
       { labelKey: "shell.nav.items", to: "/items", icon: Package },
+      { labelKey: "shell.nav.barcodes", to: "/barcodes", icon: ScanBarcode },
       { labelKey: "shell.nav.brands", to: "/brands", icon: Tag, feature: "navBrandsCategories" as const },
       { labelKey: "shell.nav.categories", to: "/categories", icon: FolderOpen, feature: "navBrandsCategories" as const },
       { labelKey: "shell.nav.suppliers", to: "/suppliers", icon: Truck },

@@ -26,10 +26,11 @@ import {
   ShipmentDeliverySheetPage,
   ShipmentCustomerDocumentPage,
 } from "../modules/shipments";
-import { StockBalancesListPage } from "../modules/stock-balances";
+import { StockBalanceDetailPage, StockBalancesListPage } from "../modules/stock-balances";
 import { StockMovementsListPage } from "../modules/stock-movements";
 import { SettingsPage } from "../modules/settings";
 import { MarkdownCreatePage, MarkdownJournalPage } from "../modules/markdown-journal";
+import { BarcodeRegistryPage } from "../modules/barcode-registry";
 
 /**
  * Route tree: shell layout with nested page routes.
@@ -41,6 +42,7 @@ export function AppRoutes() {
       <Route path="/" element={<AppShell />}>
         <Route index element={<DashboardPage />} />
         <Route path="items" element={<ItemsListPage />} />
+        <Route path="barcodes" element={<BarcodeRegistryPage />} />
         <Route path="items/:id" element={<ItemPage />} />
         <Route path="brands" element={<BrandsListPage />} />
         <Route path="brands/:id" element={<BrandPage />} />
@@ -68,6 +70,7 @@ export function AppRoutes() {
         <Route path="shipments/:id/customer-document" element={<ShipmentCustomerDocumentPage />} />
         <Route path="shipments/:id" element={<ShipmentPage />} />
         <Route path="stock-balances" element={<StockBalancesListPage />} />
+        <Route path="stock-balances/:id" element={<StockBalanceDetailPage />} />
         <Route path="stock-movements" element={<StockMovementsListPage />} />
         <Route path="markdown-journal" element={<MarkdownJournalPage />} />
         <Route path="markdown-journal/new" element={<MarkdownCreatePage />} />

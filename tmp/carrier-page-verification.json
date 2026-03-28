@@ -1,0 +1,41 @@
+{
+  "pageState": {
+    "topBar": "Carrier",
+    "header": "Carrier CDEK",
+    "tabs": [
+      {
+        "text": "Main",
+        "selected": true
+      },
+      {
+        "text": "Address",
+        "selected": false
+      },
+      {
+        "text": "Tracking & service",
+        "selected": false
+      }
+    ]
+  },
+  "mainLabels": [
+    "Code *",
+    "Name *",
+    "Carrier type *",
+    "Contact person",
+    "Phone",
+    "Email",
+    "Website",
+    "Payment terms (days)",
+    "Active",
+    "Comment"
+  ],
+  "addressLabels": [
+    "Country",
+    "City",
+    "Address"
+  ],
+  "trackingLabels": [
+    "Tracking URL template",
+    "Default service level"
+  ]
+}

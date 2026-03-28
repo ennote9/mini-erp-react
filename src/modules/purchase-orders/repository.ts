@@ -1,4 +1,4 @@
-import type { PurchaseOrder, PurchaseOrderLine } from "./model";
+import type { PurchaseOrder, PurchaseOrderAttachment, PurchaseOrderLine } from "./model";
 import { todayYYYYMMDD } from "./dateUtils";
 import { itemRepository } from "../items/repository";
 import { roundMoney } from "../../shared/commercialMoney";
@@ -38,6 +38,7 @@ const headerStore: PurchaseOrder[] = [];
 const lineStore: PurchaseOrderLine[] = [];
 let headerNextId = 1;
 let lineNextId = 1;
+let attachmentNextId = 1;
 let numberCounter = 1;
 let persistChain: Promise<void> = Promise.resolve();
 let persistDepth = 0;
@@ -84,6 +85,45 @@ function computeNextPONumberCounter(records: PurchaseOrder[]): number {
   return max + 1;
 }
 
+function computeNextAttachmentId(records: PurchaseOrderPersistRecord[]): number {
+  let max = 0;
+  for (const record of records) {
+    for (const attachment of record.attachments ?? []) {
+      const n = Number.parseInt(attachment.id, 10);
+      if (!Number.isNaN(n) && n > max) max = n;
+    }
+  }
+  return max + 1;
+}
+
+function normalizeAttachment(raw: unknown): PurchaseOrderAttachment | null {
+  if (!raw || typeof raw !== "object") return null;
+  const rec = raw as Record<string, unknown>;
+  if (
+    typeof rec.id !== "string" ||
+    typeof rec.name !== "string" ||
+    typeof rec.sizeBytes !== "number" ||
+    !Number.isFinite(rec.sizeBytes) ||
+    rec.sizeBytes < 0 ||
+    typeof rec.contentBase64 !== "string" ||
+    rec.contentBase64.trim() === "" ||
+    typeof rec.addedAt !== "string"
+  ) {
+    return null;
+  }
+  const attachment: PurchaseOrderAttachment = {
+    id: rec.id,
+    name: rec.name.trim(),
+    sizeBytes: Math.trunc(rec.sizeBytes),
+    contentBase64: rec.contentBase64.trim(),
+    addedAt: rec.addedAt,
+  };
+  if (typeof rec.mimeType === "string" && rec.mimeType.trim() !== "") {
+    attachment.mimeType = rec.mimeType.trim();
+  }
+  return attachment.name === "" ? null : attachment;
+}
+
 function normalizeLine(raw: unknown): PurchaseOrderLine | null {
   if (!raw || typeof raw !== "object") return null;
   const rec = raw as Record<string, unknown>;
@@ -126,6 +166,10 @@ function normalizePORecord(raw: unknown): PurchaseOrderPersistRecord | null {
     return null;
   }
   const lines = rec.lines.map(normalizeLine).filter((x): x is PurchaseOrderLine => x !== null);
+  const attachmentsRaw = Array.isArray(rec.attachments) ? rec.attachments : [];
+  const attachments = attachmentsRaw
+    .map(normalizeAttachment)
+    .filter((x): x is PurchaseOrderAttachment => x !== null);
   if (rec.lines.length > 0 && lines.length === 0) return null;
   return {
     id: rec.id,
@@ -137,6 +181,7 @@ function normalizePORecord(raw: unknown): PurchaseOrderPersistRecord | null {
     paymentTermsDays: asOptionalPaymentTermsDays(rec.paymentTermsDays),
     dueDate: asOptionalString(rec.dueDate),
     comment: asOptionalString(rec.comment),
+    ...(attachments.length > 0 ? { attachments } : {}),
     cancelReasonCode:
       typeof rec.cancelReasonCode === "string" && isCancelDocumentReasonCode(rec.cancelReasonCode)
         ? rec.cancelReasonCode
@@ -221,6 +266,10 @@ function nextNumber(): string {
   return formatGeneratedVisibleCode("PO", numberCounter++);
 }
 
+function nextAttachmentId(): string {
+  return String(attachmentNextId++);
+}
+
 async function bootstrapFromDisk(): Promise<void> {
   const loaded = await loadDocumentsPersisted({
     relativePath: PERSIST_PATH,
@@ -237,6 +286,7 @@ async function bootstrapFromDisk(): Promise<void> {
   lineStore.splice(0, lineStore.length, ...lines);
   headerNextId = computeNextNumericId(headerStore);
   lineNextId = computeNextNumericId(lineStore);
+  attachmentNextId = computeNextAttachmentId(loaded.records);
   numberCounter = computeNextPONumberCounter(headerStore);
 }
 
@@ -291,6 +341,47 @@ export const purchaseOrderRepository = {
     headerStore[i] = { ...headerStore[i], ...patch };
     schedulePersist();
     return headerStore[i];
+  },
+
+  listAttachments(documentId: string): PurchaseOrderAttachment[] {
+    const doc = headerStore.find((x) => x.id === documentId);
+    return doc?.attachments?.map((attachment) => ({ ...attachment })) ?? [];
+  },
+
+  addAttachments(
+    documentId: string,
+    attachments: Array<Omit<PurchaseOrderAttachment, "id" | "addedAt">>,
+  ): PurchaseOrderAttachment[] {
+    const i = headerStore.findIndex((x) => x.id === documentId);
+    if (i === -1 || attachments.length === 0) return [];
+    const created = attachments
+      .filter((attachment) => attachment.name.trim() !== "" && attachment.contentBase64.trim() !== "")
+      .map((attachment) => ({
+        ...attachment,
+        id: nextAttachmentId(),
+        addedAt: new Date().toISOString(),
+      }));
+    if (created.length === 0) return [];
+    headerStore[i] = {
+      ...headerStore[i],
+      attachments: [...(headerStore[i].attachments ?? []), ...created],
+    };
+    schedulePersist();
+    return created.map((attachment) => ({ ...attachment }));
+  },
+
+  deleteAttachment(documentId: string, attachmentId: string): boolean {
+    const i = headerStore.findIndex((x) => x.id === documentId);
+    if (i === -1) return false;
+    const attachments = headerStore[i].attachments ?? [];
+    const nextAttachments = attachments.filter((attachment) => attachment.id !== attachmentId);
+    if (nextAttachments.length === attachments.length) return false;
+    headerStore[i] = {
+      ...headerStore[i],
+      ...(nextAttachments.length > 0 ? { attachments: nextAttachments } : { attachments: undefined }),
+    };
+    schedulePersist();
+    return true;
   },
 
   replaceLines(

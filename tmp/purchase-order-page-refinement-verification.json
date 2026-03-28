@@ -1,0 +1,72 @@
+{
+  "en": {
+    "titleState": {
+      "url": "http://127.0.0.1:1420/purchase-orders/1",
+      "topBar": "Purchase Order",
+      "header": "Purchase Order PO000001",
+      "detailsDescription": ""
+    },
+    "receiptActionState": {
+      "text": "+ Create receipt",
+      "disabled": true
+    },
+    "paymentState": {
+      "inlineAmountInputs": 0,
+      "recordPaymentButtons": [
+        "Record payment"
+      ]
+    },
+    "paymentDialogState": {
+      "title": "Record payment",
+      "hasAmount": true,
+      "hasMethod": true
+    },
+    "attachmentRowsBefore": 0,
+    "attachmentRowsAfterAdd": 1,
+    "attachmentRowsAfterRemove": 0,
+    "stickyTotalsState": {
+      "text": "Total qty: 10Total amount: 45.00",
+      "position": "sticky",
+      "bottom": "0px"
+    },
+    "centeredGridState": {
+      "headerJustifyContent": "center",
+      "cellTextAlign": "center"
+    }
+  },
+  "ru": {
+    "titleState": {
+      "url": "http://127.0.0.1:1420/purchase-orders/1",
+      "topBar": "Заказ на покупку",
+      "header": "Заказ на покупку PO000001",
+      "detailsDescription": ""
+    },
+    "receiptActionState": {
+      "text": "+ Создать поступление",
+      "disabled": true
+    },
+    "paymentState": {
+      "inlineAmountInputs": 0,
+      "recordPaymentButtons": [
+        "Зафиксировать оплату"
+      ]
+    },
+    "paymentDialogState": {
+      "title": "Зафиксировать оплату",
+      "hasAmount": true,
+      "hasMethod": true
+    },
+    "attachmentRowsBefore": 0,
+    "attachmentRowsAfterAdd": 1,
+    "attachmentRowsAfterRemove": 0,
+    "stickyTotalsState": {
+      "text": "Итого кол-во: 10Итого сумма: 45.00",
+      "position": "sticky",
+      "bottom": "0px"
+    },
+    "centeredGridState": {
+      "headerJustifyContent": "center",
+      "cellTextAlign": "center"
+    }
+  }
+}

@@ -15,7 +15,7 @@ export const financeEn = {
   openCustomerInvoice: "Open payment request",
   openCustomerInvoiceShort: "Payment request",
   invoiceTitle: "Payment request",
-  invoiceSubtitle: "Sales order bill — operational document, not a tax invoice.",
+  invoiceSubtitle: "Sales Order bill — operational document, not a tax invoice.",
   invoiceDisclaimer:
     "This document summarizes amounts due on the sales order for operational follow-up. It is not a fiscal or tax invoice unless your process defines it as such separately.",
   sectionPaymentSummary: "Amounts",
@@ -44,15 +44,15 @@ export const financeEn = {
   errors: {
     generic: "Could not save payment.",
     deleteFailed: "Could not remove payment.",
-    soNotFound: "Sales order not found.",
-    soCancelled: "Payments cannot be changed on a cancelled sales order.",
+    soNotFound: "Sales Order not found.",
+    soCancelled: "Payments cannot be changed on a cancelled Sales Order.",
     amountInvalid: "Amount must be greater than zero.",
     paidAtRequired: "Date and time of payment is required.",
     paidAtInvalid: "Invalid payment date or time.",
     paymentNotFound: "Payment not found.",
-    paymentWrongOrder: "This payment does not belong to this sales order.",
+    paymentWrongOrder: "This payment does not belong to this Sales Order.",
   },
-  invoicePreparedFrom: "Prepared from sales order {{number}}",
+  invoicePreparedFrom: "Prepared from Sales Order {{number}}",
   printedAt: "Printed",
   invoiceUnavailable:
     "The payment request is not available for cancelled orders or orders without lines.",

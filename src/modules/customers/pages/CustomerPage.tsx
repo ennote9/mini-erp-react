@@ -7,6 +7,7 @@ import { translateCarrierType } from "../../carriers";
 import { Breadcrumb } from "../../../shared/ui/object/Breadcrumb";
 import { BackButton } from "../../../shared/ui/list/BackButton";
 import { Button } from "@/components/ui/button";
+import { ButtonGroup, ButtonGroupSeparator } from "@/components/ui/button-group";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -49,8 +50,6 @@ type FormState = {
   paymentTermsDays: string;
   preferredCarrierId: string;
   defaultRecipientName: string;
-  defaultRecipientPhone: string;
-  defaultDeliveryAddress: string;
   defaultDeliveryComment: string;
 };
 
@@ -71,8 +70,6 @@ function defaultForm(): FormState {
     paymentTermsDays: "",
     preferredCarrierId: "",
     defaultRecipientName: "",
-    defaultRecipientPhone: "",
-    defaultDeliveryAddress: "",
     defaultDeliveryComment: "",
   };
 }
@@ -112,7 +109,6 @@ export function CustomerPage() {
         phone: form.phone,
         email: form.email,
         paymentTermsDays: form.paymentTermsDays,
-        defaultRecipientPhone: form.defaultRecipientPhone,
       }),
     [
       form.code,
@@ -120,7 +116,6 @@ export function CustomerPage() {
       form.phone,
       form.email,
       form.paymentTermsDays,
-      form.defaultRecipientPhone,
     ],
   );
 
@@ -132,7 +127,6 @@ export function CustomerPage() {
     form.phone,
     form.email,
     form.paymentTermsDays,
-    form.defaultRecipientPhone,
   ]);
 
   const combinedIssues = useMemo(
@@ -162,8 +156,6 @@ export function CustomerPage() {
         paymentTermsDays: customer.paymentTermsDays !== undefined ? String(customer.paymentTermsDays) : "",
         preferredCarrierId: customer.preferredCarrierId ?? "",
         defaultRecipientName: customer.defaultRecipientName ?? "",
-        defaultRecipientPhone: customer.defaultRecipientPhone ?? "",
-        defaultDeliveryAddress: customer.defaultDeliveryAddress ?? "",
         defaultDeliveryComment: customer.defaultDeliveryComment ?? "",
       });
     }
@@ -186,8 +178,6 @@ export function CustomerPage() {
     customer?.paymentTermsDays,
     customer?.preferredCarrierId,
     customer?.defaultRecipientName,
-    customer?.defaultRecipientPhone,
-    customer?.defaultDeliveryAddress,
     customer?.defaultDeliveryComment,
   ]);
 
@@ -217,8 +207,6 @@ export function CustomerPage() {
         paymentTermsDays: parsePaymentTerms(form.paymentTermsDays),
         preferredCarrierId: form.preferredCarrierId.trim() || undefined,
         defaultRecipientName: form.defaultRecipientName || undefined,
-        defaultRecipientPhone: form.defaultRecipientPhone || undefined,
-        defaultDeliveryAddress: form.defaultDeliveryAddress || undefined,
         defaultDeliveryComment: form.defaultDeliveryComment || undefined,
       },
       isNew ? undefined : id ?? undefined,
@@ -305,31 +293,34 @@ export function CustomerPage() {
         <Tabs.Root defaultValue="main">
           <CardHeader className="p-2 pb-0.5 space-y-2">
             <Tabs.List
-              className="inline-flex h-9 w-full max-w-md flex-wrap items-center gap-0.5 rounded-lg border border-border/60 bg-muted/20 p-0.5 text-[13px] sm:w-auto"
+              className="inline-flex min-h-8 w-full max-w-full flex-wrap items-stretch overflow-hidden rounded-md border border-input bg-background sm:w-fit"
               aria-label={t("master.customer.tabsAria")}
             >
-              <Tabs.Trigger
-                value="main"
-                className={cn(
-                  "inline-flex flex-1 items-center justify-center rounded-md px-3 py-1.5 font-medium transition-colors sm:flex-initial",
-                  "text-muted-foreground hover:text-foreground",
-                  "data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-sm",
-                  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
-                )}
-              >
-                {t("master.customer.tabMain")}
-              </Tabs.Trigger>
-              <Tabs.Trigger
-                value="delivery"
-                className={cn(
-                  "inline-flex flex-1 items-center justify-center rounded-md px-3 py-1.5 font-medium transition-colors sm:flex-initial",
-                  "text-muted-foreground hover:text-foreground",
-                  "data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-sm",
-                  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
-                )}
-              >
-                {t("master.customer.tabDefaultDelivery")}
-              </Tabs.Trigger>
+              <ButtonGroup className="w-full flex-wrap rounded-none border-0 bg-transparent sm:w-auto" aria-label={t("master.customer.tabsAria")}>
+                <Tabs.Trigger
+                  value="main"
+                  className={cn(
+                    "inline-flex h-8 flex-1 items-center justify-center rounded-none border-0 bg-background px-3 text-sm font-medium transition-colors sm:flex-initial",
+                    "text-foreground hover:bg-accent hover:text-accent-foreground",
+                    "data-[state=active]:bg-primary data-[state=active]:text-primary-foreground",
+                    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
+                  )}
+                >
+                  {t("master.customer.tabMain")}
+                </Tabs.Trigger>
+                <ButtonGroupSeparator />
+                <Tabs.Trigger
+                  value="delivery"
+                  className={cn(
+                    "inline-flex h-8 flex-1 items-center justify-center rounded-none border-0 bg-background px-3 text-sm font-medium transition-colors sm:flex-initial",
+                    "text-foreground hover:bg-accent hover:text-accent-foreground",
+                    "data-[state=active]:bg-primary data-[state=active]:text-primary-foreground",
+                    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
+                  )}
+                >
+                  {t("master.customer.tabDefaultDelivery")}
+                </Tabs.Trigger>
+              </ButtonGroup>
             </Tabs.List>
           </CardHeader>
           <CardContent className="p-2 pt-1">
@@ -517,33 +508,6 @@ export function CustomerPage() {
                       placeholder={t("master.customer.defaultRecipientNamePlaceholder")}
                       className="h-8 text-sm"
                       autoComplete="name"
-                    />
-                  </div>
-                  <div className="flex flex-col gap-0.5">
-                    <Label htmlFor="customer-defaultRecipientPhone" className="text-sm">
-                      {t("master.customer.defaultRecipientPhone")}
-                    </Label>
-                    <Input
-                      id="customer-defaultRecipientPhone"
-                      type="text"
-                      value={form.defaultRecipientPhone}
-                      onChange={(e) => setForm((f) => ({ ...f, defaultRecipientPhone: e.target.value }))}
-                      placeholder={t("master.customer.defaultRecipientPhonePlaceholder")}
-                      className="h-8 text-sm"
-                      autoComplete="tel"
-                    />
-                  </div>
-                  <div className="flex flex-col gap-0.5 sm:col-span-2">
-                    <Label htmlFor="customer-defaultDeliveryAddress" className="text-sm">
-                      {t("master.customer.defaultDeliveryAddress")}
-                    </Label>
-                    <Textarea
-                      id="customer-defaultDeliveryAddress"
-                      value={form.defaultDeliveryAddress}
-                      onChange={(e) => setForm((f) => ({ ...f, defaultDeliveryAddress: e.target.value }))}
-                      placeholder={t("master.customer.defaultDeliveryAddressPlaceholder")}
-                      rows={2}
-                      className="resize-y min-h-[2.5rem] text-sm"
                     />
                   </div>
                   <div className="flex flex-col gap-0.5 sm:col-span-2">

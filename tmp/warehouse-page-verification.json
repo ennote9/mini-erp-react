@@ -1,0 +1,37 @@
+{
+  "pageState": {
+    "topBar": "Warehouse",
+    "header": "Warehouse WH-001",
+    "tabs": [
+      {
+        "text": "Main",
+        "selected": true
+      },
+      {
+        "text": "Address & contacts",
+        "selected": false
+      },
+      {
+        "text": "Warehouse settings",
+        "selected": false
+      }
+    ]
+  },
+  "mainLabels": [
+    "Code *",
+    "Name *",
+    "Type",
+    "Active",
+    "Comment"
+  ],
+  "addressLabels": [
+    "Address",
+    "City",
+    "Country",
+    "Contact person",
+    "Phone"
+  ],
+  "settingsLabels": [
+    "Warehouse Accounting Profile"
+  ]
+}

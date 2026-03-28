@@ -4,7 +4,7 @@
  */
 import { Fragment, useMemo, useState, useRef, useCallback, useEffect } from "react";
 import type { RowClassParams, RowClickedEvent } from "ag-grid-community";
-import { useSearchParams } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { AgGridReact } from "ag-grid-react";
 import type { ColDef, SelectionChangedEvent } from "ag-grid-community";
 import { stockBalanceRepository } from "../repository";
@@ -44,7 +44,6 @@ import { stockBalancesListExcelLabels } from "@/shared/i18n/excelListExportLabel
 import { save } from "@tauri-apps/plugin-dialog";
 import { invoke } from "@tauri-apps/api/core";
 import { revealItemInDir } from "@tauri-apps/plugin-opener";
-import { StockBalanceRowDrillDown } from "../components/StockBalanceRowDrillDown";
 import { useSettings } from "../../../shared/settings/SettingsContext";
 import { getEffectiveWorkspaceFeatureEnabled } from "../../../shared/workspace";
 import { normalizeTrim } from "../../../shared/validation";
@@ -153,6 +152,7 @@ function buildExportRowsFromBalances(
 export function StockBalancesListPage() {
   const { t, locale } = useTranslation();
   const { settings } = useSettings();
+  const navigate = useNavigate();
 
   const coverageLabel = useCallback(
     (s: StockBalanceCoverageStatus) => t(`ops.stock.coverage.${s}`),
@@ -207,12 +207,6 @@ export function StockBalancesListPage() {
     profileOverrides,
     "stockBalancesQuickFilters",
   );
-  const showDrillDownModal = getEffectiveWorkspaceFeatureEnabled(
-    workspaceMode,
-    profileOverrides,
-    "stockBalancesDrillDownModal",
-  );
-
   const [searchParams, setSearchParams] = useSearchParams();
   const itemFilterId = useMemo(() => {
     const raw = searchParams.get("itemId");
@@ -241,7 +235,6 @@ export function StockBalancesListPage() {
 
   const [searchQuery, setSearchQuery] = useState("");
   const [quickFilter, setQuickFilter] = useState<StockBalanceQuickFilter>("all");
-  const [detailRow, setDetailRow] = useState<RowData | null>(null);
   const [exportSuccess, setExportSuccess] = useState<{ path: string; filename: string } | null>(null);
   const [exportOpen, setExportOpen] = useState(false);
   const [selectedCount, setSelectedCount] = useState(0);
@@ -345,29 +338,21 @@ export function StockBalancesListPage() {
   const isEmpty = filteredRows.length === 0;
 
   useEffect(() => {
-    if (isEmpty) setDetailRow(null);
-  }, [isEmpty]);
-
-  useEffect(() => {
     if (!showQuickFilters) setQuickFilter("all");
   }, [showQuickFilters]);
 
-  useEffect(() => {
-    if (!showDrillDownModal) setDetailRow(null);
-  }, [showDrillDownModal]);
-
   const onRowClicked = useCallback(
     (e: RowClickedEvent<RowData>) => {
-      if (!showDrillDownModal) return;
       if (hasMeaningfulTextSelection()) return;
-      if (e.data) setDetailRow(e.data);
+      if (!e.data) return;
+      const currentSearch = searchParams.toString();
+      navigate({
+        pathname: `/stock-balances/${e.data.id}`,
+        search: currentSearch === "" ? "" : `?${currentSearch}`,
+      });
     },
-    [showDrillDownModal],
+    [navigate, searchParams],
   );
-
-  const onDrillDownOpenChange = useCallback((open: boolean) => {
-    if (!open) setDetailRow(null);
-  }, []);
   const hasFilter =
     searchQuery.trim() !== "" ||
     warehouseFilterId != null ||
@@ -889,27 +874,6 @@ export function StockBalancesListPage() {
               onRowClicked={onRowClicked}
             />
           </AgGridContainer>
-          {showDrillDownModal && detailRow ? (
-            <StockBalanceRowDrillDown
-              key={detailRow.id}
-              row={{
-                itemId: detailRow.itemId,
-                warehouseId: detailRow.warehouseId,
-                itemCode: detailRow.itemCode,
-                itemName: detailRow.itemName,
-                warehouseName: detailRow.warehouseName,
-                qtyOnHand: detailRow.qtyOnHand,
-                reservedQty: detailRow.reservedQty,
-                availableQty: detailRow.availableQty,
-                outgoingQty: detailRow.outgoingQty,
-                incomingQty: detailRow.incomingQty,
-                deficitQty: detailRow.deficitQty,
-                netShortageQty: detailRow.netShortageQty,
-                coverageStatus: detailRow.coverageStatus,
-              }}
-              onOpenChange={onDrillDownOpenChange}
-            />
-          ) : null}
         </>
       )}
     </ListPageLayout>

@@ -1,0 +1,39 @@
+{
+  "mainState": {
+    "topBar": "Customer",
+    "header": "Customer CUS-0001",
+    "tabs": [
+      {
+        "text": "Main",
+        "selected": true
+      },
+      {
+        "text": "Default delivery",
+        "selected": false
+      }
+    ],
+    "labels": [
+      "Code *",
+      "Name *",
+      "Contact person",
+      "Tax ID",
+      "Billing address",
+      "Shipping address",
+      "City",
+      "Country",
+      "Payment terms (days)",
+      "Phone",
+      "Email",
+      "Active",
+      "Comment"
+    ]
+  },
+  "deliveryState": {
+    "labels": [
+      "Default recipient name",
+      "Default delivery instructions",
+      "Preferred carrier"
+    ],
+    "hint": "Used to pre-fill sales order delivery details. Address and phone come from the main customer profile; keep only delivery-specific overrides here."
+  }
+}

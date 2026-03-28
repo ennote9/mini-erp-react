@@ -1,0 +1,64 @@
+{
+  "en": {
+    "titleState": {
+      "url": "http://127.0.0.1:1420/sales-orders/1",
+      "topBar": "Sales Order",
+      "header": "Sales Order SO000001"
+    },
+    "paymentBeforeOpen": {
+      "inlineAmountInputs": 0,
+      "recordPaymentButtons": [
+        "Record payment"
+      ]
+    },
+    "paymentDialogState": {
+      "dialogTitle": "Record payment",
+      "dialogHasAmountInput": true,
+      "dialogHasMethod": true
+    },
+    "executionState": {
+      "text": "ExecutionShipments: 0 posted / 0 totalShipment fulfillmentShipments: 0 posted / 0 totalNot startedShipped0Ordered5Remaining5Stock allocation(remaining not reserved)Not allocatedReserved0Shortage5",
+      "cardTitles": []
+    },
+    "stickyTotalsState": {
+      "text": "Total qty: 5Total amount: 39.95",
+      "position": "sticky",
+      "bottom": "0px"
+    }
+  },
+  "ru": {
+    "titleState": {
+      "url": "http://127.0.0.1:1420/sales-orders/1",
+      "topBar": "Заказ на продажу",
+      "header": "Заказ на продажу SO000001"
+    },
+    "paymentBeforeOpen": {
+      "inlineAmountInputs": 0,
+      "recordPaymentButtons": [
+        "Зафиксировать оплату"
+      ]
+    },
+    "paymentDialogState": {
+      "dialogTitle": "Зафиксировать оплату",
+      "dialogHasAmountInput": true,
+      "dialogHasMethod": true
+    },
+    "executionState": {
+      "text": "ИсполнениеОтгрузки: 0 проведено / 0 всегоИсполнение по отгрузкамОтгрузки: 0 проведено / 0 всегоНе начатоОтгружено0Заказано5Осталось5Резервирование(остаток не зарезервирован)Не зарезервированоВ резерве0Дефицит5",
+      "cardTitles": []
+    },
+    "stickyTotalsState": {
+      "text": "Итого кол-во: 5Итого сумма: 39.95",
+      "position": "sticky",
+      "bottom": "0px"
+    }
+  },
+  "zeroPrice": {
+    "beforeAddRowCount": 0,
+    "zeroReasonVisibleAtZero": 1,
+    "validationMessageShown": false,
+    "rowCountAfterBlockedAdd": 0,
+    "afterReasonRowCount": 1,
+    "zeroReasonVisibleAtNonZero": 0
+  }
+}

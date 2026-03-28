@@ -147,6 +147,27 @@ export const ruOps: MessageTree = {
       kindSellable: "Продаваемые",
       kindTester: "Тестеры",
     },
+    barcodeRegistry: {
+      emptyFiltered: "Нет кодов по текущему поиску или фильтрам",
+      emptyDefault: "Кодов пока нет",
+      hintReadOnly:
+        "На первом этапе реестр доступен только для чтения. Создание и изменение кодов выполняются в исходных модулях.",
+      searchAria: "Поиск по реестру штрихкодов",
+      searchPlaceholder: "Поиск по коду",
+      entryTypeFilterAria: "Фильтр по типу записи",
+      activeFilterAria: "Фильтр по активности",
+      itemFilterAria: "Фильтр по номенклатуре",
+      sourceFilterAria: "Фильтр по источнику",
+      filterAllEntryTypes: "Все типы записей",
+      filterAllActiveStates: "Любая активность",
+      filterActiveOnly: "Только активные",
+      filterInactiveOnly: "Только неактивные",
+      filterAllItems: "Вся номенклатура",
+      filterAllSources: "Все источники",
+      entryTypeItemBarcode: "Штрихкод номенклатуры",
+      entryTypeMarkdownCode: "Код уценки",
+      sourceMarkdownJournal: "Журнал уценки",
+    },
     brands: {
       emptyFiltered: "Нет брендов по текущему поиску или фильтрам",
       emptyDefault: "Брендов пока нет",
@@ -319,6 +340,10 @@ export const ruOps: MessageTree = {
     exportActiveNo: "Неактивен",
   },
   stockBalances: {
+    detail: {
+      notFound: "Строка остатка не найдена.",
+      backToListAria: "Назад к остаткам",
+    },
     quickFiltersAria: "Быстрые фильтры",
     searchAria: "Поиск остатков",
     searchPlaceholder: "Поиск",

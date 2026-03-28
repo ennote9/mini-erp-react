@@ -7,6 +7,7 @@ import { confirm, cancelDocument, createReceipt, saveDraft } from "../service";
 import { supplierRepository } from "../../suppliers/repository";
 import { warehouseRepository } from "../../warehouses/repository";
 import { itemRepository } from "../../items/repository";
+import { receiptRepository } from "../../receipts/repository";
 import { listSellableItemsForDocumentLines } from "../../items/orderLineItemsPolicy";
 import { useAppReadModelRevision } from "@/shared/inventoryMasterPageBlocks/useAppReadModelRevision";
 import { brandRepository } from "../../brands/repository";
@@ -19,7 +20,7 @@ import { Button } from "@/components/ui/button";
 import { DatePickerField } from "@/components/ui/date-picker-field";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import {
   agGridDefaultColDef,
@@ -64,12 +65,16 @@ import {
   FolderOpen,
   History,
   List,
+  Paperclip,
   Plus,
   Save,
   Trash2,
+  Wallet,
   X,
 } from "lucide-react";
 import { PurchaseOrderItemAutocomplete, type PurchaseOrderItemAutocompleteRef } from "../components/PurchaseOrderItemAutocomplete";
+import { PurchaseOrderFinanceSection } from "../components/PurchaseOrderFinanceSection";
+import { PurchaseOrderAttachmentsSection } from "../components/PurchaseOrderAttachmentsSection";
 import {
   buildLinesXlsxBuffer,
   buildDocumentXlsxBuffer,
@@ -103,6 +108,7 @@ import {
 } from "../../../shared/planningFulfillment";
 import { useSettings } from "../../../shared/settings/SettingsContext";
 import { getEffectiveWorkspaceFeatureEnabled } from "../../../shared/workspace";
+import { computePurchaseOrderTotalFromLines } from "../purchaseOrderFinance";
 
 type LineWithItem = PurchaseOrderLine & { itemName: string };
 
@@ -187,6 +193,9 @@ function poLinesDisplayColumnDefs(
   fulfillmentByItemId: Map<string, PoLineFulfillment>,
 ): ColDef<LineFormRow>[] {
   const dash = t("domain.audit.summary.emDash");
+  const centerCell = "po-grid-cell--center";
+  const centerHeader = "po-grid-header--center";
+  const numericCell = "po-grid-cell--center tabular-nums";
   return [
     {
       headerName: t("doc.columns.lineNo"),
@@ -197,6 +206,8 @@ function poLinesDisplayColumnDefs(
       maxWidth: 56,
       sortable: false,
       resizable: true,
+      headerClass: centerHeader,
+      cellClass: centerCell,
     },
     {
       headerName: t("doc.columns.itemCode"),
@@ -204,6 +215,8 @@ function poLinesDisplayColumnDefs(
       minWidth: 120,
       maxWidth: 140,
       editable: false,
+      headerClass: centerHeader,
+      cellClass: "po-grid-cell--center font-mono",
       valueGetter: (p) => {
         const itemId = p.data?.itemId;
         if (!itemId) return "";
@@ -229,6 +242,8 @@ function poLinesDisplayColumnDefs(
       minWidth: 120,
       maxWidth: 140,
       editable: false,
+      headerClass: centerHeader,
+      cellClass: centerCell,
       valueGetter: (p) => {
         const itemId = p.data?.itemId;
         if (!itemId) return "";
@@ -244,6 +259,8 @@ function poLinesDisplayColumnDefs(
       minWidth: 120,
       maxWidth: 140,
       editable: false,
+      headerClass: centerHeader,
+      cellClass: centerCell,
       valueGetter: (p) => {
         const itemId = p.data?.itemId;
         if (!itemId) return "";
@@ -260,6 +277,8 @@ function poLinesDisplayColumnDefs(
       minWidth: 70,
       maxWidth: 90,
       editable: false,
+      headerClass: centerHeader,
+      cellClass: numericCell,
     },
     {
       headerName: t("doc.columns.received"),
@@ -268,6 +287,8 @@ function poLinesDisplayColumnDefs(
       maxWidth: 96,
       editable: false,
       sortable: false,
+      headerClass: centerHeader,
+      cellClass: numericCell,
       valueGetter: (p) => {
         const itemId = p.data?.itemId;
         if (!itemId) return dash;
@@ -283,6 +304,8 @@ function poLinesDisplayColumnDefs(
       maxWidth: 112,
       editable: false,
       sortable: false,
+      headerClass: centerHeader,
+      cellClass: numericCell,
       valueGetter: (p) => {
         const itemId = p.data?.itemId;
         if (!itemId) return dash;
@@ -300,6 +323,8 @@ function poLinesDisplayColumnDefs(
       minWidth: 100,
       maxWidth: 120,
       editable: false,
+      headerClass: centerHeader,
+      cellClass: numericCell,
       valueFormatter: (p) =>
         typeof p.value === "number" && !Number.isNaN(p.value)
           ? p.value.toFixed(2)
@@ -311,6 +336,8 @@ function poLinesDisplayColumnDefs(
       minWidth: 110,
       maxWidth: 130,
       editable: false,
+      headerClass: centerHeader,
+      cellClass: numericCell,
       valueGetter: (p) => {
         const qty = p.data?.qty;
         const unitPrice = p.data?.unitPrice;
@@ -325,6 +352,8 @@ function poLinesDisplayColumnDefs(
       minWidth: 130,
       maxWidth: 180,
       editable: false,
+      headerClass: centerHeader,
+      cellClass: centerCell,
       valueGetter: (p) => {
         const up = p.data?.unitPrice;
         if (typeof up !== "number" || roundMoney(up) !== 0) return "";
@@ -341,6 +370,9 @@ function poLinesReadOnlyColumnDefs(
   fulfillment: PurchaseOrderFulfillment | null,
 ): ColDef<LineWithItem>[] {
   const dash = t("domain.audit.summary.emDash");
+  const centerCell = "po-grid-cell--center";
+  const centerHeader = "po-grid-header--center";
+  const numericCell = "po-grid-cell--center tabular-nums";
   return [
     {
       headerName: t("doc.columns.lineNo"),
@@ -351,12 +383,16 @@ function poLinesReadOnlyColumnDefs(
       maxWidth: 56,
       sortable: false,
       resizable: true,
+      headerClass: centerHeader,
+      cellClass: centerCell,
     },
     {
       headerName: t("doc.columns.itemCode"),
       width: 130,
       minWidth: 120,
       maxWidth: 140,
+      headerClass: centerHeader,
+      cellClass: "po-grid-cell--center font-mono",
       valueGetter: (p) => {
         const itemId = p.data?.itemId;
         if (!itemId) return "";
@@ -370,6 +406,8 @@ function poLinesReadOnlyColumnDefs(
       width: 130,
       minWidth: 120,
       maxWidth: 140,
+      headerClass: centerHeader,
+      cellClass: centerCell,
       valueGetter: (p) => {
         const itemId = p.data?.itemId;
         if (!itemId) return "";
@@ -384,6 +422,8 @@ function poLinesReadOnlyColumnDefs(
       width: 130,
       minWidth: 120,
       maxWidth: 140,
+      headerClass: centerHeader,
+      cellClass: centerCell,
       valueGetter: (p) => {
         const itemId = p.data?.itemId;
         if (!itemId) return "";
@@ -393,13 +433,23 @@ function poLinesReadOnlyColumnDefs(
         return category?.code ?? "";
       },
     },
-    { field: "qty", headerName: t("doc.columns.qty"), width: 80, minWidth: 70, maxWidth: 90 },
+    {
+      field: "qty",
+      headerName: t("doc.columns.qty"),
+      width: 80,
+      minWidth: 70,
+      maxWidth: 90,
+      headerClass: centerHeader,
+      cellClass: numericCell,
+    },
     {
       headerName: t("doc.columns.received"),
       width: 86,
       minWidth: 78,
       maxWidth: 96,
       sortable: false,
+      headerClass: centerHeader,
+      cellClass: numericCell,
       valueGetter: (p) => {
         const lineId = p.data?.id;
         if (!lineId || !fulfillment) return dash;
@@ -414,6 +464,8 @@ function poLinesReadOnlyColumnDefs(
       minWidth: 88,
       maxWidth: 112,
       sortable: false,
+      headerClass: centerHeader,
+      cellClass: numericCell,
       valueGetter: (p) => {
         const lineId = p.data?.id;
         if (!lineId || !fulfillment) return dash;
@@ -430,6 +482,8 @@ function poLinesReadOnlyColumnDefs(
       width: 110,
       minWidth: 100,
       maxWidth: 120,
+      headerClass: centerHeader,
+      cellClass: numericCell,
       valueFormatter: (p) =>
         typeof p.value === "number" && !Number.isNaN(p.value)
           ? p.value.toFixed(2)
@@ -440,6 +494,8 @@ function poLinesReadOnlyColumnDefs(
       width: 120,
       minWidth: 110,
       maxWidth: 130,
+      headerClass: centerHeader,
+      cellClass: numericCell,
       valueGetter: (p) => {
         const qty = p.data?.qty;
         const unitPrice = p.data?.unitPrice;
@@ -453,6 +509,8 @@ function poLinesReadOnlyColumnDefs(
       width: 150,
       minWidth: 130,
       maxWidth: 180,
+      headerClass: centerHeader,
+      cellClass: centerCell,
       valueGetter: (p) => {
         const up = p.data?.unitPrice;
         if (typeof up !== "number" || roundMoney(up) !== 0) return "";
@@ -515,7 +573,7 @@ export function PurchaseOrderPage() {
   const [lineImportInitialTab, setLineImportInitialTab] = useState<LineImportTab>("paste");
   const [exportOpen, setExportOpen] = useState(false);
   const [exportSuccess, setExportSuccess] = useState<{ path: string; filename: string } | null>(null);
-  const [poWorkingTab, setPoWorkingTab] = useState<"lines" | "events">("lines");
+  const [poWorkingTab, setPoWorkingTab] = useState<"lines" | "payments" | "attachments" | "events">("lines");
   const linesGridRef = useRef<AgGridReact<LineFormRow> | null>(null);
   const lineEntryItemPickerRef = useRef<PurchaseOrderItemAutocompleteRef | null>(null);
   const lineEntryQtyInputRef = useRef<HTMLInputElement | null>(null);
@@ -627,6 +685,27 @@ export function PurchaseOrderPage() {
   const isConfirmed = doc?.status === "confirmed";
   const isEditable = isNew || isDraft;
   const displayNumber = !doc ? "—" : isNew ? "—" : doc.number;
+  const poOrderTotalAmount = useMemo(
+    () => computePurchaseOrderTotalFromLines(lines),
+    [lines],
+  );
+  const relatedReceipts = useMemo(() => {
+    if (!id || isNew) return [];
+    return receiptRepository
+      .list()
+      .filter((receipt) => receipt.purchaseOrderId === id)
+      .sort((a, b) => {
+        const ta = new Date(a.date).getTime();
+        const tb = new Date(b.date).getTime();
+        if (ta !== tb) return tb - ta;
+        return b.id.localeCompare(a.id, undefined, { numeric: true });
+      });
+  }, [id, isNew, refresh]);
+  const draftReceipt = useMemo(
+    () => relatedReceipts.find((receipt) => receipt.status === "draft"),
+    [relatedReceipts],
+  );
+  const latestReceipt = relatedReceipts[0];
 
   useEffect(() => {
     if (!isEditable) return;
@@ -684,6 +763,13 @@ export function PurchaseOrderPage() {
     else if (!issueListContainsMessage(health.issues, result.error))
       setActionIssues([actionIssueFromServiceMessage(result.error)]);
   };
+
+  const handleOpenReceipt = useCallback(
+    (receiptId: string) => {
+      navigate(`/receipts/${receiptId}`);
+    },
+    [navigate],
+  );
 
   const handleSave = () => {
     setActionIssues([]);
@@ -1237,9 +1323,24 @@ export function PurchaseOrderPage() {
                   {t("doc.page.confirm")}
                 </Button>
               )}
-              {!isNew && isConfirmed && (
-                <Button type="button" onClick={handleCreateReceipt}>
+              {!isNew && (
+                <Button
+                  type="button"
+                  onClick={handleCreateReceipt}
+                  disabled={!isConfirmed}
+                  title={!isConfirmed ? t("issues.save.poReceiptConfirmedOnly") : undefined}
+                >
                   <span className="create-btn__plus">+</span> {t("doc.page.createReceipt")}
+                </Button>
+              )}
+              {!isNew && draftReceipt && (
+                <Button type="button" variant="outline" onClick={() => handleOpenReceipt(draftReceipt.id)}>
+                  {t("doc.po.openDraftReceipt")}
+                </Button>
+              )}
+              {!isNew && !draftReceipt && latestReceipt && (
+                <Button type="button" variant="outline" onClick={() => handleOpenReceipt(latestReceipt.id)}>
+                  {t("doc.po.openLatestReceipt")}
                 </Button>
               )}
               {!isNew && (isDraft || isConfirmed) && (
@@ -1379,6 +1480,7 @@ export function PurchaseOrderPage() {
         <Card className="max-w-2xl border-0 shadow-none">
             <CardHeader className="p-2 pb-0.5">
               <CardTitle className="text-[0.9rem] font-semibold">{t("doc.page.details")}</CardTitle>
+              <CardDescription>{t("doc.po.detailsDescription")}</CardDescription>
             </CardHeader>
             <CardContent className="p-2 pt-1">
               <div className="grid w-fit grid-cols-[280px_280px] gap-x-2 gap-y-1">
@@ -1477,6 +1579,7 @@ export function PurchaseOrderPage() {
         <Card className="max-w-2xl border-0 shadow-none">
             <CardHeader className="p-2 pb-0.5">
               <CardTitle className="text-[0.9rem] font-semibold">{t("doc.page.details")}</CardTitle>
+              <CardDescription>{t("doc.po.detailsDescription")}</CardDescription>
             </CardHeader>
             <CardContent className="p-2 pt-1">
               <dl className="doc-summary doc-summary--compact doc-summary--dense">
@@ -1539,9 +1642,9 @@ export function PurchaseOrderPage() {
             </CardContent>
           </Card>
       )}
-      <div className="doc-po-working-area mt-4 max-w-full">
+      <div className="doc-po-working-area mt-0 max-w-full border-t border-border/60 pt-2">
         <div
-          className="mb-3 flex flex-wrap gap-1 border-b border-border"
+          className="mb-2 flex flex-wrap gap-1 border-b border-border"
           role="tablist"
           aria-label={t("doc.po.tabPanelsAria")}
         >
@@ -1560,6 +1663,40 @@ export function PurchaseOrderPage() {
             <span className="inline-flex items-center gap-1.5">
               <List className="h-3.5 w-3.5" aria-hidden />
               {t("doc.po.tabLines")}
+            </span>
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={poWorkingTab === "payments"}
+            className={cn(
+              "-mb-px border-b-2 px-3 py-2 text-sm font-medium transition-colors",
+              poWorkingTab === "payments"
+                ? "border-primary text-foreground"
+                : "border-transparent text-muted-foreground hover:text-foreground",
+            )}
+            onClick={() => setPoWorkingTab("payments")}
+          >
+            <span className="inline-flex items-center gap-1.5">
+              <Wallet className="h-3.5 w-3.5" aria-hidden />
+              {t("doc.po.tabPayments")}
+            </span>
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={poWorkingTab === "attachments"}
+            className={cn(
+              "-mb-px border-b-2 px-3 py-2 text-sm font-medium transition-colors",
+              poWorkingTab === "attachments"
+                ? "border-primary text-foreground"
+                : "border-transparent text-muted-foreground hover:text-foreground",
+            )}
+            onClick={() => setPoWorkingTab("attachments")}
+          >
+            <span className="inline-flex items-center gap-1.5">
+              <Paperclip className="h-3.5 w-3.5" aria-hidden />
+              {t("doc.po.tabAttachments")}
             </span>
           </button>
           <button
@@ -1812,7 +1949,7 @@ export function PurchaseOrderPage() {
               </div>
             )}
             <div className="doc-lines__grid doc-lines__grid--fixed-h h-[22rem] min-h-[22rem]">
-              <AgGridContainer themeClass="doc-lines-grid">
+              <AgGridContainer themeClass="doc-lines-grid doc-lines-grid--po">
                 <AgGridReact<LineFormRow>
                   {...agGridDefaultGridOptions}
                   ref={linesGridRef}
@@ -1828,7 +1965,7 @@ export function PurchaseOrderPage() {
               </AgGridContainer>
             </div>
             {form.lines.length > 0 && (
-              <div className="mt-2 flex flex-wrap gap-x-6 gap-y-1 text-sm text-muted-foreground">
+              <div className="doc-lines__totals doc-lines__totals--sticky sticky bottom-0 z-10 mt-1.5 flex gap-6 rounded-md border border-border/70 bg-background/95 px-3 py-2 text-sm shadow-sm backdrop-blur supports-[backdrop-filter]:bg-background/80">
                 <span>
                   {t("doc.page.totalQty")}: {totals.totalQty}
                 </span>
@@ -1880,7 +2017,7 @@ export function PurchaseOrderPage() {
             ) : (
               <>
                 <div className="doc-lines__grid doc-lines__grid--fixed-h h-[22rem] min-h-[22rem]">
-                  <AgGridContainer themeClass="doc-lines-grid">
+                  <AgGridContainer themeClass="doc-lines-grid doc-lines-grid--po">
                     <AgGridReact<LineWithItem>
                       {...agGridDefaultGridOptions}
                       rowData={linesWithItem}
@@ -1890,7 +2027,7 @@ export function PurchaseOrderPage() {
                     />
                   </AgGridContainer>
                 </div>
-                <div className="mt-2 flex flex-wrap gap-x-6 gap-y-1 text-sm text-muted-foreground">
+                <div className="doc-lines__totals doc-lines__totals--sticky sticky bottom-0 z-10 mt-1.5 flex gap-6 rounded-md border border-border/70 bg-background/95 px-3 py-2 text-sm shadow-sm backdrop-blur supports-[backdrop-filter]:bg-background/80">
                   <span>
                     {t("doc.page.totalQty")}: {readonlyTotals.totalQty}
                   </span>
@@ -1900,6 +2037,32 @@ export function PurchaseOrderPage() {
                 </div>
               </>
             )}
+          </div>
+        )}
+        {poWorkingTab === "payments" && (
+          <div className="doc-po-tab-panel doc-po-tab-panel--payments">
+            {isNew ? (
+              <p className="text-sm text-muted-foreground">{t("doc.po.tabSaveDocumentFirst")}</p>
+            ) : id ? (
+              <PurchaseOrderFinanceSection
+                purchaseOrderId={id}
+                cancelled={doc?.status === "cancelled"}
+                orderTotalAmount={poOrderTotalAmount}
+                hasLines={lines.length > 0}
+              />
+            ) : null}
+          </div>
+        )}
+        {poWorkingTab === "attachments" && (
+          <div className="doc-po-tab-panel doc-po-tab-panel--attachments">
+            {isNew ? (
+              <p className="text-sm text-muted-foreground">{t("doc.po.tabSaveDocumentFirst")}</p>
+            ) : id ? (
+              <PurchaseOrderAttachmentsSection
+                purchaseOrderId={id}
+                canMutate={doc?.status !== "cancelled"}
+              />
+            ) : null}
           </div>
         )}
         {poWorkingTab === "events" && (

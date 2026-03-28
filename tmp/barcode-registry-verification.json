@@ -1,0 +1,145 @@
+{
+  "initialMeta": {
+    "url": "http://127.0.0.1:1420/barcodes",
+    "topBar": "Barcode Registry",
+    "headers": [
+      "",
+      "№",
+      "Code",
+      "Entry type",
+      "Item code",
+      "Item name",
+      "Active",
+      "Source",
+      "Created",
+      "Symbology"
+    ],
+    "buttonTexts": [
+      "Mini ERPAdvanced workspace",
+      "AccountSigned in",
+      "Export"
+    ]
+  },
+  "counts": {
+    "initial": 24,
+    "searched": 24,
+    "markdownOnly": 0,
+    "itemFiltered": 24
+  },
+  "emptyStates": {
+    "markdownOnlyEmptyVisible": true
+  },
+  "sampleRows": {
+    "itemBarcodeRow": {
+      "text": "15901234123457Item barcodeITEM-001Widget AActiveManufacturer—EAN-13",
+      "byColId": {
+        "0": "1",
+        "ag-Grid-SelectionColumn": "",
+        "code": "5901234123457",
+        "entryType": "Item barcode",
+        "itemCode": "ITEM-001",
+        "itemName": "Widget A",
+        "isActive": "Active",
+        "source": "Manufacturer",
+        "createdAt": "—",
+        "symbology": "EAN-13"
+      },
+      "code": "5901234123457",
+      "entryType": "Item barcode",
+      "itemCode": "ITEM-001",
+      "itemName": "Widget A",
+      "active": "Active"
+    },
+    "firstRow": {
+      "text": "15901234123457Item barcodeITEM-001Widget AActiveManufacturer—EAN-13",
+      "byColId": {
+        "0": "1",
+        "ag-Grid-SelectionColumn": "",
+        "code": "5901234123457",
+        "entryType": "Item barcode",
+        "itemCode": "ITEM-001",
+        "itemName": "Widget A",
+        "isActive": "Active",
+        "source": "Manufacturer",
+        "createdAt": "—",
+        "symbology": "EAN-13"
+      },
+      "code": "5901234123457",
+      "entryType": "Item barcode",
+      "itemCode": "ITEM-001",
+      "itemName": "Widget A",
+      "active": "Active"
+    }
+  },
+  "searchTargetCode": "5901234123457",
+  "searchOverlayText": "1 results",
+  "searchMatch": [
+    "5901234123457",
+    "5901234123458",
+    "5901234123459",
+    "5901234123460",
+    "5901234123461",
+    "5901234123462",
+    "5901234123463",
+    "5901234123464",
+    "5901234123465",
+    "5901234123466",
+    "5901234123467",
+    "5901234123468",
+    "5901234123469",
+    "5901234123470",
+    "5901234123471",
+    "5901234123472",
+    "5901234123473",
+    "5901234123474",
+    "5901234123475",
+    "5901234123476",
+    "5901234123477",
+    "5901234123478",
+    "5901234123479",
+    "5901234123480"
+  ],
+  "markdownOnlyEntryTypes": [],
+  "itemFilteredItemCodes": [
+    "ITEM-001",
+    "ITEM-002",
+    "ITEM-003",
+    "ITEM-004",
+    "ITEM-005",
+    "ITEM-006",
+    "ITEM-007",
+    "ITEM-008",
+    "ITEM-009",
+    "ITEM-010",
+    "ITEM-011",
+    "ITEM-012",
+    "ITEM-013",
+    "ITEM-014",
+    "ITEM-015",
+    "ITEM-016",
+    "ITEM-017",
+    "ITEM-018",
+    "ITEM-019",
+    "ITEM-020",
+    "ITEM-021",
+    "ITEM-022",
+    "ITEM-023",
+    "ITEM-025"
+  ],
+  "export": {
+    "suggestedFilename": "barcode-registry.xlsx",
+    "savedAs": "/home/shaxr/code/mini-erp-react/tmp/barcode-registry.xlsx"
+  },
+  "itemDrilldown": {
+    "performed": true,
+    "url": "http://127.0.0.1:1420/items/1",
+    "topBar": "Catalog item",
+    "header": "Catalog item ITEM-001"
+  },
+  "markdownDrilldown": {
+    "performed": false,
+    "url": "http://127.0.0.1:1420/barcodes",
+    "topBar": "Barcode Registry",
+    "header": ""
+  }
+}

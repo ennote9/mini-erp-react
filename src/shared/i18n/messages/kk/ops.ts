@@ -147,6 +147,27 @@ export const kkOps: MessageTree = {
       kindSellable: "Сатылатындар",
       kindTester: "Тестерлер",
     },
+    barcodeRegistry: {
+      emptyFiltered: "Ағымдағы іздеу немесе сүзгілер бойынша кодтар жоқ",
+      emptyDefault: "Кодтар әлі жоқ",
+      hintReadOnly:
+        "1-кезеңде тізілім тек оқу үшін қолжетімді. Кодтарды жасау және өзгерту өздерінің бастапқы модульдерінде орындалады.",
+      searchAria: "Штрихкодтар тізілімінен код бойынша іздеу",
+      searchPlaceholder: "Код бойынша іздеу",
+      entryTypeFilterAria: "Жазба түрі бойынша сүзгі",
+      activeFilterAria: "Белсенділік бойынша сүзгі",
+      itemFilterAria: "Тауар бойынша сүзгі",
+      sourceFilterAria: "Көз бойынша сүзгі",
+      filterAllEntryTypes: "Барлық жазба түрлері",
+      filterAllActiveStates: "Кез келген белсенділік",
+      filterActiveOnly: "Тек белсенді",
+      filterInactiveOnly: "Тек белсенді емес",
+      filterAllItems: "Барлық тауарлар",
+      filterAllSources: "Барлық көздер",
+      entryTypeItemBarcode: "Тауар штрихкоды",
+      entryTypeMarkdownCode: "Уценка коды",
+      sourceMarkdownJournal: "Уценка журналы",
+    },
     brands: {
       emptyFiltered: "Ағымдағы іздеу немесе сүзгілер бойынша брендтер жоқ",
       emptyDefault: "Брендтер әлі жоқ",
@@ -319,6 +340,10 @@ export const kkOps: MessageTree = {
     exportActiveNo: "Белсенді емес",
   },
   stockBalances: {
+    detail: {
+      notFound: "Қалдық жолы табылмады.",
+      backToListAria: "Қалдықтар тізіміне оралу",
+    },
     quickFiltersAria: "Жылдам сүзгілер",
     searchAria: "Қалдықтарды іздеу",
     searchPlaceholder: "Іздеу",

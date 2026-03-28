@@ -97,6 +97,25 @@ export function itemsListExcelLabels(t: TFunction): ExcelListSheetLabels {
   };
 }
 
+export function barcodeRegistryListExcelLabels(t: TFunction): ExcelListSheetLabels {
+  return {
+    sheetName: t("exportExcel.list.barcodes"),
+    headers: [
+      t("exportExcel.list.colNo"),
+      t("exportExcel.list.colCode"),
+      t("exportExcel.list.colEntryType"),
+      t("exportExcel.list.colItemCode"),
+      t("exportExcel.list.colItemName"),
+      t("exportExcel.list.colActive"),
+      t("exportExcel.list.colSource"),
+      t("exportExcel.list.colCreated"),
+      t("exportExcel.list.colSymbology"),
+      t("exportExcel.list.colMarkdownJournal"),
+      t("exportExcel.list.colRecordStatus"),
+    ],
+  };
+}
+
 export function purchaseOrdersListExcelLabels(t: TFunction): ExcelListSheetLabels {
   return {
     sheetName: t("exportExcel.list.purchaseOrders"),

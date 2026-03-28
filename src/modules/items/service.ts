@@ -24,6 +24,7 @@ export type SaveItemInput = {
   uom: string;
   isActive: boolean;
   description?: string;
+  accountingProfile?: string;
   brandId?: string;
   categoryId?: string;
   purchasePrice?: number;
@@ -103,6 +104,7 @@ export function saveItem(
   const name = normalizeTrim(data.name);
   const uom = normalizeUOM(data.uom);
   const description = normalizeTrim(data.description) || undefined;
+  const accountingProfile = normalizeTrim(data.accountingProfile) || undefined;
   const brandId = data.brandId && data.brandId.trim() !== "" ? data.brandId.trim() : undefined;
   const categoryId = data.categoryId && data.categoryId.trim() !== "" ? data.categoryId.trim() : undefined;
   const purchasePrice = data.purchasePrice !== undefined ? Number(data.purchasePrice) : undefined;
@@ -116,6 +118,7 @@ export function saveItem(
     uom,
     isActive: data.isActive,
     description,
+    accountingProfile,
     brandId,
     categoryId,
     purchasePrice,

@@ -1,5 +1,6 @@
 import { useCallback, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
+import { Dialog } from "radix-ui";
 import { useTranslation } from "@/shared/i18n/context";
 import type { AppLocaleId } from "@/shared/i18n/locales";
 import { useAppReadModelRevision } from "@/shared/inventoryMasterPageBlocks/useAppReadModelRevision";
@@ -20,6 +21,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { SelectField } from "@/components/ui/select-field";
 import { ExternalLink, Trash2 } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 const ERROR_KEY: Record<PaymentServiceErrorCode, string> = {
   SO_NOT_FOUND: "finance.errors.soNotFound",
@@ -78,6 +80,7 @@ export function SalesOrderFinanceSection(props: SalesOrderFinanceSectionProps) {
   const [reference, setReference] = useState("");
   const [comment, setComment] = useState("");
   const [formError, setFormError] = useState<string | null>(null);
+  const [recordPaymentOpen, setRecordPaymentOpen] = useState(false);
 
   const paymentStatusLabel = useMemo(() => {
     const key = `finance.paymentStatus.${summary.status}` as const;
@@ -98,6 +101,20 @@ export function SalesOrderFinanceSection(props: SalesOrderFinanceSectionProps) {
   const showAmountsAndPayments = hasLines || payments.length > 0;
   const invoiceTo = `/sales-orders/${salesOrderId}/customer-invoice`;
 
+  const resetPaymentForm = useCallback(() => {
+    setAmountStr("");
+    setPaidAtLocal(defaultDatetimeLocal());
+    setMethod("bank_transfer");
+    setReference("");
+    setComment("");
+    setFormError(null);
+  }, []);
+
+  const openRecordPaymentDialog = useCallback(() => {
+    resetPaymentForm();
+    setRecordPaymentOpen(true);
+  }, [resetPaymentForm]);
+
   const handleAddPayment = useCallback(() => {
     setFormError(null);
     const raw = amountStr.replace(",", ".").trim();
@@ -113,11 +130,9 @@ export function SalesOrderFinanceSection(props: SalesOrderFinanceSectionProps) {
       setFormError(t(ERROR_KEY[result.code]));
       return;
     }
-    setAmountStr("");
-    setPaidAtLocal(defaultDatetimeLocal());
-    setReference("");
-    setComment("");
-  }, [amountStr, paidAtLocal, method, reference, comment, salesOrderId, t]);
+    resetPaymentForm();
+    setRecordPaymentOpen(false);
+  }, [amountStr, paidAtLocal, method, reference, comment, salesOrderId, t, resetPaymentForm]);
 
   const handleDelete = useCallback(
     (paymentId: string) => {
@@ -148,6 +163,11 @@ export function SalesOrderFinanceSection(props: SalesOrderFinanceSectionProps) {
               {t("finance.openCustomerInvoice")}
             </Button>
           )}
+          {canMutatePayments ? (
+            <Button type="button" size="sm" className="gap-1.5" onClick={openRecordPaymentDialog}>
+              {t("finance.addPayment")}
+            </Button>
+          ) : null}
         </div>
 
         {!hasLines && payments.length === 0 ? (
@@ -181,84 +201,6 @@ export function SalesOrderFinanceSection(props: SalesOrderFinanceSectionProps) {
                 </span>
               </div>
             </div>
-
-            {canMutatePayments ? (
-            <div className="rounded-md border border-dashed border-border/80 p-3 space-y-2">
-              <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                {t("finance.addPayment")}
-              </h4>
-              {formError ? <p className="text-sm text-destructive">{formError}</p> : null}
-              <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
-                <div className="flex flex-col gap-0.5">
-                  <Label htmlFor="so-pay-amount" className="text-xs">
-                    {t("finance.amount")}
-                  </Label>
-                  <Input
-                    id="so-pay-amount"
-                    type="text"
-                    inputMode="decimal"
-                    value={amountStr}
-                    onChange={(e) => setAmountStr(e.target.value)}
-                    className="h-8 text-sm"
-                    autoComplete="off"
-                  />
-                </div>
-                <div className="flex flex-col gap-0.5">
-                  <Label htmlFor="so-pay-at" className="text-xs">
-                    {t("finance.paidAt")}
-                  </Label>
-                  <Input
-                    id="so-pay-at"
-                    type="datetime-local"
-                    value={paidAtLocal}
-                    onChange={(e) => setPaidAtLocal(e.target.value)}
-                    className="h-8 text-sm [color-scheme:dark]"
-                  />
-                </div>
-                <div className="flex flex-col gap-0.5 sm:col-span-2 lg:col-span-1">
-                  <Label htmlFor="so-pay-method" className="text-xs">
-                    {t("finance.method")}
-                  </Label>
-                  <SelectField
-                    id="so-pay-method"
-                    value={method}
-                    onChange={(v) => setMethod(v as CustomerPaymentMethod)}
-                    options={methodOptions}
-                    placeholder={t("common.select")}
-                    className="w-full min-w-0"
-                  />
-                </div>
-                <div className="flex flex-col gap-0.5 sm:col-span-2">
-                  <Label htmlFor="so-pay-ref" className="text-xs">
-                    {t("finance.reference")}
-                  </Label>
-                  <Input
-                    id="so-pay-ref"
-                    type="text"
-                    value={reference}
-                    onChange={(e) => setReference(e.target.value)}
-                    className="h-8 text-sm"
-                    autoComplete="off"
-                  />
-                </div>
-                <div className="flex flex-col gap-0.5 sm:col-span-2">
-                  <Label htmlFor="so-pay-comment" className="text-xs">
-                    {t("finance.comment")}
-                  </Label>
-                  <Textarea
-                    id="so-pay-comment"
-                    value={comment}
-                    onChange={(e) => setComment(e.target.value)}
-                    rows={2}
-                    className="min-h-[2.5rem] resize-y text-sm"
-                  />
-                </div>
-              </div>
-              <Button type="button" size="sm" onClick={handleAddPayment}>
-                {t("finance.addPayment")}
-              </Button>
-            </div>
-            ) : null}
 
             <div>
               <h4 className="mb-1 text-xs font-semibold uppercase tracking-wide leading-none text-muted-foreground">
@@ -318,6 +260,114 @@ export function SalesOrderFinanceSection(props: SalesOrderFinanceSectionProps) {
           </>
         ) : null}
       </CardContent>
+      <Dialog.Root
+        open={recordPaymentOpen}
+        onOpenChange={(open) => {
+          setRecordPaymentOpen(open);
+          if (!open) setFormError(null);
+        }}
+      >
+        <Dialog.Portal>
+          <Dialog.Overlay className="fixed inset-0 z-50 bg-black/50 backdrop-blur-[1px]" />
+          <Dialog.Content
+            className={cn(
+              "fixed left-1/2 top-1/2 z-50 w-[min(100vw-1.5rem,34rem)] -translate-x-1/2 -translate-y-1/2 rounded-lg border border-border bg-background p-4 shadow-lg",
+              "data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95",
+            )}
+          >
+            <Dialog.Title className="text-base font-semibold text-foreground">
+              {t("finance.addPayment")}
+            </Dialog.Title>
+            <Dialog.Description className="mt-1 text-sm text-muted-foreground">
+              {t("finance.sectionHint")}
+            </Dialog.Description>
+            <div className="mt-4 space-y-3">
+              {formError ? <p className="text-sm text-destructive">{formError}</p> : null}
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div className="flex flex-col gap-1">
+                  <Label htmlFor="so-pay-amount" className="text-xs">
+                    {t("finance.amount")}
+                  </Label>
+                  <Input
+                    id="so-pay-amount"
+                    type="text"
+                    inputMode="decimal"
+                    value={amountStr}
+                    onChange={(e) => setAmountStr(e.target.value)}
+                    className="h-8 text-sm"
+                    autoComplete="off"
+                  />
+                </div>
+                <div className="flex flex-col gap-1">
+                  <Label htmlFor="so-pay-at" className="text-xs">
+                    {t("finance.paidAt")}
+                  </Label>
+                  <Input
+                    id="so-pay-at"
+                    type="datetime-local"
+                    value={paidAtLocal}
+                    onChange={(e) => setPaidAtLocal(e.target.value)}
+                    className="h-8 text-sm [color-scheme:dark]"
+                  />
+                </div>
+                <div className="flex flex-col gap-1 sm:col-span-2">
+                  <Label htmlFor="so-pay-method" className="text-xs">
+                    {t("finance.method")}
+                  </Label>
+                  <SelectField
+                    id="so-pay-method"
+                    value={method}
+                    onChange={(v) => setMethod(v as CustomerPaymentMethod)}
+                    options={methodOptions}
+                    placeholder={t("common.select")}
+                    className="w-full min-w-0"
+                  />
+                </div>
+                <div className="flex flex-col gap-1 sm:col-span-2">
+                  <Label htmlFor="so-pay-ref" className="text-xs">
+                    {t("finance.reference")}
+                  </Label>
+                  <Input
+                    id="so-pay-ref"
+                    type="text"
+                    value={reference}
+                    onChange={(e) => setReference(e.target.value)}
+                    className="h-8 text-sm"
+                    autoComplete="off"
+                  />
+                </div>
+                <div className="flex flex-col gap-1 sm:col-span-2">
+                  <Label htmlFor="so-pay-comment" className="text-xs">
+                    {t("finance.comment")}
+                  </Label>
+                  <Textarea
+                    id="so-pay-comment"
+                    value={comment}
+                    onChange={(e) => setComment(e.target.value)}
+                    rows={3}
+                    className="min-h-[3rem] resize-y text-sm"
+                  />
+                </div>
+              </div>
+              <div className="flex items-center justify-end gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => {
+                    setRecordPaymentOpen(false);
+                    setFormError(null);
+                  }}
+                >
+                  {t("common.cancel")}
+                </Button>
+                <Button type="button" onClick={handleAddPayment}>
+                  {t("finance.addPayment")}
+                </Button>
+              </div>
+            </div>
+          </Dialog.Content>
+        </Dialog.Portal>
+      </Dialog.Root>
     </Card>
   );
 }

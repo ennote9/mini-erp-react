@@ -12,6 +12,7 @@ export type SaveWarehouseInput = {
   name: string;
   isActive: boolean;
   comment?: string;
+  accountingProfile?: string;
   warehouseType?: string;
   address?: string;
   city?: string;
@@ -59,6 +60,7 @@ export function saveWarehouse(
   const code = normalizeCode(data.code);
   const name = normalizeTrim(data.name);
   const comment = normalizeTrim(data.comment) || undefined;
+  const accountingProfile = normalizeTrim(data.accountingProfile) || undefined;
   const warehouseType = normalizeTrim(data.warehouseType) || undefined;
   const address = normalizeTrim(data.address) || undefined;
   const city = normalizeTrim(data.city) || undefined;
@@ -71,6 +73,7 @@ export function saveWarehouse(
     name,
     isActive: data.isActive,
     comment,
+    accountingProfile,
     warehouseType,
     address,
     city,

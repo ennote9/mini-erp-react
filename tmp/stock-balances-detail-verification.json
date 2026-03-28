@@ -1,0 +1,26 @@
+{
+  "listState": {
+    "topBar": "Stock Balances",
+    "rowCount": 1,
+    "dialogCount": 0
+  },
+  "clickedItemCode": "ITEM-001",
+  "detailState": {
+    "url": "http://127.0.0.1:1420/stock-balances/1",
+    "topBar": "Stock Balance",
+    "header": "ITEM-001—Widget A",
+    "backHref": "/stock-balances",
+    "dialogCount": 0,
+    "summaryLabels": [
+      "Total quantity0",
+      "Reserved0",
+      "Available0",
+      "Outgoing0"
+    ]
+  },
+  "backState": {
+    "url": "http://127.0.0.1:1420/stock-balances",
+    "topBar": "Stock Balances",
+    "dialogCount": 0
+  }
+}

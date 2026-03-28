@@ -4,10 +4,10 @@ import { itemRepository } from "../repository";
 import { brandRepository } from "../../brands/repository";
 import { categoryRepository } from "../../categories/repository";
 import { nextTesterCodeForBaseItem, saveItemAwaitPersist } from "../service";
-import { bridgeLegacyBarcodeValueFromCollection } from "../lib/itemBarcodes";
 import { Breadcrumb } from "../../../shared/ui/object/Breadcrumb";
 import { BackButton } from "../../../shared/ui/list/BackButton";
 import { Button } from "@/components/ui/button";
+import { ButtonGroup, ButtonGroupSeparator } from "@/components/ui/button-group";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -33,9 +33,6 @@ import { getItemFormHealth } from "../../../shared/masterDataHealth";
 import { DocumentIssueStrip } from "../../../shared/ui/feedback/DocumentIssueStrip";
 import { ItemImagesCard } from "../components/ItemImagesCard";
 import { ItemBarcodesCard } from "../components/ItemBarcodesCard";
-import { markdownRepository } from "@/modules/markdown-journal";
-import { warehouseRepository } from "@/modules/warehouses/repository";
-import { useAppReadModelRevision } from "@/shared/inventoryMasterPageBlocks/useAppReadModelRevision";
 import { Save, X } from "lucide-react";
 import { useTranslation } from "@/shared/i18n/context";
 
@@ -45,6 +42,7 @@ type FormState = {
   uom: string;
   isActive: boolean;
   description: string;
+  accountingProfile: string;
   brandId: string;
   categoryId: string;
   purchasePrice: string;
@@ -59,6 +57,7 @@ function defaultForm(): FormState {
     uom: "",
     isActive: true,
     description: "",
+    accountingProfile: "",
     brandId: "",
     categoryId: "",
     purchasePrice: "",
@@ -67,17 +66,15 @@ function defaultForm(): FormState {
   };
 }
 
-const EN_BARCODE_SUMMARY_RULES = new Intl.PluralRules("en");
-const RU_BARCODE_SUMMARY_RULES = new Intl.PluralRules("ru");
-
 export function ItemPage() {
-  const { t, locale } = useTranslation();
+  const { t } = useTranslation();
   const { id } = useParams<{ id: string }>();
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const isNew = id === "new";
   const [imagesRevision, setImagesRevision] = useState(0);
   const [barcodesRevision, setBarcodesRevision] = useState(0);
+  const [activeTab, setActiveTab] = useState("main");
   const requestedKind = (searchParams.get("kind") ?? "").toUpperCase();
   const requestedBaseItemId = searchParams.get("baseItemId") ?? "";
   const isValidCreateKind = requestedKind === "SELLABLE" || requestedKind === "TESTER";
@@ -132,40 +129,6 @@ export function ItemPage() {
     [health.issues, actionIssues],
   );
 
-  const barcodeMainSummary = useMemo(() => {
-    if (isNew || !item) return null;
-    const list = item.barcodes ?? [];
-    const count = list.length;
-    const primary = bridgeLegacyBarcodeValueFromCollection(list);
-    return { count, primary };
-  }, [isNew, item, barcodesRevision]);
-
-  const barcodeSummaryCountText = useMemo(() => {
-    if (!barcodeMainSummary) return null;
-    const count = barcodeMainSummary.count;
-
-    if (locale === "ru") {
-      const category = RU_BARCODE_SUMMARY_RULES.select(count);
-      const key =
-        category === "one"
-          ? "master.item.barcodes.summaryCountOne"
-          : category === "few"
-            ? "master.item.barcodes.summaryCountFew"
-            : "master.item.barcodes.summaryCountMany";
-      return `${t(key, { count })}. ${t("master.item.barcodes.summaryManageHint")}`;
-    }
-
-    if (locale === "en") {
-      const key =
-        EN_BARCODE_SUMMARY_RULES.select(count) === "one"
-          ? "master.item.barcodes.summaryCountOne"
-          : "master.item.barcodes.summaryCountOther";
-      return `${t(key, { count })}. ${t("master.item.barcodes.summaryManageHint")}`;
-    }
-
-    return t("master.item.barcodes.summaryCount", { count });
-  }, [barcodeMainSummary, locale, t]);
-
   useEffect(() => {
     if (isNew) {
       if (requestedKind === "TESTER" && requestedBaseItemId) {
@@ -178,6 +141,7 @@ export function ItemPage() {
             uom: base.uom,
             isActive: true,
             description: base.description ?? "",
+            accountingProfile: base.accountingProfile ?? "",
             brandId: base.brandId ?? "",
             categoryId: base.categoryId ?? "",
             purchasePrice: base.purchasePrice !== undefined ? String(base.purchasePrice) : "",
@@ -197,6 +161,7 @@ export function ItemPage() {
         uom: item.uom,
         isActive: item.isActive,
         description: item.description ?? "",
+        accountingProfile: item.accountingProfile ?? "",
         brandId: item.brandId ?? "",
         categoryId: item.categoryId ?? "",
         purchasePrice: item.purchasePrice !== undefined ? String(item.purchasePrice) : "",
@@ -213,6 +178,7 @@ export function ItemPage() {
     item?.uom,
     item?.isActive,
     item?.description,
+    item?.accountingProfile,
     item?.brandId,
     item?.categoryId,
     item?.purchasePrice,
@@ -249,6 +215,7 @@ export function ItemPage() {
           uom: form.uom,
           isActive: form.isActive,
           description: form.description || undefined,
+          accountingProfile: form.accountingProfile || undefined,
           brandId: form.brandId || undefined,
           categoryId: form.categoryId || undefined,
           purchasePrice: parsePrice(form.purchasePrice),
@@ -282,15 +249,15 @@ export function ItemPage() {
     navigate(`/stock-movements?itemId=${encodeURIComponent(itemRecordId)}`);
   }, [itemRecordId, navigate]);
 
+  const openMarkdownForItem = useCallback(() => {
+    if (!itemRecordId) return;
+    navigate(`/markdown-journal?itemId=${encodeURIComponent(itemRecordId)}`);
+  }, [itemRecordId, navigate]);
+
   const relatedTesters = useMemo(() => {
     if (!itemRecordId) return [];
     return itemRepository.list().filter((x) => x.itemKind === "TESTER" && x.baseItemId === itemRecordId);
   }, [itemRecordId, imagesRevision, barcodesRevision]);
-  const markdownRevision = useAppReadModelRevision();
-  const relatedMarkdown = useMemo(() => {
-    if (!itemRecordId) return [];
-    return markdownRepository.list().filter((x) => x.itemId === itemRecordId);
-  }, [itemRecordId, markdownRevision]);
 
   const baseItemForTesterView = useMemo(() => {
     const bid = isNew ? form.baseItemId || requestedBaseItemId : item?.baseItemId;
@@ -367,9 +334,26 @@ export function ItemPage() {
     : t("master.item.titleWithCode", { code: item!.code });
 
   const showTestersTab = isNew ? requestedKind !== "TESTER" : item!.itemKind === "SELLABLE";
+  const tabItems = [
+    { value: "main", label: t("master.item.tabMain") },
+    { value: "images", label: t("master.item.tabImages") },
+    { value: "barcodes", label: t("master.item.tabBarcodes") },
+    ...(showTestersTab ? [{ value: "testers", label: t("master.item.tabTesters") }] : []),
+  ];
+  const availableTabValues = useMemo(() => tabItems.map((tab) => tab.value), [tabItems]);
 
   const inactiveSuffix = t("master.item.inactiveSuffix");
   const selectDash = t("master.common.selectEmpty");
+
+  useEffect(() => {
+    setActiveTab("main");
+  }, [id, requestedKind, requestedBaseItemId]);
+
+  useEffect(() => {
+    if (!availableTabValues.includes(activeTab)) {
+      setActiveTab("main");
+    }
+  }, [activeTab, availableTabValues]);
 
   return (
     <div className="doc-page">
@@ -403,6 +387,15 @@ export function ItemPage() {
                 >
                   {t("master.item.openAllStockMovements")}
                 </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="h-7 shrink-0 px-2.5 text-xs"
+                  onClick={openMarkdownForItem}
+                >
+                  {t("master.item.openAllMarkdown")}
+                </Button>
               </div>
             ) : null}
           </div>
@@ -424,69 +417,30 @@ export function ItemPage() {
         </div>
       </div>
       <Card className="mt-4 max-w-2xl w-full border-0 shadow-none">
-        <Tabs.Root defaultValue="main">
+        <Tabs.Root value={activeTab} onValueChange={setActiveTab}>
           <CardHeader className="p-2 pb-0.5 space-y-2">
             <Tabs.List
-              className="inline-flex min-h-9 w-full max-w-full flex-wrap items-center gap-0.5 rounded-lg border border-border/60 bg-muted/20 p-0.5 text-[13px] sm:w-fit"
+              className="inline-flex min-h-8 w-full max-w-full flex-wrap items-stretch overflow-hidden rounded-md border border-input bg-background sm:w-fit"
               aria-label={t("master.item.tabsAria")}
             >
-              <Tabs.Trigger
-                value="main"
-                className={cn(
-                  "inline-flex flex-1 items-center justify-center rounded-md px-3 py-1.5 font-medium transition-colors sm:flex-initial",
-                  "text-muted-foreground hover:text-foreground",
-                  "data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-sm",
-                  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
-                )}
-              >
-                {t("master.item.tabMain")}
-              </Tabs.Trigger>
-              <Tabs.Trigger
-                value="images"
-                className={cn(
-                  "inline-flex flex-1 items-center justify-center rounded-md px-3 py-1.5 font-medium transition-colors sm:flex-initial",
-                  "text-muted-foreground hover:text-foreground",
-                  "data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-sm",
-                  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
-                )}
-              >
-                {t("master.item.tabImages")}
-              </Tabs.Trigger>
-              <Tabs.Trigger
-                value="barcodes"
-                className={cn(
-                  "inline-flex flex-1 items-center justify-center rounded-md px-3 py-1.5 font-medium transition-colors sm:flex-initial",
-                  "text-muted-foreground hover:text-foreground",
-                  "data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-sm",
-                  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
-                )}
-              >
-                {t("master.item.tabBarcodes")}
-              </Tabs.Trigger>
-              {showTestersTab ? (
-                <Tabs.Trigger
-                  value="testers"
-                  className={cn(
-                    "inline-flex flex-1 items-center justify-center rounded-md px-3 py-1.5 font-medium transition-colors sm:flex-initial",
-                    "text-muted-foreground hover:text-foreground",
-                    "data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-sm",
-                    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
-                  )}
-                >
-                  {t("master.item.tabTesters")}
-                </Tabs.Trigger>
-              ) : null}
-              <Tabs.Trigger
-                value="markdown"
-                className={cn(
-                  "inline-flex flex-1 items-center justify-center rounded-md px-3 py-1.5 font-medium transition-colors sm:flex-initial",
-                  "text-muted-foreground hover:text-foreground",
-                  "data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-sm",
-                  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
-                )}
-              >
-                {t("master.item.tabMarkdown")}
-              </Tabs.Trigger>
+              <ButtonGroup className="w-full flex-wrap rounded-none border-0 bg-transparent sm:w-auto" aria-label={t("master.item.tabsAria")}>
+                {tabItems.map((tab, index) => (
+                  <div key={tab.value} className="contents">
+                    {index > 0 ? <ButtonGroupSeparator /> : null}
+                    <Tabs.Trigger
+                      value={tab.value}
+                      className={cn(
+                        "inline-flex h-8 flex-1 items-center justify-center rounded-none border-0 bg-background px-3 text-sm font-medium transition-colors sm:flex-initial",
+                        "text-foreground hover:bg-accent hover:text-accent-foreground",
+                        "data-[state=active]:bg-primary data-[state=active]:text-primary-foreground",
+                        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
+                      )}
+                    >
+                      {tab.label}
+                    </Tabs.Trigger>
+                  </div>
+                ))}
+              </ButtonGroup>
             </Tabs.List>
           </CardHeader>
           <CardContent className="p-2 pt-1">
@@ -569,6 +523,19 @@ export function ItemPage() {
                       value={form.uom}
                       onChange={(e) => setForm((f) => ({ ...f, uom: e.target.value }))}
                       placeholder={t("master.item.uomPlaceholder")}
+                      className="h-8 text-sm"
+                    />
+                  </div>
+                  <div className="flex flex-col gap-0.5">
+                    <Label htmlFor="item-accounting-profile" className="text-sm">
+                      {t("master.item.accountingProfile")}
+                    </Label>
+                    <Input
+                      id="item-accounting-profile"
+                      type="text"
+                      value={form.accountingProfile}
+                      onChange={(e) => setForm((f) => ({ ...f, accountingProfile: e.target.value }))}
+                      placeholder={t("master.common.optionalPlaceholder")}
                       className="h-8 text-sm"
                     />
                   </div>
@@ -664,17 +631,6 @@ export function ItemPage() {
                       className="resize-none h-auto min-h-[4.5rem] text-sm"
                     />
                   </div>
-                  {barcodeMainSummary ? (
-                    <div className="rounded-md border border-border/60 bg-muted/15 px-3 py-2 sm:col-span-2">
-                      <p className="text-xs font-medium text-muted-foreground">{t("master.item.barcodes.summaryTitle")}</p>
-                      <p className="mt-1 text-sm font-mono tabular-nums">
-                        {barcodeMainSummary.primary ?? t("master.item.barcodes.summaryNoPrimary")}
-                      </p>
-                      <p className="mt-0.5 text-xs text-muted-foreground">
-                        {barcodeSummaryCountText}
-                      </p>
-                    </div>
-                  ) : null}
                   {((isNew && requestedKind === "TESTER") || (!isNew && item!.itemKind === "TESTER")) && (
                     <div className="sm:col-span-2 rounded-md border border-border/60 bg-muted/20 p-2 text-xs">
                       <div className="font-medium text-foreground/90">{t("master.item.baseItemSectionTitle")}</div>
@@ -769,60 +725,6 @@ export function ItemPage() {
                 </div>
               </Tabs.Content>
             ) : null}
-            <Tabs.Content value="markdown" className="outline-none focus-visible:outline-none">
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <p className="text-xs text-muted-foreground">{t("master.item.markdown.tabHint")}</p>
-                  {itemRecordId ? (
-                    <div className="flex gap-2">
-                      <Button type="button" size="sm" variant="outline" onClick={() => navigate(`/markdown-journal/new?itemId=${encodeURIComponent(itemRecordId)}`)}>
-                        {t("master.item.markdown.create")}
-                      </Button>
-                      <Button type="button" size="sm" variant="outline" onClick={() => navigate(`/markdown-journal?itemId=${encodeURIComponent(itemRecordId)}`)}>
-                        {t("master.item.markdown.openAll")}
-                      </Button>
-                    </div>
-                  ) : null}
-                </div>
-                <div className="rounded-md border border-border/70">
-                  {relatedMarkdown.length === 0 ? (
-                    <div className="p-3 text-xs text-muted-foreground">—</div>
-                  ) : (
-                    <table className="w-full text-xs">
-                      <thead className="bg-muted/30">
-                        <tr>
-                          <th className="px-2 py-1 text-left">{t("markdown.fields.markdownCode")}</th>
-                          <th className="px-2 py-1 text-left">{t("common.status")}</th>
-                          <th className="px-2 py-1 text-left">{t("markdown.fields.markdownPrice")}</th>
-                          <th className="px-2 py-1 text-left">{t("markdown.fields.reason")}</th>
-                          <th className="px-2 py-1 text-left">{t("common.warehouse")}</th>
-                          <th className="px-2 py-1 text-left">{t("markdown.fields.createdAt")}</th>
-                          <th className="px-2 py-1 text-left">{t("common.actions")}</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {relatedMarkdown.map((row) => {
-                          const wh = warehouseRepository.getById(row.warehouseId);
-                          return (
-                          <tr key={row.id} className="border-t border-border/60">
-                            <td className="px-2 py-1">{row.markdownCode}</td>
-                            <td className="px-2 py-1">{t(`markdown.status.${row.status}`)}</td>
-                            <td className="px-2 py-1">{row.markdownPrice.toFixed(2)}</td>
-                            <td className="px-2 py-1">{t(`markdown.reason.${row.reasonCode}`)}</td>
-                            <td className="px-2 py-1">{wh ? wh.code : row.warehouseId}</td>
-                            <td className="px-2 py-1">{row.createdAt}</td>
-                            <td className="px-2 py-1">
-                              <Link className="list-table__link" to={`/markdown-journal?view=codes&q=${encodeURIComponent(row.markdownCode)}`}>{t("common.open")}</Link>
-                            </td>
-                          </tr>
-                          );
-                        })}
-                      </tbody>
-                    </table>
-                  )}
-                </div>
-              </div>
-            </Tabs.Content>
           </CardContent>
         </Tabs.Root>
       </Card>

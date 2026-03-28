@@ -177,7 +177,6 @@ export type CustomerFormHealthInput = {
   phone: string;
   email: string;
   paymentTermsDays: string;
-  defaultRecipientPhone: string;
 };
 
 export function getCustomerFormHealth(input: CustomerFormHealthInput): { issues: Issue[] } {
@@ -213,15 +212,6 @@ export function getCustomerFormHealth(input: CustomerFormHealthInput): { issues:
       ? "issues.master.phoneDigit"
       : "issues.master.phoneFormat";
     issues.push(fieldIssue("error", "phone", phoneErr, { key }));
-  }
-  const defaultRecipPhoneErr = validatePhone(input.defaultRecipientPhone);
-  if (defaultRecipPhoneErr) {
-    const key = defaultRecipPhoneErr.includes("digit")
-      ? "issues.master.phoneDigit"
-      : "issues.master.phoneFormat";
-    issues.push(
-      fieldIssue("error", "defaultRecipientPhone", defaultRecipPhoneErr, { key }),
-    );
   }
   const emailErr = validateEmail(input.email);
   if (emailErr)

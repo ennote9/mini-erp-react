@@ -72,6 +72,7 @@ export interface Item {
   uom: string;
   isActive: boolean;
   description?: string;
+  accountingProfile?: string;
   brandId?: string;
   categoryId?: string;
   /**

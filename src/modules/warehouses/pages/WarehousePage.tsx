@@ -5,6 +5,7 @@ import { saveWarehouse } from "../service";
 import { Breadcrumb } from "../../../shared/ui/object/Breadcrumb";
 import { BackButton } from "../../../shared/ui/list/BackButton";
 import { Button } from "@/components/ui/button";
+import { ButtonGroup, ButtonGroupSeparator } from "@/components/ui/button-group";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -28,12 +29,15 @@ import { getWarehouseFormHealth } from "../../../shared/masterDataHealth";
 import { DocumentIssueStrip } from "../../../shared/ui/feedback/DocumentIssueStrip";
 import { Save, X } from "lucide-react";
 import { useTranslation } from "@/shared/i18n/context";
+import { cn } from "@/lib/utils";
+import { Tabs } from "radix-ui";
 
 type FormState = {
   code: string;
   name: string;
   isActive: boolean;
   comment: string;
+  accountingProfile: string;
   warehouseType: string;
   address: string;
   city: string;
@@ -48,6 +52,7 @@ function defaultForm(): FormState {
     name: "",
     isActive: true,
     comment: "",
+    accountingProfile: "",
     warehouseType: "",
     address: "",
     city: "",
@@ -68,6 +73,7 @@ export function WarehousePage() {
   );
 
   const [form, setForm] = useState<FormState>(defaultForm);
+  const [activeTab, setActiveTab] = useState("main");
   const [actionIssues, setActionIssues] = useState<Issue[]>([]);
 
   const health = useMemo(
@@ -100,6 +106,7 @@ export function WarehousePage() {
         name: warehouse.name,
         isActive: warehouse.isActive,
         comment: warehouse.comment ?? "",
+        accountingProfile: warehouse.accountingProfile ?? "",
         warehouseType: warehouse.warehouseType ?? "",
         address: warehouse.address ?? "",
         city: warehouse.city ?? "",
@@ -110,6 +117,10 @@ export function WarehousePage() {
     }
   }, [id, isNew, warehouse]);
 
+  useEffect(() => {
+    setActiveTab("main");
+  }, [id]);
+
   const handleSave = () => {
     setActionIssues([]);
     const result = saveWarehouse(
@@ -118,6 +129,7 @@ export function WarehousePage() {
         name: form.name,
         isActive: form.isActive,
         comment: form.comment || undefined,
+        accountingProfile: form.accountingProfile || undefined,
         warehouseType: form.warehouseType || undefined,
         address: form.address || undefined,
         city: form.city || undefined,
@@ -161,6 +173,11 @@ export function WarehousePage() {
   ];
 
   const displayTitle = isNew ? t("master.warehouse.titleNew") : t("master.warehouse.titleWithCode", { code: warehouse!.code });
+  const tabItems = [
+    { value: "main", label: t("master.warehouse.tabMain") },
+    { value: "address", label: t("master.warehouse.tabAddressContacts") },
+    { value: "settings", label: t("master.warehouse.tabSettings") },
+  ];
 
   return (
     <div className="doc-page">
@@ -241,160 +258,216 @@ export function WarehousePage() {
         </div>
       </div>
       <Card className="mt-4 max-w-2xl border-0 shadow-none">
-        <CardHeader className="p-2 pb-0.5">
-          <CardTitle className="text-[0.9rem] font-semibold">{t("master.common.detailsTitle")}</CardTitle>
-          <CardDescription className="text-xs">
-            {t("master.warehouse.detailsDescription")}
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="p-2 pt-1">
-          <div className="grid gap-2 sm:grid-cols-2">
-            <div className="flex flex-col gap-0.5 sm:col-span-2">
-              <Label htmlFor="warehouse-code" className="text-sm">
-                {t("doc.columns.code")} <span className="text-destructive">{t("doc.page.requiredStar")}</span>
-              </Label>
-              <Input
-                id="warehouse-code"
-                type="text"
-                value={form.code}
-                onChange={(e) => setForm((f) => ({ ...f, code: e.target.value }))}
-                placeholder={t("master.warehouse.codePlaceholder")}
-                className="h-8 text-sm"
-              />
-            </div>
-            <div className="flex flex-col gap-0.5 sm:col-span-2">
-              <Label htmlFor="warehouse-name" className="text-sm">
-                {t("doc.columns.name")} <span className="text-destructive">{t("doc.page.requiredStar")}</span>
-              </Label>
-              <Input
-                id="warehouse-name"
-                type="text"
-                value={form.name}
-                onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
-                placeholder={t("master.warehouse.namePlaceholder")}
-                className="h-8 text-sm"
-              />
-            </div>
-            <div className="flex flex-col gap-0.5">
-              <Label htmlFor="warehouse-type" className="text-sm">{t("master.warehouse.typeLabel")}</Label>
-              <Input
-                id="warehouse-type"
-                type="text"
-                value={form.warehouseType}
-                onChange={(e) =>
-                  setForm((f) => ({ ...f, warehouseType: e.target.value }))
-                }
-                placeholder={t("master.warehouse.warehouseTypePlaceholder")}
-                className="h-8 text-sm"
-              />
-            </div>
-            <div className="flex items-center space-x-2 sm:col-span-2">
-              <Checkbox
-                id="warehouse-active"
-                checked={form.isActive}
-                onCheckedChange={(checked) =>
-                  setForm((f) => ({ ...f, isActive: checked === true }))
-                }
-              />
-              <Label
-                htmlFor="warehouse-active"
-                className="cursor-pointer text-sm font-normal"
-              >
-                {t("ops.master.activeCell.active")}
-              </Label>
-            </div>
-            <div className="flex flex-col gap-0.5 sm:col-span-2">
-              <Label htmlFor="warehouse-comment" className="text-sm">{t("doc.columns.comment")}</Label>
-              <Textarea
-                id="warehouse-comment"
-                value={form.comment}
-                onChange={(e) =>
-                  setForm((f) => ({ ...f, comment: e.target.value }))
-                }
-                placeholder={t("common.optional")}
-                rows={2}
-                className="resize-none min-h-[4.5rem] text-sm"
-              />
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-      <Card className="mt-4 max-w-2xl border-0 shadow-none">
-        <CardHeader className="p-2 pb-0.5">
-          <CardTitle className="text-sm font-semibold">{t("master.warehouse.addressContactTitle")}</CardTitle>
-          <CardDescription className="text-xs">
-            {t("master.warehouse.addressContactDescription")}
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="p-2 pt-1">
-          <div className="grid gap-2 sm:grid-cols-2">
-            <div className="flex flex-col gap-0.5 sm:col-span-2">
-              <Label htmlFor="warehouse-address" className="text-sm">{t("master.supplier.address")}</Label>
-              <Input
-                id="warehouse-address"
-                type="text"
-                value={form.address}
-                onChange={(e) =>
-                  setForm((f) => ({ ...f, address: e.target.value }))
-                }
-                placeholder={t("master.warehouse.streetPlaceholder")}
-                className="h-8 text-sm"
-              />
-            </div>
-            <div className="flex flex-col gap-0.5">
-              <Label htmlFor="warehouse-city" className="text-sm">{t("doc.columns.city")}</Label>
-              <Input
-                id="warehouse-city"
-                type="text"
-                value={form.city}
-                onChange={(e) =>
-                  setForm((f) => ({ ...f, city: e.target.value }))
-                }
-                placeholder={t("master.warehouse.cityPlaceholder")}
-                className="h-8 text-sm"
-              />
-            </div>
-            <div className="flex flex-col gap-0.5">
-              <Label htmlFor="warehouse-country" className="text-sm">{t("master.supplier.country")}</Label>
-              <Input
-                id="warehouse-country"
-                type="text"
-                value={form.country}
-                onChange={(e) =>
-                  setForm((f) => ({ ...f, country: e.target.value }))
-                }
-                placeholder={t("master.warehouse.countryPlaceholder")}
-                className="h-8 text-sm"
-              />
-            </div>
-            <div className="flex flex-col gap-0.5 sm:col-span-2">
-              <Label htmlFor="warehouse-contact-person" className="text-sm">{t("doc.columns.contactPerson")}</Label>
-              <Input
-                id="warehouse-contact-person"
-                type="text"
-                value={form.contactPerson}
-                onChange={(e) =>
-                  setForm((f) => ({ ...f, contactPerson: e.target.value }))
-                }
-                placeholder={t("master.warehouse.contactNamePlaceholder")}
-                className="h-8 text-sm"
-              />
-            </div>
-            <div className="flex flex-col gap-0.5 sm:col-span-2">
-              <Label htmlFor="warehouse-phone" className="text-sm">{t("doc.columns.phone")}</Label>
-              <Input
-                id="warehouse-phone"
-                type="text"
-                value={form.phone}
-                onChange={(e) =>
-                  setForm((f) => ({ ...f, phone: e.target.value }))
-                }
-                placeholder={t("master.warehouse.phoneExamplePlaceholder")}
-                className="h-8 text-sm"
-              />
-            </div>
-          </div>
-        </CardContent>
+        <Tabs.Root value={activeTab} onValueChange={setActiveTab}>
+          <CardHeader className="p-2 pb-0.5 space-y-2">
+            <Tabs.List
+              className="inline-flex min-h-8 w-full max-w-full flex-wrap items-stretch overflow-hidden rounded-md border border-input bg-background sm:w-fit"
+              aria-label={t("master.warehouse.tabsAria")}
+            >
+              <ButtonGroup className="w-full flex-wrap rounded-none border-0 bg-transparent sm:w-auto" aria-label={t("master.warehouse.tabsAria")}>
+                {tabItems.map((tab, index) => (
+                  <div key={tab.value} className="contents">
+                    {index > 0 ? <ButtonGroupSeparator /> : null}
+                    <Tabs.Trigger
+                      value={tab.value}
+                      className={cn(
+                        "inline-flex h-8 flex-1 items-center justify-center rounded-none border-0 bg-background px-3 text-sm font-medium transition-colors sm:flex-initial",
+                        "text-foreground hover:bg-accent hover:text-accent-foreground",
+                        "data-[state=active]:bg-primary data-[state=active]:text-primary-foreground",
+                        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
+                      )}
+                    >
+                      {tab.label}
+                    </Tabs.Trigger>
+                  </div>
+                ))}
+              </ButtonGroup>
+            </Tabs.List>
+          </CardHeader>
+          <CardContent className="p-2 pt-1">
+            <Tabs.Content value="main" className="outline-none focus-visible:outline-none">
+              <div className="space-y-2">
+                <div>
+                  <CardTitle className="text-[0.9rem] font-semibold">{t("master.common.detailsTitle")}</CardTitle>
+                  <CardDescription className="text-xs">
+                    {t("master.warehouse.detailsDescription")}
+                  </CardDescription>
+                </div>
+                <div className="grid gap-2 sm:grid-cols-2">
+                  <div className="flex flex-col gap-0.5 sm:col-span-2">
+                    <Label htmlFor="warehouse-code" className="text-sm">
+                      {t("doc.columns.code")} <span className="text-destructive">{t("doc.page.requiredStar")}</span>
+                    </Label>
+                    <Input
+                      id="warehouse-code"
+                      type="text"
+                      value={form.code}
+                      onChange={(e) => setForm((f) => ({ ...f, code: e.target.value }))}
+                      placeholder={t("master.warehouse.codePlaceholder")}
+                      className="h-8 text-sm"
+                    />
+                  </div>
+                  <div className="flex flex-col gap-0.5 sm:col-span-2">
+                    <Label htmlFor="warehouse-name" className="text-sm">
+                      {t("doc.columns.name")} <span className="text-destructive">{t("doc.page.requiredStar")}</span>
+                    </Label>
+                    <Input
+                      id="warehouse-name"
+                      type="text"
+                      value={form.name}
+                      onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
+                      placeholder={t("master.warehouse.namePlaceholder")}
+                      className="h-8 text-sm"
+                    />
+                  </div>
+                  <div className="flex flex-col gap-0.5">
+                    <Label htmlFor="warehouse-type" className="text-sm">{t("master.warehouse.typeLabel")}</Label>
+                    <Input
+                      id="warehouse-type"
+                      type="text"
+                      value={form.warehouseType}
+                      onChange={(e) =>
+                        setForm((f) => ({ ...f, warehouseType: e.target.value }))
+                      }
+                      placeholder={t("master.warehouse.warehouseTypePlaceholder")}
+                      className="h-8 text-sm"
+                    />
+                  </div>
+                  <div className="flex items-center space-x-2 sm:col-span-2">
+                    <Checkbox
+                      id="warehouse-active"
+                      checked={form.isActive}
+                      onCheckedChange={(checked) =>
+                        setForm((f) => ({ ...f, isActive: checked === true }))
+                      }
+                    />
+                    <Label
+                      htmlFor="warehouse-active"
+                      className="cursor-pointer text-sm font-normal"
+                    >
+                      {t("ops.master.activeCell.active")}
+                    </Label>
+                  </div>
+                  <div className="flex flex-col gap-0.5 sm:col-span-2">
+                    <Label htmlFor="warehouse-comment" className="text-sm">{t("doc.columns.comment")}</Label>
+                    <Textarea
+                      id="warehouse-comment"
+                      value={form.comment}
+                      onChange={(e) =>
+                        setForm((f) => ({ ...f, comment: e.target.value }))
+                      }
+                      placeholder={t("common.optional")}
+                      rows={2}
+                      className="resize-none min-h-[4.5rem] text-sm"
+                    />
+                  </div>
+                </div>
+              </div>
+            </Tabs.Content>
+            <Tabs.Content value="address" className="outline-none focus-visible:outline-none">
+              <div className="space-y-2">
+                <div>
+                  <CardTitle className="text-[0.9rem] font-semibold">{t("master.warehouse.addressContactTitle")}</CardTitle>
+                  <CardDescription className="text-xs">
+                    {t("master.warehouse.addressContactDescription")}
+                  </CardDescription>
+                </div>
+                <div className="grid gap-2 sm:grid-cols-2">
+                  <div className="flex flex-col gap-0.5 sm:col-span-2">
+                    <Label htmlFor="warehouse-address" className="text-sm">{t("master.supplier.address")}</Label>
+                    <Input
+                      id="warehouse-address"
+                      type="text"
+                      value={form.address}
+                      onChange={(e) =>
+                        setForm((f) => ({ ...f, address: e.target.value }))
+                      }
+                      placeholder={t("master.warehouse.streetPlaceholder")}
+                      className="h-8 text-sm"
+                    />
+                  </div>
+                  <div className="flex flex-col gap-0.5">
+                    <Label htmlFor="warehouse-city" className="text-sm">{t("doc.columns.city")}</Label>
+                    <Input
+                      id="warehouse-city"
+                      type="text"
+                      value={form.city}
+                      onChange={(e) =>
+                        setForm((f) => ({ ...f, city: e.target.value }))
+                      }
+                      placeholder={t("master.warehouse.cityPlaceholder")}
+                      className="h-8 text-sm"
+                    />
+                  </div>
+                  <div className="flex flex-col gap-0.5">
+                    <Label htmlFor="warehouse-country" className="text-sm">{t("master.supplier.country")}</Label>
+                    <Input
+                      id="warehouse-country"
+                      type="text"
+                      value={form.country}
+                      onChange={(e) =>
+                        setForm((f) => ({ ...f, country: e.target.value }))
+                      }
+                      placeholder={t("master.warehouse.countryPlaceholder")}
+                      className="h-8 text-sm"
+                    />
+                  </div>
+                  <div className="flex flex-col gap-0.5 sm:col-span-2">
+                    <Label htmlFor="warehouse-contact-person" className="text-sm">{t("doc.columns.contactPerson")}</Label>
+                    <Input
+                      id="warehouse-contact-person"
+                      type="text"
+                      value={form.contactPerson}
+                      onChange={(e) =>
+                        setForm((f) => ({ ...f, contactPerson: e.target.value }))
+                      }
+                      placeholder={t("master.warehouse.contactNamePlaceholder")}
+                      className="h-8 text-sm"
+                    />
+                  </div>
+                  <div className="flex flex-col gap-0.5 sm:col-span-2">
+                    <Label htmlFor="warehouse-phone" className="text-sm">{t("doc.columns.phone")}</Label>
+                    <Input
+                      id="warehouse-phone"
+                      type="text"
+                      value={form.phone}
+                      onChange={(e) =>
+                        setForm((f) => ({ ...f, phone: e.target.value }))
+                      }
+                      placeholder={t("master.warehouse.phoneExamplePlaceholder")}
+                      className="h-8 text-sm"
+                    />
+                  </div>
+                </div>
+              </div>
+            </Tabs.Content>
+            <Tabs.Content value="settings" className="outline-none focus-visible:outline-none">
+              <div className="space-y-2">
+                <div>
+                  <CardTitle className="text-[0.9rem] font-semibold">{t("master.warehouse.settingsTitle")}</CardTitle>
+                  <CardDescription className="text-xs">
+                    {t("master.warehouse.settingsDescription")}
+                  </CardDescription>
+                </div>
+                <div className="grid gap-2 sm:grid-cols-2">
+                  <div className="flex flex-col gap-0.5">
+                    <Label htmlFor="warehouse-accounting-profile" className="text-sm">
+                      {t("master.warehouse.accountingProfile")}
+                    </Label>
+                    <Input
+                      id="warehouse-accounting-profile"
+                      type="text"
+                      value={form.accountingProfile}
+                      onChange={(e) => setForm((f) => ({ ...f, accountingProfile: e.target.value }))}
+                      placeholder={t("master.common.optionalPlaceholder")}
+                      className="h-8 text-sm"
+                    />
+                  </div>
+                </div>
+              </div>
+            </Tabs.Content>
+          </CardContent>
+        </Tabs.Root>
       </Card>
     </div>
   );

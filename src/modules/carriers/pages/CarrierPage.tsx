@@ -6,6 +6,7 @@ import { CARRIER_TYPE_IDS } from "../model";
 import { Breadcrumb } from "../../../shared/ui/object/Breadcrumb";
 import { BackButton } from "../../../shared/ui/list/BackButton";
 import { Button } from "@/components/ui/button";
+import { ButtonGroup, ButtonGroupSeparator } from "@/components/ui/button-group";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -29,6 +30,8 @@ import { getCarrierFormHealth } from "../../../shared/masterDataHealth";
 import { DocumentIssueStrip } from "../../../shared/ui/feedback/DocumentIssueStrip";
 import { Save, X } from "lucide-react";
 import { useTranslation } from "@/shared/i18n/context";
+import { cn } from "@/lib/utils";
+import { Tabs } from "radix-ui";
 
 type FormState = {
   code: string;
@@ -79,6 +82,7 @@ export function CarrierPage() {
   );
 
   const [form, setForm] = useState<FormState>(defaultForm);
+  const [activeTab, setActiveTab] = useState("main");
   const [actionIssues, setActionIssues] = useState<Issue[]>([]);
 
   const health = useMemo(
@@ -129,6 +133,10 @@ export function CarrierPage() {
       });
     }
   }, [id, isNew, carrier]);
+
+  useEffect(() => {
+    setActiveTab("main");
+  }, [id]);
 
   const parsePaymentTerms = (s: string): number | undefined => {
     const trimmed = s.trim();
@@ -195,6 +203,11 @@ export function CarrierPage() {
   const displayTitle = isNew
     ? t("master.carrier.titleNew")
     : t("master.carrier.titleWithCode", { code: carrier!.code });
+  const tabItems = [
+    { value: "main", label: t("master.carrier.tabMain") },
+    { value: "address", label: t("master.carrier.tabAddress") },
+    { value: "tracking", label: t("master.carrier.tabTrackingService") },
+  ];
 
   return (
     <div className="doc-page">
@@ -264,228 +277,287 @@ export function CarrierPage() {
         </div>
       </div>
 
-      <Card className="mt-4 max-w-2xl border-0 shadow-none">
-        <CardHeader className="p-2 pb-0.5">
-          <CardTitle className="text-[0.9rem] font-semibold">{t("master.common.detailsTitle")}</CardTitle>
-        </CardHeader>
-        <CardContent className="p-2 pt-1">
-          <div className="grid gap-2 sm:grid-cols-2">
-            <div className="flex flex-col gap-0.5 sm:col-span-2">
-              <Label htmlFor="carrier-code" className="text-sm">
-                {t("doc.columns.code")} <span className="text-destructive">{t("doc.page.requiredStar")}</span>
-              </Label>
-              <Input
-                id="carrier-code"
-                type="text"
-                value={form.code}
-                onChange={(e) => setForm((f) => ({ ...f, code: e.target.value }))}
-                placeholder={t("master.carrier.codePlaceholder")}
-                className="h-8 text-sm"
-              />
-            </div>
-            <div className="flex flex-col gap-0.5 sm:col-span-2">
-              <Label htmlFor="carrier-name" className="text-sm">
-                {t("doc.columns.name")} <span className="text-destructive">{t("doc.page.requiredStar")}</span>
-              </Label>
-              <Input
-                id="carrier-name"
-                type="text"
-                value={form.name}
-                onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
-                placeholder={t("master.carrier.namePlaceholder")}
-                className="h-8 text-sm"
-              />
-            </div>
-            <div className="flex flex-col gap-0.5 sm:col-span-2">
-              <Label htmlFor="carrier-type" className="text-sm">
-                {t("doc.columns.carrierType")} <span className="text-destructive">{t("doc.page.requiredStar")}</span>
-              </Label>
-              <select
-                id="carrier-type"
-                className="doc-form__select h-8 w-full rounded-md border border-input bg-background px-2 text-sm"
-                value={form.carrierType}
-                onChange={(e) => setForm((f) => ({ ...f, carrierType: e.target.value }))}
-              >
-                {CARRIER_TYPE_IDS.map((tid) => (
-                  <option key={tid} value={tid}>
-                    {t(`master.carrier.types.${tid}`)}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div className="flex flex-col gap-0.5">
-              <Label htmlFor="carrier-contact" className="text-sm">
-                {t("doc.columns.contactPerson")}
-              </Label>
-              <Input
-                id="carrier-contact"
-                type="text"
-                value={form.contactPerson}
-                onChange={(e) => setForm((f) => ({ ...f, contactPerson: e.target.value }))}
-                placeholder={t("common.optional")}
-                className="h-8 text-sm"
-              />
-            </div>
-            <div className="flex flex-col gap-0.5">
-              <Label htmlFor="carrier-phone" className="text-sm">
-                {t("doc.columns.phone")}
-              </Label>
-              <Input
-                id="carrier-phone"
-                type="text"
-                value={form.phone}
-                onChange={(e) => setForm((f) => ({ ...f, phone: e.target.value }))}
-                placeholder={t("common.optional")}
-                className="h-8 text-sm"
-              />
-            </div>
-            <div className="flex flex-col gap-0.5 sm:col-span-2">
-              <Label htmlFor="carrier-email" className="text-sm">
-                {t("doc.columns.email")}
-              </Label>
-              <Input
-                id="carrier-email"
-                type="text"
-                value={form.email}
-                onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))}
-                placeholder={t("common.optional")}
-                className="h-8 text-sm"
-              />
-            </div>
-            <div className="flex flex-col gap-0.5 sm:col-span-2">
-              <Label htmlFor="carrier-website" className="text-sm">
-                {t("doc.columns.website")}
-              </Label>
-              <Input
-                id="carrier-website"
-                type="text"
-                value={form.website}
-                onChange={(e) => setForm((f) => ({ ...f, website: e.target.value }))}
-                placeholder={t("common.optional")}
-                className="h-8 text-sm"
-              />
-            </div>
-            <div className="flex flex-col gap-0.5">
-              <Label htmlFor="carrier-paymentTerms" className="text-sm">
-                {t("doc.page.paymentTermsDaysLabel")}
-              </Label>
-              <Input
-                id="carrier-paymentTerms"
-                type="number"
-                min={0}
-                step={1}
-                value={form.paymentTermsDays}
-                onChange={(e) => setForm((f) => ({ ...f, paymentTermsDays: e.target.value }))}
-                placeholder={t("master.common.paymentTermsExample")}
-                className="h-8 text-sm"
-              />
-            </div>
-            <div className="flex items-center space-x-2 sm:col-span-2">
-              <Checkbox
-                id="carrier-active"
-                checked={form.isActive}
-                onCheckedChange={(checked) => setForm((f) => ({ ...f, isActive: checked === true }))}
-              />
-              <Label htmlFor="carrier-active" className="cursor-pointer text-sm font-normal">
-                {t("ops.master.activeCell.active")}
-              </Label>
-            </div>
-            <div className="flex flex-col gap-0.5 sm:col-span-2">
-              <span className="text-sm font-medium">{t("master.carrier.addressSectionTitle")}</span>
-              <span className="text-xs text-muted-foreground">{t("master.carrier.addressSectionDescription")}</span>
-            </div>
-            <div className="flex flex-col gap-0.5">
-              <Label htmlFor="carrier-country" className="text-sm">
-                {t("master.supplier.country")}
-              </Label>
-              <Input
-                id="carrier-country"
-                type="text"
-                value={form.country}
-                onChange={(e) => setForm((f) => ({ ...f, country: e.target.value }))}
-                placeholder={t("common.optional")}
-                className="h-8 text-sm"
-              />
-            </div>
-            <div className="flex flex-col gap-0.5">
-              <Label htmlFor="carrier-city" className="text-sm">
-                {t("doc.columns.city")}
-              </Label>
-              <Input
-                id="carrier-city"
-                type="text"
-                value={form.city}
-                onChange={(e) => setForm((f) => ({ ...f, city: e.target.value }))}
-                placeholder={t("common.optional")}
-                className="h-8 text-sm"
-              />
-            </div>
-            <div className="flex flex-col gap-0.5 sm:col-span-2">
-              <Label htmlFor="carrier-address" className="text-sm">
-                {t("master.supplier.address")}
-              </Label>
-              <Input
-                id="carrier-address"
-                type="text"
-                value={form.address}
-                onChange={(e) => setForm((f) => ({ ...f, address: e.target.value }))}
-                placeholder={t("common.optional")}
-                className="h-8 text-sm"
-              />
-            </div>
-            <div className="flex flex-col gap-0.5 sm:col-span-2">
-              <Label htmlFor="carrier-comment" className="text-sm">
-                {t("doc.columns.comment")}
-              </Label>
-              <Textarea
-                id="carrier-comment"
-                value={form.comment}
-                onChange={(e) => setForm((f) => ({ ...f, comment: e.target.value }))}
-                placeholder={t("common.optional")}
-                rows={2}
-                className="resize-none min-h-[4.5rem] text-sm"
-              />
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+      <Tabs.Root value={activeTab} onValueChange={setActiveTab} className="mt-4 max-w-2xl">
+        <Tabs.List
+          aria-label={t("master.carrier.tabsAria")}
+          className="inline-flex min-h-8 w-full max-w-full flex-wrap items-stretch overflow-hidden rounded-md border border-input bg-background sm:w-fit"
+        >
+          <ButtonGroup>
+            {tabItems.map((tab, index) => (
+              <div key={tab.value} className="contents">
+                <Tabs.Trigger asChild value={tab.value}>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    className={cn(
+                      "inline-flex h-8 flex-1 items-center justify-center rounded-none border-0 bg-background px-3 text-sm font-medium transition-colors sm:flex-initial",
+                      "text-foreground hover:bg-accent hover:text-accent-foreground data-[state=active]:bg-primary data-[state=active]:text-primary-foreground",
+                      "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
+                    )}
+                  >
+                    {tab.label}
+                  </Button>
+                </Tabs.Trigger>
+                {index < tabItems.length - 1 ? <ButtonGroupSeparator /> : null}
+              </div>
+            ))}
+          </ButtonGroup>
+        </Tabs.List>
 
-      <Card className="mt-4 max-w-2xl border-0 shadow-none">
-        <CardHeader className="p-2 pb-0.5">
-          <CardTitle className="text-[0.9rem] font-semibold">{t("master.carrier.logisticsSectionTitle")}</CardTitle>
-          <CardDescription className="text-xs">{t("master.carrier.logisticsSectionDescription")}</CardDescription>
-        </CardHeader>
-        <CardContent className="p-2 pt-1">
-          <div className="grid gap-2 sm:grid-cols-2">
-            <div className="flex flex-col gap-0.5 sm:col-span-2">
-              <Label htmlFor="carrier-tracking-url" className="text-sm">
-                {t("doc.columns.trackingUrlTemplate")}
-              </Label>
-              <Input
-                id="carrier-tracking-url"
-                type="text"
-                value={form.trackingUrlTemplate}
-                onChange={(e) => setForm((f) => ({ ...f, trackingUrlTemplate: e.target.value }))}
-                placeholder={t("master.carrier.trackingUrlPlaceholder")}
-                className="h-8 text-sm font-mono text-xs"
-              />
-            </div>
-            <div className="flex flex-col gap-0.5 sm:col-span-2">
-              <Label htmlFor="carrier-service-level" className="text-sm">
-                {t("doc.columns.serviceLevelDefault")}
-              </Label>
-              <Input
-                id="carrier-service-level"
-                type="text"
-                value={form.serviceLevelDefault}
-                onChange={(e) => setForm((f) => ({ ...f, serviceLevelDefault: e.target.value }))}
-                placeholder={t("master.carrier.serviceLevelPlaceholder")}
-                className="h-8 text-sm"
-              />
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+        <Tabs.Content value="main" className="mt-4">
+          <Card className="border-0 shadow-none">
+            <CardHeader className="p-2 pb-0.5">
+              <CardTitle className="text-[0.9rem] font-semibold">
+                {t("master.common.detailsTitle")}
+              </CardTitle>
+              <CardDescription className="text-xs">
+                {t("master.carrier.detailsDescription")}
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="p-2 pt-1">
+              <div className="grid gap-2 sm:grid-cols-2">
+                <div className="flex flex-col gap-0.5 sm:col-span-2">
+                  <Label htmlFor="carrier-code" className="text-sm">
+                    {t("doc.columns.code")}{" "}
+                    <span className="text-destructive">{t("doc.page.requiredStar")}</span>
+                  </Label>
+                  <Input
+                    id="carrier-code"
+                    type="text"
+                    value={form.code}
+                    onChange={(e) => setForm((f) => ({ ...f, code: e.target.value }))}
+                    placeholder={t("master.carrier.codePlaceholder")}
+                    className="h-8 text-sm"
+                  />
+                </div>
+                <div className="flex flex-col gap-0.5 sm:col-span-2">
+                  <Label htmlFor="carrier-name" className="text-sm">
+                    {t("doc.columns.name")}{" "}
+                    <span className="text-destructive">{t("doc.page.requiredStar")}</span>
+                  </Label>
+                  <Input
+                    id="carrier-name"
+                    type="text"
+                    value={form.name}
+                    onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
+                    placeholder={t("master.carrier.namePlaceholder")}
+                    className="h-8 text-sm"
+                  />
+                </div>
+                <div className="flex flex-col gap-0.5 sm:col-span-2">
+                  <Label htmlFor="carrier-type" className="text-sm">
+                    {t("doc.columns.carrierType")}{" "}
+                    <span className="text-destructive">{t("doc.page.requiredStar")}</span>
+                  </Label>
+                  <select
+                    id="carrier-type"
+                    className="doc-form__select h-8 w-full rounded-md border border-input bg-background px-2 text-sm"
+                    value={form.carrierType}
+                    onChange={(e) => setForm((f) => ({ ...f, carrierType: e.target.value }))}
+                  >
+                    {CARRIER_TYPE_IDS.map((tid) => (
+                      <option key={tid} value={tid}>
+                        {t(`master.carrier.types.${tid}`)}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className="flex flex-col gap-0.5">
+                  <Label htmlFor="carrier-contact" className="text-sm">
+                    {t("doc.columns.contactPerson")}
+                  </Label>
+                  <Input
+                    id="carrier-contact"
+                    type="text"
+                    value={form.contactPerson}
+                    onChange={(e) => setForm((f) => ({ ...f, contactPerson: e.target.value }))}
+                    placeholder={t("common.optional")}
+                    className="h-8 text-sm"
+                  />
+                </div>
+                <div className="flex flex-col gap-0.5">
+                  <Label htmlFor="carrier-phone" className="text-sm">
+                    {t("doc.columns.phone")}
+                  </Label>
+                  <Input
+                    id="carrier-phone"
+                    type="text"
+                    value={form.phone}
+                    onChange={(e) => setForm((f) => ({ ...f, phone: e.target.value }))}
+                    placeholder={t("common.optional")}
+                    className="h-8 text-sm"
+                  />
+                </div>
+                <div className="flex flex-col gap-0.5 sm:col-span-2">
+                  <Label htmlFor="carrier-email" className="text-sm">
+                    {t("doc.columns.email")}
+                  </Label>
+                  <Input
+                    id="carrier-email"
+                    type="text"
+                    value={form.email}
+                    onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))}
+                    placeholder={t("common.optional")}
+                    className="h-8 text-sm"
+                  />
+                </div>
+                <div className="flex flex-col gap-0.5 sm:col-span-2">
+                  <Label htmlFor="carrier-website" className="text-sm">
+                    {t("doc.columns.website")}
+                  </Label>
+                  <Input
+                    id="carrier-website"
+                    type="text"
+                    value={form.website}
+                    onChange={(e) => setForm((f) => ({ ...f, website: e.target.value }))}
+                    placeholder={t("common.optional")}
+                    className="h-8 text-sm"
+                  />
+                </div>
+                <div className="flex flex-col gap-0.5">
+                  <Label htmlFor="carrier-paymentTerms" className="text-sm">
+                    {t("doc.page.paymentTermsDaysLabel")}
+                  </Label>
+                  <Input
+                    id="carrier-paymentTerms"
+                    type="number"
+                    min={0}
+                    step={1}
+                    value={form.paymentTermsDays}
+                    onChange={(e) => setForm((f) => ({ ...f, paymentTermsDays: e.target.value }))}
+                    placeholder={t("master.common.paymentTermsExample")}
+                    className="h-8 text-sm"
+                  />
+                </div>
+                <div className="flex items-center space-x-2 sm:col-span-2">
+                  <Checkbox
+                    id="carrier-active"
+                    checked={form.isActive}
+                    onCheckedChange={(checked) =>
+                      setForm((f) => ({ ...f, isActive: checked === true }))
+                    }
+                  />
+                  <Label htmlFor="carrier-active" className="cursor-pointer text-sm font-normal">
+                    {t("ops.master.activeCell.active")}
+                  </Label>
+                </div>
+                <div className="flex flex-col gap-0.5 sm:col-span-2">
+                  <Label htmlFor="carrier-comment" className="text-sm">
+                    {t("doc.columns.comment")}
+                  </Label>
+                  <Textarea
+                    id="carrier-comment"
+                    value={form.comment}
+                    onChange={(e) => setForm((f) => ({ ...f, comment: e.target.value }))}
+                    placeholder={t("common.optional")}
+                    rows={2}
+                    className="min-h-[4.5rem] resize-none text-sm"
+                  />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </Tabs.Content>
+
+        <Tabs.Content value="address" className="mt-4">
+          <Card className="border-0 shadow-none">
+            <CardHeader className="p-2 pb-0.5">
+              <CardTitle className="text-[0.9rem] font-semibold">
+                {t("master.carrier.addressSectionTitle")}
+              </CardTitle>
+              <CardDescription className="text-xs">
+                {t("master.carrier.addressSectionDescription")}
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="p-2 pt-1">
+              <div className="grid gap-2 sm:grid-cols-2">
+                <div className="flex flex-col gap-0.5">
+                  <Label htmlFor="carrier-country" className="text-sm">
+                    {t("master.supplier.country")}
+                  </Label>
+                  <Input
+                    id="carrier-country"
+                    type="text"
+                    value={form.country}
+                    onChange={(e) => setForm((f) => ({ ...f, country: e.target.value }))}
+                    placeholder={t("common.optional")}
+                    className="h-8 text-sm"
+                  />
+                </div>
+                <div className="flex flex-col gap-0.5">
+                  <Label htmlFor="carrier-city" className="text-sm">
+                    {t("doc.columns.city")}
+                  </Label>
+                  <Input
+                    id="carrier-city"
+                    type="text"
+                    value={form.city}
+                    onChange={(e) => setForm((f) => ({ ...f, city: e.target.value }))}
+                    placeholder={t("common.optional")}
+                    className="h-8 text-sm"
+                  />
+                </div>
+                <div className="flex flex-col gap-0.5 sm:col-span-2">
+                  <Label htmlFor="carrier-address" className="text-sm">
+                    {t("master.supplier.address")}
+                  </Label>
+                  <Input
+                    id="carrier-address"
+                    type="text"
+                    value={form.address}
+                    onChange={(e) => setForm((f) => ({ ...f, address: e.target.value }))}
+                    placeholder={t("common.optional")}
+                    className="h-8 text-sm"
+                  />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </Tabs.Content>
+
+        <Tabs.Content value="tracking" className="mt-4">
+          <Card className="border-0 shadow-none">
+            <CardHeader className="p-2 pb-0.5">
+              <CardTitle className="text-[0.9rem] font-semibold">
+                {t("master.carrier.logisticsSectionTitle")}
+              </CardTitle>
+              <CardDescription className="text-xs">
+                {t("master.carrier.logisticsSectionDescription")}
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="p-2 pt-1">
+              <div className="grid gap-2 sm:grid-cols-2">
+                <div className="flex flex-col gap-0.5 sm:col-span-2">
+                  <Label htmlFor="carrier-tracking-url" className="text-sm">
+                    {t("doc.columns.trackingUrlTemplate")}
+                  </Label>
+                  <Input
+                    id="carrier-tracking-url"
+                    type="text"
+                    value={form.trackingUrlTemplate}
+                    onChange={(e) => setForm((f) => ({ ...f, trackingUrlTemplate: e.target.value }))}
+                    placeholder={t("master.carrier.trackingUrlPlaceholder")}
+                    className="h-8 text-sm font-mono text-xs"
+                  />
+                </div>
+                <div className="flex flex-col gap-0.5 sm:col-span-2">
+                  <Label htmlFor="carrier-service-level" className="text-sm">
+                    {t("doc.columns.serviceLevelDefault")}
+                  </Label>
+                  <Input
+                    id="carrier-service-level"
+                    type="text"
+                    value={form.serviceLevelDefault}
+                    onChange={(e) => setForm((f) => ({ ...f, serviceLevelDefault: e.target.value }))}
+                    placeholder={t("master.carrier.serviceLevelPlaceholder")}
+                    className="h-8 text-sm"
+                  />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </Tabs.Content>
+      </Tabs.Root>
     </div>
   );
 }

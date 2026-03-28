@@ -26,7 +26,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { SelectField } from "@/components/ui/select-field";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import {
   agGridDefaultColDef,
@@ -109,6 +109,7 @@ import {
 import { getEffectiveWorkspaceFeatureEnabled } from "../../../shared/workspace";
 import {
   ZERO_PRICE_LINE_REASON_CODES,
+  isZeroPriceLineReasonCode,
   type CancelDocumentReasonCode,
   type ZeroPriceLineReasonCode,
 } from "../../../shared/reasonCodes";
@@ -573,6 +574,32 @@ function buildExportRowsFromLinesWithItem(lines: LineWithItem[]): SoExportLineRo
   });
 }
 
+function ExecutionMetric({
+  label,
+  value,
+  danger = false,
+}: {
+  label: string;
+  value: string | number;
+  danger?: boolean;
+}) {
+  return (
+    <div className="rounded-md border border-border/60 bg-background px-2.5 py-2">
+      <p className="text-[0.65rem] font-medium uppercase tracking-wide text-muted-foreground">
+        {label}
+      </p>
+      <p
+        className={cn(
+          "mt-1 text-sm font-semibold tabular-nums",
+          danger ? "text-destructive" : "text-foreground",
+        )}
+      >
+        {value}
+      </p>
+    </div>
+  );
+}
+
 export function SalesOrderPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -673,6 +700,32 @@ export function SalesOrderPage() {
       })),
     [t, locale],
   );
+  const zeroPriceReasonRequired = settings.commercial.zeroPriceLinesRequireReason;
+  const lineEntryUnitPriceRounded = useMemo(
+    () =>
+      roundMoney(
+        typeof lineEntryUnitPrice === "number" &&
+          Number.isFinite(lineEntryUnitPrice) &&
+          lineEntryUnitPrice >= 0
+          ? lineEntryUnitPrice
+          : 0,
+      ),
+    [lineEntryUnitPrice],
+  );
+  const showLineEntryZeroPriceReason = lineEntryUnitPriceRounded === 0;
+  const normalizedLineEntryZeroPriceReason = normalizeTrim(lineEntryZeroPriceReason);
+
+  const validateLineEntryZeroPriceReason = useCallback(() => {
+    if (!showLineEntryZeroPriceReason || !zeroPriceReasonRequired) return true;
+    if (isZeroPriceLineReasonCode(normalizedLineEntryZeroPriceReason)) return true;
+    setActionIssues([actionIssue(t("issues.planning.zeroPriceReasonRequired"))]);
+    return false;
+  }, [
+    showLineEntryZeroPriceReason,
+    zeroPriceReasonRequired,
+    normalizedLineEntryZeroPriceReason,
+    t,
+  ]);
 
   useEffect(() => {
     prevCustomerIdRef.current = null;
@@ -843,8 +896,8 @@ export function SalesOrderPage() {
     }
 
     const recipientName = cust?.defaultRecipientName ?? "";
-    const recipientPhone = cust?.defaultRecipientPhone ?? "";
-    const deliveryAddress = cust?.defaultDeliveryAddress ?? "";
+    const recipientPhone = cust?.phone ?? cust?.defaultRecipientPhone ?? "";
+    const deliveryAddress = cust?.shippingAddress ?? cust?.defaultDeliveryAddress ?? "";
     const deliveryComment = cust?.defaultDeliveryComment ?? "";
 
     setForm((f) => ({
@@ -1007,6 +1060,7 @@ export function SalesOrderPage() {
 
     const rawPrice = Number(lineEntryUnitPrice);
     const unitPrice = roundMoney(Number.isFinite(rawPrice) && rawPrice >= 0 ? rawPrice : 0);
+    if (unitPrice === 0 && !validateLineEntryZeroPriceReason()) return;
     if (markdownCode) {
       const issue = getMarkdownSelectionIssue(markdownCode);
       if (issue) {
@@ -1027,7 +1081,9 @@ export function SalesOrderPage() {
     }
     const _lineId = nextLineIdRef.current++;
     const zp =
-      unitPrice === 0 && lineEntryZeroPriceReason.trim() !== "" ? lineEntryZeroPriceReason.trim() : "";
+      unitPrice === 0 && isZeroPriceLineReasonCode(normalizedLineEntryZeroPriceReason)
+        ? normalizedLineEntryZeroPriceReason
+        : "";
     setForm((f) => ({
       ...f,
       lines: [
@@ -1091,8 +1147,11 @@ export function SalesOrderPage() {
     if (!itemId || !Number.isFinite(qty) || qty <= 0) return;
     const rawPrice = Number(lineEntryUnitPrice);
     const unitPrice = roundMoney(Number.isFinite(rawPrice) && rawPrice >= 0 ? rawPrice : 0);
+    if (unitPrice === 0 && !validateLineEntryZeroPriceReason()) return;
     const zp =
-      unitPrice === 0 && lineEntryZeroPriceReason.trim() !== "" ? lineEntryZeroPriceReason.trim() : "";
+      unitPrice === 0 && isZeroPriceLineReasonCode(normalizedLineEntryZeroPriceReason)
+        ? normalizedLineEntryZeroPriceReason
+        : "";
     if (markdownCode) {
       const issue = getMarkdownSelectionIssue(markdownCode);
       if (issue) {
@@ -1193,13 +1252,13 @@ export function SalesOrderPage() {
   const handleLineEntryItemChange = (itemId: string) => {
     setLineEntryItemId(itemId);
     setLineEntryMarkdownCode(null);
+    setLineEntryZeroPriceReason("");
     const item = itemId ? itemRepository.getById(itemId) : undefined;
     const price = item?.salePrice;
     const up = roundMoney(
       typeof price === "number" && !Number.isNaN(price) && price >= 0 ? price : 0,
     );
     setLineEntryUnitPrice(up);
-    if (up !== 0) setLineEntryZeroPriceReason("");
     if (itemId && editingLineId === null) {
       setTimeout(() => {
         lineEntryQtyInputRef.current?.focus();
@@ -2269,104 +2328,126 @@ export function SalesOrderPage() {
           </button>
         </div>
         {soWorkingTab === "execution" && (
-          <div className="doc-so-tab-panel doc-so-tab-panel--execution space-y-2">
-            {!isNew ? (
-              <div className="grid gap-2 lg:grid-cols-2">
-                {soFulfillment ? (
-                  <section className="rounded-md border border-border/60 bg-transparent p-3">
-                    <div className="mb-2 flex items-start justify-between gap-2">
-                      <h3 className="text-sm font-semibold text-foreground">{t("doc.fulfillment.so.sectionTitle")}</h3>
-                      <Badge
-                        variant="outline"
-                        className={cn(
-                          "h-6 rounded-full px-2 text-[11px] font-semibold",
-                          soFulfillment.hasOverFulfillment
-                            ? "border-destructive/60 text-destructive"
-                            : "border-border text-foreground",
-                        )}
-                      >
-                        {translatePlanningFulfillmentState(t, soFulfillment.state)}
-                      </Badge>
-                    </div>
-                    <div className="grid grid-cols-2 gap-x-3 gap-y-1.5 text-xs">
-                      <div className="space-y-0.5">
-                        <p className="text-[11px] uppercase tracking-wide text-muted-foreground">{t("doc.columns.shipped")}</p>
-                        <p className="tabular-nums text-sm font-semibold text-foreground">{soFulfillment.totalShipped}</p>
-                      </div>
-                      <div className="space-y-0.5">
-                        <p className="text-[11px] uppercase tracking-wide text-muted-foreground">{t("doc.columns.ordered")}</p>
-                        <p className="tabular-nums text-sm font-semibold text-foreground">{soFulfillment.totalOrdered}</p>
-                      </div>
-                      <div className="space-y-0.5">
-                        <p className="text-[11px] uppercase tracking-wide text-muted-foreground">
-                          {t("doc.fulfillment.so.remainingLabel")}
-                        </p>
-                        <p
-                          className={cn(
-                            "tabular-nums text-sm font-semibold",
-                            soFulfillment.totalRemaining < 0 ? "text-destructive" : "text-foreground",
-                          )}
-                        >
-                          {soFulfillment.totalRemaining < 0
-                            ? t("doc.fulfillment.remainingOver", { qty: soFulfillment.totalRemaining })
-                            : soFulfillment.totalRemaining}
-                        </p>
-                      </div>
-                      <div className="col-span-2 space-y-0.5">
-                        <p className="text-[11px] uppercase tracking-wide text-muted-foreground">
-                          {t("doc.fulfillment.so.shipmentsPostedTotal", {
-                            posted: soFulfillment.postedShipmentCount,
-                            total: soFulfillment.relatedShipmentCount,
-                          })}
-                        </p>
-                      </div>
-                    </div>
-                    {soFulfillment.hasOverFulfillment ? (
-                      <p className="mt-2 text-xs font-medium text-destructive">{t("doc.fulfillment.so.overShipped")}</p>
-                    ) : null}
-                  </section>
-                ) : null}
-                {showSalesOrderAllocationUi && soAllocationView ? (
-                  <section className="rounded-md border border-border/60 bg-transparent p-3">
-                    <div className="mb-2 flex items-start justify-between gap-2">
-                      <h3 className="text-sm font-semibold text-foreground">{t("doc.fulfillment.so.allocationSectionTitle")}</h3>
-                      <Badge
-                        variant="outline"
-                        className={cn(
-                          "h-6 rounded-full px-2 text-[11px] font-semibold",
-                          soAllocationView.totalShortage > 0
-                            ? "border-destructive/60 text-destructive"
-                            : "border-border text-foreground",
-                        )}
-                      >
-                        {translateSalesOrderAllocationState(t, soAllocationView.state)}
-                      </Badge>
-                    </div>
-                    <div className="grid grid-cols-2 gap-x-3 gap-y-1.5 text-xs">
-                      <div className="space-y-0.5">
-                        <p className="text-[11px] uppercase tracking-wide text-muted-foreground">{t("doc.columns.reserved")}</p>
-                        <p className="tabular-nums text-sm font-semibold text-foreground">{soAllocationView.totalReserved}</p>
-                      </div>
-                      <div className="space-y-0.5">
-                        <p className="text-[11px] uppercase tracking-wide text-muted-foreground">{t("doc.columns.shortage")}</p>
-                        <p
-                          className={cn(
-                            "tabular-nums text-sm font-semibold",
-                            soAllocationView.totalShortage > 0 ? "text-destructive" : "text-foreground",
-                          )}
-                        >
-                          {soAllocationView.totalShortage}
-                        </p>
-                      </div>
-                    </div>
-                    <p className="mt-2 text-xs text-muted-foreground/85">{t("doc.fulfillment.so.allocationShortageHint")}</p>
-                  </section>
-                ) : null}
-              </div>
-            ) : null}
+          <div className="doc-so-tab-panel doc-so-tab-panel--execution space-y-3">
             {isNew ? (
-              <p className="text-sm text-muted-foreground">{t("doc.so.tabSaveDocumentFirst")}</p>
-            ) : null}
+              <Card className="border border-dashed border-border/70 shadow-none">
+                <CardContent className="p-4">
+                  <p className="text-sm text-muted-foreground">{t("doc.so.tabSaveDocumentFirst")}</p>
+                </CardContent>
+              </Card>
+            ) : (
+              <>
+                <Card className="border border-border/70 shadow-none">
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-sm">{t("doc.so.tabExecution")}</CardTitle>
+                    <CardDescription className="text-xs">
+                      {t("doc.fulfillment.so.shipmentsPostedTotal", {
+                        posted: soFulfillment?.postedShipmentCount ?? 0,
+                        total: soFulfillment?.relatedShipmentCount ?? 0,
+                      })}
+                    </CardDescription>
+                  </CardHeader>
+                </Card>
+                <div className="grid gap-3 xl:grid-cols-2">
+                  {soFulfillment ? (
+                    <Card className="border border-border/70 shadow-none">
+                      <CardHeader className="pb-3">
+                        <div className="flex items-start justify-between gap-2">
+                          <div>
+                            <CardTitle className="text-sm">{t("doc.fulfillment.so.sectionTitle")}</CardTitle>
+                            <CardDescription className="mt-1 text-xs">
+                              {t("doc.fulfillment.so.shipmentsPostedTotal", {
+                                posted: soFulfillment.postedShipmentCount,
+                                total: soFulfillment.relatedShipmentCount,
+                              })}
+                            </CardDescription>
+                          </div>
+                          <Badge
+                            variant="outline"
+                            className={cn(
+                              "h-6 rounded-full px-2 text-[11px] font-semibold",
+                              soFulfillment.hasOverFulfillment
+                                ? "border-destructive/60 text-destructive"
+                                : "border-border text-foreground",
+                            )}
+                          >
+                            {translatePlanningFulfillmentState(t, soFulfillment.state)}
+                          </Badge>
+                        </div>
+                      </CardHeader>
+                      <CardContent className="space-y-3 pt-0">
+                        <div className="grid gap-2 sm:grid-cols-3">
+                          <ExecutionMetric
+                            label={t("doc.columns.shipped")}
+                            value={soFulfillment.totalShipped}
+                          />
+                          <ExecutionMetric
+                            label={t("doc.columns.ordered")}
+                            value={soFulfillment.totalOrdered}
+                          />
+                          <ExecutionMetric
+                            label={t("doc.fulfillment.so.remainingLabel")}
+                            value={
+                              soFulfillment.totalRemaining < 0
+                                ? t("doc.fulfillment.remainingOver", {
+                                    qty: soFulfillment.totalRemaining,
+                                  })
+                                : soFulfillment.totalRemaining
+                            }
+                            danger={soFulfillment.totalRemaining < 0}
+                          />
+                        </div>
+                        {soFulfillment.hasOverFulfillment ? (
+                          <p className="text-xs font-medium text-destructive">
+                            {t("doc.fulfillment.so.overShipped")}
+                          </p>
+                        ) : null}
+                      </CardContent>
+                    </Card>
+                  ) : null}
+                  {showSalesOrderAllocationUi && soAllocationView ? (
+                    <Card className="border border-border/70 shadow-none">
+                      <CardHeader className="pb-3">
+                        <div className="flex items-start justify-between gap-2">
+                          <div>
+                            <CardTitle className="text-sm">
+                              {t("doc.fulfillment.so.allocationSectionTitle")}
+                            </CardTitle>
+                            <CardDescription className="mt-1 text-xs">
+                              {t("doc.fulfillment.so.allocationShortageHint")}
+                            </CardDescription>
+                          </div>
+                          <Badge
+                            variant="outline"
+                            className={cn(
+                              "h-6 rounded-full px-2 text-[11px] font-semibold",
+                              soAllocationView.totalShortage > 0
+                                ? "border-destructive/60 text-destructive"
+                                : "border-border text-foreground",
+                            )}
+                          >
+                            {translateSalesOrderAllocationState(t, soAllocationView.state)}
+                          </Badge>
+                        </div>
+                      </CardHeader>
+                      <CardContent className="pt-0">
+                        <div className="grid gap-2 sm:grid-cols-2">
+                          <ExecutionMetric
+                            label={t("doc.columns.reserved")}
+                            value={soAllocationView.totalReserved}
+                          />
+                          <ExecutionMetric
+                            label={t("doc.columns.shortage")}
+                            value={soAllocationView.totalShortage}
+                            danger={soAllocationView.totalShortage > 0}
+                          />
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ) : null}
+                </div>
+              </>
+            )}
           </div>
         )}
         {soWorkingTab === "payments" && (
@@ -2463,26 +2544,34 @@ export function SalesOrderPage() {
                         className="h-8 w-[80px] text-sm text-right align-middle [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                       />
                     </div>
-                    <div className="flex flex-col gap-0.5 md:col-span-1">
-                      <Label htmlFor="so-line-entry-zp-reason" className="text-sm">
-                        {t("doc.page.zeroPriceReasonLabel")}
-                        {roundMoney(lineEntryUnitPrice) === 0 ? (
-                          <span className="text-destructive"> *</span>
-                        ) : null}
-                      </Label>
-                      <SelectField
-                        id="so-line-entry-zp-reason"
-                        value={lineEntryZeroPriceReason}
-                        onChange={setLineEntryZeroPriceReason}
-                        options={zeroPriceReasonOptions}
-                        placeholder={
-                          roundMoney(lineEntryUnitPrice) === 0
-                            ? t("doc.cancelDialog.selectPlaceholder")
-                            : t("domain.audit.summary.emDash")
-                        }
-                        className="w-[min(100%,220px)] min-w-0"
-                        disabled={roundMoney(lineEntryUnitPrice) !== 0}
-                      />
+                    <div className="flex min-h-[3.5rem] flex-col gap-0.5 md:col-span-1">
+                      {showLineEntryZeroPriceReason ? (
+                        <>
+                          <Label htmlFor="so-line-entry-zp-reason" className="text-sm">
+                            {t("doc.page.zeroPriceReasonLabel")}
+                            {zeroPriceReasonRequired ? (
+                              <span className="text-destructive"> *</span>
+                            ) : null}
+                          </Label>
+                          <SelectField
+                            id="so-line-entry-zp-reason"
+                            value={lineEntryZeroPriceReason}
+                            onChange={setLineEntryZeroPriceReason}
+                            options={zeroPriceReasonOptions}
+                            placeholder={t("doc.cancelDialog.selectPlaceholder")}
+                            className="w-[min(100%,220px)] min-w-0"
+                          />
+                        </>
+                      ) : (
+                        <>
+                          <span className="text-sm font-medium text-muted-foreground">
+                            {t("doc.page.zeroPriceReasonLabel")}
+                          </span>
+                          <span className="text-xs text-muted-foreground">
+                            {t("domain.audit.summary.emDash")}
+                          </span>
+                        </>
+                      )}
                     </div>
                     <div
                       ref={lineEntryDropdownRightEdgeRef}
@@ -2615,7 +2704,7 @@ export function SalesOrderPage() {
               </AgGridContainer>
             </div>
             {form.lines.length > 0 && (
-              <div className="doc-lines__totals mt-1.5 flex gap-6 text-sm">
+              <div className="doc-lines__totals doc-lines__totals--sticky sticky bottom-0 z-10 mt-1.5 flex gap-6 rounded-md border border-border/70 bg-background/95 px-3 py-2 text-sm shadow-sm backdrop-blur supports-[backdrop-filter]:bg-background/80">
                 <span>
                   {t("doc.page.totalQty")}: {totals.totalQty}
                 </span>
@@ -2643,7 +2732,7 @@ export function SalesOrderPage() {
                     />
                   </AgGridContainer>
                 </div>
-                <div className="doc-lines__totals mt-1.5 flex gap-6 text-sm">
+                <div className="doc-lines__totals doc-lines__totals--sticky sticky bottom-0 z-10 mt-1.5 flex gap-6 rounded-md border border-border/70 bg-background/95 px-3 py-2 text-sm shadow-sm backdrop-blur supports-[backdrop-filter]:bg-background/80">
                   <span>
                     {t("doc.page.totalQty")}: {readonlyTotals.totalQty}
                   </span>

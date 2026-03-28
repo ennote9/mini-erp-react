@@ -1330,12 +1330,18 @@ summary,
   height: 30px !important;
   min-height: 30px !important;
 }
+.doc-page .doc-lines-grid--po .ag-header-cell.po-grid-header--center .ag-header-cell-label {
+  justify-content: center;
+}
 .doc-page .ag-theme-quartz-dark .ag-cell {
   padding-left: 12px !important;
   padding-right: 12px !important;
   padding-top: 0 !important;
   padding-bottom: 0 !important;
   line-height: 1.1 !important;
+}
+.doc-page .doc-lines-grid--po .ag-cell.po-grid-cell--center {
+  text-align: center;
 }
 .doc-page .ag-theme-quartz-dark .ag-row:hover .ag-cell {
   background-color: hsl(0 0% 12%) !important;

@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { Dialog } from "radix-ui";
 import type { ItemBarcode } from "../model";
 import {
   ITEM_BARCODE_PACKAGING_LEVELS,
@@ -41,6 +42,7 @@ export function ItemBarcodesCard({ isNew, itemId, barcodes, onBarcodesChanged }:
   const { t } = useTranslation();
   const [draft, setDraft] = useState<ItemBarcodeDraft>(defaultDraft);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [dialogOpen, setDialogOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<{ text: string; variant: "error" | "info" } | null>(null);
 
@@ -49,6 +51,17 @@ export function ItemBarcodesCard({ isNew, itemId, barcodes, onBarcodesChanged }:
   const resetDraft = () => {
     setDraft(defaultDraft());
     setEditingId(null);
+  };
+
+  const closeDialog = () => {
+    setDialogOpen(false);
+    resetDraft();
+  };
+
+  const startCreate = () => {
+    resetDraft();
+    setMessage(null);
+    setDialogOpen(true);
   };
 
   const startEdit = (row: ItemBarcode) => {
@@ -64,6 +77,7 @@ export function ItemBarcodesCard({ isNew, itemId, barcodes, onBarcodesChanged }:
       comment: row.comment ?? "",
     });
     setMessage(null);
+    setDialogOpen(true);
   };
 
   const handleSave = async () => {
@@ -80,7 +94,7 @@ export function ItemBarcodesCard({ isNew, itemId, barcodes, onBarcodesChanged }:
       await flushPendingItemsPersist();
       onBarcodesChanged();
       setMessage({ text: t("master.item.barcodes.saved"), variant: "info" });
-      resetDraft();
+      closeDialog();
     } catch (e) {
       setMessage({
         text: e instanceof Error ? e.message : t("master.item.barcodes.saveFailed"),
@@ -128,8 +142,15 @@ export function ItemBarcodesCard({ isNew, itemId, barcodes, onBarcodesChanged }:
   return (
     <Card className="border-0 shadow-none">
       <CardHeader className="p-2 pb-0.5">
-        <CardTitle className="text-[0.9rem] font-semibold">{t("master.item.barcodes.title")}</CardTitle>
-        <CardDescription className="text-xs">{t("master.item.barcodes.description")}</CardDescription>
+        <div className="flex flex-wrap items-start justify-between gap-2">
+          <div className="space-y-1">
+            <CardTitle className="text-[0.9rem] font-semibold">{t("master.item.barcodes.title")}</CardTitle>
+            <CardDescription className="text-xs">{t("master.item.barcodes.description")}</CardDescription>
+          </div>
+          <Button type="button" size="sm" onClick={startCreate}>
+            {t("master.item.barcodes.create")}
+          </Button>
+        </div>
       </CardHeader>
       <CardContent className="p-2 pt-1 space-y-3">
         {message && (
@@ -184,94 +205,116 @@ export function ItemBarcodesCard({ isNew, itemId, barcodes, onBarcodesChanged }:
             </tbody>
           </table>
         </div>
-
-        <div className="grid gap-2 sm:grid-cols-2">
-          <div className="flex flex-col gap-0.5 sm:col-span-2">
-            <Label className="text-sm">{t("master.item.barcodes.codeValue")}</Label>
-            <Input
-              value={draft.codeValue}
-              onChange={(e) => setDraft((x) => ({ ...x, codeValue: e.target.value }))}
-              className="h-8 text-sm font-mono"
-            />
-          </div>
-          <div className="flex flex-col gap-0.5">
-            <Label className="text-sm">{t("master.item.barcodes.symbology")}</Label>
-            <select
-              value={draft.symbology}
-              onChange={(e) => setDraft((x) => ({ ...x, symbology: e.target.value as ItemBarcodeDraft["symbology"] }))}
-              className="flex h-8 w-full rounded border border-input bg-background px-2 py-1 text-sm text-foreground"
-            >
-              {ITEM_BARCODE_SYMBOLOGIES.map((v) => (
-                <option key={v} value={v}>{t(`master.item.barcodes.types.${v}`)}</option>
-              ))}
-            </select>
-          </div>
-          <div className="flex flex-col gap-0.5">
-            <Label className="text-sm">{t("master.item.barcodes.packagingLevel")}</Label>
-            <select
-              value={draft.packagingLevel}
-              onChange={(e) =>
-                setDraft((x) => ({ ...x, packagingLevel: e.target.value as ItemBarcodeDraft["packagingLevel"] }))
-              }
-              className="flex h-8 w-full rounded border border-input bg-background px-2 py-1 text-sm text-foreground"
-            >
-              {ITEM_BARCODE_PACKAGING_LEVELS.map((v) => (
-                <option key={v} value={v}>{t(`master.item.barcodes.packaging.${v}`)}</option>
-              ))}
-            </select>
-          </div>
-          <div className="flex flex-col gap-0.5">
-            <Label className="text-sm">{t("master.item.barcodes.barcodeRole")}</Label>
-            <select
-              value={draft.barcodeRole}
-              onChange={(e) =>
-                setDraft((x) => ({ ...x, barcodeRole: e.target.value as ItemBarcodeDraft["barcodeRole"] }))
-              }
-              className="flex h-8 w-full rounded border border-input bg-background px-2 py-1 text-sm text-foreground"
-            >
-              {ITEM_BARCODE_ROLES.map((v) => (
-                <option key={v} value={v}>{t(`master.item.barcodes.roles.${v}`)}</option>
-              ))}
-            </select>
-          </div>
-          <div className="flex flex-col gap-0.5">
-            <Label className="text-sm">{t("master.item.barcodes.sourceType")}</Label>
-            <select
-              value={draft.sourceType}
-              onChange={(e) =>
-                setDraft((x) => ({ ...x, sourceType: e.target.value as ItemBarcodeDraft["sourceType"] }))
-              }
-              className="flex h-8 w-full rounded border border-input bg-background px-2 py-1 text-sm text-foreground"
-            >
-              {ITEM_BARCODE_SOURCE_TYPES.map((v) => (
-                <option key={v} value={v}>{t(`master.item.barcodes.sources.${v}`)}</option>
-              ))}
-            </select>
-          </div>
-          <div className="flex items-center gap-2">
-            <Checkbox checked={draft.isPrimary} onCheckedChange={(checked) => setDraft((x) => ({ ...x, isPrimary: checked === true }))} />
-            <Label className="text-sm">{t("master.item.barcodes.primary")}</Label>
-          </div>
-          <div className="flex items-center gap-2">
-            <Checkbox checked={draft.isActive} onCheckedChange={(checked) => setDraft((x) => ({ ...x, isActive: checked === true }))} />
-            <Label className="text-sm">{t("master.item.barcodes.active")}</Label>
-          </div>
-          <div className="flex flex-col gap-0.5 sm:col-span-2">
-            <Label className="text-sm">{t("master.item.barcodes.comment")}</Label>
-            <Textarea value={draft.comment ?? ""} onChange={(e) => setDraft((x) => ({ ...x, comment: e.target.value }))} rows={2} className="resize-none min-h-[4.5rem] text-sm" />
-          </div>
-        </div>
-        <div className="flex gap-2">
-          <Button type="button" size="sm" className="h-8 text-xs" onClick={() => void handleSave()} disabled={busy}>
-            {editingId ? t("common.save") : t("master.item.barcodes.add")}
-          </Button>
-          {editingId && (
-            <Button type="button" variant="outline" size="sm" className="h-8 text-xs" onClick={resetDraft} disabled={busy}>
-              {t("common.cancel")}
-            </Button>
-          )}
-        </div>
       </CardContent>
+      <Dialog.Root
+        open={dialogOpen}
+        onOpenChange={(next) => {
+          if (busy) return;
+          if (next) {
+            setDialogOpen(true);
+            return;
+          }
+          closeDialog();
+        }}
+      >
+        <Dialog.Portal>
+          <Dialog.Overlay className="fixed inset-0 z-50 bg-black/50 backdrop-blur-[1px]" />
+          <Dialog.Content
+            className="fixed left-1/2 top-1/2 z-50 w-[min(92vw,42rem)] -translate-x-1/2 -translate-y-1/2 rounded-lg border border-border bg-background p-4 shadow-lg focus:outline-none"
+          >
+            <Dialog.Title className="text-base font-semibold text-foreground">
+              {editingId ? t("master.item.barcodes.editTitle") : t("master.item.barcodes.createTitle")}
+            </Dialog.Title>
+            <Dialog.Description className="mt-1 text-sm text-muted-foreground">
+              {t("master.item.barcodes.dialogDescription")}
+            </Dialog.Description>
+            <div className="mt-4 grid gap-2 sm:grid-cols-2">
+              <div className="flex flex-col gap-0.5 sm:col-span-2">
+                <Label className="text-sm">{t("master.item.barcodes.codeValue")}</Label>
+                <Input
+                  value={draft.codeValue}
+                  onChange={(e) => setDraft((x) => ({ ...x, codeValue: e.target.value }))}
+                  className="h-8 text-sm font-mono"
+                />
+              </div>
+              <div className="flex flex-col gap-0.5">
+                <Label className="text-sm">{t("master.item.barcodes.symbology")}</Label>
+                <select
+                  value={draft.symbology}
+                  onChange={(e) => setDraft((x) => ({ ...x, symbology: e.target.value as ItemBarcodeDraft["symbology"] }))}
+                  className="flex h-8 w-full rounded border border-input bg-background px-2 py-1 text-sm text-foreground"
+                >
+                  {ITEM_BARCODE_SYMBOLOGIES.map((v) => (
+                    <option key={v} value={v}>{t(`master.item.barcodes.types.${v}`)}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="flex flex-col gap-0.5">
+                <Label className="text-sm">{t("master.item.barcodes.packagingLevel")}</Label>
+                <select
+                  value={draft.packagingLevel}
+                  onChange={(e) =>
+                    setDraft((x) => ({ ...x, packagingLevel: e.target.value as ItemBarcodeDraft["packagingLevel"] }))
+                  }
+                  className="flex h-8 w-full rounded border border-input bg-background px-2 py-1 text-sm text-foreground"
+                >
+                  {ITEM_BARCODE_PACKAGING_LEVELS.map((v) => (
+                    <option key={v} value={v}>{t(`master.item.barcodes.packaging.${v}`)}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="flex flex-col gap-0.5">
+                <Label className="text-sm">{t("master.item.barcodes.barcodeRole")}</Label>
+                <select
+                  value={draft.barcodeRole}
+                  onChange={(e) =>
+                    setDraft((x) => ({ ...x, barcodeRole: e.target.value as ItemBarcodeDraft["barcodeRole"] }))
+                  }
+                  className="flex h-8 w-full rounded border border-input bg-background px-2 py-1 text-sm text-foreground"
+                >
+                  {ITEM_BARCODE_ROLES.map((v) => (
+                    <option key={v} value={v}>{t(`master.item.barcodes.roles.${v}`)}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="flex flex-col gap-0.5">
+                <Label className="text-sm">{t("master.item.barcodes.sourceType")}</Label>
+                <select
+                  value={draft.sourceType}
+                  onChange={(e) =>
+                    setDraft((x) => ({ ...x, sourceType: e.target.value as ItemBarcodeDraft["sourceType"] }))
+                  }
+                  className="flex h-8 w-full rounded border border-input bg-background px-2 py-1 text-sm text-foreground"
+                >
+                  {ITEM_BARCODE_SOURCE_TYPES.map((v) => (
+                    <option key={v} value={v}>{t(`master.item.barcodes.sources.${v}`)}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="flex items-center gap-2">
+                <Checkbox checked={draft.isPrimary} onCheckedChange={(checked) => setDraft((x) => ({ ...x, isPrimary: checked === true }))} />
+                <Label className="text-sm">{t("master.item.barcodes.primary")}</Label>
+              </div>
+              <div className="flex items-center gap-2">
+                <Checkbox checked={draft.isActive} onCheckedChange={(checked) => setDraft((x) => ({ ...x, isActive: checked === true }))} />
+                <Label className="text-sm">{t("master.item.barcodes.active")}</Label>
+              </div>
+              <div className="flex flex-col gap-0.5 sm:col-span-2">
+                <Label className="text-sm">{t("master.item.barcodes.comment")}</Label>
+                <Textarea value={draft.comment ?? ""} onChange={(e) => setDraft((x) => ({ ...x, comment: e.target.value }))} rows={2} className="resize-none min-h-[4.5rem] text-sm" />
+              </div>
+            </div>
+            <div className="mt-4 flex justify-end gap-2">
+              <Button type="button" variant="outline" onClick={closeDialog} disabled={busy}>
+                {t("common.cancel")}
+              </Button>
+              <Button type="button" onClick={() => void handleSave()} disabled={busy}>
+                {editingId ? t("common.save") : t("common.create")}
+              </Button>
+            </div>
+          </Dialog.Content>
+        </Dialog.Portal>
+      </Dialog.Root>
     </Card>
   );
 }

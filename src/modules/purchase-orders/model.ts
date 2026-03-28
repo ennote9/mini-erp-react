@@ -1,5 +1,14 @@
 import type { PlanningDocumentStatus } from "../../shared/domain";
 
+export interface PurchaseOrderAttachment {
+  id: string;
+  name: string;
+  mimeType?: string;
+  sizeBytes: number;
+  contentBase64: string;
+  addedAt: string;
+}
+
 /**
  * Purchase Order entity per docs/01_product_core/02_Domain_Model.md.
  * Planning document: intention to buy stock from a supplier.
@@ -16,6 +25,7 @@ export interface PurchaseOrder {
   /** Due date YYYY-MM-DD derived from date + paymentTermsDays when terms are set; omitted when terms unset. */
   dueDate?: string;
   comment?: string;
+  attachments?: PurchaseOrderAttachment[];
   /** Set when status becomes cancelled (controlled exception). */
   cancelReasonCode?: string;
   cancelReasonComment?: string;
