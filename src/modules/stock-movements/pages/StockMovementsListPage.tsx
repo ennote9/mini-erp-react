@@ -21,10 +21,13 @@ import { EmptyState } from "../../../shared/ui/feedback/EmptyState";
 import {
   AgGridContainer,
   AgGridMovementTypeCellRenderer,
+  applyAgGridColumnFilters,
   agGridDefaultColDef,
   agGridDefaultGridOptions,
   agGridRowNumberColDef,
   agGridSelectionColumnDef,
+  decorateAgGridColumnDefsWithFilters,
+  type AgGridColumnFilterConfig,
 } from "../../../shared/ui/ag-grid";
 import { BackButton } from "../../../shared/ui/list/BackButton";
 import { ListPageSearch } from "../../../shared/ui/list/ListPageSearch";
@@ -40,6 +43,12 @@ import { useTranslation } from "@/shared/i18n/context";
 import { buildReadableUniqueFilename, ensureUniqueExportPath } from "@/shared/export/filenameBuilder";
 import { stockMovementsListExcelLabels } from "@/shared/i18n/excelListExportLabels";
 import { normalizeTrim } from "../../../shared/validation";
+import {
+  hasActiveAgGridColumnFilters,
+  readUrlAgGridColumnFilters,
+  replaceUrlAgGridColumnFilters,
+  type AgGridColumnFilterClause,
+} from "@/shared/navigation/agGridColumnFilters";
 
 type RowData = StockMovement & {
   itemCode: string;
@@ -258,6 +267,7 @@ export function StockMovementsListPage() {
   );
 
   const [searchQuery, setSearchQuery] = useState("");
+  const columnFilterModel = useMemo(() => readUrlAgGridColumnFilters(searchParams), [searchParams]);
   const [exportSuccess, setExportSuccess] = useState<{ path: string; filename: string } | null>(null);
   const [exportOpen, setExportOpen] = useState(false);
   const [selectedCount, setSelectedCount] = useState(0);
@@ -315,13 +325,46 @@ export function StockMovementsListPage() {
     searchQuery,
   ]);
 
-  const isEmpty = filteredRows.length === 0;
+  const stockMovementColumnFilterConfigs = useMemo<Record<string, AgGridColumnFilterConfig<RowData>>>(
+    () => ({
+      datetime: { kind: "datetime" },
+      movementType: {
+        kind: "enum",
+        getValue: (row) => movementTypeLabel(row.movementType),
+        options: Array.from(new Set(rowsWithNames.map((row) => movementTypeLabel(row.movementType))))
+          .filter(Boolean)
+          .sort((a, b) => a.localeCompare(b))
+          .map((value) => ({ value, label: value })),
+      },
+      itemCode: { kind: "text" },
+      itemName: { kind: "text" },
+      warehouseName: {
+        kind: "enum",
+        options: Array.from(new Set(rowsWithNames.map((row) => row.warehouseName)))
+          .filter(Boolean)
+          .sort((a, b) => a.localeCompare(b))
+          .map((value) => ({ value, label: value })),
+      },
+      qtyDelta: { kind: "number" },
+      sourceDocumentLabel: { kind: "text", getValue: (row) => row.sourceDocumentLabel },
+      relatedOrder: { kind: "text", getValue: (row) => row.relatedOrderLabel },
+    }),
+    [rowsWithNames, movementTypeLabel],
+  );
+
+  const displayRows = useMemo(
+    () => applyAgGridColumnFilters(filteredRows, columnFilterModel, stockMovementColumnFilterConfigs),
+    [filteredRows, columnFilterModel, stockMovementColumnFilterConfigs],
+  );
+
+  const isEmpty = displayRows.length === 0;
   const hasFilter =
     searchQuery.trim() !== "" ||
     warehouseFilterId != null ||
     itemFilterId != null ||
     brandFilterId != null ||
-    categoryFilterId != null;
+    categoryFilterId != null ||
+    hasActiveAgGridColumnFilters(columnFilterModel);
 
   const brandFilterLabel = useMemo((): string => {
     if (brandFilterId == null) return "";
@@ -386,13 +429,13 @@ export function StockMovementsListPage() {
 
   const getExportRowsCurrentView = useCallback((): StockMovementsExportRow[] => {
     const api = gridRef.current?.api;
-    if (!api) return buildExportRowsFromMovements(filteredRows, movementTypeLabel);
+    if (!api) return buildExportRowsFromMovements(displayRows, movementTypeLabel);
     const rows: RowData[] = [];
     api.forEachNodeAfterFilterAndSort((rowNode) => {
       if (rowNode.data) rows.push(rowNode.data);
     });
     return buildExportRowsFromMovements(rows, movementTypeLabel);
-  }, [filteredRows, movementTypeLabel]);
+  }, [displayRows, movementTypeLabel]);
 
   const getExportRowsSelected = useCallback((): StockMovementsExportRow[] => {
     const api = gridRef.current?.api;
@@ -509,7 +552,26 @@ export function StockMovementsListPage() {
     t,
   ]);
 
-  const columnDefs = useMemo<ColDef<RowData>[]>(
+  const handleApplyColumnFilter = useCallback(
+    (colId: string, clause: AgGridColumnFilterClause) => {
+      replaceUrlAgGridColumnFilters(searchParams, setSearchParams, {
+        ...columnFilterModel,
+        [colId]: clause,
+      });
+    },
+    [columnFilterModel, searchParams, setSearchParams],
+  );
+
+  const handleResetColumnFilter = useCallback(
+    (colId: string) => {
+      const nextModel = { ...columnFilterModel };
+      delete nextModel[colId];
+      replaceUrlAgGridColumnFilters(searchParams, setSearchParams, nextModel);
+    },
+    [columnFilterModel, searchParams, setSearchParams],
+  );
+
+  const baseColumnDefs = useMemo<ColDef<RowData>[]>(
     () => [
       agGridRowNumberColDef,
       {
@@ -551,6 +613,7 @@ export function StockMovementsListPage() {
             : "",
       },
       {
+        colId: "sourceDocumentLabel",
         headerName: t("doc.columns.sourceDocument"),
         minWidth: 132,
         width: 148,
@@ -569,6 +632,24 @@ export function StockMovementsListPage() {
     [t, locale],
   );
 
+  const columnDefs = useMemo(
+    () =>
+      decorateAgGridColumnDefsWithFilters(
+        baseColumnDefs,
+        stockMovementColumnFilterConfigs,
+        columnFilterModel,
+        handleApplyColumnFilter,
+        handleResetColumnFilter,
+      ),
+    [
+      baseColumnDefs,
+      stockMovementColumnFilterConfigs,
+      columnFilterModel,
+      handleApplyColumnFilter,
+      handleResetColumnFilter,
+    ],
+  );
+
   return (
     <ListPageLayout
       header={null}
@@ -581,7 +662,7 @@ export function StockMovementsListPage() {
             value={searchQuery}
             onChange={setSearchQuery}
             aria-label={t("ops.stockMovements.searchAria")}
-            resultCount={filteredRows.length}
+            resultCount={displayRows.length}
           />
           <div className="flex flex-row items-center gap-2 shrink-0 ml-auto">
             {brandFilterId != null && (
@@ -790,7 +871,7 @@ export function StockMovementsListPage() {
           <AgGridReact<RowData>
             {...agGridDefaultGridOptions}
             ref={gridRef}
-            rowData={filteredRows}
+            rowData={displayRows}
             columnDefs={columnDefs}
             defaultColDef={agGridDefaultColDef}
             rowSelection={{ mode: "multiRow", checkboxes: true, headerCheckbox: true, enableClickSelection: true }}

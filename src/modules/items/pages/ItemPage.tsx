@@ -1,4 +1,4 @@
-import { useParams, useNavigate, useSearchParams, Link } from "react-router-dom";
+import { useParams, useNavigate, useSearchParams, Link, useLocation } from "react-router-dom";
 import { useMemo, useState, useEffect, useCallback } from "react";
 import { itemRepository } from "../repository";
 import { brandRepository } from "../../brands/repository";
@@ -35,6 +35,8 @@ import { ItemImagesCard } from "../components/ItemImagesCard";
 import { ItemBarcodesCard } from "../components/ItemBarcodesCard";
 import { Save, X } from "lucide-react";
 import { useTranslation } from "@/shared/i18n/context";
+import { appendReturnTo, buildReturnToValue, readReturnToParam } from "@/shared/navigation/returnTo";
+import { useUrlTabState } from "@/shared/navigation/useUrlTabState";
 
 type FormState = {
   code: string;
@@ -70,11 +72,11 @@ export function ItemPage() {
   const { t } = useTranslation();
   const { id } = useParams<{ id: string }>();
   const [searchParams] = useSearchParams();
+  const location = useLocation();
   const navigate = useNavigate();
   const isNew = id === "new";
   const [imagesRevision, setImagesRevision] = useState(0);
   const [barcodesRevision, setBarcodesRevision] = useState(0);
-  const [activeTab, setActiveTab] = useState("main");
   const requestedKind = (searchParams.get("kind") ?? "").toUpperCase();
   const requestedBaseItemId = searchParams.get("baseItemId") ?? "";
   const createKind: "SELLABLE" | "TESTER" = requestedKind === "TESTER" ? "TESTER" : "SELLABLE";
@@ -226,7 +228,7 @@ export function ItemPage() {
         isNew ? undefined : id ?? undefined,
       );
       if (result.success) {
-        navigate("/items");
+        navigate(backHref);
       } else if (!issueListContainsMessage(health.issues, result.error)) {
         setActionIssues([actionIssueFromServiceMessage(result.error)]);
       }
@@ -234,7 +236,7 @@ export function ItemPage() {
   };
 
   const handleCancel = () => {
-    navigate("/items");
+    navigate(backHref);
   };
 
   const itemRecordId = !isNew && id ? id : null;
@@ -307,24 +309,29 @@ export function ItemPage() {
     ...(showTestersTab ? [{ value: "testers", label: t("master.item.tabTesters") }] : []),
   ];
   const availableTabValues = useMemo(() => tabItems.map((tab) => tab.value), [tabItems]);
+  const [activeTab, setActiveTab] = useUrlTabState({
+    allowedValues: availableTabValues as readonly string[],
+    defaultValue: "main",
+  });
+  const returnTo = readReturnToParam(searchParams);
+  const backHref = returnTo ?? "/items";
+  const currentReturnTo = useMemo(
+    () => buildReturnToValue(location.pathname, location.search),
+    [location.pathname, location.search],
+  );
 
   const inactiveSuffix = t("master.item.inactiveSuffix");
   const selectDash = t("master.common.selectEmpty");
 
-  useEffect(() => {
-    setActiveTab("main");
-  }, [id, createKind, requestedBaseItemId]);
-
-  useEffect(() => {
-    if (!availableTabValues.includes(activeTab)) {
-      setActiveTab("main");
-    }
-  }, [activeTab, availableTabValues]);
-
   return (
     <div className="doc-page">
       <div className="doc-page__breadcrumb">
-        <BackButton to="/items" aria-label={t("master.item.backToListAria")} />
+        <BackButton
+          to={returnTo ?? undefined}
+          fallbackTo="/items"
+          preferHistory={!returnTo}
+          aria-label={t("master.item.backToListAria")}
+        />
         <Breadcrumb items={breadcrumbItems} />
       </div>
       <div className="doc-page__header">
@@ -649,13 +656,20 @@ export function ItemPage() {
                 <div className="space-y-2">
                   <div className="flex items-center justify-between">
                     <p className="text-xs text-muted-foreground">{t("master.item.testers.tabHint")}</p>
-                    {itemRecordId ? (
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant="outline"
-                        onClick={() => navigate(`/items/new?kind=TESTER&baseItemId=${encodeURIComponent(itemRecordId)}`)}
-                      >
+	                    {itemRecordId ? (
+	                      <Button
+	                        type="button"
+	                        size="sm"
+	                        variant="outline"
+	                        onClick={() =>
+	                          navigate(
+	                            appendReturnTo(
+	                              `/items/new?kind=TESTER&baseItemId=${encodeURIComponent(itemRecordId)}`,
+	                              currentReturnTo,
+	                            ),
+	                          )
+	                        }
+	                      >
                         {t("master.item.testers.createTester")}
                       </Button>
                     ) : null}

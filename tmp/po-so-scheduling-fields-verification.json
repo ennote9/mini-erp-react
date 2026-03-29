@@ -1,0 +1,59 @@
+{
+  "purchaseOrder": {
+    "editState": {
+      "url": "http://127.0.0.1:1420/purchase-orders/1",
+      "hasPreliminaryField": true,
+      "hasActualArrivalField": true,
+      "actualArrivalInputType": "datetime-local",
+      "sectionHeads": [
+        "Document",
+        "Supply",
+        "Commercial",
+        "Notes"
+      ]
+    },
+    "readonlyState": {
+      "url": "http://127.0.0.1:1420/purchase-orders/1",
+      "hasPreliminaryLabel": true,
+      "hasActualArrivalLabel": true,
+      "hasPreliminaryValue": true,
+      "hasActualArrivalValue": true,
+      "hasEditableInputs": false,
+      "tabs": [
+        "Lines",
+        "Execution",
+        "Payments",
+        "Attachments",
+        "Event log"
+      ]
+    }
+  },
+  "salesOrder": {
+    "editState": {
+      "url": "http://127.0.0.1:1420/sales-orders/1",
+      "hasPreliminaryField": true,
+      "hasActualShipmentField": true,
+      "sectionHeads": [
+        "Document",
+        "Delivery",
+        "Commercial",
+        "Notes"
+      ]
+    },
+    "readonlyState": {
+      "url": "http://127.0.0.1:1420/sales-orders/1",
+      "hasPreliminaryLabel": true,
+      "hasActualShipmentLabel": true,
+      "hasPreliminaryValue": true,
+      "hasActualShipmentValue": true,
+      "hasEditableInputs": false,
+      "tabs": [
+        "Lines",
+        "Execution",
+        "Payments",
+        "Attachments",
+        "Event log"
+      ]
+    }
+  }
+}

@@ -1,0 +1,204 @@
+{
+  "baseUrl": "http://127.0.0.1:1420",
+  "verifiedAt": "2026-03-29T16:21:45.896Z",
+  "items": {
+    "firstCode": "ITEM-001",
+    "textOperators": [
+      "contains",
+      "not_contains",
+      "equals",
+      "not_equals",
+      "starts_with",
+      "ends_with",
+      "in",
+      "not_in",
+      "is_empty",
+      "is_not_empty"
+    ],
+    "textOperatorLabels": [
+      "Contains",
+      "Does not contain",
+      "Equals",
+      "Does not equal",
+      "Starts with",
+      "Ends with",
+      "One of",
+      "Not one of",
+      "Is empty",
+      "Is not empty"
+    ],
+    "headerButtonsBeforeFilter": 1,
+    "itemsUrlAfterFilter": "http://127.0.0.1:1420/items?cf=code%7Eequals%7EITEM-001",
+    "backRestoredFilter": true,
+    "sortUrlAfterClick": "http://127.0.0.1:1420/items?cf=code%7Eequals%7EITEM-001&sort=code%3Aasc"
+  },
+  "salesOrders": {
+    "Status": {
+      "operators": [
+        "equals",
+        "not_equals",
+        "in",
+        "not_in",
+        "is_empty",
+        "is_not_empty"
+      ],
+      "operatorLabels": [
+        "Equals",
+        "Does not equal",
+        "One of",
+        "Not one of",
+        "Is empty",
+        "Is not empty"
+      ]
+    }
+  },
+  "salesOrdersEnumMultiselect": {
+    "operatorLabels": [
+      "Equals",
+      "Does not equal",
+      "One of",
+      "Not one of",
+      "Is empty",
+      "Is not empty"
+    ],
+    "checkboxCount": 4,
+    "firstOptionLabel": "Draft",
+    "searchPlaceholderVisible": true
+  },
+  "purchaseOrders": {
+    "Number": {
+      "operators": [
+        "contains",
+        "not_contains",
+        "equals",
+        "not_equals",
+        "starts_with",
+        "ends_with",
+        "in",
+        "not_in",
+        "is_empty",
+        "is_not_empty"
+      ],
+      "operatorLabels": [
+        "Contains",
+        "Does not contain",
+        "Equals",
+        "Does not equal",
+        "Starts with",
+        "Ends with",
+        "One of",
+        "Not one of",
+        "Is empty",
+        "Is not empty"
+      ]
+    }
+  },
+  "stockBalances": {
+    "Total quantity": {
+      "operators": [
+        "eq",
+        "neq",
+        "gt",
+        "gte",
+        "lt",
+        "lte",
+        "between",
+        "not_between",
+        "is_empty",
+        "is_not_empty"
+      ],
+      "operatorLabels": [
+        "Equals",
+        "Does not equal",
+        "Greater than",
+        "Greater than or equal to",
+        "Less than",
+        "Less than or equal to",
+        "Between",
+        "Not between",
+        "Is empty",
+        "Is not empty"
+      ]
+    }
+  },
+  "markdownJournal": {
+    "route": "/markdown-journal",
+    "skippedEmpty": true
+  },
+  "barcodeRegistry": {
+    "Type": {
+      "operators": [
+        "equals",
+        "not_equals",
+        "in",
+        "not_in",
+        "is_empty",
+        "is_not_empty"
+      ],
+      "operatorLabels": [
+        "Equals",
+        "Does not equal",
+        "One of",
+        "Not one of",
+        "Is empty",
+        "Is not empty"
+      ]
+    }
+  },
+  "brands": {
+    "Active": {
+      "operators": [
+        "is_true",
+        "is_false",
+        "is_empty",
+        "is_not_empty"
+      ],
+      "operatorLabels": [
+        "Is true",
+        "Is false",
+        "Is empty",
+        "Is not empty"
+      ]
+    }
+  },
+  "categories": {
+    "route": "/categories",
+    "headerLabel": "Code",
+    "popupOpened": true
+  },
+  "suppliers": {
+    "route": "/suppliers",
+    "headerLabel": "Code",
+    "popupOpened": true
+  },
+  "customers": {
+    "route": "/customers",
+    "headerLabel": "Code",
+    "popupOpened": true
+  },
+  "warehouses": {
+    "route": "/warehouses",
+    "headerLabel": "Code",
+    "popupOpened": true
+  },
+  "carriers": {
+    "route": "/carriers",
+    "headerLabel": "Code",
+    "popupOpened": true
+  },
+  "receipts": {
+    "route": "/receipts",
+    "headerLabel": "Number",
+    "skippedEmpty": true
+  },
+  "shipments": {
+    "route": "/shipments",
+    "headerLabel": "Number",
+    "skippedEmpty": true
+  },
+  "stockMovements": {
+    "route": "/stock-movements",
+    "headerLabel": "Date/time",
+    "skippedEmpty": true
+  }
+}

@@ -1,0 +1,51 @@
+{
+  "tabTexts": [
+    "Lines",
+    "Execution",
+    "Payments",
+    "Attachments",
+    "Event log"
+  ],
+  "attachmentStateBefore": {
+    "url": "http://127.0.0.1:1420/sales-orders/1?tab=attachments",
+    "hasSectionTitle": true,
+    "emptyTextPresent": true,
+    "rows": 0
+  },
+  "attachmentStateAfterAdd": {
+    "rows": 1,
+    "hasPackageJson": true
+  },
+  "urlAfterReload": "http://127.0.0.1:1420/sales-orders/1?tab=attachments",
+  "postReloadState": {
+    "rows": 1,
+    "hasPackageJson": true,
+    "buttonLabels": [
+      "Mini ERPAdvanced workspace",
+      "AccountSigned in",
+      "Back to Sales Orders",
+      "Save (Ctrl/Cmd+S)",
+      "Confirm",
+      "Cancel document",
+      "Open print documents menu",
+      "Export",
+      "Export options",
+      "Cancel",
+      "Открыть календарь",
+      "CUS-0001 - Beta Corp",
+      "WH-001 - Main Warehouse",
+      "Lines",
+      "Execution",
+      "Payments",
+      "Attachments",
+      "Event log",
+      "Attach files",
+      "Download attachment",
+      "Remove attachment"
+    ]
+  },
+  "attachmentStateAfterRemove": {
+    "rows": 0,
+    "emptyTextPresent": true
+  }
+}

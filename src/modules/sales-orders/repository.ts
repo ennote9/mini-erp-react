@@ -1,4 +1,4 @@
-import type { SalesOrder, SalesOrderLine } from "./model";
+import type { SalesOrder, SalesOrderAttachment, SalesOrderLine } from "./model";
 import { todayYYYYMMDD } from "./dateUtils";
 import { itemRepository } from "../items/repository";
 import { roundMoney } from "../../shared/commercialMoney";
@@ -39,6 +39,7 @@ const headerStore: SalesOrder[] = [];
 const lineStore: SalesOrderLine[] = [];
 let headerNextId = 1;
 let lineNextId = 1;
+let attachmentNextId = 1;
 let numberCounter = 1;
 let persistChain: Promise<void> = Promise.resolve();
 let persistDepth = 0;
@@ -91,6 +92,45 @@ function computeNextSONumberCounter(records: SalesOrder[]): number {
   return max + 1;
 }
 
+function computeNextAttachmentId(records: SalesOrderPersistRecord[]): number {
+  let max = 0;
+  for (const record of records) {
+    for (const attachment of record.attachments ?? []) {
+      const n = Number.parseInt(attachment.id, 10);
+      if (!Number.isNaN(n) && n > max) max = n;
+    }
+  }
+  return max + 1;
+}
+
+function normalizeAttachment(raw: unknown): SalesOrderAttachment | null {
+  if (!raw || typeof raw !== "object") return null;
+  const rec = raw as Record<string, unknown>;
+  if (
+    typeof rec.id !== "string" ||
+    typeof rec.name !== "string" ||
+    typeof rec.sizeBytes !== "number" ||
+    !Number.isFinite(rec.sizeBytes) ||
+    rec.sizeBytes < 0 ||
+    typeof rec.contentBase64 !== "string" ||
+    rec.contentBase64.trim() === "" ||
+    typeof rec.addedAt !== "string"
+  ) {
+    return null;
+  }
+  const attachment: SalesOrderAttachment = {
+    id: rec.id,
+    name: rec.name.trim(),
+    sizeBytes: Math.trunc(rec.sizeBytes),
+    contentBase64: rec.contentBase64.trim(),
+    addedAt: rec.addedAt,
+  };
+  if (typeof rec.mimeType === "string" && rec.mimeType.trim() !== "") {
+    attachment.mimeType = rec.mimeType.trim();
+  }
+  return attachment.name === "" ? null : attachment;
+}
+
 function normalizeLine(raw: unknown): SalesOrderLine | null {
   if (!raw || typeof raw !== "object") return null;
   const rec = raw as Record<string, unknown>;
@@ -136,6 +176,10 @@ function normalizeSORecord(raw: unknown): SalesOrderPersistRecord | null {
     return null;
   }
   const lines = rec.lines.map(normalizeLine).filter((x): x is SalesOrderLine => x !== null);
+  const attachmentsRaw = Array.isArray(rec.attachments) ? rec.attachments : [];
+  const attachments = attachmentsRaw
+    .map(normalizeAttachment)
+    .filter((x): x is SalesOrderAttachment => x !== null);
   if (rec.lines.length > 0 && lines.length === 0) return null;
   return {
     id: rec.id,
@@ -144,9 +188,12 @@ function normalizeSORecord(raw: unknown): SalesOrderPersistRecord | null {
     customerId: rec.customerId,
     warehouseId: rec.warehouseId,
     status: rec.status,
+    preliminaryShipmentDate: asOptionalTrimmedString(rec.preliminaryShipmentDate),
+    actualShipmentDate: asOptionalTrimmedString(rec.actualShipmentDate),
     paymentTermsDays: asOptionalPaymentTermsDays(rec.paymentTermsDays),
     dueDate: asOptionalString(rec.dueDate),
     comment: asOptionalString(rec.comment),
+    ...(attachments.length > 0 ? { attachments } : {}),
     cancelReasonCode:
       typeof rec.cancelReasonCode === "string" && isCancelDocumentReasonCode(rec.cancelReasonCode)
         ? rec.cancelReasonCode
@@ -235,6 +282,10 @@ function nextNumber(): string {
   return formatGeneratedVisibleCode("SO", numberCounter++);
 }
 
+function nextAttachmentId(): string {
+  return String(attachmentNextId++);
+}
+
 async function bootstrapFromDisk(): Promise<void> {
   const loaded = await loadDocumentsPersisted({
     relativePath: PERSIST_PATH,
@@ -251,6 +302,7 @@ async function bootstrapFromDisk(): Promise<void> {
   lineStore.splice(0, lineStore.length, ...lines);
   headerNextId = computeNextNumericId(headerStore);
   lineNextId = computeNextNumericId(lineStore);
+  attachmentNextId = computeNextAttachmentId(loaded.records);
   numberCounter = computeNextSONumberCounter(headerStore);
 }
 
@@ -261,6 +313,47 @@ export const salesOrderRepository = {
 
   getById(id: string): SalesOrder | undefined {
     return headerStore.find((x) => x.id === id);
+  },
+
+  listAttachments(documentId: string): SalesOrderAttachment[] {
+    const doc = headerStore.find((x) => x.id === documentId);
+    return doc?.attachments?.map((attachment) => ({ ...attachment })) ?? [];
+  },
+
+  addAttachments(
+    documentId: string,
+    attachments: Array<Omit<SalesOrderAttachment, "id" | "addedAt">>,
+  ): SalesOrderAttachment[] {
+    const i = headerStore.findIndex((x) => x.id === documentId);
+    if (i === -1 || attachments.length === 0) return [];
+    const created = attachments
+      .filter((attachment) => attachment.name.trim() !== "" && attachment.contentBase64.trim() !== "")
+      .map((attachment) => ({
+        ...attachment,
+        id: nextAttachmentId(),
+        addedAt: new Date().toISOString(),
+      }));
+    if (created.length === 0) return [];
+    headerStore[i] = {
+      ...headerStore[i],
+      attachments: [...(headerStore[i].attachments ?? []), ...created],
+    };
+    schedulePersist();
+    return created.map((attachment) => ({ ...attachment }));
+  },
+
+  deleteAttachment(documentId: string, attachmentId: string): boolean {
+    const i = headerStore.findIndex((x) => x.id === documentId);
+    if (i === -1) return false;
+    const attachments = headerStore[i].attachments ?? [];
+    const nextAttachments = attachments.filter((attachment) => attachment.id !== attachmentId);
+    if (nextAttachments.length === attachments.length) return false;
+    headerStore[i] = {
+      ...headerStore[i],
+      ...(nextAttachments.length > 0 ? { attachments: nextAttachments } : { attachments: undefined }),
+    };
+    schedulePersist();
+    return true;
   },
 
   listLines(documentId: string): SalesOrderLine[] {

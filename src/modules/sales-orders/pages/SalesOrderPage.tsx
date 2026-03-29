@@ -1,4 +1,4 @@
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams, useNavigate, useSearchParams } from "react-router-dom";
 import { useMemo, useState, useEffect, useRef, useCallback } from "react";
 import { AgGridReact } from "ag-grid-react";
 import type { ColDef, SelectionChangedEvent } from "ag-grid-community";
@@ -14,6 +14,8 @@ import { listSellableItemsForDocumentLines } from "../../items/orderLineItemsPol
 import { markdownRepository } from "../../markdown-journal/repository";
 import type { MarkdownRecord } from "../../markdown-journal/model";
 import { useAppReadModelRevision } from "@/shared/inventoryMasterPageBlocks/useAppReadModelRevision";
+import { appendReturnTo, readReturnToParam } from "@/shared/navigation/returnTo";
+import { useUrlTabState } from "@/shared/navigation/useUrlTabState";
 import { brandRepository } from "../../brands/repository";
 import { categoryRepository } from "../../categories/repository";
 import type { SalesOrderLine } from "../model";
@@ -56,6 +58,7 @@ import {
 import { DocumentIssueStrip } from "../../../shared/ui/feedback/DocumentIssueStrip";
 import { SalesOrderItemAutocomplete, type SalesOrderItemAutocompleteRef } from "../components/SalesOrderItemAutocomplete";
 import { SalesOrderFinanceSection } from "../components/SalesOrderFinanceSection";
+import { SalesOrderAttachmentsSection } from "../components/SalesOrderAttachmentsSection";
 import { deriveSalesOrderPaymentSummary } from "../salesOrderFinance";
 import { salesOrderPaymentRepository } from "../salesOrderPaymentRepository";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -77,6 +80,7 @@ import {
   FolderOpen,
   History,
   List,
+  Paperclip,
   Activity,
   Plus,
   Save,
@@ -141,6 +145,8 @@ type FormState = {
   customerId: string;
   warehouseId: string;
   carrierId: string;
+  preliminaryShipmentDate: string;
+  actualShipmentDate: string;
   recipientName: string;
   recipientPhone: string;
   deliveryAddress: string;
@@ -156,6 +162,8 @@ function defaultForm(): FormState {
     customerId: "",
     warehouseId: "",
     carrierId: "",
+    preliminaryShipmentDate: "",
+    actualShipmentDate: "",
     recipientName: "",
     recipientPhone: "",
     deliveryAddress: "",
@@ -603,6 +611,7 @@ function ExecutionMetric({
 export function SalesOrderPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { t, locale } = useTranslation();
   const { settings } = useSettings();
   const [refresh, setRefresh] = useState(0);
@@ -656,7 +665,10 @@ export function SalesOrderPage() {
   const [lineImportInitialTab, setLineImportInitialTab] = useState<LineImportTab>("paste");
   const [exportSuccess, setExportSuccess] = useState<{ path: string; filename: string } | null>(null);
   const [exportOpen, setExportOpen] = useState(false);
-  const [soWorkingTab, setSoWorkingTab] = useState<"lines" | "execution" | "payments" | "events">("lines");
+  const [soWorkingTab, setSoWorkingTab] = useUrlTabState({
+    allowedValues: ["lines", "execution", "payments", "attachments", "events"] as const,
+    defaultValue: "lines",
+  });
   const linesGridRef = useRef<AgGridReact<LineFormRow> | null>(null);
   const lineEntryItemPickerRef = useRef<SalesOrderItemAutocompleteRef | null>(null);
   const lineEntryQtyInputRef = useRef<HTMLInputElement | null>(null);
@@ -737,6 +749,8 @@ export function SalesOrderPage() {
     form.customerId,
     form.warehouseId,
     form.carrierId,
+    form.preliminaryShipmentDate,
+    form.actualShipmentDate,
     form.recipientName,
     form.recipientPhone,
     form.deliveryAddress,
@@ -781,6 +795,8 @@ export function SalesOrderPage() {
         customerId: doc.customerId,
         warehouseId: doc.warehouseId,
         carrierId: doc.carrierId ?? "",
+        preliminaryShipmentDate: doc.preliminaryShipmentDate ?? "",
+        actualShipmentDate: doc.actualShipmentDate ?? "",
         recipientName: doc.recipientName ?? "",
         recipientPhone: doc.recipientPhone ?? "",
         deliveryAddress: doc.deliveryAddress ?? "",
@@ -809,6 +825,8 @@ export function SalesOrderPage() {
     doc?.customerId,
     doc?.warehouseId,
     doc?.carrierId,
+    doc?.preliminaryShipmentDate,
+    doc?.actualShipmentDate,
     doc?.recipientName,
     doc?.recipientPhone,
     doc?.deliveryAddress,
@@ -941,6 +959,9 @@ export function SalesOrderPage() {
     () => warehouseRepository.list().filter((w) => w.isActive),
     [],
   );
+  const returnTo = readReturnToParam(searchParams);
+  const backHref = returnTo ?? "/sales-orders";
+
   const handleConfirm = () => {
     if (!id || isNew) return;
     setActionIssues([]);
@@ -1000,6 +1021,8 @@ export function SalesOrderPage() {
         customerId: form.customerId,
         warehouseId: form.warehouseId,
         carrierId: form.carrierId.trim() || undefined,
+        preliminaryShipmentDate: form.preliminaryShipmentDate || undefined,
+        actualShipmentDate: form.actualShipmentDate || undefined,
         recipientName: form.recipientName || undefined,
         recipientPhone: form.recipientPhone || undefined,
         deliveryAddress: form.deliveryAddress || undefined,
@@ -1012,7 +1035,7 @@ export function SalesOrderPage() {
     );
     if (result.success) {
       if (isNew) {
-        navigate(`/sales-orders/${result.id}`, { replace: true });
+        navigate(appendReturnTo(`/sales-orders/${result.id}`, returnTo), { replace: true });
       } else {
         setRefresh((r) => r + 1);
       }
@@ -1022,7 +1045,7 @@ export function SalesOrderPage() {
   };
 
   const handleCancel = () => {
-    navigate("/sales-orders");
+    navigate(backHref);
   };
 
   const removeLineByLineId = useCallback((lineId: number) => {
@@ -1620,7 +1643,14 @@ export function SalesOrderPage() {
   return (
     <DocumentPageLayout
       breadcrumbItems={breadcrumbItems}
-      breadcrumbPrefix={<BackButton to="/sales-orders" aria-label={t("doc.so.backToListAria")} />}
+      breadcrumbPrefix={
+        <BackButton
+          to={returnTo ?? undefined}
+          fallbackTo="/sales-orders"
+          preferHistory={!returnTo}
+          aria-label={t("doc.so.backToListAria")}
+        />
+      }
       header={
         <div className="doc-header">
           <div className="doc-header__title-row">
@@ -1931,6 +1961,34 @@ export function SalesOrderPage() {
                       </div>
                       <div className="grid grid-cols-1 gap-x-2.5 gap-y-1 sm:grid-cols-2">
                         <div className="flex min-w-0 flex-col gap-0.5">
+                          <Label htmlFor="so-preliminary-shipment-date" className="text-xs leading-none">
+                            {t("doc.so.preliminaryShipmentDate")}
+                          </Label>
+                          <DatePickerField
+                            id="so-preliminary-shipment-date"
+                            value={form.preliminaryShipmentDate}
+                            onChange={(preliminaryShipmentDate) =>
+                              setForm((f) => ({ ...f, preliminaryShipmentDate }))
+                            }
+                            className="h-8 w-full [&_input]:text-sm"
+                          />
+                        </div>
+                        <div className="flex min-w-0 flex-col gap-0.5">
+                          <Label htmlFor="so-actual-shipment-date" className="text-xs leading-none">
+                            {t("doc.so.actualShipmentDate")}
+                          </Label>
+                          <DatePickerField
+                            id="so-actual-shipment-date"
+                            value={form.actualShipmentDate}
+                            onChange={(actualShipmentDate) =>
+                              setForm((f) => ({ ...f, actualShipmentDate }))
+                            }
+                            className="h-8 w-full [&_input]:text-sm"
+                          />
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-1 gap-x-2.5 gap-y-1 sm:grid-cols-2">
+                        <div className="flex min-w-0 flex-col gap-0.5">
                           <Label htmlFor="so-recipient-name" className="text-xs leading-none">
                             {t("doc.shipment.recipientName")}
                           </Label>
@@ -2117,6 +2175,22 @@ export function SalesOrderPage() {
                       <div className="doc-summary__row py-0.5">
                         <dt className="doc-summary__term">{t("doc.so.carrier")}</dt>
                         <dd className="doc-summary__value">{carrierReadOnlyLabel}</dd>
+                      </div>
+                      <div className="doc-summary__row py-0.5">
+                        <dt className="doc-summary__term">{t("doc.so.preliminaryShipmentDate")}</dt>
+                        <dd className="doc-summary__value tabular-nums">
+                          {doc!.preliminaryShipmentDate?.trim()
+                            ? normalizeDateForSO(doc!.preliminaryShipmentDate)
+                            : emDashSummary}
+                        </dd>
+                      </div>
+                      <div className="doc-summary__row py-0.5">
+                        <dt className="doc-summary__term">{t("doc.so.actualShipmentDate")}</dt>
+                        <dd className="doc-summary__value tabular-nums">
+                          {doc!.actualShipmentDate?.trim()
+                            ? normalizeDateForSO(doc!.actualShipmentDate)
+                            : emDashSummary}
+                        </dd>
                       </div>
                       <div className="doc-summary__row py-0.5">
                         <dt className="doc-summary__term">{t("doc.shipment.recipientName")}</dt>
@@ -2312,6 +2386,23 @@ export function SalesOrderPage() {
           <button
             type="button"
             role="tab"
+            aria-selected={soWorkingTab === "attachments"}
+            className={cn(
+              "-mb-px border-b-2 px-3 py-2 text-sm font-medium transition-colors",
+              soWorkingTab === "attachments"
+                ? "border-primary text-foreground"
+                : "border-transparent text-muted-foreground hover:text-foreground",
+            )}
+            onClick={() => setSoWorkingTab("attachments")}
+          >
+            <span className="inline-flex items-center gap-1.5">
+              <Paperclip className="h-3.5 w-3.5" aria-hidden />
+              {t("doc.so.tabAttachments")}
+            </span>
+          </button>
+          <button
+            type="button"
+            role="tab"
             aria-selected={soWorkingTab === "events"}
             className={cn(
               "-mb-px border-b-2 px-3 py-2 text-sm font-medium transition-colors",
@@ -2460,6 +2551,18 @@ export function SalesOrderPage() {
                 cancelled={doc.status === "cancelled"}
                 orderTotalAmount={isEditable ? totals.totalAmount : readonlyTotals.totalAmount}
                 hasLines={isEditable ? form.lines.length > 0 : lines.length > 0}
+              />
+            ) : null}
+          </div>
+        )}
+        {soWorkingTab === "attachments" && (
+          <div className="doc-so-tab-panel doc-so-tab-panel--attachments">
+            {isNew ? (
+              <p className="text-sm text-muted-foreground">{t("doc.so.tabSaveDocumentFirst")}</p>
+            ) : doc ? (
+              <SalesOrderAttachmentsSection
+                salesOrderId={id!}
+                canMutate={doc.status !== "cancelled"}
               />
             ) : null}
           </div>

@@ -1,5 +1,5 @@
 import { useMemo, useState, useRef, useCallback } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { AgGridReact } from "ag-grid-react";
 import type { ColDef, SelectionChangedEvent } from "ag-grid-community";
 import { carrierRepository } from "../repository";
@@ -10,11 +10,14 @@ import {
   AgGridContainer,
   AgGridActiveBooleanCellRenderer,
   AgGridCarrierTypeCellRenderer,
+  applyAgGridColumnFilters,
   agGridDefaultColDef,
   agGridDefaultGridOptions,
   agGridRowNumberColDef,
   agGridSelectionColumnDef,
+  decorateAgGridColumnDefsWithFilters,
   hasMeaningfulTextSelection,
+  type AgGridColumnFilterConfig,
 } from "../../../shared/ui/ag-grid";
 import { BackButton } from "../../../shared/ui/list/BackButton";
 import { ListPageSearch } from "../../../shared/ui/list/ListPageSearch";
@@ -31,6 +34,12 @@ import { buildReadableUniqueFilename, ensureUniqueExportPath } from "@/shared/ex
 import { carriersListExcelLabels } from "@/shared/i18n/excelListExportLabels";
 import type { TFunction } from "@/shared/i18n/resolve";
 import { translateCarrierType } from "../carrierLabels";
+import {
+  hasActiveAgGridColumnFilters,
+  readUrlAgGridColumnFilters,
+  replaceUrlAgGridColumnFilters,
+  type AgGridColumnFilterClause,
+} from "@/shared/navigation/agGridColumnFilters";
 
 function buildExportRowsFromCarriers(
   carriers: Carrier[],
@@ -52,6 +61,7 @@ function buildExportRowsFromCarriers(
 export function CarriersListPage() {
   const { t, locale } = useTranslation();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [searchQuery, setSearchQuery] = useState("");
   const [exportSuccess, setExportSuccess] = useState<{ path: string; filename: string } | null>(null);
   const [exportOpen, setExportOpen] = useState(false);
@@ -67,9 +77,32 @@ export function CarriersListPage() {
   const filteredRows = useMemo(() => {
     return carrierRepository.search(searchQuery);
   }, [searchQuery]);
+  const columnFilterModel = useMemo(() => readUrlAgGridColumnFilters(searchParams), [searchParams]);
+  const carrierColumnFilterConfigs = useMemo<Record<string, AgGridColumnFilterConfig<Carrier>>>(
+    () => ({
+      code: { kind: "text" },
+      name: { kind: "text" },
+      carrierType: {
+        kind: "enum",
+        getValue: (row) => translateCarrierType(t, row.carrierType),
+        options: Array.from(new Set(carrierRepository.list().map((row) => translateCarrierType(t, row.carrierType))))
+          .filter(Boolean)
+          .sort((a, b) => a.localeCompare(b))
+          .map((value) => ({ value, label: value })),
+      },
+      phone: { kind: "text" },
+      email: { kind: "text" },
+      isActive: { kind: "boolean" },
+    }),
+    [t],
+  );
+  const displayRows = useMemo(
+    () => applyAgGridColumnFilters(filteredRows, columnFilterModel, carrierColumnFilterConfigs),
+    [filteredRows, columnFilterModel, carrierColumnFilterConfigs],
+  );
 
-  const isEmpty = filteredRows.length === 0;
-  const hasFilter = searchQuery.trim() !== "";
+  const isEmpty = displayRows.length === 0;
+  const hasFilter = searchQuery.trim() !== "" || hasActiveAgGridColumnFilters(columnFilterModel);
 
   const getExportRowsCurrentView = useCallback((): CarriersExportRow[] => {
     const api = gridRef.current?.api;
@@ -146,7 +179,26 @@ export function CarriersListPage() {
   const emptyTitle = hasFilter ? t("ops.list.carriers.emptyFiltered") : t("ops.list.carriers.emptyDefault");
   const emptyHint = hasFilter ? t("ops.list.carriers.hintFilter") : t("ops.list.carriers.hintCreate");
 
-  const columnDefs = useMemo<ColDef<Carrier>[]>(
+  const handleApplyColumnFilter = useCallback(
+    (colId: string, clause: AgGridColumnFilterClause) => {
+      replaceUrlAgGridColumnFilters(searchParams, setSearchParams, {
+        ...columnFilterModel,
+        [colId]: clause,
+      });
+    },
+    [columnFilterModel, searchParams, setSearchParams],
+  );
+
+  const handleResetColumnFilter = useCallback(
+    (colId: string) => {
+      const nextModel = { ...columnFilterModel };
+      delete nextModel[colId];
+      replaceUrlAgGridColumnFilters(searchParams, setSearchParams, nextModel);
+    },
+    [columnFilterModel, searchParams, setSearchParams],
+  );
+
+  const baseColumnDefs = useMemo<ColDef<Carrier>[]>(
     () => [
       agGridRowNumberColDef,
       {
@@ -187,6 +239,24 @@ export function CarriersListPage() {
     [t, locale],
   );
 
+  const columnDefs = useMemo(
+    () =>
+      decorateAgGridColumnDefsWithFilters(
+        baseColumnDefs,
+        carrierColumnFilterConfigs,
+        columnFilterModel,
+        handleApplyColumnFilter,
+        handleResetColumnFilter,
+      ),
+    [
+      baseColumnDefs,
+      carrierColumnFilterConfigs,
+      columnFilterModel,
+      handleApplyColumnFilter,
+      handleResetColumnFilter,
+    ],
+  );
+
   return (
     <ListPageLayout
       header={null}
@@ -199,7 +269,7 @@ export function CarriersListPage() {
             value={searchQuery}
             onChange={setSearchQuery}
             aria-label={t("ops.list.carriers.searchAria")}
-            resultCount={filteredRows.length}
+            resultCount={displayRows.length}
           />
           <div className="flex flex-row items-center gap-2 shrink-0 ml-auto">
             {exportSuccess && (
@@ -313,7 +383,7 @@ export function CarriersListPage() {
           <AgGridReact<Carrier>
             {...agGridDefaultGridOptions}
             ref={gridRef}
-            rowData={filteredRows}
+            rowData={displayRows}
             columnDefs={columnDefs}
             defaultColDef={agGridDefaultColDef}
             rowSelection={{ mode: "multiRow", checkboxes: true, headerCheckbox: true, enableClickSelection: true }}

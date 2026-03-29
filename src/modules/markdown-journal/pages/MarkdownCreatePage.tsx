@@ -38,6 +38,8 @@ import {
 } from "../service";
 import { MARKDOWN_REASONS } from "../pageConfig";
 import { cn } from "@/lib/utils";
+import { appendReturnTo, readReturnToParam } from "@/shared/navigation/returnTo";
+import { useUrlTabState } from "@/shared/navigation/useUrlTabState";
 
 const DEFAULT_WAREHOUSE_ID = "1";
 const LOCAL_ACTOR = "local-operator";
@@ -74,7 +76,6 @@ type MarkdownCodeRow = {
   printedAt: string;
 };
 
-type JournalDetailTab = "lines" | "codes";
 type PrintMode = "all" | "selected";
 
 function buildCancelTarget(itemId: string): string {
@@ -370,7 +371,10 @@ export function MarkdownCreatePage() {
   const [lineEntryPrice, setLineEntryPrice] = useState(0);
   const [lineEntryReason, setLineEntryReason] = useState<MarkdownReasonCode>("OTHER");
   const [editingLineId, setEditingLineId] = useState<string | null>(null);
-  const [detailTab, setDetailTab] = useState<JournalDetailTab>("lines");
+  const [detailTab, setDetailTab] = useUrlTabState({
+    allowedValues: ["lines", "codes"] as const,
+    defaultValue: "lines",
+  });
   const [printDialogOpen, setPrintDialogOpen] = useState(false);
   const [selectedCodeIds, setSelectedCodeIds] = useState<string[]>([]);
   const lineEntryItemPickerRef = useRef<{ focus: () => void } | null>(null);
@@ -418,7 +422,9 @@ export function MarkdownCreatePage() {
   const isCancelled = journal?.status === "cancelled";
   const isReadOnly = !isNew && !isDraft;
 
+  const returnTo = readReturnToParam(searchParams);
   const cancelTarget = useMemo(() => buildCancelTarget(prefillItemId), [prefillItemId]);
+  const resolvedBackTarget = returnTo ?? cancelTarget;
 
   const resetLineEntry = useCallback(() => {
     setItemEntryId(prefillItemId);
@@ -430,8 +436,8 @@ export function MarkdownCreatePage() {
   }, [prefillItemId]);
 
   const handleCancel = useCallback(() => {
-    navigate(cancelTarget);
-  }, [cancelTarget, navigate]);
+    navigate(resolvedBackTarget);
+  }, [resolvedBackTarget, navigate]);
 
   const handleAddOrUpdateLine = useCallback(() => {
     setCreateError(null);
@@ -520,7 +526,7 @@ export function MarkdownCreatePage() {
       setCreateError(result.error);
       return;
     }
-    navigate(`/markdown-journal/journals/${result.journal.id}`, { replace: true });
+    navigate(appendReturnTo(`/markdown-journal/journals/${result.journal.id}`, returnTo), { replace: true });
   }, [
     comment,
     id,
@@ -540,8 +546,8 @@ export function MarkdownCreatePage() {
       setCreateError(result.error);
       return;
     }
-    navigate(`/markdown-journal/journals/${result.journal.id}`, { replace: true });
-  }, [id, navigate]);
+    navigate(appendReturnTo(`/markdown-journal/journals/${result.journal.id}`, returnTo), { replace: true });
+  }, [id, navigate, returnTo]);
 
   const handleCancelJournal = useCallback(() => {
     if (!id) return;
@@ -551,8 +557,8 @@ export function MarkdownCreatePage() {
       setCreateError(result.error);
       return;
     }
-    navigate(`/markdown-journal/journals/${result.journal.id}`, { replace: true });
-  }, [id, navigate]);
+    navigate(appendReturnTo(`/markdown-journal/journals/${result.journal.id}`, returnTo), { replace: true });
+  }, [id, navigate, returnTo]);
 
   const handlePrint = useCallback(() => {
     setCreateError(null);
@@ -794,7 +800,14 @@ export function MarkdownCreatePage() {
   return (
     <DocumentPageLayout
       breadcrumbItems={breadcrumbItems}
-      breadcrumbPrefix={<BackButton to={cancelTarget} aria-label={t("markdown.journal.backToListAria")} />}
+      breadcrumbPrefix={
+        <BackButton
+          to={returnTo ?? undefined}
+          fallbackTo={cancelTarget}
+          preferHistory={!returnTo}
+          aria-label={t("markdown.journal.backToListAria")}
+        />
+      }
       header={
         <div className="doc-header">
           <div className="doc-header__title-row">

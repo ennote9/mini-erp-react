@@ -1,0 +1,25 @@
+{
+  "linesState": {
+    "url": "http://127.0.0.1:1420/purchase-orders/1",
+    "hasInlineExecutionHeading": false,
+    "hasGrid": true,
+    "hasTotals": true
+  },
+  "executionState": {
+    "url": "http://127.0.0.1:1420/purchase-orders/1?tab=execution",
+    "headingTexts": [
+      "Execution",
+      "Receipt fulfillment",
+      "0",
+      "10",
+      "10"
+    ],
+    "hasReceiptFulfillment": true,
+    "metricLabels": [
+      "Received",
+      "Ordered",
+      "Remaining"
+    ]
+  },
+  "executionUrlAfterReload": "http://127.0.0.1:1420/purchase-orders/1?tab=execution"
+}

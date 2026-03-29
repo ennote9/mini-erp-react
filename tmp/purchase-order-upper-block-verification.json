@@ -1,0 +1,18 @@
+{
+  "url": "http://127.0.0.1:1420/purchase-orders/1",
+  "sectionHeads": [
+    "Document",
+    "Supply",
+    "Commercial",
+    "Notes"
+  ],
+  "hasSupplierLabel": true,
+  "hasWarehouseLabel": true,
+  "hasPaymentTermsLabel": true,
+  "hasCommentField": true,
+  "commentTag": "TEXTAREA",
+  "topCardWidthClass": null,
+  "lowerAreaHasExecutionTab": true,
+  "lowerAreaHasLinesGrid": true,
+  "lowerAreaHasTotals": true
+}

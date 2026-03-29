@@ -48,6 +48,8 @@ export type SaveDraftInput = {
   date: string;
   supplierId: string;
   warehouseId: string;
+  preliminaryDeliveryDate?: string;
+  actualArrivalDateTime?: string;
   /** Raw form text; empty = no terms stored. */
   paymentTermsDays?: string;
   comment?: string;
@@ -62,9 +64,32 @@ export type SaveDraftResult =
   | { success: true; id: string }
   | { success: false; error: string };
 
+const DATETIME_LOCAL_REGEX = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/;
+
+function normalizeOptionalPODate(value: string | undefined): string | undefined {
+  const trimmed = normalizeTrim(value);
+  if (trimmed === "") return undefined;
+  return normalizeDateForPO(trimmed);
+}
+
+function normalizeOptionalLocalDateTime(value: string | undefined): string | undefined {
+  const trimmed = normalizeTrim(value);
+  if (trimmed === "") return undefined;
+  return trimmed;
+}
+
 function validateSaveDraft(data: SaveDraftInput): string | null {
   const dateErr = validateDateForPO(data.date);
   if (dateErr) return dateErr;
+  const preliminaryDeliveryDate = normalizeTrim(data.preliminaryDeliveryDate);
+  if (preliminaryDeliveryDate !== "") {
+    const preliminaryDateErr = validateDateForPO(preliminaryDeliveryDate);
+    if (preliminaryDateErr) return preliminaryDateErr.replace(/^Date\b/, "Preliminary delivery date");
+  }
+  const actualArrivalDateTime = normalizeTrim(data.actualArrivalDateTime);
+  if (actualArrivalDateTime !== "" && !DATETIME_LOCAL_REGEX.test(actualArrivalDateTime)) {
+    return "Actual arrival date and time must be in YYYY-MM-DDTHH:mm format.";
+  }
   const supplierIdTrimmed = normalizeTrim(data.supplierId);
   if (supplierIdTrimmed === "") return "Supplier is required.";
   const warehouseIdTrimmed = normalizeTrim(data.warehouseId);
@@ -131,6 +156,8 @@ function poHeaderFlat(po: PurchaseOrder) {
     date: po.date,
     supplierId: po.supplierId,
     warehouseId: po.warehouseId,
+    preliminaryDeliveryDate: po.preliminaryDeliveryDate ?? "",
+    actualArrivalDateTime: po.actualArrivalDateTime ?? "",
     comment: po.comment ?? "",
     paymentTermsDays: po.paymentTermsDays ?? null,
     dueDate: po.dueDate ?? null,
@@ -147,6 +174,8 @@ export function saveDraft(
   const date = normalizeDateForPO(data.date);
   const supplierId = normalizeTrim(data.supplierId);
   const warehouseId = normalizeTrim(data.warehouseId);
+  const preliminaryDeliveryDate = normalizeOptionalPODate(data.preliminaryDeliveryDate);
+  const actualArrivalDateTime = normalizeOptionalLocalDateTime(data.actualArrivalDateTime);
   const comment = normalizeDocumentComment(data.comment);
   const paymentTermsDays = parsePaymentTermsDaysToStore(data.paymentTermsDays);
   const dueDate = computePlanningDueDate(date, paymentTermsDays);
@@ -159,6 +188,8 @@ export function saveDraft(
     supplierId,
     warehouseId,
     status: "draft" as const,
+    ...(preliminaryDeliveryDate ? { preliminaryDeliveryDate } : {}),
+    ...(actualArrivalDateTime ? { actualArrivalDateTime } : {}),
     comment: comment ?? "",
     paymentTermsDays,
     dueDate,
@@ -178,7 +209,16 @@ export function saveDraft(
     const changedFields = planningHeaderChangedFields(
       beforeHeader as unknown as Record<string, unknown>,
       afterHeader as unknown as Record<string, unknown>,
-      ["date", "supplierId", "warehouseId", "comment", "paymentTermsDays", "dueDate"],
+      [
+        "date",
+        "supplierId",
+        "warehouseId",
+        "preliminaryDeliveryDate",
+        "actualArrivalDateTime",
+        "comment",
+        "paymentTermsDays",
+        "dueDate",
+      ],
     );
     if (changedFields.length > 0) {
       appendAuditEvent({

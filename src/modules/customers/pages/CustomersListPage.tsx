@@ -10,11 +10,14 @@ import { EmptyState } from "../../../shared/ui/feedback/EmptyState";
 import {
   AgGridContainer,
   AgGridActiveBooleanCellRenderer,
+  applyAgGridColumnFilters,
   agGridDefaultColDef,
   agGridDefaultGridOptions,
   agGridRowNumberColDef,
   agGridSelectionColumnDef,
+  decorateAgGridColumnDefsWithFilters,
   hasMeaningfulTextSelection,
+  type AgGridColumnFilterConfig,
 } from "../../../shared/ui/ag-grid";
 import { BackButton } from "../../../shared/ui/list/BackButton";
 import { ListPageSearch } from "../../../shared/ui/list/ListPageSearch";
@@ -29,6 +32,12 @@ import { revealItemInDir } from "@tauri-apps/plugin-opener";
 import { useTranslation } from "@/shared/i18n/context";
 import { buildReadableUniqueFilename, ensureUniqueExportPath } from "@/shared/export/filenameBuilder";
 import { customersListExcelLabels } from "@/shared/i18n/excelListExportLabels";
+import {
+  hasActiveAgGridColumnFilters,
+  readUrlAgGridColumnFilters,
+  replaceUrlAgGridColumnFilters,
+  type AgGridColumnFilterClause,
+} from "@/shared/navigation/agGridColumnFilters";
 
 function parseQueryId(searchParams: URLSearchParams, key: string): string | null {
   const raw = searchParams.get(key);
@@ -91,10 +100,30 @@ export function CustomersListPage() {
     next = filterCustomersBySearch(next, searchQuery);
     return next;
   }, [searchQuery, preferredCarrierFilterId]);
+  const columnFilterModel = useMemo(() => readUrlAgGridColumnFilters(searchParams), [searchParams]);
+  const customerColumnFilterConfigs = useMemo<Record<string, AgGridColumnFilterConfig<Customer>>>(
+    () => ({
+      code: { kind: "text" },
+      name: { kind: "text" },
+      contactPerson: { kind: "text" },
+      phone: { kind: "text" },
+      email: { kind: "text" },
+      city: { kind: "text" },
+      paymentTermsDays: { kind: "number" },
+      isActive: { kind: "boolean" },
+    }),
+    [],
+  );
+  const displayRows = useMemo(
+    () => applyAgGridColumnFilters(filteredRows, columnFilterModel, customerColumnFilterConfigs),
+    [filteredRows, columnFilterModel, customerColumnFilterConfigs],
+  );
 
-  const isEmpty = filteredRows.length === 0;
+  const isEmpty = displayRows.length === 0;
   const hasFilter =
-    searchQuery.trim() !== "" || preferredCarrierFilterId != null;
+    searchQuery.trim() !== "" ||
+    preferredCarrierFilterId != null ||
+    hasActiveAgGridColumnFilters(columnFilterModel);
 
   const preferredCarrierFilterLabel = useMemo((): string => {
     if (preferredCarrierFilterId == null) return "";
@@ -195,7 +224,26 @@ export function CustomersListPage() {
 
   const emDash = t("domain.audit.summary.emDash");
 
-  const columnDefs = useMemo<ColDef<Customer>[]>(
+  const handleApplyColumnFilter = useCallback(
+    (colId: string, clause: AgGridColumnFilterClause) => {
+      replaceUrlAgGridColumnFilters(searchParams, setSearchParams, {
+        ...columnFilterModel,
+        [colId]: clause,
+      });
+    },
+    [columnFilterModel, searchParams, setSearchParams],
+  );
+
+  const handleResetColumnFilter = useCallback(
+    (colId: string) => {
+      const nextModel = { ...columnFilterModel };
+      delete nextModel[colId];
+      replaceUrlAgGridColumnFilters(searchParams, setSearchParams, nextModel);
+    },
+    [columnFilterModel, searchParams, setSearchParams],
+  );
+
+  const baseColumnDefs = useMemo<ColDef<Customer>[]>(
     () => [
       agGridRowNumberColDef,
       {
@@ -252,6 +300,24 @@ export function CustomersListPage() {
     [t, locale, emDash],
   );
 
+  const columnDefs = useMemo(
+    () =>
+      decorateAgGridColumnDefsWithFilters(
+        baseColumnDefs,
+        customerColumnFilterConfigs,
+        columnFilterModel,
+        handleApplyColumnFilter,
+        handleResetColumnFilter,
+      ),
+    [
+      baseColumnDefs,
+      customerColumnFilterConfigs,
+      columnFilterModel,
+      handleApplyColumnFilter,
+      handleResetColumnFilter,
+    ],
+  );
+
   return (
     <ListPageLayout
       header={null}
@@ -264,7 +330,7 @@ export function CustomersListPage() {
             value={searchQuery}
             onChange={setSearchQuery}
             aria-label={t("ops.list.customers.searchAria")}
-            resultCount={filteredRows.length}
+            resultCount={displayRows.length}
           />
           <div className="flex flex-row flex-wrap items-center gap-2 shrink-0 ml-auto justify-end">
             {preferredCarrierFilterId != null && (
@@ -404,7 +470,7 @@ export function CustomersListPage() {
           <AgGridReact<Customer>
             {...agGridDefaultGridOptions}
             ref={gridRef}
-            rowData={filteredRows}
+            rowData={displayRows}
             columnDefs={columnDefs}
             defaultColDef={agGridDefaultColDef}
             rowSelection={{ mode: "multiRow", checkboxes: true, headerCheckbox: true, enableClickSelection: true }}

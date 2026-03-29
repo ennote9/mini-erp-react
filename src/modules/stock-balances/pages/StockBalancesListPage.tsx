@@ -4,7 +4,7 @@
  */
 import { Fragment, useMemo, useState, useRef, useCallback, useEffect } from "react";
 import type { RowClassParams, RowClickedEvent } from "ag-grid-community";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { AgGridReact } from "ag-grid-react";
 import type { ColDef, SelectionChangedEvent } from "ag-grid-community";
 import { stockBalanceRepository } from "../repository";
@@ -18,11 +18,14 @@ import { EmptyState } from "../../../shared/ui/feedback/EmptyState";
 import {
   AgGridContainer,
   AgGridStockCoverageCellRenderer,
+  applyAgGridColumnFilters,
   agGridDefaultColDef,
   agGridDefaultGridOptions,
   agGridRowNumberColDef,
   agGridSelectionColumnDef,
+  decorateAgGridColumnDefsWithFilters,
   hasMeaningfulTextSelection,
+  type AgGridColumnFilterConfig,
 } from "../../../shared/ui/ag-grid";
 import { BackButton } from "../../../shared/ui/list/BackButton";
 import { ListPageSearch } from "../../../shared/ui/list/ListPageSearch";
@@ -49,6 +52,15 @@ import { useSettings } from "../../../shared/settings/SettingsContext";
 import { getEffectiveWorkspaceFeatureEnabled } from "../../../shared/workspace";
 import { normalizeTrim } from "../../../shared/validation";
 import { STOCK_STYLE_VALUES, type StockStyle } from "@/shared/inventoryStyle";
+import { applyUrlGridSort, getCurrentGridSort, readUrlGridSort, serializeUrlGridSort } from "@/shared/navigation/agGridSort";
+import {
+  hasActiveAgGridColumnFilters,
+  readUrlAgGridColumnFilters,
+  replaceUrlAgGridColumnFilters,
+  type AgGridColumnFilterClause,
+} from "@/shared/navigation/agGridColumnFilters";
+import { appendReturnTo, buildNavigationStateKey, buildReturnToValue, replaceQueryParam } from "@/shared/navigation/returnTo";
+import { useSessionScrollRestore } from "@/shared/navigation/useSessionScrollRestore";
 
 type RowData = StockBalance & {
   itemCode: string;
@@ -163,6 +175,7 @@ function buildExportRowsFromBalances(
 export function StockBalancesListPage() {
   const { t, locale } = useTranslation();
   const { settings } = useSettings();
+  const location = useLocation();
   const navigate = useNavigate();
 
   const coverageLabel = useCallback(
@@ -245,19 +258,58 @@ export function StockBalancesListPage() {
     return t === "" ? null : t;
   }, [searchParams]);
 
-  const [searchQuery, setSearchQuery] = useState("");
-  const [styleFilter, setStyleFilter] = useState<StockStyle | "">("");
-  const [quickFilter, setQuickFilter] = useState<StockBalanceQuickFilter>("all");
+  const searchQuery = searchParams.get("q") ?? "";
+  const rawStyleFilter = searchParams.get("style");
+  const styleFilter: StockStyle | "" =
+    rawStyleFilter && STOCK_STYLE_VALUES.includes(rawStyleFilter as StockStyle)
+      ? (rawStyleFilter as StockStyle)
+      : "";
+  const rawQuickFilter = searchParams.get("quick");
+  const quickFilter: StockBalanceQuickFilter =
+    rawQuickFilter === "shortage" ||
+    rawQuickFilter === "outgoing" ||
+    rawQuickFilter === "incoming" ||
+    rawQuickFilter === "avail_lte_zero" ||
+    rawQuickFilter === "needs_replenishment" ||
+    rawQuickFilter === "coverage_at_risk"
+      ? rawQuickFilter
+      : "all";
   const [exportSuccess, setExportSuccess] = useState<{ path: string; filename: string } | null>(null);
   const [exportOpen, setExportOpen] = useState(false);
   const [selectedCount, setSelectedCount] = useState(0);
   const gridRef = useRef<AgGridReact<RowData> | null>(null);
+  const gridContainerRef = useRef<HTMLDivElement | null>(null);
   const listSearchInputRef = useRef<HTMLInputElement>(null);
   useListPageSearchHotkey(listSearchInputRef);
+  const listStateKey = useMemo(
+    () => buildNavigationStateKey(location.pathname, searchParams),
+    [location.pathname, searchParams],
+  );
+  useSessionScrollRestore(listStateKey, gridContainerRef);
+  const currentReturnTo = useMemo(
+    () => buildReturnToValue(location.pathname, location.search),
+    [location.pathname, location.search],
+  );
+  const initialSortModel = useMemo(() => readUrlGridSort(searchParams), [searchParams]);
+  const columnFilterModel = useMemo(() => readUrlAgGridColumnFilters(searchParams), [searchParams]);
 
   const onSelectionChanged = useCallback((e: SelectionChangedEvent<RowData>) => {
     setSelectedCount(e.api.getSelectedRows().length);
   }, []);
+
+  const setQueryValue = useCallback(
+    (key: string, value: string, defaultValue = "") => {
+      replaceQueryParam(searchParams, setSearchParams, key, value, defaultValue);
+    },
+    [searchParams, setSearchParams],
+  );
+
+  const handleSortChanged = useCallback(() => {
+    const api = gridRef.current?.api;
+    if (!api) return;
+    const serialized = serializeUrlGridSort(getCurrentGridSort(api, ["selection", "rowNumber"]));
+    replaceQueryParam(searchParams, setSearchParams, "sort", serialized);
+  }, [searchParams, setSearchParams]);
 
   const rowsWithNames = useMemo(() => {
     const outgoing = buildOutgoingRemainingByWarehouseItem();
@@ -357,23 +409,63 @@ export function StockBalancesListPage() {
     return filterByQuickFilter(bySearch, quickFilter);
   }, [rowsAfterStyle, searchQuery, quickFilter, coverageLabel, styleLabel]);
 
-  const isEmpty = filteredRows.length === 0;
+  const stockBalanceColumnFilterConfigs = useMemo<Record<string, AgGridColumnFilterConfig<RowData>>>(
+    () => ({
+      itemCode: { kind: "text" },
+      itemName: { kind: "text" },
+      warehouseName: {
+        kind: "enum",
+        options: Array.from(new Set(rowsWithNames.map((row) => row.warehouseName)))
+          .filter(Boolean)
+          .sort((a, b) => a.localeCompare(b))
+          .map((value) => ({ value, label: value })),
+      },
+      style: {
+        kind: "enum",
+        options: STOCK_STYLE_VALUES.map((value) => ({
+          value,
+          label: styleLabel(value),
+        })),
+      },
+      qtyOnHand: { kind: "number" },
+      reservedQty: { kind: "number" },
+      availableQty: { kind: "number" },
+      deficitQty: { kind: "number" },
+      outgoingQty: { kind: "number" },
+      incomingQty: { kind: "number" },
+      netShortageQty: { kind: "number" },
+      coverageStatus: {
+        kind: "enum",
+        options: [
+          { value: "covered", label: coverageLabel("covered") },
+          { value: "at_risk", label: coverageLabel("at_risk") },
+          { value: "short", label: coverageLabel("short") },
+        ],
+      },
+    }),
+    [rowsWithNames, styleLabel, coverageLabel],
+  );
+
+  const displayRows = useMemo(
+    () => applyAgGridColumnFilters(filteredRows, columnFilterModel, stockBalanceColumnFilterConfigs),
+    [filteredRows, columnFilterModel, stockBalanceColumnFilterConfigs],
+  );
+
+  const isEmpty = displayRows.length === 0;
 
   useEffect(() => {
-    if (!showQuickFilters) setQuickFilter("all");
-  }, [showQuickFilters]);
+    if (!showQuickFilters && quickFilter !== "all") {
+      replaceQueryParam(searchParams, setSearchParams, "quick", "all", "all");
+    }
+  }, [quickFilter, searchParams, setSearchParams, showQuickFilters]);
 
   const onRowClicked = useCallback(
     (e: RowClickedEvent<RowData>) => {
       if (hasMeaningfulTextSelection()) return;
       if (!e.data) return;
-      const currentSearch = searchParams.toString();
-      navigate({
-        pathname: `/stock-balances/${e.data.id}`,
-        search: currentSearch === "" ? "" : `?${currentSearch}`,
-      });
+      navigate(appendReturnTo(`/stock-balances/${e.data.id}`, currentReturnTo));
     },
-    [navigate, searchParams],
+    [navigate, currentReturnTo],
   );
   const hasFilter =
     searchQuery.trim() !== "" ||
@@ -382,7 +474,8 @@ export function StockBalancesListPage() {
     brandFilterId != null ||
     categoryFilterId != null ||
     styleFilter !== "" ||
-    quickFilter !== "all";
+    quickFilter !== "all" ||
+    hasActiveAgGridColumnFilters(columnFilterModel);
 
   const brandFilterLabel = useMemo((): string => {
     if (brandFilterId == null) return "";
@@ -448,14 +541,14 @@ export function StockBalancesListPage() {
   const getExportRowsCurrentView = useCallback((): StockBalancesExportRow[] => {
     const api = gridRef.current?.api;
     if (!api) {
-      return buildExportRowsFromBalances(filteredRows, coverageLabel, styleLabel);
+      return buildExportRowsFromBalances(displayRows, coverageLabel, styleLabel);
     }
     const rows: RowData[] = [];
     api.forEachNodeAfterFilterAndSort((rowNode) => {
       if (rowNode.data) rows.push(rowNode.data);
     });
     return buildExportRowsFromBalances(rows, coverageLabel, styleLabel);
-  }, [filteredRows, coverageLabel, styleLabel]);
+  }, [displayRows, coverageLabel, styleLabel]);
 
   const getExportRowsSelected = useCallback((): StockBalancesExportRow[] => {
     const api = gridRef.current?.api;
@@ -589,7 +682,26 @@ export function StockBalancesListPage() {
       typeof p.value === "number" && !Number.isNaN(p.value) ? String(p.value) : "—",
   });
 
-  const columnDefs = useMemo<ColDef<RowData>[]>(() => {
+  const handleApplyColumnFilter = useCallback(
+    (colId: string, clause: AgGridColumnFilterClause) => {
+      replaceUrlAgGridColumnFilters(searchParams, setSearchParams, {
+        ...columnFilterModel,
+        [colId]: clause,
+      });
+    },
+    [columnFilterModel, searchParams, setSearchParams],
+  );
+
+  const handleResetColumnFilter = useCallback(
+    (colId: string) => {
+      const nextModel = { ...columnFilterModel };
+      delete nextModel[colId];
+      replaceUrlAgGridColumnFilters(searchParams, setSearchParams, nextModel);
+    },
+    [columnFilterModel, searchParams, setSearchParams],
+  );
+
+  const baseColumnDefs = useMemo<ColDef<RowData>[]>(() => {
     const base: ColDef<RowData>[] = [
       agGridRowNumberColDef,
       {
@@ -646,6 +758,24 @@ export function StockBalancesListPage() {
     ];
   }, [showOperationalGrid, t, locale, coverageLabel, styleLabel]);
 
+  const columnDefs = useMemo(
+    () =>
+      decorateAgGridColumnDefsWithFilters(
+        baseColumnDefs,
+        stockBalanceColumnFilterConfigs,
+        columnFilterModel,
+        handleApplyColumnFilter,
+        handleResetColumnFilter,
+      ),
+    [
+      baseColumnDefs,
+      stockBalanceColumnFilterConfigs,
+      columnFilterModel,
+      handleApplyColumnFilter,
+      handleResetColumnFilter,
+    ],
+  );
+
   return (
     <ListPageLayout
       header={null}
@@ -664,7 +794,7 @@ export function StockBalancesListPage() {
                     className="px-2 text-xs gap-1"
                     title={opt.aria}
                     aria-pressed={quickFilter === opt.value}
-                    onClick={() => setQuickFilter(opt.value)}
+                    onClick={() => setQueryValue("quick", opt.value, "all")}
                   >
                     <span>{opt.label}</span>
                     <span
@@ -685,13 +815,13 @@ export function StockBalancesListPage() {
             inputRef={listSearchInputRef}
             placeholder={t("ops.stockBalances.searchPlaceholder")}
             value={searchQuery}
-            onChange={setSearchQuery}
+            onChange={(value) => setQueryValue("q", value)}
             aria-label={t("ops.stockBalances.searchAria")}
-            resultCount={filteredRows.length}
+            resultCount={displayRows.length}
           />
           <SelectField
             value={styleFilter}
-            onChange={(value) => setStyleFilter(value as StockStyle | "")}
+            onChange={(value) => setQueryValue("style", value, "")}
             options={STOCK_STYLE_VALUES.map((value) => ({
               value,
               label: styleLabel(value),
@@ -904,13 +1034,15 @@ export function StockBalancesListPage() {
         <EmptyState title={emptyTitle} hint={emptyHint} />
       ) : (
         <>
-          <AgGridContainer themeClass="stock-balances-grid">
+          <AgGridContainer ref={gridContainerRef} themeClass="stock-balances-grid">
             <AgGridReact<RowData>
               {...agGridDefaultGridOptions}
               ref={gridRef}
-              rowData={filteredRows}
+              rowData={displayRows}
               columnDefs={columnDefs}
               defaultColDef={agGridDefaultColDef}
+              onGridReady={(event) => applyUrlGridSort(event.api, initialSortModel)}
+              onSortChanged={handleSortChanged}
               rowSelection={{ mode: "multiRow", checkboxes: true, headerCheckbox: true, enableClickSelection: true }}
               selectionColumnDef={agGridSelectionColumnDef}
               getRowId={(params) => params.data.id}

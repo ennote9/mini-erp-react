@@ -1,5 +1,5 @@
 import { useMemo, useState, useRef, useCallback } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { AgGridReact } from "ag-grid-react";
 import type { ColDef, SelectionChangedEvent } from "ag-grid-community";
 import { categoryRepository } from "../repository";
@@ -9,11 +9,14 @@ import { EmptyState } from "../../../shared/ui/feedback/EmptyState";
 import {
   AgGridContainer,
   AgGridActiveBooleanCellRenderer,
+  applyAgGridColumnFilters,
   agGridDefaultColDef,
   agGridDefaultGridOptions,
   agGridRowNumberColDef,
   agGridSelectionColumnDef,
+  decorateAgGridColumnDefsWithFilters,
   hasMeaningfulTextSelection,
+  type AgGridColumnFilterConfig,
 } from "../../../shared/ui/ag-grid";
 import { BackButton } from "../../../shared/ui/list/BackButton";
 import { ListPageSearch } from "../../../shared/ui/list/ListPageSearch";
@@ -28,6 +31,12 @@ import { revealItemInDir } from "@tauri-apps/plugin-opener";
 import { useTranslation } from "@/shared/i18n/context";
 import { buildReadableUniqueFilename, ensureUniqueExportPath } from "@/shared/export/filenameBuilder";
 import { categoriesListExcelLabels } from "@/shared/i18n/excelListExportLabels";
+import {
+  hasActiveAgGridColumnFilters,
+  readUrlAgGridColumnFilters,
+  replaceUrlAgGridColumnFilters,
+  type AgGridColumnFilterClause,
+} from "@/shared/navigation/agGridColumnFilters";
 
 function buildExportRowsFromCategories(
   categories: Category[],
@@ -45,6 +54,7 @@ function buildExportRowsFromCategories(
 export function CategoriesListPage() {
   const { t, locale } = useTranslation();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [searchQuery, setSearchQuery] = useState("");
   const [exportSuccess, setExportSuccess] = useState<{ path: string; filename: string } | null>(null);
   const [exportOpen, setExportOpen] = useState(false);
@@ -60,9 +70,23 @@ export function CategoriesListPage() {
   const filteredRows = useMemo(() => {
     return categoryRepository.search(searchQuery);
   }, [searchQuery]);
+  const columnFilterModel = useMemo(() => readUrlAgGridColumnFilters(searchParams), [searchParams]);
+  const categoryColumnFilterConfigs = useMemo<Record<string, AgGridColumnFilterConfig<Category>>>(
+    () => ({
+      code: { kind: "text" },
+      name: { kind: "text" },
+      comment: { kind: "text" },
+      isActive: { kind: "boolean" },
+    }),
+    [],
+  );
+  const displayRows = useMemo(
+    () => applyAgGridColumnFilters(filteredRows, columnFilterModel, categoryColumnFilterConfigs),
+    [filteredRows, columnFilterModel, categoryColumnFilterConfigs],
+  );
 
-  const isEmpty = filteredRows.length === 0;
-  const hasFilter = searchQuery.trim() !== "";
+  const isEmpty = displayRows.length === 0;
+  const hasFilter = searchQuery.trim() !== "" || hasActiveAgGridColumnFilters(columnFilterModel);
 
   const getExportRowsCurrentView = useCallback((): CategoriesExportRow[] => {
     const api = gridRef.current?.api;
@@ -139,7 +163,26 @@ export function CategoriesListPage() {
   const emptyTitle = hasFilter ? t("ops.list.categories.emptyFiltered") : t("ops.list.categories.emptyDefault");
   const emptyHint = hasFilter ? t("ops.list.categories.hintFilter") : t("ops.list.categories.hintCreate");
 
-  const columnDefs = useMemo<ColDef<Category>[]>(
+  const handleApplyColumnFilter = useCallback(
+    (colId: string, clause: AgGridColumnFilterClause) => {
+      replaceUrlAgGridColumnFilters(searchParams, setSearchParams, {
+        ...columnFilterModel,
+        [colId]: clause,
+      });
+    },
+    [columnFilterModel, searchParams, setSearchParams],
+  );
+
+  const handleResetColumnFilter = useCallback(
+    (colId: string) => {
+      const nextModel = { ...columnFilterModel };
+      delete nextModel[colId];
+      replaceUrlAgGridColumnFilters(searchParams, setSearchParams, nextModel);
+    },
+    [columnFilterModel, searchParams, setSearchParams],
+  );
+
+  const baseColumnDefs = useMemo<ColDef<Category>[]>(
     () => [
       agGridRowNumberColDef,
       {
@@ -169,6 +212,24 @@ export function CategoriesListPage() {
     [t, locale],
   );
 
+  const columnDefs = useMemo(
+    () =>
+      decorateAgGridColumnDefsWithFilters(
+        baseColumnDefs,
+        categoryColumnFilterConfigs,
+        columnFilterModel,
+        handleApplyColumnFilter,
+        handleResetColumnFilter,
+      ),
+    [
+      baseColumnDefs,
+      categoryColumnFilterConfigs,
+      columnFilterModel,
+      handleApplyColumnFilter,
+      handleResetColumnFilter,
+    ],
+  );
+
   return (
     <ListPageLayout
       header={null}
@@ -181,7 +242,7 @@ export function CategoriesListPage() {
             value={searchQuery}
             onChange={setSearchQuery}
             aria-label={t("ops.list.categories.searchAria")}
-            resultCount={filteredRows.length}
+            resultCount={displayRows.length}
           />
           <div className="flex flex-row items-center gap-2 shrink-0 ml-auto">
             {exportSuccess && (
@@ -295,7 +356,7 @@ export function CategoriesListPage() {
           <AgGridReact<Category>
             {...agGridDefaultGridOptions}
             ref={gridRef}
-            rowData={filteredRows}
+            rowData={displayRows}
             columnDefs={columnDefs}
             defaultColDef={agGridDefaultColDef}
             rowSelection={{ mode: "multiRow", checkboxes: true, headerCheckbox: true, enableClickSelection: true }}

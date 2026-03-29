@@ -54,6 +54,12 @@ function asOptionalString(v: unknown): string | undefined {
   return typeof v === "string" ? v : undefined;
 }
 
+function asOptionalTrimmedString(v: unknown): string | undefined {
+  if (typeof v !== "string") return undefined;
+  const t = v.trim();
+  return t === "" ? undefined : t;
+}
+
 function asOptionalPaymentTermsDays(v: unknown): number | undefined {
   if (v == null) return undefined;
   if (typeof v !== "number" || !Number.isFinite(v)) return undefined;
@@ -178,6 +184,8 @@ function normalizePORecord(raw: unknown): PurchaseOrderPersistRecord | null {
     supplierId: rec.supplierId,
     warehouseId: rec.warehouseId,
     status: rec.status,
+    preliminaryDeliveryDate: asOptionalTrimmedString(rec.preliminaryDeliveryDate),
+    actualArrivalDateTime: asOptionalTrimmedString(rec.actualArrivalDateTime),
     paymentTermsDays: asOptionalPaymentTermsDays(rec.paymentTermsDays),
     dueDate: asOptionalString(rec.dueDate),
     comment: asOptionalString(rec.comment),

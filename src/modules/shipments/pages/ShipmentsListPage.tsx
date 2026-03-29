@@ -17,11 +17,14 @@ import { EmptyState } from "../../../shared/ui/feedback/EmptyState";
 import {
   AgGridContainer,
   AgGridFactualStatusCellRenderer,
+  applyAgGridColumnFilters,
   agGridDefaultColDef,
   agGridDefaultGridOptions,
   getAgGridRowNumberColDef,
   agGridSelectionColumnDef,
+  decorateAgGridColumnDefsWithFilters,
   hasMeaningfulTextSelection,
+  type AgGridColumnFilterConfig,
 } from "../../../shared/ui/ag-grid";
 import { BackButton } from "../../../shared/ui/list/BackButton";
 import { ListPageSearch } from "../../../shared/ui/list/ListPageSearch";
@@ -42,6 +45,12 @@ import { buildReadableUniqueFilename, ensureUniqueExportPath } from "@/shared/ex
 import { shipmentsListExcelLabels } from "@/shared/i18n/excelListExportLabels";
 import { readOptionalFactualStatusFromQuery } from "@/shared/navigation/listQueryStatus";
 import { toGeneratedCodeSearchTokens } from "@/shared/generatedVisibleCodes";
+import {
+  hasActiveAgGridColumnFilters,
+  readUrlAgGridColumnFilters,
+  replaceUrlAgGridColumnFilters,
+  type AgGridColumnFilterClause,
+} from "@/shared/navigation/agGridColumnFilters";
 
 type StatusFilter = "all" | FactualDocumentStatus;
 
@@ -155,6 +164,7 @@ export function ShipmentsListPage() {
     if (statusFromQuery === undefined) return;
     setStatusFilter(statusFromQuery);
   }, [statusFromQuery]);
+  const columnFilterModel = useMemo(() => readUrlAgGridColumnFilters(searchParams), [searchParams]);
   const [exportSuccess, setExportSuccess] = useState<{ path: string; filename: string } | null>(null);
   const [exportOpen, setExportOpen] = useState(false);
   const [selectedCount, setSelectedCount] = useState(0);
@@ -190,12 +200,56 @@ export function ShipmentsListPage() {
     return filterByStatus(byCarrier, statusFilter);
   }, [rowsWithNames, searchQuery, statusFilter, warehouseFilterId, carrierFilterId]);
 
-  const isEmpty = filteredRows.length === 0;
+  const statusOptions = useMemo(
+    (): { value: StatusFilter; label: string }[] => [
+      { value: "all", label: t("doc.list.all") },
+      { value: "draft", label: t("status.factual.draft") },
+      { value: "posted", label: t("status.factual.posted") },
+      { value: "reversed", label: t("status.factual.reversed") },
+      { value: "cancelled", label: t("status.factual.cancelled") },
+    ],
+    [t, locale],
+  );
+
+  const shipmentColumnFilterConfigs = useMemo<Record<string, AgGridColumnFilterConfig<RowData>>>(
+    () => ({
+      number: { kind: "text" },
+      date: { kind: "date" },
+      salesOrderNumber: { kind: "text" },
+      warehouseName: {
+        kind: "enum",
+        options: Array.from(new Set(rowsWithNames.map((row) => row.warehouseName)))
+          .filter(Boolean)
+          .sort((a, b) => a.localeCompare(b))
+          .map((value) => ({ value, label: value })),
+      },
+      carrierLabel: { kind: "text" },
+      trackingLabel: { kind: "text", getValue: (row) => row.trackingRaw },
+      recipientLabel: { kind: "text" },
+      recipientPhoneLabel: { kind: "text" },
+      deliveryAddressPreview: { kind: "text" },
+      status: {
+        kind: "enum",
+        options: statusOptions
+          .filter((option) => option.value !== "all")
+          .map((option) => ({ value: option.value, label: option.label })),
+      },
+    }),
+    [rowsWithNames, statusOptions],
+  );
+
+  const displayRows = useMemo(
+    () => applyAgGridColumnFilters(filteredRows, columnFilterModel, shipmentColumnFilterConfigs),
+    [filteredRows, columnFilterModel, shipmentColumnFilterConfigs],
+  );
+
+  const isEmpty = displayRows.length === 0;
   const hasFilter =
     statusFilter !== "all" ||
     searchQuery.trim() !== "" ||
     warehouseFilterId != null ||
-    carrierFilterId != null;
+    carrierFilterId != null ||
+    hasActiveAgGridColumnFilters(columnFilterModel);
 
   const warehouseFilterLabel = useMemo((): string => {
     if (warehouseFilterId == null) return "";
@@ -225,13 +279,13 @@ export function ShipmentsListPage() {
 
   const getExportRowsCurrentView = useCallback((): ShipmentsExportRow[] => {
     const api = gridRef.current?.api;
-    if (!api) return buildExportRowsFromShipments(filteredRows);
+    if (!api) return buildExportRowsFromShipments(displayRows);
     const rows: RowData[] = [];
     api.forEachNodeAfterFilterAndSort((rowNode) => {
       if (rowNode.data) rows.push(rowNode.data);
     });
     return buildExportRowsFromShipments(rows);
-  }, [filteredRows]);
+  }, [displayRows]);
 
   const getExportRowsSelected = useCallback((): ShipmentsExportRow[] => {
     const api = gridRef.current?.api;
@@ -327,18 +381,26 @@ export function ShipmentsListPage() {
     locale,
   ]);
 
-  const statusOptions = useMemo(
-    (): { value: StatusFilter; label: string }[] => [
-      { value: "all", label: t("doc.list.all") },
-      { value: "draft", label: t("status.factual.draft") },
-      { value: "posted", label: t("status.factual.posted") },
-      { value: "reversed", label: t("status.factual.reversed") },
-      { value: "cancelled", label: t("status.factual.cancelled") },
-    ],
-    [t, locale],
+  const handleApplyColumnFilter = useCallback(
+    (colId: string, clause: AgGridColumnFilterClause) => {
+      replaceUrlAgGridColumnFilters(searchParams, setSearchParams, {
+        ...columnFilterModel,
+        [colId]: clause,
+      });
+    },
+    [columnFilterModel, searchParams, setSearchParams],
   );
 
-  const columnDefs = useMemo<ColDef<RowData>[]>(
+  const handleResetColumnFilter = useCallback(
+    (colId: string) => {
+      const nextModel = { ...columnFilterModel };
+      delete nextModel[colId];
+      replaceUrlAgGridColumnFilters(searchParams, setSearchParams, nextModel);
+    },
+    [columnFilterModel, searchParams, setSearchParams],
+  );
+
+  const baseColumnDefs = useMemo<ColDef<RowData>[]>(
     () => [
       getAgGridRowNumberColDef(t),
       {
@@ -410,6 +472,24 @@ export function ShipmentsListPage() {
     [t, locale],
   );
 
+  const columnDefs = useMemo(
+    () =>
+      decorateAgGridColumnDefsWithFilters(
+        baseColumnDefs,
+        shipmentColumnFilterConfigs,
+        columnFilterModel,
+        handleApplyColumnFilter,
+        handleResetColumnFilter,
+      ),
+    [
+      baseColumnDefs,
+      shipmentColumnFilterConfigs,
+      columnFilterModel,
+      handleApplyColumnFilter,
+      handleResetColumnFilter,
+    ],
+  );
+
   return (
     <ListPageLayout
       header={null}
@@ -437,7 +517,7 @@ export function ShipmentsListPage() {
             value={searchQuery}
             onChange={setSearchQuery}
             aria-label={t("ops.list.shipments.searchAria")}
-            resultCount={filteredRows.length}
+            resultCount={displayRows.length}
           />
           <div className="flex flex-row items-center gap-2 shrink-0 ml-auto flex-wrap justify-end">
             {warehouseFilterId != null && (
@@ -590,7 +670,7 @@ export function ShipmentsListPage() {
           <AgGridReact<RowData>
             {...agGridDefaultGridOptions}
             ref={gridRef}
-            rowData={filteredRows}
+            rowData={displayRows}
             columnDefs={columnDefs}
             defaultColDef={agGridDefaultColDef}
             rowSelection={{ mode: "multiRow", checkboxes: true, headerCheckbox: true, enableClickSelection: true }}

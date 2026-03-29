@@ -3,7 +3,7 @@
  * Preserves search, New button, row navigation, empty state.
  */
 import { useMemo, useState, useRef, useCallback } from "react";
-import { useNavigate, useSearchParams, Link } from "react-router-dom";
+import { useLocation, useNavigate, useSearchParams, Link } from "react-router-dom";
 import { AgGridReact } from "ag-grid-react";
 import type { ColDef, ICellRendererParams, SelectionChangedEvent } from "ag-grid-community";
 import { itemRepository } from "../repository";
@@ -15,11 +15,14 @@ import { EmptyState } from "../../../shared/ui/feedback/EmptyState";
 import {
   AgGridContainer,
   AgGridActiveBooleanCellRenderer,
+  applyAgGridColumnFilters,
   agGridDefaultColDef,
   agGridDefaultGridOptions,
   agGridRowNumberColDef,
   agGridSelectionColumnDef,
+  decorateAgGridColumnDefsWithFilters,
   hasMeaningfulTextSelection,
+  type AgGridColumnFilterConfig,
 } from "../../../shared/ui/ag-grid";
 import { BackButton } from "../../../shared/ui/list/BackButton";
 import { ListPageSearch } from "../../../shared/ui/list/ListPageSearch";
@@ -39,6 +42,14 @@ import {
   isMarkdownCodeFormat,
   resolveMarkdownRecordByScanInput,
 } from "@/modules/markdown-journal";
+import { applyUrlGridSort, getCurrentGridSort, readUrlGridSort, serializeUrlGridSort } from "@/shared/navigation/agGridSort";
+import { appendReturnTo, buildNavigationStateKey, buildReturnToValue, replaceQueryParam } from "@/shared/navigation/returnTo";
+import { useSessionScrollRestore } from "@/shared/navigation/useSessionScrollRestore";
+import {
+  hasActiveAgGridColumnFilters,
+  readUrlAgGridColumnFilters,
+  replaceUrlAgGridColumnFilters,
+} from "@/shared/navigation/agGridColumnFilters";
 
 function applyBrandIdFilter(items: Item[], brandId: string | null): Item[] {
   if (brandId == null || brandId === "") return items;
@@ -87,6 +98,7 @@ function buildExportRowsFromItems(items: Item[], activeYes: string, activeNo: st
 
 export function ItemsListPage() {
   const { t, locale } = useTranslation();
+  const location = useLocation();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const brandFilterId = useMemo(() => {
@@ -103,24 +115,99 @@ export function ItemsListPage() {
     return t === "" ? null : t;
   }, [searchParams]);
 
-  const [searchQuery, setSearchQuery] = useState("");
+  const searchQuery = searchParams.get("q") ?? "";
   const appReadRevision = useAppReadModelRevision();
   const [exportSuccess, setExportSuccess] = useState<{ path: string; filename: string } | null>(null);
   const [exportOpen, setExportOpen] = useState(false);
   const [selectedCount, setSelectedCount] = useState(0);
   const gridRef = useRef<AgGridReact<Item> | null>(null);
+  const gridContainerRef = useRef<HTMLDivElement | null>(null);
   const listSearchInputRef = useRef<HTMLInputElement>(null);
   useListPageSearchHotkey(listSearchInputRef);
+  const listStateKey = useMemo(
+    () => buildNavigationStateKey(location.pathname, searchParams),
+    [location.pathname, searchParams],
+  );
+  useSessionScrollRestore(listStateKey, gridContainerRef);
+  const currentReturnTo = useMemo(
+    () => buildReturnToValue(location.pathname, location.search),
+    [location.pathname, location.search],
+  );
+  const initialSortModel = useMemo(() => readUrlGridSort(searchParams), [searchParams]);
+  const columnFilterModel = useMemo(() => readUrlAgGridColumnFilters(searchParams), [searchParams]);
 
   const onSelectionChanged = useCallback((e: SelectionChangedEvent<Item>) => {
     setSelectedCount(e.api.getSelectedRows().length);
   }, []);
+
+  const handleSearchQueryChange = useCallback(
+    (value: string) => {
+      replaceQueryParam(searchParams, setSearchParams, "q", value);
+    },
+    [searchParams, setSearchParams],
+  );
+
+  const syncSortToUrl = useCallback(() => {
+    const api = gridRef.current?.api;
+    if (!api) return;
+    const nextValue = serializeUrlGridSort(getCurrentGridSort(api, ["selection", "rowNumber"]));
+    replaceQueryParam(searchParams, setSearchParams, "sort", nextValue);
+  }, [searchParams, setSearchParams]);
 
   const filteredItems = useMemo(() => {
     const searched = itemRepository.search(searchQuery);
     const brandFiltered = applyBrandIdFilter(searched, brandFilterId);
     return applyCategoryIdFilter(brandFiltered, categoryFilterId);
   }, [searchQuery, brandFilterId, categoryFilterId, appReadRevision]);
+
+  const itemColumnFilterConfigs = useMemo<Record<string, AgGridColumnFilterConfig<Item>>>(
+    () => ({
+      code: { kind: "text" },
+      itemKind: {
+        kind: "enum",
+        getValue: (item) => item.itemKind ?? "SELLABLE",
+        options: [
+          { value: "SELLABLE", label: t("master.item.kind.sellable") },
+          { value: "TESTER", label: t("master.item.kind.tester") },
+        ],
+      },
+      name: { kind: "text" },
+      imageCount: {
+        kind: "number",
+        getValue: (item) => (Array.isArray(item.images) ? item.images.length : 0),
+      },
+      brand: {
+        kind: "enum",
+        getValue: (item) => {
+          if (!item.brandId) return "";
+          return brandRepository.getById(item.brandId)?.name ?? "";
+        },
+        options: brandRepository
+          .list()
+          .map((brand) => ({ value: brand.name, label: brand.name })),
+      },
+      category: {
+        kind: "enum",
+        getValue: (item) => {
+          if (!item.categoryId) return "";
+          return categoryRepository.getById(item.categoryId)?.name ?? "";
+        },
+        options: categoryRepository
+          .list()
+          .map((category) => ({ value: category.name, label: category.name })),
+      },
+      uom: { kind: "text" },
+      purchasePrice: { kind: "number" },
+      salePrice: { kind: "number" },
+      isActive: { kind: "boolean" },
+    }),
+    [t, locale, appReadRevision],
+  );
+
+  const displayItems = useMemo(
+    () => applyAgGridColumnFilters(filteredItems, columnFilterModel, itemColumnFilterConfigs),
+    [filteredItems, columnFilterModel, itemColumnFilterConfigs],
+  );
 
   const markdownScanMatch = useMemo(() => {
     const q = searchQuery.trim();
@@ -135,11 +222,12 @@ export function ItemsListPage() {
     return resolveMarkdownRecordByScanInput(q) == null;
   }, [searchQuery, appReadRevision]);
 
-  const isEmpty = filteredItems.length === 0;
+  const isEmpty = displayItems.length === 0;
   const hasActiveFilter =
     searchQuery.trim() !== "" ||
     brandFilterId != null ||
-    categoryFilterId != null;
+    categoryFilterId != null ||
+    hasActiveAgGridColumnFilters(columnFilterModel);
 
   const brandFilterLabel = useMemo((): string => {
     if (brandFilterId == null) return "";
@@ -258,7 +346,7 @@ export function ItemsListPage() {
     return t("ops.list.master.hintClearFilters");
   }, [hasActiveFilter, brandFilterId, categoryFilterId, t]);
 
-  const columnDefs = useMemo<ColDef<Item>[]>(
+  const baseColumnDefs = useMemo<ColDef<Item>[]>(
     () => [
       agGridRowNumberColDef,
       {
@@ -292,6 +380,7 @@ export function ItemsListPage() {
       },
       {
         headerName: t("doc.columns.brand"),
+        colId: "brand",
         width: 110,
         valueGetter: (params) => {
           const id = params.data?.brandId;
@@ -302,6 +391,7 @@ export function ItemsListPage() {
       },
       {
         headerName: t("doc.columns.category"),
+        colId: "category",
         width: 120,
         valueGetter: (params) => {
           const id = params.data?.categoryId;
@@ -343,6 +433,43 @@ export function ItemsListPage() {
     [t, locale],
   );
 
+  const handleApplyColumnFilter = useCallback(
+    (colId: string, clause: { operator: any; value?: string; valueTo?: string; values?: string[] }) => {
+      replaceUrlAgGridColumnFilters(searchParams, setSearchParams, {
+        ...columnFilterModel,
+        [colId]: clause,
+      });
+    },
+    [searchParams, setSearchParams, columnFilterModel],
+  );
+
+  const handleResetColumnFilter = useCallback(
+    (colId: string) => {
+      const nextModel = { ...columnFilterModel };
+      delete nextModel[colId];
+      replaceUrlAgGridColumnFilters(searchParams, setSearchParams, nextModel);
+    },
+    [searchParams, setSearchParams, columnFilterModel],
+  );
+
+  const columnDefs = useMemo(
+    () =>
+      decorateAgGridColumnDefsWithFilters(
+        baseColumnDefs,
+        itemColumnFilterConfigs,
+        columnFilterModel,
+        handleApplyColumnFilter,
+        handleResetColumnFilter,
+      ),
+    [
+      baseColumnDefs,
+      itemColumnFilterConfigs,
+      columnFilterModel,
+      handleApplyColumnFilter,
+      handleResetColumnFilter,
+    ],
+  );
+
   return (
     <ListPageLayout
       header={null}
@@ -353,9 +480,9 @@ export function ItemsListPage() {
             inputRef={listSearchInputRef}
             placeholder={t("ops.list.items.searchPlaceholder")}
             value={searchQuery}
-            onChange={setSearchQuery}
+            onChange={handleSearchQueryChange}
             aria-label={t("ops.list.items.searchAria")}
-            resultCount={filteredItems.length}
+            resultCount={displayItems.length}
           />
           <div className="flex flex-row items-center gap-2 shrink-0 ml-auto">
             {brandFilterId != null && (
@@ -501,7 +628,7 @@ export function ItemsListPage() {
             variant="default"
             size="sm"
             className="list-page__create-btn rounded-md bg-white text-black hover:bg-gray-200"
-            onClick={() => navigate("/items/new")}
+            onClick={() => navigate(appendReturnTo("/items/new", currentReturnTo))}
           >
             <svg className="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M12 5v14" /><path d="M5 12h14" /></svg> {t("doc.list.create")}
           </Button>
@@ -542,19 +669,21 @@ export function ItemsListPage() {
         {isEmpty ? (
           <EmptyState title={emptyTitle} hint={emptyHint} />
         ) : (
-          <AgGridContainer themeClass="items-grid">
+          <AgGridContainer ref={gridContainerRef} themeClass="items-grid">
           <AgGridReact<Item>
             {...agGridDefaultGridOptions}
             ref={gridRef}
-            rowData={filteredItems}
+            rowData={displayItems}
             columnDefs={columnDefs}
             defaultColDef={agGridDefaultColDef}
+            onGridReady={(event) => applyUrlGridSort(event.api, initialSortModel)}
+            onSortChanged={syncSortToUrl}
             rowSelection={{ mode: "multiRow", checkboxes: true, headerCheckbox: true, enableClickSelection: true }}
             selectionColumnDef={agGridSelectionColumnDef}
             getRowId={(params) => params.data.id}
             onRowClicked={(e) => {
               if (hasMeaningfulTextSelection()) return;
-              if (e.data) navigate(`/items/${e.data.id}`);
+              if (e.data) navigate(appendReturnTo(`/items/${e.data.id}`, currentReturnTo));
             }}
             onSelectionChanged={onSelectionChanged}
           />

@@ -17,3 +17,10 @@ export {
   AgGridMovementTypeCellRenderer,
   AgGridCarrierTypeCellRenderer,
 } from "./AgGridOutlinePillCellRenderers";
+export {
+  applyAgGridColumnFilters,
+  decorateAgGridColumnDefsWithFilters,
+  defaultOperatorsForKind,
+  type AgGridColumnFilterConfig,
+  type AgGridColumnFilterOption,
+} from "./AgGridColumnFilters";

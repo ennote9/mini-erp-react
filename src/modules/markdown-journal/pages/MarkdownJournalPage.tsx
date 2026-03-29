@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useRef, useState } from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { useEffect, useMemo, useRef, useState, useCallback } from "react";
+import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { AgGridReact } from "ag-grid-react";
 import type { ColDef } from "ag-grid-community";
 import { Button } from "@/components/ui/button";
@@ -19,14 +19,26 @@ import { useListPageSearchHotkey } from "@/shared/hotkeys";
 import { EmptyState } from "@/shared/ui/feedback/EmptyState";
 import {
   AgGridContainer,
+  applyAgGridColumnFilters,
   agGridDefaultColDef,
   agGridDefaultGridOptions,
   agGridRowNumberColDef,
+  decorateAgGridColumnDefsWithFilters,
   hasMeaningfulTextSelection,
+  type AgGridColumnFilterConfig,
 } from "@/shared/ui/ag-grid";
 import {
   MARKDOWN_JOURNAL_STATUS_FILTERS,
 } from "../pageConfig";
+import { applyUrlGridSort, getCurrentGridSort, readUrlGridSort, serializeUrlGridSort } from "@/shared/navigation/agGridSort";
+import {
+  hasActiveAgGridColumnFilters,
+  readUrlAgGridColumnFilters,
+  replaceUrlAgGridColumnFilters,
+  type AgGridColumnFilterClause,
+} from "@/shared/navigation/agGridColumnFilters";
+import { appendReturnTo, buildNavigationStateKey, buildReturnToValue, replaceQueryParam } from "@/shared/navigation/returnTo";
+import { useSessionScrollRestore } from "@/shared/navigation/useSessionScrollRestore";
 
 type MarkdownRegisterView = "journals" | "codes";
 
@@ -82,29 +94,68 @@ function warehouseLabelFor(id: string): string {
 
 export function MarkdownJournalPage() {
   const { t } = useTranslation();
+  const location = useLocation();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const appRevision = useAppReadModelRevision();
   const prefillItemId = searchParams.get("itemId") ?? "";
   const viewFromQuery = searchParams.get("view");
 
-  const [search, setSearch] = useState("");
+  const search = searchParams.get("q") ?? "";
   const [view, setView] = useState<MarkdownRegisterView>(
     viewFromQuery === "codes" || viewFromQuery === "lines" ? "codes" : "journals",
   );
-  const [filterStatus, setFilterStatus] = useState<MarkdownJournalStatus | "all">("all");
+  const [filterStatus, setFilterStatus] = useState<MarkdownJournalStatus | "all">(
+    ((searchParams.get("status") as MarkdownJournalStatus | "all" | null) ?? "all"),
+  );
   const listSearchInputRef = useRef<HTMLInputElement>(null);
+  const gridRef = useRef<AgGridReact<JournalRow | MarkdownCodeRow> | null>(null);
+  const gridContainerRef = useRef<HTMLDivElement | null>(null);
   useListPageSearchHotkey(listSearchInputRef);
+  const listStateKey = useMemo(
+    () => buildNavigationStateKey(location.pathname, searchParams),
+    [location.pathname, searchParams],
+  );
+  useSessionScrollRestore(listStateKey, gridContainerRef);
+  const currentReturnTo = useMemo(
+    () => buildReturnToValue(location.pathname, location.search),
+    [location.pathname, location.search],
+  );
+  const initialSortModel = useMemo(() => readUrlGridSort(searchParams), [searchParams]);
+  const columnFilterModel = useMemo(() => readUrlAgGridColumnFilters(searchParams), [searchParams]);
 
   useEffect(() => {
     const nextView = viewFromQuery === "codes" || viewFromQuery === "lines" ? "codes" : "journals";
     setView(nextView);
   }, [viewFromQuery]);
 
+  useEffect(() => {
+    const rawStatus = searchParams.get("status");
+    const nextStatus =
+      rawStatus && MARKDOWN_JOURNAL_STATUS_FILTERS.includes(rawStatus as MarkdownJournalStatus | "all")
+        ? (rawStatus as MarkdownJournalStatus | "all")
+        : "all";
+    setFilterStatus(nextStatus);
+  }, [searchParams]);
+
   const createTarget = useMemo(() => {
     if (!prefillItemId) return "/markdown-journal/new";
     return `/markdown-journal/new?itemId=${encodeURIComponent(prefillItemId)}`;
   }, [prefillItemId]);
+
+  const setQueryValue = useCallback(
+    (key: string, value: string, defaultValue = "") => {
+      replaceQueryParam(searchParams, setSearchParams, key, value, defaultValue);
+    },
+    [searchParams, setSearchParams],
+  );
+
+  const handleSortChanged = useCallback(() => {
+    const api = gridRef.current?.api;
+    if (!api) return;
+    const serialized = serializeUrlGridSort(getCurrentGridSort(api, ["rowNumber"]));
+    replaceQueryParam(searchParams, setSearchParams, "sort", serialized);
+  }, [searchParams, setSearchParams]);
 
   const journalRows = useMemo<JournalRow[]>(() => {
     return markdownJournalRepository
@@ -153,6 +204,42 @@ export function MarkdownJournalPage() {
     }
     return base;
   }, [filterStatus, journalRows, prefillItemId, search, appRevision]);
+
+  const journalColumnFilterConfigs = useMemo<Record<string, AgGridColumnFilterConfig<JournalRow>>>(
+    () => ({
+      number: { kind: "text" },
+      status: {
+        kind: "enum",
+        options: MARKDOWN_JOURNAL_STATUS_FILTERS
+          .filter((value): value is MarkdownJournalStatus => value !== "all")
+          .map((value) => ({ value, label: journalStatusLabel(value, t) })),
+      },
+      sourceWarehouseLabel: {
+        kind: "enum",
+        options: Array.from(new Set(journalRows.map((row) => row.sourceWarehouseLabel)))
+          .filter(Boolean)
+          .sort((a, b) => a.localeCompare(b))
+          .map((value) => ({ value, label: value })),
+      },
+      targetWarehouseLabel: {
+        kind: "enum",
+        options: Array.from(new Set(journalRows.map((row) => row.targetWarehouseLabel)))
+          .filter(Boolean)
+          .sort((a, b) => a.localeCompare(b))
+          .map((value) => ({ value, label: value })),
+      },
+      lineCount: { kind: "number" },
+      totalQty: { kind: "number" },
+      createdAt: { kind: "datetime" },
+      postedAt: { kind: "datetime" },
+    }),
+    [journalRows, t],
+  );
+
+  const displayJournalRows = useMemo(
+    () => applyAgGridColumnFilters(filteredJournalRows, columnFilterModel, journalColumnFilterConfigs),
+    [filteredJournalRows, columnFilterModel, journalColumnFilterConfigs],
+  );
 
   const codeRows = useMemo<MarkdownCodeRow[]>(() => {
     return markdownJournalRepository
@@ -209,9 +296,52 @@ export function MarkdownJournalPage() {
     return base;
   }, [codeRows, prefillItemId, search]);
 
-  const activeRows = view === "journals" ? filteredJournalRows : filteredCodeRows;
+  const codeColumnFilterConfigs = useMemo<Record<string, AgGridColumnFilterConfig<MarkdownCodeRow>>>(
+    () => ({
+      markdownCode: { kind: "text" },
+      journalNumber: { kind: "text" },
+      itemCode: { kind: "text" },
+      itemName: { kind: "text" },
+      quantity: { kind: "number" },
+      markdownPrice: { kind: "number" },
+      warehouseLabel: {
+        kind: "enum",
+        options: Array.from(new Set(codeRows.map((row) => row.warehouseLabel)))
+          .filter(Boolean)
+          .sort((a, b) => a.localeCompare(b))
+          .map((value) => ({ value, label: value })),
+      },
+      statusLabel: {
+        kind: "enum",
+        options: Array.from(new Set(codeRows.map((row) => row.statusLabel)))
+          .filter(Boolean)
+          .sort((a, b) => a.localeCompare(b))
+          .map((value) => ({ value, label: value })),
+      },
+      reasonLabel: {
+        kind: "enum",
+        options: Array.from(new Set(codeRows.map((row) => row.reasonLabel)))
+          .filter(Boolean)
+          .sort((a, b) => a.localeCompare(b))
+          .map((value) => ({ value, label: value })),
+      },
+      postedAt: { kind: "datetime" },
+    }),
+    [codeRows],
+  );
+
+  const displayCodeRows = useMemo(
+    () => applyAgGridColumnFilters(filteredCodeRows, columnFilterModel, codeColumnFilterConfigs),
+    [filteredCodeRows, columnFilterModel, codeColumnFilterConfigs],
+  );
+
+  const activeRows = view === "journals" ? displayJournalRows : displayCodeRows;
   const isEmpty = activeRows.length === 0;
-  const hasFilter = search.trim() !== "" || filterStatus !== "all" || prefillItemId !== "";
+  const hasFilter =
+    search.trim() !== "" ||
+    filterStatus !== "all" ||
+    prefillItemId !== "" ||
+    hasActiveAgGridColumnFilters(columnFilterModel);
 
   const emptyTitle = hasFilter
     ? t("ops.list.master.emptyFiltered")
@@ -220,7 +350,26 @@ export function MarkdownJournalPage() {
     ? t("ops.list.master.hintClearFilters")
     : t("ops.list.master.hintCreateFirst");
 
-  const journalColumnDefs = useMemo<ColDef<JournalRow>[]>(
+  const handleApplyColumnFilter = useCallback(
+    (colId: string, clause: AgGridColumnFilterClause) => {
+      replaceUrlAgGridColumnFilters(searchParams, setSearchParams, {
+        ...columnFilterModel,
+        [colId]: clause,
+      });
+    },
+    [columnFilterModel, searchParams, setSearchParams],
+  );
+
+  const handleResetColumnFilter = useCallback(
+    (colId: string) => {
+      const nextModel = { ...columnFilterModel };
+      delete nextModel[colId];
+      replaceUrlAgGridColumnFilters(searchParams, setSearchParams, nextModel);
+    },
+    [columnFilterModel, searchParams, setSearchParams],
+  );
+
+  const baseJournalColumnDefs = useMemo<ColDef<JournalRow>[]>(
     () => [
       agGridRowNumberColDef,
       {
@@ -276,7 +425,7 @@ export function MarkdownJournalPage() {
     [t],
   );
 
-  const codeColumnDefs = useMemo<ColDef<MarkdownCodeRow>[]>(
+  const baseCodeColumnDefs = useMemo<ColDef<MarkdownCodeRow>[]>(
     () => [
       agGridRowNumberColDef,
       {
@@ -345,6 +494,42 @@ export function MarkdownJournalPage() {
     [t],
   );
 
+  const journalColumnDefs = useMemo(
+    () =>
+      decorateAgGridColumnDefsWithFilters(
+        baseJournalColumnDefs,
+        journalColumnFilterConfigs,
+        columnFilterModel,
+        handleApplyColumnFilter,
+        handleResetColumnFilter,
+      ),
+    [
+      baseJournalColumnDefs,
+      journalColumnFilterConfigs,
+      columnFilterModel,
+      handleApplyColumnFilter,
+      handleResetColumnFilter,
+    ],
+  );
+
+  const codeColumnDefs = useMemo(
+    () =>
+      decorateAgGridColumnDefsWithFilters(
+        baseCodeColumnDefs,
+        codeColumnFilterConfigs,
+        columnFilterModel,
+        handleApplyColumnFilter,
+        handleResetColumnFilter,
+      ),
+    [
+      baseCodeColumnDefs,
+      codeColumnFilterConfigs,
+      columnFilterModel,
+      handleApplyColumnFilter,
+      handleResetColumnFilter,
+    ],
+  );
+
   return (
     <ListPageLayout
       header={null}
@@ -382,7 +567,7 @@ export function MarkdownJournalPage() {
                     type="button"
                     variant={filterStatus === value ? "default" : "outline"}
                     size="sm"
-                    onClick={() => setFilterStatus(value)}
+                    onClick={() => setQueryValue("status", value, "all")}
                     disabled={view !== "journals"}
                   >
                     {value === "all"
@@ -400,7 +585,7 @@ export function MarkdownJournalPage() {
                   : t("markdown.journal.searchMarkdownCodes")
               }
               value={search}
-              onChange={setSearch}
+              onChange={(value) => setQueryValue("q", value)}
               aria-label={
                 view === "journals"
                   ? t("markdown.journal.searchJournals")
@@ -414,7 +599,7 @@ export function MarkdownJournalPage() {
                 variant="default"
                 size="sm"
                 className="list-page__create-btn rounded-md bg-white text-black hover:bg-gray-200"
-                onClick={() => navigate(createTarget)}
+                onClick={() => navigate(appendReturnTo(createTarget, currentReturnTo))}
               >
                 <svg
                   className="h-3 w-3"
@@ -439,21 +624,24 @@ export function MarkdownJournalPage() {
       {isEmpty ? (
         <EmptyState title={emptyTitle} hint={emptyHint} />
       ) : (
-        <AgGridContainer themeClass="markdown-journal-grid">
+        <AgGridContainer ref={gridContainerRef} themeClass="markdown-journal-grid">
           <AgGridReact<JournalRow | MarkdownCodeRow>
             {...agGridDefaultGridOptions}
+            ref={gridRef}
             rowData={activeRows}
             columnDefs={(view === "journals" ? journalColumnDefs : codeColumnDefs) as ColDef<JournalRow | MarkdownCodeRow>[]}
             defaultColDef={agGridDefaultColDef}
+            onGridReady={(event) => applyUrlGridSort(event.api, initialSortModel)}
+            onSortChanged={handleSortChanged}
             getRowId={(params) => params.data.id}
             onRowClicked={(event) => {
               if (hasMeaningfulTextSelection()) return;
               if (event.data) {
                 if (view === "journals") {
-                  navigate(`/markdown-journal/journals/${event.data.id}`);
+                  navigate(appendReturnTo(`/markdown-journal/journals/${event.data.id}`, currentReturnTo));
                 } else {
                   const row = event.data as MarkdownCodeRow;
-                  navigate(`/markdown-journal/journals/${row.journalId}`);
+                  navigate(appendReturnTo(`/markdown-journal/journals/${row.journalId}`, currentReturnTo));
                 }
               }
             }}

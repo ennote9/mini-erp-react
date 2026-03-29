@@ -20,6 +20,10 @@ export interface PurchaseOrder {
   supplierId: string;
   warehouseId: string;
   status: PlanningDocumentStatus;
+  /** Optional preliminary supplier-side delivery date (YYYY-MM-DD). */
+  preliminaryDeliveryDate?: string;
+  /** Optional actual arrival date and time (local datetime, YYYY-MM-DDTHH:mm). */
+  actualArrivalDateTime?: string;
   /** Net payment terms in whole days (optional). Empty on document = none / not specified. */
   paymentTermsDays?: number;
   /** Due date YYYY-MM-DD derived from date + paymentTermsDays when terms are set; omitted when terms unset. */

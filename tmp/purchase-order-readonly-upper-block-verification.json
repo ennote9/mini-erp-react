@@ -1,0 +1,39 @@
+{
+  "confirmAttempted": true,
+  "editState": {
+    "url": "http://127.0.0.1:1420/purchase-orders/1",
+    "sectionHeads": [
+      "Document",
+      "Supply",
+      "Commercial",
+      "Notes"
+    ],
+    "hasSupplier": true,
+    "hasWarehouse": true,
+    "hasPaymentTerms": true,
+    "hasCommentLabel": true,
+    "hasCommentTextarea": true,
+    "commentTag": "TEXTAREA"
+  },
+  "readonlyState": {
+    "url": "http://127.0.0.1:1420/purchase-orders/1",
+    "sectionHeads": [
+      "Document",
+      "Supply",
+      "Commercial",
+      "Notes"
+    ],
+    "hasSupplier": true,
+    "hasWarehouse": true,
+    "hasPaymentTerms": true,
+    "hasCommentLabel": true,
+    "hasCommentTextarea": false,
+    "commentTag": null
+  },
+  "lowerAreaState": {
+    "hasLinesTab": true,
+    "hasExecutionTab": true,
+    "hasLinesGrid": true,
+    "hasStickyTotals": true
+  }
+}

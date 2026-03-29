@@ -61,6 +61,8 @@ export type SaveDraftInput = {
   date: string;
   customerId: string;
   warehouseId: string;
+  preliminaryShipmentDate?: string;
+  actualShipmentDate?: string;
   /** Empty / whitespace normalized to undefined on save. */
   carrierId?: string;
   recipientName?: string;
@@ -80,6 +82,12 @@ export type SaveDraftInput = {
 export type SaveDraftResult =
   | { success: true; id: string }
   | { success: false; error: string };
+
+function normalizeOptionalSODate(value: string | undefined): string | undefined {
+  const trimmed = normalizeTrim(value);
+  if (trimmed === "") return undefined;
+  return normalizeDateForSO(trimmed);
+}
 
 export type AllocateStockResult =
   | { success: true; linesTouched: number }
@@ -145,6 +153,16 @@ function validateSalesOrderLines(
 function validateSaveDraft(data: SaveDraftInput): string | null {
   const dateErr = validateDateForSO(data.date);
   if (dateErr) return dateErr;
+  const preliminaryShipmentDate = normalizeTrim(data.preliminaryShipmentDate);
+  if (preliminaryShipmentDate !== "") {
+    const preliminaryDateErr = validateDateForSO(preliminaryShipmentDate);
+    if (preliminaryDateErr) return preliminaryDateErr.replace(/^Date\b/, "Preliminary shipment date");
+  }
+  const actualShipmentDate = normalizeTrim(data.actualShipmentDate);
+  if (actualShipmentDate !== "") {
+    const actualDateErr = validateDateForSO(actualShipmentDate);
+    if (actualDateErr) return actualDateErr.replace(/^Date\b/, "Actual shipment date");
+  }
   const customerIdTrimmed = normalizeTrim(data.customerId);
   if (customerIdTrimmed === "") return "Customer is required.";
   const warehouseIdTrimmed = normalizeTrim(data.warehouseId);
@@ -224,6 +242,8 @@ function soHeaderFlat(so: SalesOrder) {
     date: so.date,
     customerId: so.customerId,
     warehouseId: so.warehouseId,
+    preliminaryShipmentDate: so.preliminaryShipmentDate ?? "",
+    actualShipmentDate: so.actualShipmentDate ?? "",
     carrierId: so.carrierId ?? "",
     recipientName: so.recipientName ?? "",
     recipientPhone: so.recipientPhone ?? "",
@@ -245,6 +265,8 @@ export function saveDraft(
   const date = normalizeDateForSO(data.date);
   const customerId = normalizeTrim(data.customerId);
   const warehouseId = normalizeTrim(data.warehouseId);
+  const preliminaryShipmentDate = normalizeOptionalSODate(data.preliminaryShipmentDate);
+  const actualShipmentDate = normalizeOptionalSODate(data.actualShipmentDate);
   const comment = normalizeDocumentComment(data.comment);
   const paymentTermsDays = parsePaymentTermsDaysToStore(data.paymentTermsDays);
   const dueDate = computePlanningDueDate(date, paymentTermsDays);
@@ -273,6 +295,8 @@ export function saveDraft(
     customerId,
     warehouseId,
     status: "draft" as const,
+    ...(preliminaryShipmentDate ? { preliminaryShipmentDate } : {}),
+    ...(actualShipmentDate ? { actualShipmentDate } : {}),
     comment: comment ?? "",
     paymentTermsDays,
     dueDate,
@@ -301,6 +325,8 @@ export function saveDraft(
         "date",
         "customerId",
         "warehouseId",
+        "preliminaryShipmentDate",
+        "actualShipmentDate",
         "carrierId",
         "recipientName",
         "recipientPhone",

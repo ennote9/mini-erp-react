@@ -1,7 +1,7 @@
 import { useCallback, useMemo, useRef, useState } from "react";
 import { AgGridReact } from "ag-grid-react";
 import type { ColDef, ICellRendererParams, RowClickedEvent, SelectionChangedEvent } from "ag-grid-community";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { ChevronDown, File, FileSpreadsheet, FolderOpen, ScanBarcode, TicketPercent, X } from "lucide-react";
@@ -16,11 +16,14 @@ import {
   AgGridActiveBooleanCellRenderer,
   AgGridContainer,
   GridOutlinePillBadge,
+  applyAgGridColumnFilters,
   agGridDefaultColDef,
   agGridDefaultGridOptions,
   agGridRowNumberColDef,
   agGridSelectionColumnDef,
+  decorateAgGridColumnDefsWithFilters,
   hasMeaningfulTextSelection,
+  type AgGridColumnFilterConfig,
 } from "@/shared/ui/ag-grid";
 import { EmptyState } from "@/shared/ui/feedback/EmptyState";
 import { BackButton } from "@/shared/ui/list/BackButton";
@@ -38,6 +41,14 @@ import {
   type BarcodeRegistryRow,
   type BarcodeRegistrySource,
 } from "../barcodeRegistryReadModel";
+import { applyUrlGridSort, getCurrentGridSort, readUrlGridSort, serializeUrlGridSort } from "@/shared/navigation/agGridSort";
+import { appendReturnTo, buildNavigationStateKey, buildReturnToValue, replaceQueryParam } from "@/shared/navigation/returnTo";
+import { useSessionScrollRestore } from "@/shared/navigation/useSessionScrollRestore";
+import {
+  hasActiveAgGridColumnFilters,
+  readUrlAgGridColumnFilters,
+  replaceUrlAgGridColumnFilters,
+} from "@/shared/navigation/agGridColumnFilters";
 
 type EntryTypeFilter = "all" | BarcodeRegistryEntryType;
 type ActiveFilter = "all" | "active" | "inactive";
@@ -84,20 +95,38 @@ function filterRows(
 
 export function BarcodeRegistryPage() {
   const { t, locale } = useTranslation();
+  const location = useLocation();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const appRevision = useAppReadModelRevision();
   const listSearchInputRef = useRef<HTMLInputElement>(null);
   const gridRef = useRef<AgGridReact<BarcodeRegistryRow> | null>(null);
+  const gridContainerRef = useRef<HTMLDivElement | null>(null);
   useListPageSearchHotkey(listSearchInputRef);
 
-  const [searchQuery, setSearchQuery] = useState("");
-  const [entryTypeFilter, setEntryTypeFilter] = useState<EntryTypeFilter>("all");
-  const [activeFilter, setActiveFilter] = useState<ActiveFilter>("all");
-  const [itemFilterId, setItemFilterId] = useState("all");
-  const [sourceFilter, setSourceFilter] = useState("all");
+  const searchQuery = searchParams.get("q") ?? "";
+  const rawTypeFilter = searchParams.get("type");
+  const entryTypeFilter: EntryTypeFilter =
+    rawTypeFilter === "ITEM_BARCODE" || rawTypeFilter === "MARKDOWN_CODE" ? rawTypeFilter : "all";
+  const rawActiveFilter = searchParams.get("active");
+  const activeFilter: ActiveFilter =
+    rawActiveFilter === "active" || rawActiveFilter === "inactive" ? rawActiveFilter : "all";
+  const itemFilterId = searchParams.get("itemId") ?? "all";
+  const sourceFilter = searchParams.get("source") ?? "all";
   const [selectedCount, setSelectedCount] = useState(0);
   const [exportOpen, setExportOpen] = useState(false);
   const [exportSuccess, setExportSuccess] = useState<{ path: string; filename: string } | null>(null);
+  const listStateKey = useMemo(
+    () => buildNavigationStateKey(location.pathname, searchParams),
+    [location.pathname, searchParams],
+  );
+  useSessionScrollRestore(listStateKey, gridContainerRef);
+  const currentReturnTo = useMemo(
+    () => buildReturnToValue(location.pathname, location.search),
+    [location.pathname, location.search],
+  );
+  const initialSortModel = useMemo(() => readUrlGridSort(searchParams), [searchParams]);
+  const columnFilterModel = useMemo(() => readUrlAgGridColumnFilters(searchParams), [searchParams]);
 
   const entryTypeLabel = useCallback(
     (value: BarcodeRegistryEntryType) =>
@@ -155,12 +184,69 @@ export function BarcodeRegistryPage() {
     [rows, searchQuery, entryTypeFilter, activeFilter, itemFilterId, sourceFilter],
   );
 
+  const barcodeColumnFilterConfigs = useMemo<Record<string, AgGridColumnFilterConfig<BarcodeRegistryRow>>>(
+    () => ({
+      code: { kind: "text" },
+      entryType: {
+        kind: "enum",
+        options: [
+          { value: "ITEM_BARCODE", label: entryTypeLabel("ITEM_BARCODE") },
+          { value: "MARKDOWN_CODE", label: entryTypeLabel("MARKDOWN_CODE") },
+        ],
+      },
+      itemCode: { kind: "text" },
+      itemName: { kind: "text" },
+      isActive: { kind: "boolean" },
+      source: {
+        kind: "enum",
+        options: sourceOptions,
+      },
+      createdAt: { kind: "datetime" },
+      symbology: {
+        kind: "enum",
+        options: [...new Set(rows.map((row) => row.symbology).filter(Boolean))].map((value) => ({
+          value: String(value),
+          label: symbologyLabel(value as ItemBarcodeSymbology),
+        })),
+      },
+      markdownJournalNumber: { kind: "text" },
+      markdownStatus: {
+        kind: "enum",
+        options: [...new Set(rows.map((row) => row.markdownStatus).filter(Boolean))].map((value) => ({
+          value: String(value),
+          label: markdownStatusLabel(String(value)),
+        })),
+      },
+    }),
+    [entryTypeLabel, markdownStatusLabel, rows, sourceOptions, symbologyLabel],
+  );
+
+  const displayRows = useMemo(
+    () => applyAgGridColumnFilters(filteredRows, columnFilterModel, barcodeColumnFilterConfigs),
+    [filteredRows, columnFilterModel, barcodeColumnFilterConfigs],
+  );
+
+  const setQueryValue = useCallback(
+    (key: string, value: string, defaultValue: string) => {
+      replaceQueryParam(searchParams, setSearchParams, key, value, defaultValue);
+    },
+    [searchParams, setSearchParams],
+  );
+
+  const handleSortChanged = useCallback(() => {
+    const api = gridRef.current?.api;
+    if (!api) return;
+    const serialized = serializeUrlGridSort(getCurrentGridSort(api, ["selection", "rowNumber"]));
+    replaceQueryParam(searchParams, setSearchParams, "sort", serialized);
+  }, [searchParams, setSearchParams]);
+
   const hasFilter =
     searchQuery.trim() !== "" ||
     entryTypeFilter !== "all" ||
     activeFilter !== "all" ||
     itemFilterId !== "all" ||
-    sourceFilter !== "all";
+    sourceFilter !== "all" ||
+    hasActiveAgGridColumnFilters(columnFilterModel);
 
   const buildExportRows = useCallback(
     (inputRows: BarcodeRegistryRow[]): BarcodeRegistryExportRow[] =>
@@ -259,12 +345,12 @@ export function BarcodeRegistryPage() {
     (event: RowClickedEvent<BarcodeRegistryRow>) => {
       if (hasMeaningfulTextSelection()) return;
       if (!event.data) return;
-      navigate(event.data.nativePath);
+      navigate(appendReturnTo(event.data.nativePath, currentReturnTo));
     },
-    [navigate],
+    [navigate, currentReturnTo],
   );
 
-  const columnDefs = useMemo<ColDef<BarcodeRegistryRow>[]>(
+  const baseColumnDefs = useMemo<ColDef<BarcodeRegistryRow>[]>(
     () => [
       agGridRowNumberColDef,
       {
@@ -338,6 +424,43 @@ export function BarcodeRegistryPage() {
     [markdownStatusLabel, sourceLabel, symbologyLabel, t],
   );
 
+  const handleApplyColumnFilter = useCallback(
+    (colId: string, clause: { operator: any; value?: string; valueTo?: string; values?: string[] }) => {
+      replaceUrlAgGridColumnFilters(searchParams, setSearchParams, {
+        ...columnFilterModel,
+        [colId]: clause,
+      });
+    },
+    [searchParams, setSearchParams, columnFilterModel],
+  );
+
+  const handleResetColumnFilter = useCallback(
+    (colId: string) => {
+      const nextModel = { ...columnFilterModel };
+      delete nextModel[colId];
+      replaceUrlAgGridColumnFilters(searchParams, setSearchParams, nextModel);
+    },
+    [searchParams, setSearchParams, columnFilterModel],
+  );
+
+  const columnDefs = useMemo(
+    () =>
+      decorateAgGridColumnDefsWithFilters(
+        baseColumnDefs,
+        barcodeColumnFilterConfigs,
+        columnFilterModel,
+        handleApplyColumnFilter,
+        handleResetColumnFilter,
+      ),
+    [
+      baseColumnDefs,
+      barcodeColumnFilterConfigs,
+      columnFilterModel,
+      handleApplyColumnFilter,
+      handleResetColumnFilter,
+    ],
+  );
+
   return (
     <ListPageLayout
       header={null}
@@ -349,9 +472,9 @@ export function BarcodeRegistryPage() {
               inputRef={listSearchInputRef}
               placeholder={t("ops.list.barcodeRegistry.searchPlaceholder")}
               value={searchQuery}
-              onChange={setSearchQuery}
+              onChange={(value) => setQueryValue("q", value, "")}
               aria-label={t("ops.list.barcodeRegistry.searchAria")}
-              resultCount={filteredRows.length}
+              resultCount={displayRows.length}
             />
             <div className="ml-auto flex flex-wrap items-center gap-2">
               {exportSuccess && (
@@ -454,7 +577,7 @@ export function BarcodeRegistryPage() {
               className={selectClassName}
               aria-label={t("ops.list.barcodeRegistry.entryTypeFilterAria")}
               value={entryTypeFilter}
-              onChange={(event) => setEntryTypeFilter(event.target.value as EntryTypeFilter)}
+              onChange={(event) => setQueryValue("type", event.target.value, "all")}
             >
               <option value="all">{t("ops.list.barcodeRegistry.filterAllEntryTypes")}</option>
               <option value="ITEM_BARCODE">{t("ops.list.barcodeRegistry.entryTypeItemBarcode")}</option>
@@ -464,7 +587,7 @@ export function BarcodeRegistryPage() {
               className={selectClassName}
               aria-label={t("ops.list.barcodeRegistry.activeFilterAria")}
               value={activeFilter}
-              onChange={(event) => setActiveFilter(event.target.value as ActiveFilter)}
+              onChange={(event) => setQueryValue("active", event.target.value, "all")}
             >
               <option value="all">{t("ops.list.barcodeRegistry.filterAllActiveStates")}</option>
               <option value="active">{t("ops.list.barcodeRegistry.filterActiveOnly")}</option>
@@ -474,7 +597,7 @@ export function BarcodeRegistryPage() {
               className={selectClassName}
               aria-label={t("ops.list.barcodeRegistry.itemFilterAria")}
               value={itemFilterId}
-              onChange={(event) => setItemFilterId(event.target.value)}
+              onChange={(event) => setQueryValue("itemId", event.target.value, "all")}
             >
               <option value="all">{t("ops.list.barcodeRegistry.filterAllItems")}</option>
               {itemOptions.map((option) => (
@@ -487,7 +610,7 @@ export function BarcodeRegistryPage() {
               className={selectClassName}
               aria-label={t("ops.list.barcodeRegistry.sourceFilterAria")}
               value={sourceFilter}
-              onChange={(event) => setSourceFilter(event.target.value)}
+              onChange={(event) => setQueryValue("source", event.target.value, "all")}
             >
               <option value="all">{t("ops.list.barcodeRegistry.filterAllSources")}</option>
               {sourceOptions.map((option) => (
@@ -500,7 +623,7 @@ export function BarcodeRegistryPage() {
         </div>
       }
     >
-      {filteredRows.length === 0 ? (
+      {displayRows.length === 0 ? (
         <EmptyState
           title={
             hasFilter
@@ -514,14 +637,16 @@ export function BarcodeRegistryPage() {
           }
         />
       ) : (
-        <AgGridContainer themeClass="barcode-registry-grid">
+        <AgGridContainer ref={gridContainerRef} themeClass="barcode-registry-grid">
           <AgGridReact<BarcodeRegistryRow>
             {...agGridDefaultGridOptions}
             context={{ entryTypeLabel }}
             ref={gridRef}
-            rowData={filteredRows}
+            rowData={displayRows}
             columnDefs={columnDefs}
             defaultColDef={agGridDefaultColDef}
+            onGridReady={(event) => applyUrlGridSort(event.api, initialSortModel)}
+            onSortChanged={handleSortChanged}
             rowSelection={{ mode: "multiRow", checkboxes: true, headerCheckbox: true, enableClickSelection: true }}
             selectionColumnDef={agGridSelectionColumnDef}
             getRowId={(params) => params.data.id}

@@ -18,6 +18,7 @@ import {
   StockBalanceDetailContent,
   type StockBalanceDrillDownSnapshot,
 } from "../components/StockBalanceDetailContent";
+import { readReturnToParam } from "@/shared/navigation/returnTo";
 
 function coverageBadgeVariant(
   s: StockBalanceCoverageStatus,
@@ -31,8 +32,11 @@ export function StockBalanceDetailPage() {
   const { t } = useTranslation();
   const { id } = useParams<{ id: string }>();
   const location = useLocation();
+  const searchParams = useMemo(() => new URLSearchParams(location.search), [location.search]);
+  const returnTo = readReturnToParam(searchParams);
 
-  const backHref = location.search === "" ? "/stock-balances" : `/stock-balances${location.search}`;
+  const backHref =
+    returnTo ?? (location.search === "" ? "/stock-balances" : `/stock-balances${location.search}`);
 
   const row = useMemo((): StockBalanceDrillDownSnapshot | null => {
     if (!id) return null;
@@ -66,7 +70,12 @@ export function StockBalanceDetailPage() {
     return (
       <div className="doc-page">
         <div className="doc-page__breadcrumb">
-          <BackButton to={backHref} aria-label={t("ops.stockBalances.detail.backToListAria")} />
+          <BackButton
+            to={returnTo ?? undefined}
+            fallbackTo="/stock-balances"
+            preferHistory={!returnTo}
+            aria-label={t("ops.stockBalances.detail.backToListAria")}
+          />
           <Breadcrumb items={[{ label: t("routes.stockBalances"), to: backHref }]} />
         </div>
         <div className="doc-page doc-page--not-found">
@@ -86,7 +95,12 @@ export function StockBalanceDetailPage() {
   return (
     <div className="doc-page">
       <div className="doc-page__breadcrumb">
-        <BackButton to={backHref} aria-label={t("ops.stockBalances.detail.backToListAria")} />
+        <BackButton
+          to={returnTo ?? undefined}
+          fallbackTo="/stock-balances"
+          preferHistory={!returnTo}
+          aria-label={t("ops.stockBalances.detail.backToListAria")}
+        />
         <Breadcrumb items={breadcrumbItems} />
       </div>
 

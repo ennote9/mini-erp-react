@@ -1,5 +1,5 @@
 import React, { useMemo, useState, useRef, useCallback, useEffect } from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { AgGridReact } from "ag-grid-react";
 import type { ColDef, SelectionChangedEvent } from "ag-grid-community";
 import { salesOrderRepository } from "../repository";
@@ -15,11 +15,14 @@ import { EmptyState } from "../../../shared/ui/feedback/EmptyState";
 import {
   AgGridContainer,
   AgGridPlanningStatusCellRenderer,
+  applyAgGridColumnFilters,
   agGridDefaultColDef,
   agGridDefaultGridOptions,
   getAgGridRowNumberColDef,
   agGridSelectionColumnDef,
+  decorateAgGridColumnDefsWithFilters,
   hasMeaningfulTextSelection,
+  type AgGridColumnFilterConfig,
 } from "../../../shared/ui/ag-grid";
 import { BackButton } from "../../../shared/ui/list/BackButton";
 import { ListPageSearch } from "../../../shared/ui/list/ListPageSearch";
@@ -40,6 +43,15 @@ import { buildReadableUniqueFilename, ensureUniqueExportPath } from "@/shared/ex
 import { salesOrdersListExcelLabels } from "@/shared/i18n/excelListExportLabels";
 import { readOptionalPlanningStatusFromQuery } from "@/shared/navigation/listQueryStatus";
 import { toGeneratedCodeSearchTokens } from "@/shared/generatedVisibleCodes";
+import { applyUrlGridSort, getCurrentGridSort, readUrlGridSort, serializeUrlGridSort } from "@/shared/navigation/agGridSort";
+import {
+  hasActiveAgGridColumnFilters,
+  readUrlAgGridColumnFilters,
+  replaceUrlAgGridColumnFilters,
+  type AgGridColumnFilterClause,
+} from "@/shared/navigation/agGridColumnFilters";
+import { appendReturnTo, buildNavigationStateKey, buildReturnToValue, replaceQueryParam } from "@/shared/navigation/returnTo";
+import { useSessionScrollRestore } from "@/shared/navigation/useSessionScrollRestore";
 
 type StatusFilter = "all" | PlanningDocumentStatus;
 
@@ -123,6 +135,7 @@ function buildExportRowsFromSO(rows: RowData[]): SalesOrdersExportRow[] {
 }
 
 export function SalesOrdersListPage() {
+  const location = useLocation();
   const navigate = useNavigate();
   const { t, locale } = useTranslation();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -146,7 +159,7 @@ export function SalesOrdersListPage() {
     return ids;
   }, [itemFilterId]);
 
-  const [searchQuery, setSearchQuery] = useState("");
+  const searchQuery = searchParams.get("q") ?? "";
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
 
   const statusFromQuery = useMemo(
@@ -161,12 +174,38 @@ export function SalesOrdersListPage() {
   const [exportOpen, setExportOpen] = useState(false);
   const [selectedCount, setSelectedCount] = useState(0);
   const gridRef = useRef<AgGridReact<RowData> | null>(null);
+  const gridContainerRef = useRef<HTMLDivElement | null>(null);
   const listSearchInputRef = useRef<HTMLInputElement>(null);
   useListPageSearchHotkey(listSearchInputRef);
+  const listStateKey = useMemo(
+    () => buildNavigationStateKey(location.pathname, searchParams),
+    [location.pathname, searchParams],
+  );
+  useSessionScrollRestore(listStateKey, gridContainerRef);
+  const currentReturnTo = useMemo(
+    () => buildReturnToValue(location.pathname, location.search),
+    [location.pathname, location.search],
+  );
+  const initialSortModel = useMemo(() => readUrlGridSort(searchParams), [searchParams]);
+  const columnFilterModel = useMemo(() => readUrlAgGridColumnFilters(searchParams), [searchParams]);
 
   const onSelectionChanged = useCallback((e: SelectionChangedEvent<RowData>) => {
     setSelectedCount(e.api.getSelectedRows().length);
   }, []);
+
+  const setQueryValue = useCallback(
+    (key: string, value: string, defaultValue = "") => {
+      replaceQueryParam(searchParams, setSearchParams, key, value, defaultValue);
+    },
+    [searchParams, setSearchParams],
+  );
+
+  const handleSortChanged = useCallback(() => {
+    const api = gridRef.current?.api;
+    if (!api) return;
+    const serialized = serializeUrlGridSort(getCurrentGridSort(api, ["selection", "lineNo"]));
+    replaceQueryParam(searchParams, setSearchParams, "sort", serialized);
+  }, [searchParams, setSearchParams]);
 
   const rowsWithNames = useMemo(() => {
     const list = salesOrderRepository.list();
@@ -233,14 +272,14 @@ export function SalesOrdersListPage() {
     salesOrderIdsContainingItem,
   ]);
 
-  const isEmpty = filteredRows.length === 0;
   const hasFilter =
     statusFilter !== "all" ||
     searchQuery.trim() !== "" ||
     customerFilterId != null ||
     warehouseFilterId != null ||
     carrierFilterId != null ||
-    itemFilterId != null;
+    itemFilterId != null ||
+    hasActiveAgGridColumnFilters(columnFilterModel);
 
   const customerFilterLabel = useMemo((): string => {
     if (customerFilterId == null) return "";
@@ -301,16 +340,6 @@ export function SalesOrdersListPage() {
     return itemFilterId;
   }, [itemFilterId, emDash]);
 
-  const getExportRowsCurrentView = useCallback((): SalesOrdersExportRow[] => {
-    const api = gridRef.current?.api;
-    if (!api) return buildExportRowsFromSO(filteredRows);
-    const rows: RowData[] = [];
-    api.forEachNodeAfterFilterAndSort((rowNode) => {
-      if (rowNode.data) rows.push(rowNode.data);
-    });
-    return buildExportRowsFromSO(rows);
-  }, [filteredRows]);
-
   const getExportRowsSelected = useCallback((): SalesOrdersExportRow[] => {
     const api = gridRef.current?.api;
     const rows: RowData[] = api ? (api.getSelectedRows() as RowData[]) : [];
@@ -357,19 +386,6 @@ export function SalesOrdersListPage() {
   );
 
   const listExcelLabels = useMemo(() => salesOrdersListExcelLabels(t), [t, locale]);
-
-  const handleExportCurrentView = useCallback(() => {
-    const rows = getExportRowsCurrentView();
-    runExportWithSaveAs("sales-orders.xlsx", () => buildSalesOrdersListXlsxBuffer(rows, listExcelLabels));
-  }, [getExportRowsCurrentView, listExcelLabels, runExportWithSaveAs]);
-
-  const handleExportSelected = useCallback(() => {
-    const rows = getExportRowsSelected();
-    if (rows.length === 0) return;
-    runExportWithSaveAs("sales-orders-selected.xlsx", () => buildSalesOrdersListXlsxBuffer(rows, listExcelLabels));
-  }, [getExportRowsSelected, listExcelLabels, runExportWithSaveAs]);
-
-  const exportSelectedDisabled = selectedCount === 0;
 
   const emptyTitle = hasFilter
     ? t("ops.list.salesOrders.emptyFiltered")
@@ -442,7 +458,87 @@ export function SalesOrdersListPage() {
     [t, locale],
   );
 
-  const columnDefs = useMemo<ColDef<RowData>[]>(
+  const salesOrderColumnFilterConfigs = useMemo<Record<string, AgGridColumnFilterConfig<RowData>>>(
+    () => ({
+      number: { kind: "text" },
+      date: { kind: "date" },
+      customerName: {
+        kind: "enum",
+        options: Array.from(new Set(rowsWithNames.map((row) => row.customerName)))
+          .filter(Boolean)
+          .sort((a, b) => a.localeCompare(b))
+          .map((value) => ({ value, label: value })),
+      },
+      warehouseName: {
+        kind: "enum",
+        options: Array.from(new Set(rowsWithNames.map((row) => row.warehouseName)))
+          .filter(Boolean)
+          .sort((a, b) => a.localeCompare(b))
+          .map((value) => ({ value, label: value })),
+      },
+      carrierLabel: { kind: "text" },
+      recipientLabel: { kind: "text" },
+      recipientPhoneLabel: { kind: "text" },
+      status: {
+        kind: "enum",
+        options: statusOptions
+          .filter((option) => option.value !== "all")
+          .map((option) => ({ value: option.value, label: option.label })),
+      },
+    }),
+    [rowsWithNames, statusOptions],
+  );
+
+  const displayRows = useMemo(
+    () => applyAgGridColumnFilters(filteredRows, columnFilterModel, salesOrderColumnFilterConfigs),
+    [filteredRows, columnFilterModel, salesOrderColumnFilterConfigs],
+  );
+
+  const isEmpty = displayRows.length === 0;
+
+  const getExportRowsCurrentView = useCallback((): SalesOrdersExportRow[] => {
+    const api = gridRef.current?.api;
+    if (!api) return buildExportRowsFromSO(displayRows);
+    const rows: RowData[] = [];
+    api.forEachNodeAfterFilterAndSort((rowNode) => {
+      if (rowNode.data) rows.push(rowNode.data);
+    });
+    return buildExportRowsFromSO(rows);
+  }, [displayRows]);
+
+  const handleExportCurrentView = useCallback(() => {
+    const rows = getExportRowsCurrentView();
+    runExportWithSaveAs("sales-orders.xlsx", () => buildSalesOrdersListXlsxBuffer(rows, listExcelLabels));
+  }, [getExportRowsCurrentView, listExcelLabels, runExportWithSaveAs]);
+
+  const handleExportSelected = useCallback(() => {
+    const rows = getExportRowsSelected();
+    if (rows.length === 0) return;
+    runExportWithSaveAs("sales-orders-selected.xlsx", () => buildSalesOrdersListXlsxBuffer(rows, listExcelLabels));
+  }, [getExportRowsSelected, listExcelLabels, runExportWithSaveAs]);
+
+  const exportSelectedDisabled = selectedCount === 0;
+
+  const handleApplyColumnFilter = useCallback(
+    (colId: string, clause: AgGridColumnFilterClause) => {
+      replaceUrlAgGridColumnFilters(searchParams, setSearchParams, {
+        ...columnFilterModel,
+        [colId]: clause,
+      });
+    },
+    [columnFilterModel, searchParams, setSearchParams],
+  );
+
+  const handleResetColumnFilter = useCallback(
+    (colId: string) => {
+      const nextModel = { ...columnFilterModel };
+      delete nextModel[colId];
+      replaceUrlAgGridColumnFilters(searchParams, setSearchParams, nextModel);
+    },
+    [columnFilterModel, searchParams, setSearchParams],
+  );
+
+  const baseColumnDefs = useMemo<ColDef<RowData>[]>(
     () => [
       getAgGridRowNumberColDef(t),
       {
@@ -497,6 +593,24 @@ export function SalesOrdersListPage() {
     [t, locale],
   );
 
+  const columnDefs = useMemo(
+    () =>
+      decorateAgGridColumnDefsWithFilters(
+        baseColumnDefs,
+        salesOrderColumnFilterConfigs,
+        columnFilterModel,
+        handleApplyColumnFilter,
+        handleResetColumnFilter,
+      ),
+    [
+      baseColumnDefs,
+      salesOrderColumnFilterConfigs,
+      columnFilterModel,
+      handleApplyColumnFilter,
+      handleResetColumnFilter,
+    ],
+  );
+
   return (
     <ListPageLayout
       header={null}
@@ -511,7 +625,7 @@ export function SalesOrdersListPage() {
                   type="button"
                   variant={statusFilter === value ? "default" : "outline"}
                   size="sm"
-                  onClick={() => setStatusFilter(value)}
+                  onClick={() => setQueryValue("status", value, "all")}
                 >
                   {label}
                 </Button>
@@ -522,9 +636,9 @@ export function SalesOrdersListPage() {
             inputRef={listSearchInputRef}
             placeholder={t("ops.list.salesOrders.searchPlaceholder")}
             value={searchQuery}
-            onChange={setSearchQuery}
+            onChange={(value) => setQueryValue("q", value)}
             aria-label={t("ops.list.salesOrders.searchAria")}
-            resultCount={filteredRows.length}
+            resultCount={displayRows.length}
           />
           <div className="flex flex-row flex-wrap items-center gap-2 shrink-0 ml-auto justify-end">
             {warehouseFilterId != null && (
@@ -720,7 +834,7 @@ export function SalesOrdersListPage() {
             variant="default"
             size="sm"
             className="list-page__create-btn rounded-md bg-white text-black hover:bg-gray-200"
-            onClick={() => navigate("/sales-orders/new")}
+            onClick={() => navigate(appendReturnTo("/sales-orders/new", currentReturnTo))}
           >
             <svg className="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M12 5v14" /><path d="M5 12h14" /></svg> {t("doc.list.create")}
           </Button>
@@ -730,19 +844,21 @@ export function SalesOrdersListPage() {
       {isEmpty ? (
         <EmptyState title={emptyTitle} hint={emptyHint} />
       ) : (
-        <AgGridContainer themeClass="sales-orders-grid">
-          <AgGridReact<RowData>
-            {...agGridDefaultGridOptions}
-            ref={gridRef}
-            rowData={filteredRows}
-            columnDefs={columnDefs}
+        <AgGridContainer ref={gridContainerRef} themeClass="sales-orders-grid">
+            <AgGridReact<RowData>
+              {...agGridDefaultGridOptions}
+              ref={gridRef}
+              rowData={displayRows}
+              columnDefs={columnDefs}
             defaultColDef={agGridDefaultColDef}
+            onGridReady={(event) => applyUrlGridSort(event.api, initialSortModel)}
+            onSortChanged={handleSortChanged}
             rowSelection={{ mode: "multiRow", checkboxes: true, headerCheckbox: true, enableClickSelection: true }}
             selectionColumnDef={agGridSelectionColumnDef}
             getRowId={(params) => params.data.id}
             onRowClicked={(e) => {
               if (hasMeaningfulTextSelection()) return;
-              if (e.data) navigate(`/sales-orders/${e.data.id}`);
+              if (e.data) navigate(appendReturnTo(`/sales-orders/${e.data.id}`, currentReturnTo));
             }}
             onSelectionChanged={onSelectionChanged}
           />

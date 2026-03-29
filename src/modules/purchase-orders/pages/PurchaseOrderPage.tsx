@@ -1,4 +1,4 @@
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams, useNavigate, useSearchParams } from "react-router-dom";
 import { useMemo, useState, useEffect, useRef, useCallback } from "react";
 import { AgGridReact } from "ag-grid-react";
 import type { ColDef, SelectionChangedEvent } from "ag-grid-community";
@@ -10,6 +10,8 @@ import { itemRepository } from "../../items/repository";
 import { receiptRepository } from "../../receipts/repository";
 import { listSellableItemsForDocumentLines } from "../../items/orderLineItemsPolicy";
 import { useAppReadModelRevision } from "@/shared/inventoryMasterPageBlocks/useAppReadModelRevision";
+import { appendReturnTo, readReturnToParam } from "@/shared/navigation/returnTo";
+import { useUrlTabState } from "@/shared/navigation/useUrlTabState";
 import { brandRepository } from "../../brands/repository";
 import { categoryRepository } from "../../categories/repository";
 import type { PurchaseOrderLine } from "../model";
@@ -20,6 +22,7 @@ import { Button } from "@/components/ui/button";
 import { DatePickerField } from "@/components/ui/date-picker-field";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -55,10 +58,13 @@ import {
   type ResolvedImportLine,
 } from "../../../shared/ui/object/DocumentLineImportModal";
 import {
+  Activity,
   ClipboardPaste,
+  ClipboardList,
   Check,
   ChevronDown,
   CircleCheck,
+  Coins,
   File,
   FileSpreadsheet,
   FileX,
@@ -124,6 +130,8 @@ type FormState = {
   date: string;
   supplierId: string;
   warehouseId: string;
+  preliminaryDeliveryDate: string;
+  actualArrivalDateTime: string;
   paymentTermsDays: string;
   comment: string;
   lines: LineFormRow[];
@@ -134,6 +142,8 @@ function defaultForm(): FormState {
     date: todayYYYYMMDD(),
     supplierId: "",
     warehouseId: "",
+    preliminaryDeliveryDate: "",
+    actualArrivalDateTime: "",
     paymentTermsDays: "",
     comment: "",
     lines: [],
@@ -186,6 +196,11 @@ function buildExportRowsFromLinesWithItem(lines: LineWithItem[]): PoExportLineRo
       lineAmount,
     };
   });
+}
+
+function displayLocalDateTime(value?: string | null): string {
+  if (typeof value !== "string" || value.trim() === "") return "—";
+  return value.replace("T", " ");
 }
 
 function poLinesDisplayColumnDefs(
@@ -522,9 +537,36 @@ function poLinesReadOnlyColumnDefs(
   ];
 }
 
+function ExecutionMetric({
+  label,
+  value,
+  danger = false,
+}: {
+  label: string;
+  value: string | number;
+  danger?: boolean;
+}) {
+  return (
+    <div className="rounded-md border border-border/60 bg-background px-2.5 py-2">
+      <p className="text-[0.65rem] font-medium uppercase tracking-wide text-muted-foreground">
+        {label}
+      </p>
+      <p
+        className={cn(
+          "mt-1 text-sm font-semibold tabular-nums",
+          danger ? "text-destructive" : "text-foreground",
+        )}
+      >
+        {value}
+      </p>
+    </div>
+  );
+}
+
 export function PurchaseOrderPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { t, locale } = useTranslation();
   const { settings } = useSettings();
   const workspaceMode = settings.general.workspaceMode;
@@ -573,7 +615,10 @@ export function PurchaseOrderPage() {
   const [lineImportInitialTab, setLineImportInitialTab] = useState<LineImportTab>("paste");
   const [exportOpen, setExportOpen] = useState(false);
   const [exportSuccess, setExportSuccess] = useState<{ path: string; filename: string } | null>(null);
-  const [poWorkingTab, setPoWorkingTab] = useState<"lines" | "payments" | "attachments" | "events">("lines");
+  const [poWorkingTab, setPoWorkingTab] = useUrlTabState({
+    allowedValues: ["lines", "execution", "payments", "attachments", "events"] as const,
+    defaultValue: "lines",
+  });
   const linesGridRef = useRef<AgGridReact<LineFormRow> | null>(null);
   const lineEntryItemPickerRef = useRef<PurchaseOrderItemAutocompleteRef | null>(null);
   const lineEntryQtyInputRef = useRef<HTMLInputElement | null>(null);
@@ -595,7 +640,14 @@ export function PurchaseOrderPage() {
 
   useEffect(() => {
     setActionIssues([]);
-  }, [form.supplierId, form.warehouseId, form.paymentTermsDays, form.lines]);
+  }, [
+    form.supplierId,
+    form.warehouseId,
+    form.preliminaryDeliveryDate,
+    form.actualArrivalDateTime,
+    form.paymentTermsDays,
+    form.lines,
+  ]);
 
   useEffect(() => {
     if (isNew) {
@@ -630,6 +682,8 @@ export function PurchaseOrderPage() {
         date: normalizeDateForPO(doc.date),
         supplierId: doc.supplierId,
         warehouseId: doc.warehouseId,
+        preliminaryDeliveryDate: doc.preliminaryDeliveryDate ?? "",
+        actualArrivalDateTime: doc.actualArrivalDateTime ?? "",
         paymentTermsDays:
           doc.paymentTermsDays !== undefined && Number.isInteger(doc.paymentTermsDays)
             ? String(doc.paymentTermsDays)
@@ -652,6 +706,8 @@ export function PurchaseOrderPage() {
     doc?.date,
     doc?.supplierId,
     doc?.warehouseId,
+    doc?.preliminaryDeliveryDate,
+    doc?.actualArrivalDateTime,
     doc?.paymentTermsDays,
     doc?.comment,
     refresh,
@@ -755,6 +811,9 @@ export function PurchaseOrderPage() {
     setCancelReasonDialogOpen(true);
   };
 
+  const returnTo = readReturnToParam(searchParams);
+  const backHref = returnTo ?? "/purchase-orders";
+
   const handleCreateReceipt = () => {
     if (!id || isNew) return;
     setActionIssues([]);
@@ -795,6 +854,8 @@ export function PurchaseOrderPage() {
         date: normalizeDateForPO(form.date),
         supplierId: form.supplierId,
         warehouseId: form.warehouseId,
+        preliminaryDeliveryDate: form.preliminaryDeliveryDate || undefined,
+        actualArrivalDateTime: form.actualArrivalDateTime || undefined,
         paymentTermsDays: form.paymentTermsDays,
         comment: form.comment || undefined,
         lines: linesToSave,
@@ -803,7 +864,7 @@ export function PurchaseOrderPage() {
     );
     if (result.success) {
       if (isNew) {
-        navigate(`/purchase-orders/${result.id}`, { replace: true });
+        navigate(appendReturnTo(`/purchase-orders/${result.id}`, returnTo), { replace: true });
       } else {
         setRefresh((r) => r + 1);
       }
@@ -813,7 +874,7 @@ export function PurchaseOrderPage() {
   };
 
   const handleCancel = () => {
-    navigate("/purchase-orders");
+    navigate(backHref);
   };
 
   const removeLineByLineId = useCallback((lineId: number) => {
@@ -1279,7 +1340,14 @@ export function PurchaseOrderPage() {
   return (
     <DocumentPageLayout
       breadcrumbItems={breadcrumbItems}
-      breadcrumbPrefix={<BackButton to="/purchase-orders" aria-label={t("doc.po.backToListAria")} />}
+      breadcrumbPrefix={
+        <BackButton
+          to={returnTo ?? undefined}
+          fallbackTo="/purchase-orders"
+          preferHistory={!returnTo}
+          aria-label={t("doc.po.backToListAria")}
+        />
+      }
       header={
         <div className="doc-header">
           <div className="doc-header__title-row">
@@ -1477,170 +1545,324 @@ export function PurchaseOrderPage() {
     >
       <>
       {isEditable ? (
-        <Card className="max-w-2xl border-0 shadow-none">
-            <CardHeader className="p-2 pb-0.5">
-              <CardTitle className="text-[0.9rem] font-semibold">{t("doc.page.details")}</CardTitle>
-              <CardDescription>{t("doc.po.detailsDescription")}</CardDescription>
-            </CardHeader>
-            <CardContent className="p-2 pt-1">
-              <div className="grid w-fit grid-cols-[280px_280px] gap-x-2 gap-y-1">
-                <div className="flex min-w-0 w-full flex-col gap-0.5">
-                  <Label htmlFor="po-number" className="text-sm">{t("doc.columns.number")}</Label>
-                  <div id="po-number" className="flex h-8 items-center text-sm text-muted-foreground">
-                    {displayNumber}
+        <Card className="w-full border-0 bg-transparent shadow-none">
+          <CardHeader className="px-3 py-2 pb-1.5">
+            <CardTitle className="text-[0.9rem] font-semibold">{t("doc.page.details")}</CardTitle>
+          </CardHeader>
+          <CardContent className="px-3 pb-3 pt-0">
+            <div className="flex w-full min-w-0 flex-col gap-y-2 overflow-x-auto lg:flex-row lg:flex-nowrap lg:justify-start lg:gap-x-[1.5cm] lg:gap-y-0 lg:items-start">
+              <div className="flex w-fit min-w-0 max-w-full shrink-0 flex-col gap-2.5 p-3">
+                <section className="min-w-0" aria-labelledby="po-details-doc-heading">
+                  <h3
+                    id="po-details-doc-heading"
+                    className="mb-0.5 flex items-center gap-1 text-[0.7rem] font-semibold uppercase tracking-wide text-muted-foreground"
+                  >
+                    <File className="h-3.5 w-3.5" aria-hidden />
+                    {t("doc.po.sectionDocument")}
+                  </h3>
+                  <div className="grid grid-cols-1 gap-x-2.5 gap-y-0 sm:grid-cols-2 sm:justify-items-start">
+                    <div className="flex w-full max-w-[140px] min-w-0 flex-col gap-0.5">
+                      <Label htmlFor="po-number" className="text-xs leading-none">
+                        {t("doc.columns.number")}
+                      </Label>
+                      <div
+                        id="po-number"
+                        className="flex h-6 items-center text-sm leading-tight text-muted-foreground"
+                      >
+                        {displayNumber}
+                      </div>
+                    </div>
+                    <div className="flex w-full max-w-[140px] min-w-0 flex-col gap-0.5">
+                      <Label htmlFor="po-date" className="text-xs leading-none">
+                        {t("doc.columns.date")} <span className="text-destructive">*</span>
+                      </Label>
+                      <DatePickerField
+                        id="po-date"
+                        value={form.date}
+                        onChange={(v) => setForm((f) => ({ ...f, date: v }))}
+                        className="h-8 w-full max-w-[140px] min-w-0 [&_input]:text-sm"
+                      />
+                    </div>
                   </div>
-                </div>
-                <div className="flex min-w-0 w-full flex-col gap-0.5">
-                  <Label htmlFor="po-date" className="text-sm">
-                    {t("doc.columns.date")} <span className="text-destructive">*</span>
-                  </Label>
-                  <DatePickerField
-                    id="po-date"
-                    value={form.date}
-                    onChange={(v) => setForm((f) => ({ ...f, date: v }))}
-                    className="h-8 w-full min-w-0 [&_input]:text-sm"
-                  />
-                </div>
-                <div className="flex min-w-0 w-full flex-col gap-0.5">
-                  <Label htmlFor="po-supplier" className="text-sm">
-                    {t("doc.columns.supplier")} <span className="text-destructive">*</span>
-                  </Label>
-                  <SelectField
-                    id="po-supplier"
-                    value={form.supplierId}
-                    onChange={(v) =>
-                      setForm((f) => ({ ...f, supplierId: v }))
-                    }
-                    options={activeSuppliers.map((s) => ({
-                      value: s.id,
-                      label: `${s.code} - ${s.name}`,
-                    }))}
-                    placeholder={t("doc.page.selectSupplier")}
-                    aria-label={t("doc.columns.supplier")}
-                  />
-                </div>
-                <div className="flex min-w-0 w-full flex-col gap-0.5">
-                  <Label htmlFor="po-warehouse" className="text-sm">
-                    {t("doc.columns.warehouse")} <span className="text-destructive">*</span>
-                  </Label>
-                  <SelectField
-                    id="po-warehouse"
-                    value={form.warehouseId}
-                    onChange={(v) =>
-                      setForm((f) => ({ ...f, warehouseId: v }))
-                    }
-                    options={activeWarehouses.map((w) => ({
-                      value: w.id,
-                      label: `${w.code} - ${w.name}`,
-                    }))}
-                    placeholder={t("doc.page.selectWarehouse")}
-                    aria-label={t("doc.columns.warehouse")}
-                  />
-                </div>
-                <div className="flex min-w-0 w-full flex-col gap-0.5">
-                  <Label htmlFor="po-payment-terms" className="text-sm">
-                    {t("doc.page.paymentTermsDaysLabel")}
-                  </Label>
-                  <Input
-                    id="po-payment-terms"
-                    type="number"
-                    min={0}
-                    step={1}
-                    value={form.paymentTermsDays}
-                    onChange={(e) => setForm((f) => ({ ...f, paymentTermsDays: e.target.value }))}
-                    placeholder={t("doc.page.paymentTermsInputPlaceholder")}
-                    className="h-8 text-sm"
-                  />
-                </div>
-                <div className="flex min-w-0 w-full flex-col gap-0.5">
-                  <span className="text-sm text-muted-foreground">{t("doc.page.dueDate")}</span>
-                  <div className="flex h-8 items-center text-sm text-foreground/90 tabular-nums">
-                    {computedDueDateDisplay}
-                  </div>
-                </div>
-                <div className="col-span-2 flex flex-col gap-0.5">
-                  <Label htmlFor="po-comment" className="text-sm">{t("doc.columns.comment")}</Label>
-                  <Input
-                    id="po-comment"
-                    type="text"
-                    value={form.comment}
-                    onChange={(e) =>
-                      setForm((f) => ({ ...f, comment: e.target.value }))
-                    }
-                    placeholder={t("common.optional")}
-                    className="h-8 text-sm"
-                  />
-                </div>
+                </section>
               </div>
-
-            </CardContent>
-          </Card>
-      ) : (
-        <Card className="max-w-2xl border-0 shadow-none">
-            <CardHeader className="p-2 pb-0.5">
-              <CardTitle className="text-[0.9rem] font-semibold">{t("doc.page.details")}</CardTitle>
-              <CardDescription>{t("doc.po.detailsDescription")}</CardDescription>
-            </CardHeader>
-            <CardContent className="p-2 pt-1">
-              <dl className="doc-summary doc-summary--compact doc-summary--dense">
-                <div className="doc-summary__row">
-                  <dt className="doc-summary__term">{t("doc.columns.number")}</dt>
-                  <dd className="doc-summary__value">{doc!.number}</dd>
-                </div>
-                <div className="doc-summary__row">
-                  <dt className="doc-summary__term">{t("doc.columns.date")}</dt>
-                  <dd className="doc-summary__value">{normalizeDateForPO(doc!.date)}</dd>
-                </div>
-                <div className="doc-summary__row">
-                  <dt className="doc-summary__term">{t("doc.columns.supplier")}</dt>
-                  <dd className="doc-summary__value">{supplierName}</dd>
-                </div>
-                <div className="doc-summary__row">
-                  <dt className="doc-summary__term">{t("doc.columns.warehouse")}</dt>
-                  <dd className="doc-summary__value">{warehouseName}</dd>
-                </div>
-                <div className="doc-summary__row">
-                  <dt className="doc-summary__term">{t("doc.summary.paymentTerms")}</dt>
-                  <dd className="doc-summary__value">
-                    {doc!.paymentTermsDays !== undefined
-                      ? t("doc.summary.paymentTermsDays", { days: doc!.paymentTermsDays })
-                      : t("domain.audit.summary.emDash")}
-                  </dd>
-                </div>
-                <div className="doc-summary__row">
-                  <dt className="doc-summary__term">{t("doc.page.dueDate")}</dt>
-                  <dd className="doc-summary__value">
-                    {doc!.dueDate != null && doc!.dueDate !== ""
-                      ? doc!.dueDate
-                      : t("domain.audit.summary.emDash")}
-                  </dd>
-                </div>
-                {doc!.comment != null && doc!.comment !== "" && (
-                  <div className="doc-summary__row">
-                    <dt className="doc-summary__term">{t("doc.columns.comment")}</dt>
-                    <dd className="doc-summary__value">{doc!.comment}</dd>
+              <div className="flex min-h-0 w-fit min-w-0 max-w-full shrink-0 flex-col p-3">
+                <section className="flex min-w-0 flex-col" aria-labelledby="po-details-supply-heading">
+                  <h3
+                    id="po-details-supply-heading"
+                    className="mb-0.5 flex items-center gap-1 text-[0.7rem] font-semibold uppercase tracking-wide text-muted-foreground"
+                  >
+                    <List className="h-3.5 w-3.5" aria-hidden />
+                    {t("doc.po.sectionSupply")}
+                  </h3>
+                  <div className="grid grid-cols-1 gap-x-2.5 gap-y-1 sm:grid-cols-2">
+                    <div className="flex w-full max-w-[18rem] min-w-0 flex-col gap-0.5">
+                      <Label htmlFor="po-supplier" className="text-xs leading-none">
+                        {t("doc.columns.supplier")} <span className="text-destructive">*</span>
+                      </Label>
+                      <SelectField
+                        id="po-supplier"
+                        value={form.supplierId}
+                        onChange={(supplierId) => setForm((f) => ({ ...f, supplierId }))}
+                        options={activeSuppliers.map((s) => ({
+                          value: s.id,
+                          label: `${s.code} - ${s.name}`,
+                        }))}
+                        placeholder={t("doc.page.selectSupplier")}
+                        aria-label={t("doc.columns.supplier")}
+                        className="!w-[18rem] min-w-0"
+                      />
+                    </div>
+                    <div className="flex w-full max-w-[18rem] min-w-0 flex-col gap-0.5">
+                      <Label htmlFor="po-warehouse" className="text-xs leading-none">
+                        {t("doc.columns.warehouse")} <span className="text-destructive">*</span>
+                      </Label>
+                      <SelectField
+                        id="po-warehouse"
+                        value={form.warehouseId}
+                        onChange={(warehouseId) => setForm((f) => ({ ...f, warehouseId }))}
+                        options={activeWarehouses.map((w) => ({
+                          value: w.id,
+                          label: `${w.code} - ${w.name}`,
+                        }))}
+                        placeholder={t("doc.page.selectWarehouse")}
+                        aria-label={t("doc.columns.warehouse")}
+                        className="!w-[18rem] min-w-0"
+                      />
+                    </div>
+                    <div className="flex w-full max-w-[18rem] min-w-0 flex-col gap-0.5">
+                      <Label htmlFor="po-preliminary-delivery-date" className="text-xs leading-none">
+                        {t("doc.po.preliminaryDeliveryDate")}
+                      </Label>
+                      <DatePickerField
+                        id="po-preliminary-delivery-date"
+                        value={form.preliminaryDeliveryDate}
+                        onChange={(preliminaryDeliveryDate) =>
+                          setForm((f) => ({ ...f, preliminaryDeliveryDate }))
+                        }
+                        className="h-8 w-full max-w-[18rem] min-w-0 [&_input]:text-sm"
+                      />
+                    </div>
+                    <div className="flex w-full max-w-[18rem] min-w-0 flex-col gap-0.5">
+                      <Label htmlFor="po-actual-arrival-datetime" className="text-xs leading-none">
+                        {t("doc.po.actualArrivalDateTime")}
+                      </Label>
+                      <Input
+                        id="po-actual-arrival-datetime"
+                        type="datetime-local"
+                        value={form.actualArrivalDateTime}
+                        onChange={(e) =>
+                          setForm((f) => ({ ...f, actualArrivalDateTime: e.target.value }))
+                        }
+                        className="h-8 w-full text-sm"
+                      />
+                    </div>
                   </div>
-                )}
-                {doc!.status === "cancelled" && doc!.cancelReasonCode != null && doc!.cancelReasonCode !== "" && (
-                  <>
-                    <div className="doc-summary__row">
-                      <dt className="doc-summary__term">{t("doc.summary.cancelReason")}</dt>
-                      <dd className="doc-summary__value">
-                        {translateCancelReason(t, doc!.cancelReasonCode as CancelDocumentReasonCode)}
+                </section>
+              </div>
+              <div className="flex min-h-0 w-fit min-w-0 max-w-full shrink-0 flex-col p-3">
+                <section className="flex min-w-0 flex-col" aria-labelledby="po-details-commercial-heading">
+                  <h3
+                    id="po-details-commercial-heading"
+                    className="mb-0.5 flex items-center gap-1 text-[0.7rem] font-semibold uppercase tracking-wide text-muted-foreground"
+                  >
+                    <Coins className="h-3.5 w-3.5" aria-hidden />
+                    {t("doc.po.sectionCommercial")}
+                  </h3>
+                  <div className="grid grid-cols-1 gap-x-2.5 gap-y-0.5 sm:grid-cols-2 sm:items-start sm:justify-items-start">
+                    <div className="flex w-full min-w-0 max-w-[calc(140px+1rem)] flex-col gap-0.5">
+                      <Label htmlFor="po-payment-terms" className="text-xs leading-tight">
+                        {t("doc.page.paymentTermsDaysLabel")}
+                      </Label>
+                      <Input
+                        id="po-payment-terms"
+                        type="number"
+                        min={0}
+                        step={1}
+                        value={form.paymentTermsDays}
+                        onChange={(e) => setForm((f) => ({ ...f, paymentTermsDays: e.target.value }))}
+                        placeholder={t("doc.page.paymentTermsInputPlaceholder")}
+                        className="h-8 w-full text-right tabular-nums text-sm [appearance:textfield] focus-visible:border-input focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring/25 focus-visible:ring-offset-0 [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                      />
+                    </div>
+                    <div className="flex w-full max-w-[140px] min-w-0 flex-col gap-0.5">
+                      <span className="text-sm leading-tight text-muted-foreground">
+                        {t("doc.page.dueDate")}
+                      </span>
+                      <div className="flex min-h-8 items-center text-sm leading-tight text-foreground/90 tabular-nums">
+                        {computedDueDateDisplay}
+                      </div>
+                    </div>
+                  </div>
+                </section>
+              </div>
+              <div className="flex min-h-0 w-fit min-w-0 max-w-full shrink-0 flex-col p-3">
+                <section className="min-w-0" aria-labelledby="po-details-notes-heading">
+                  <h3
+                    id="po-details-notes-heading"
+                    className="mb-1 flex items-center gap-1 text-[0.7rem] font-semibold uppercase tracking-wide text-muted-foreground"
+                  >
+                    <ClipboardList className="h-3.5 w-3.5" aria-hidden />
+                    {t("doc.po.sectionNotes")}
+                  </h3>
+                  <Label htmlFor="po-comment" className="sr-only">
+                    {t("doc.columns.comment")}
+                  </Label>
+                  <Textarea
+                    id="po-comment"
+                    value={form.comment}
+                    onChange={(e) => setForm((f) => ({ ...f, comment: e.target.value }))}
+                    rows={3}
+                    placeholder={t("common.optional")}
+                    className="min-h-[4rem] w-[min(24rem,100%)] min-w-[12rem] resize-y text-sm"
+                  />
+                </section>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      ) : (
+        <Card className="w-full border-0 bg-transparent shadow-none">
+          <CardHeader className="px-3 py-2 pb-1.5">
+            <CardTitle className="text-[0.9rem] font-semibold">{t("doc.page.details")}</CardTitle>
+          </CardHeader>
+          <CardContent className="px-3 pb-3 pt-0">
+            <div className="flex w-full min-w-0 flex-col gap-y-2 overflow-x-auto lg:flex-row lg:flex-nowrap lg:justify-start lg:gap-x-[1.5cm] lg:gap-y-0 lg:items-start">
+              <div className="flex w-fit min-w-0 max-w-full shrink-0 flex-col gap-2.5 p-3">
+                <section className="min-w-0" aria-labelledby="po-ro-details-doc-heading">
+                  <h3
+                    id="po-ro-details-doc-heading"
+                    className="mb-0.5 flex items-center gap-1 text-[0.7rem] font-semibold uppercase tracking-wide text-muted-foreground"
+                  >
+                    <File className="h-3.5 w-3.5" aria-hidden />
+                    {t("doc.po.sectionDocument")}
+                  </h3>
+                  <dl className="doc-summary doc-summary--compact doc-summary--dense so-doc-summary-compact">
+                    <div className="doc-summary__row py-0.5">
+                      <dt className="doc-summary__term">{t("doc.columns.number")}</dt>
+                      <dd className="doc-summary__value font-medium">{doc!.number}</dd>
+                    </div>
+                    <div className="doc-summary__row py-0.5">
+                      <dt className="doc-summary__term">{t("doc.columns.date")}</dt>
+                      <dd className="doc-summary__value">{normalizeDateForPO(doc!.date)}</dd>
+                    </div>
+                  </dl>
+                </section>
+              </div>
+              <div className="flex min-h-0 w-fit min-w-0 max-w-full shrink-0 flex-col p-3">
+                <section className="flex min-w-0 flex-col" aria-labelledby="po-ro-details-supply-heading">
+                  <h3
+                    id="po-ro-details-supply-heading"
+                    className="mb-0.5 flex items-center gap-1 text-[0.7rem] font-semibold uppercase tracking-wide text-muted-foreground"
+                  >
+                    <List className="h-3.5 w-3.5" aria-hidden />
+                    {t("doc.po.sectionSupply")}
+                  </h3>
+                  <dl className="doc-summary doc-summary--compact doc-summary--dense so-doc-summary-compact max-w-[20rem] min-w-0 self-start">
+                    <div className="doc-summary__row py-0.5">
+                      <dt className="doc-summary__term">{t("doc.columns.supplier")}</dt>
+                      <dd className="doc-summary__value">{supplierName}</dd>
+                    </div>
+                    <div className="doc-summary__row py-0.5">
+                      <dt className="doc-summary__term">{t("doc.columns.warehouse")}</dt>
+                      <dd className="doc-summary__value">{warehouseName}</dd>
+                    </div>
+                    <div className="doc-summary__row py-0.5">
+                      <dt className="doc-summary__term">{t("doc.po.preliminaryDeliveryDate")}</dt>
+                      <dd className="doc-summary__value tabular-nums">
+                        {doc!.preliminaryDeliveryDate != null && doc!.preliminaryDeliveryDate !== ""
+                          ? normalizeDateForPO(doc!.preliminaryDeliveryDate)
+                          : t("domain.audit.summary.emDash")}
                       </dd>
                     </div>
-                    {doc!.cancelReasonComment != null && doc!.cancelReasonComment !== "" && (
-                      <div className="doc-summary__row">
-                        <dt className="doc-summary__term">{t("doc.summary.cancelComment")}</dt>
-                        <dd className="doc-summary__value">{doc!.cancelReasonComment}</dd>
+                    <div className="doc-summary__row py-0.5">
+                      <dt className="doc-summary__term">{t("doc.po.actualArrivalDateTime")}</dt>
+                      <dd className="doc-summary__value tabular-nums">
+                        {displayLocalDateTime(doc!.actualArrivalDateTime)}
+                      </dd>
+                    </div>
+                  </dl>
+                </section>
+              </div>
+              <div className="flex min-h-0 w-fit min-w-0 max-w-full shrink-0 flex-col p-3">
+                <section className="flex min-w-0 flex-col" aria-labelledby="po-ro-details-commercial-heading">
+                  <h3
+                    id="po-ro-details-commercial-heading"
+                    className="mb-0.5 flex items-center gap-1 text-[0.7rem] font-semibold uppercase tracking-wide text-muted-foreground"
+                  >
+                    <Coins className="h-3.5 w-3.5" aria-hidden />
+                    {t("doc.po.sectionCommercial")}
+                  </h3>
+                  <div className="grid grid-cols-1 gap-x-2.5 gap-y-0.5 sm:grid-cols-2 sm:items-start sm:justify-items-start">
+                    <dl className="doc-summary doc-summary--compact doc-summary--dense so-doc-summary-compact m-0 min-w-0 max-w-full self-start">
+                      <div className="doc-summary__row py-0.5">
+                        <dt className="doc-summary__term">{t("doc.summary.paymentTerms")}</dt>
+                        <dd className="doc-summary__value">
+                          {doc!.paymentTermsDays !== undefined
+                            ? t("doc.summary.paymentTermsDays", { days: doc!.paymentTermsDays })
+                            : t("domain.audit.summary.emDash")}
+                        </dd>
                       </div>
-                    )}
-                  </>
-                )}
-              </dl>
-
-            </CardContent>
-          </Card>
+                    </dl>
+                    <dl className="doc-summary doc-summary--compact doc-summary--dense so-doc-summary-compact m-0 min-w-0 max-w-[140px] self-start">
+                      <div className="doc-summary__row py-0.5">
+                        <dt className="doc-summary__term">{t("doc.page.dueDate")}</dt>
+                        <dd className="doc-summary__value tabular-nums">
+                          {doc!.dueDate != null && doc!.dueDate !== ""
+                            ? doc!.dueDate
+                            : t("domain.audit.summary.emDash")}
+                        </dd>
+                      </div>
+                    </dl>
+                  </div>
+                </section>
+              </div>
+              <div className="flex min-h-0 w-fit min-w-0 max-w-full shrink-0 flex-col p-3">
+                <section className="min-w-0" aria-labelledby="po-ro-details-notes-heading">
+                  <h3
+                    id="po-ro-details-notes-heading"
+                    className="mb-0.5 flex items-center gap-1 text-[0.7rem] font-semibold uppercase tracking-wide text-muted-foreground"
+                  >
+                    <ClipboardList className="h-3.5 w-3.5" aria-hidden />
+                    {t("doc.po.sectionNotes")}
+                  </h3>
+                  <dl className="doc-summary doc-summary--compact doc-summary--dense so-doc-summary-compact so-notes-summary-stack">
+                    <div className="doc-summary__row py-0.5">
+                      <dt className="doc-summary__term">{t("doc.columns.comment")}</dt>
+                      <dd className="doc-summary__value whitespace-pre-wrap">
+                        {doc!.comment != null && doc!.comment.trim() !== ""
+                          ? doc!.comment
+                          : t("domain.audit.summary.emDash")}
+                      </dd>
+                    </div>
+                    {doc!.status === "cancelled" &&
+                    doc!.cancelReasonCode != null &&
+                    doc!.cancelReasonCode !== "" ? (
+                      <>
+                        <div className="doc-summary__row py-0.5">
+                          <dt className="doc-summary__term text-destructive">
+                            {t("doc.summary.cancelReason")}
+                          </dt>
+                          <dd className="doc-summary__value whitespace-pre-wrap">
+                            {translateCancelReason(t, doc!.cancelReasonCode as CancelDocumentReasonCode)}
+                          </dd>
+                        </div>
+                        {doc!.cancelReasonComment != null && doc!.cancelReasonComment !== "" ? (
+                          <div className="doc-summary__row py-0.5">
+                            <dt className="doc-summary__term">{t("doc.summary.cancelComment")}</dt>
+                            <dd className="doc-summary__value whitespace-pre-wrap">
+                              {doc!.cancelReasonComment}
+                            </dd>
+                          </div>
+                        ) : null}
+                      </>
+                    ) : null}
+                  </dl>
+                </section>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
       )}
       <div className="doc-po-working-area mt-0 max-w-full border-t border-border/60 pt-2">
         <div
@@ -1663,6 +1885,23 @@ export function PurchaseOrderPage() {
             <span className="inline-flex items-center gap-1.5">
               <List className="h-3.5 w-3.5" aria-hidden />
               {t("doc.po.tabLines")}
+            </span>
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={poWorkingTab === "execution"}
+            className={cn(
+              "-mb-px border-b-2 px-3 py-2 text-sm font-medium transition-colors",
+              poWorkingTab === "execution"
+                ? "border-primary text-foreground"
+                : "border-transparent text-muted-foreground hover:text-foreground",
+            )}
+            onClick={() => setPoWorkingTab("execution")}
+          >
+            <span className="inline-flex items-center gap-1.5">
+              <Activity className="h-3.5 w-3.5" aria-hidden />
+              {t("doc.po.tabExecution")}
             </span>
           </button>
           <button
@@ -1717,42 +1956,100 @@ export function PurchaseOrderPage() {
             </span>
           </button>
         </div>
+        {poWorkingTab === "execution" && (
+          <div className="doc-po-tab-panel doc-po-tab-panel--execution space-y-3">
+            {isNew ? (
+              <Card className="border border-dashed border-border/70 shadow-none">
+                <CardContent className="p-4">
+                  <p className="text-sm text-muted-foreground">
+                    {t("doc.po.tabExecutionSaveDocumentFirst")}
+                  </p>
+                </CardContent>
+              </Card>
+            ) : (
+              <>
+                <Card className="border border-border/70 shadow-none">
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-sm">{t("doc.po.tabExecution")}</CardTitle>
+                    <CardDescription className="text-xs">
+                      {t("doc.fulfillment.po.receiptsPostedTotal", {
+                        posted: poFulfillment?.postedReceiptCount ?? 0,
+                        total: poFulfillment?.relatedReceiptCount ?? 0,
+                      })}
+                    </CardDescription>
+                  </CardHeader>
+                </Card>
+                {poFulfillment ? (
+                  <Card className="border border-border/70 shadow-none">
+                    <CardHeader className="pb-3">
+                      <div className="flex items-start justify-between gap-2">
+                        <div>
+                          <CardTitle className="text-sm">
+                            {t("doc.fulfillment.po.sectionTitle")}
+                          </CardTitle>
+                          <CardDescription className="mt-1 text-xs">
+                            {t("doc.fulfillment.po.receiptsPostedTotal", {
+                              posted: poFulfillment.postedReceiptCount,
+                              total: poFulfillment.relatedReceiptCount,
+                            })}
+                          </CardDescription>
+                        </div>
+                        <Badge
+                          variant="outline"
+                          className={cn(
+                            "h-6 rounded-full px-2 text-[11px] font-semibold",
+                            poFulfillment.hasOverFulfillment
+                              ? "border-destructive/60 text-destructive"
+                              : "border-border text-foreground",
+                          )}
+                        >
+                          {translatePlanningFulfillmentState(t, poFulfillment.state)}
+                        </Badge>
+                      </div>
+                    </CardHeader>
+                    <CardContent className="space-y-3 pt-0">
+                      <div className="grid gap-2 sm:grid-cols-3">
+                        <ExecutionMetric
+                          label={t("doc.columns.received")}
+                          value={poFulfillment.totalReceived}
+                        />
+                        <ExecutionMetric
+                          label={t("doc.columns.ordered")}
+                          value={poFulfillment.totalOrdered}
+                        />
+                        <ExecutionMetric
+                          label={t("doc.fulfillment.po.remainingLabel")}
+                          value={
+                            poFulfillment.totalRemaining < 0
+                              ? t("doc.fulfillment.remainingOver", {
+                                  qty: poFulfillment.totalRemaining,
+                                })
+                              : poFulfillment.totalRemaining
+                          }
+                          danger={poFulfillment.totalRemaining < 0}
+                        />
+                      </div>
+                      {poFulfillment.hasOverFulfillment ? (
+                        <p className="text-xs font-medium text-destructive">
+                          {t("doc.fulfillment.po.overReceived")}
+                        </p>
+                      ) : null}
+                    </CardContent>
+                  </Card>
+                ) : (
+                  <Card className="border border-dashed border-border/70 shadow-none">
+                    <CardContent className="p-4">
+                      <p className="text-sm text-muted-foreground">{t("doc.page.noLines")}</p>
+                    </CardContent>
+                  </Card>
+                )}
+              </>
+            )}
+          </div>
+        )}
         {poWorkingTab === "lines" && isEditable && (
 
           <div className="doc-lines mt-0">
-            {!isNew && poFulfillment ? (
-              <div className="mb-2 max-w-4xl text-xs">
-                <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
-                  <span className="font-medium text-foreground">{t("doc.fulfillment.po.sectionTitle")}</span>
-                  <span className="tabular-nums text-muted-foreground">
-                    {translatePlanningFulfillmentState(t, poFulfillment.state)}
-                  </span>
-                  <span className="text-muted-foreground tabular-nums">
-                    {t("doc.fulfillment.po.receivedOrdered", {
-                      received: poFulfillment.totalReceived,
-                      ordered: poFulfillment.totalOrdered,
-                    })}
-                  </span>
-                  <span className="text-muted-foreground">
-                    {t("doc.fulfillment.po.remainingLabel")}{" "}
-                    <span className="text-foreground tabular-nums">
-                      {poFulfillment.totalRemaining < 0
-                        ? t("doc.fulfillment.remainingOver", { qty: poFulfillment.totalRemaining })
-                        : poFulfillment.totalRemaining}
-                    </span>
-                  </span>
-                  <span className="text-muted-foreground tabular-nums">
-                    {t("doc.fulfillment.po.receiptsPostedTotal", {
-                      posted: poFulfillment.postedReceiptCount,
-                      total: poFulfillment.relatedReceiptCount,
-                    })}
-                  </span>
-                  {poFulfillment.hasOverFulfillment ? (
-                    <span className="text-destructive font-medium">{t("doc.fulfillment.po.overReceived")}</span>
-                  ) : null}
-                </div>
-              </div>
-            ) : null}
             {isEditable && (
               <div className="flex items-end gap-2 w-full mb-1.5">
                 <Card className="border-0 shadow-none flex-1 min-w-0">
@@ -1979,39 +2276,6 @@ export function PurchaseOrderPage() {
         {poWorkingTab === "lines" && !isEditable && (
 
           <div className="doc-lines mt-0">
-            {poFulfillment ? (
-              <div className="mb-2 max-w-4xl text-xs">
-                <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
-                  <span className="font-medium text-foreground">{t("doc.fulfillment.po.sectionTitle")}</span>
-                  <span className="tabular-nums text-muted-foreground">
-                    {translatePlanningFulfillmentState(t, poFulfillment.state)}
-                  </span>
-                  <span className="text-muted-foreground tabular-nums">
-                    {t("doc.fulfillment.po.receivedOrdered", {
-                      received: poFulfillment.totalReceived,
-                      ordered: poFulfillment.totalOrdered,
-                    })}
-                  </span>
-                  <span className="text-muted-foreground">
-                    {t("doc.fulfillment.po.remainingLabel")}{" "}
-                    <span className="text-foreground tabular-nums">
-                      {poFulfillment.totalRemaining < 0
-                        ? t("doc.fulfillment.remainingOver", { qty: poFulfillment.totalRemaining })
-                        : poFulfillment.totalRemaining}
-                    </span>
-                  </span>
-                  <span className="text-muted-foreground tabular-nums">
-                    {t("doc.fulfillment.po.receiptsPostedTotal", {
-                      posted: poFulfillment.postedReceiptCount,
-                      total: poFulfillment.relatedReceiptCount,
-                    })}
-                  </span>
-                  {poFulfillment.hasOverFulfillment ? (
-                    <span className="text-destructive font-medium">{t("doc.fulfillment.po.overReceived")}</span>
-                  ) : null}
-                </div>
-              </div>
-            ) : null}
             {linesWithItem.length === 0 ? (
               <p className="doc-lines__empty">{t("doc.page.noLines")}</p>
             ) : (
