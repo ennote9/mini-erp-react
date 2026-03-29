@@ -29,6 +29,7 @@ let numberCounter = 1;
 let persistChain: Promise<void> = Promise.resolve();
 let persistDepth = 0;
 let lastWriteError: string | null = null;
+let pendingWriteErrors: string[] = [];
 
 const PERSIST_PATH = getDocumentsFilePath("receipts.json");
 
@@ -145,7 +146,11 @@ export function getLastReceiptPersistError(): string | null {
 
 export async function flushPendingReceiptPersist(): Promise<void> {
   await persistChain;
-  if (lastWriteError) throw new Error(lastWriteError);
+  if (pendingWriteErrors.length > 0) {
+    const message = pendingWriteErrors.join(" | ");
+    pendingWriteErrors = [];
+    throw new Error(message);
+  }
 }
 
 function schedulePersist(): void {
@@ -158,6 +163,7 @@ function schedulePersist(): void {
         lastWriteError = null;
       } catch (e) {
         lastWriteError = e instanceof Error ? e.message : String(e);
+        pendingWriteErrors.push(lastWriteError);
         if (import.meta.env.DEV) {
           console.error("[receiptRepository] persist failed:", e);
         }

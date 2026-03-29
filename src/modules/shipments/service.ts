@@ -1,14 +1,26 @@
 import type { Issue } from "../../shared/issues";
 import { actionIssue, actionWarning } from "../../shared/issues";
-import { shipmentRepository } from "./repository";
-import { salesOrderRepository } from "../sales-orders/repository";
-import { stockReservationRepository } from "../stock-reservations/repository";
+import { flushPendingShipmentPersist, shipmentRepository } from "./repository";
+import {
+  flushPendingSalesOrderPersist,
+  salesOrderRepository,
+} from "../sales-orders/repository";
+import {
+  flushPendingStockReservationPersist,
+  stockReservationRepository,
+} from "../stock-reservations/repository";
 import { warehouseRepository } from "../warehouses/repository";
 import { carrierRepository } from "../carriers/repository";
 import { itemRepository } from "../items/repository";
 import { markdownRepository } from "../markdown-journal/repository";
-import { stockMovementRepository } from "../stock-movements/repository";
-import { stockBalanceRepository } from "../stock-balances/repository";
+import {
+  flushPendingStockMovementPersist,
+  stockMovementRepository,
+} from "../stock-movements/repository";
+import {
+  flushPendingStockBalancePersist,
+  stockBalanceRepository,
+} from "../stock-balances/repository";
 import { parseDocumentLineQty } from "../../shared/documentValidation";
 import { normalizeTrim, validatePhone } from "../../shared/validation";
 import {
@@ -18,7 +30,10 @@ import {
   type ReversalDocumentReasonInput,
 } from "../../shared/reasonCodes";
 import { getAppSettings } from "../../shared/settings/store";
-import { appendAuditEvent } from "../../shared/audit/eventLogRepository";
+import {
+  appendAuditEvent,
+  flushPendingAuditEventPersist,
+} from "../../shared/audit/eventLogRepository";
 import { AUDIT_ACTOR_LOCAL_USER } from "../../shared/audit/eventLogTypes";
 import {
   aggregateShippedQtyByItemForSalesOrder,
@@ -41,6 +56,29 @@ export type CancelDocumentResult =
 export type ReverseDocumentResult =
   | { success: true }
   | { success: false; error: string };
+
+function persistenceErrorMessage(error: unknown, prefix: string): string {
+  const message = error instanceof Error ? error.message : String(error);
+  return `${prefix}: ${message}`;
+}
+
+async function flushShipmentCriticalPersistence(): Promise<void> {
+  const settled = await Promise.allSettled([
+    flushPendingStockReservationPersist(),
+    flushPendingStockMovementPersist(),
+    flushPendingStockBalancePersist(),
+    flushPendingShipmentPersist(),
+    flushPendingSalesOrderPersist(),
+    flushPendingAuditEventPersist(),
+  ]);
+  const failures = settled.flatMap((result) => {
+    if (result.status === "fulfilled") return [];
+    return [result.reason instanceof Error ? result.reason.message : String(result.reason)];
+  });
+  if (failures.length > 0) {
+    throw new Error(failures.join(" | "));
+  }
+}
 
 function lineStockStyle(markdownCode: string | undefined): StockStyle {
   if (!markdownCode) return DEFAULT_STOCK_STYLE;
@@ -394,102 +432,112 @@ export function validateShipmentFull(shipmentId: string): Issue[] {
   return issues;
 }
 
-export function post(shipmentId: string): PostResult {
+export async function post(shipmentId: string): Promise<PostResult> {
   const issues = validateShipmentFull(shipmentId);
   const hasErrors = issues.some((i) => i.severity === "error");
   if (hasErrors) return { success: false, issues };
 
-  const shipment = shipmentRepository.getById(shipmentId)!;
-  const lines = shipmentRepository.listLines(shipmentId);
-  const now = new Date().toISOString();
+  try {
+    await flushShipmentCriticalPersistence();
 
-  let totalReservationConsumed = 0;
-  for (const line of lines) {
-    const q = parseDocumentLineQty(line.qty) ?? 0;
-    if (q <= 0) continue;
-    const ok = stockReservationRepository.tryConsumeActiveForSalesOrderItem(
-      shipment.salesOrderId,
-      line.itemId,
-      q,
-      shipment.warehouseId,
-    );
-    if (!ok) {
-      return {
-        success: false,
-        issues: [
-          actionIssue(
-            "Could not consume stock reservations. Refresh and try again, or re-allocate on the sales order.",
-            { key: "issues.shipment.reservationConsumeFailed" },
-          ),
-        ],
-      };
+    const shipment = shipmentRepository.getById(shipmentId)!;
+    const lines = shipmentRepository.listLines(shipmentId);
+    const now = new Date().toISOString();
+
+    let totalReservationConsumed = 0;
+    for (const line of lines) {
+      const q = parseDocumentLineQty(line.qty) ?? 0;
+      if (q <= 0) continue;
+      const ok = stockReservationRepository.tryConsumeActiveForSalesOrderItem(
+        shipment.salesOrderId,
+        line.itemId,
+        q,
+        shipment.warehouseId,
+      );
+      if (!ok) {
+        return {
+          success: false,
+          issues: [
+            actionIssue(
+              "Could not consume stock reservations. Refresh and try again, or re-allocate on the sales order.",
+              { key: "issues.shipment.reservationConsumeFailed" },
+            ),
+          ],
+        };
+      }
+      totalReservationConsumed += q;
     }
-    totalReservationConsumed += q;
-  }
 
-  if (totalReservationConsumed > 0) {
-    const soDoc = salesOrderRepository.getById(shipment.salesOrderId);
+    if (totalReservationConsumed > 0) {
+      const soDoc = salesOrderRepository.getById(shipment.salesOrderId);
+      appendAuditEvent({
+        entityType: "sales_order",
+        entityId: shipment.salesOrderId,
+        eventType: "reservation_consumed",
+        actor: AUDIT_ACTOR_LOCAL_USER,
+        payload: {
+          documentNumber: soDoc?.number ?? "",
+          consumedQty: totalReservationConsumed,
+          shipmentId,
+          shipmentNumber: shipment.number,
+        },
+      });
+    }
+
+    for (const line of lines) {
+      stockMovementRepository.create({
+        datetime: now,
+        movementType: "shipment",
+        itemId: line.itemId,
+        warehouseId: shipment.warehouseId,
+        style: lineStockStyle(line.markdownCode),
+        qtyDelta: -line.qty,
+        sourceDocumentType: "shipment",
+        sourceDocumentId: shipmentId,
+      });
+
+      stockBalanceRepository.adjustQty({
+        itemId: line.itemId,
+        warehouseId: shipment.warehouseId,
+        style: lineStockStyle(line.markdownCode),
+        qtyDelta: -line.qty,
+      });
+    }
+
+    const prevStatus = shipment.status;
+    shipmentRepository.update(shipmentId, { status: "posted" });
+    const soFulfillment = computeSalesOrderFulfillment(shipment.salesOrderId);
+    const nextSoStatus = soFulfillment.state === "complete" ? "closed" : "confirmed";
+    salesOrderRepository.update(shipment.salesOrderId, {
+      status: nextSoStatus,
+    });
+    if (
+      nextSoStatus === "closed" &&
+      getAppSettings().inventory.releaseReservationsOnSalesOrderClose
+    ) {
+      reconcileSalesOrderReservations(shipment.salesOrderId, { reason: "sales_order_closed" });
+    }
     appendAuditEvent({
-      entityType: "sales_order",
-      entityId: shipment.salesOrderId,
-      eventType: "reservation_consumed",
+      entityType: "shipment",
+      entityId: shipmentId,
+      eventType: "document_posted",
       actor: AUDIT_ACTOR_LOCAL_USER,
       payload: {
-        documentNumber: soDoc?.number ?? "",
-        consumedQty: totalReservationConsumed,
-        shipmentId,
-        shipmentNumber: shipment.number,
+        documentNumber: shipment.number,
+        previousStatus: prevStatus,
+        newStatus: "posted" as const,
+        salesOrderId: shipment.salesOrderId,
       },
     });
-  }
 
-  for (const line of lines) {
-    stockMovementRepository.create({
-      datetime: now,
-      movementType: "shipment",
-      itemId: line.itemId,
-      warehouseId: shipment.warehouseId,
-      style: lineStockStyle(line.markdownCode),
-      qtyDelta: -line.qty,
-      sourceDocumentType: "shipment",
-      sourceDocumentId: shipmentId,
-    });
-
-    stockBalanceRepository.adjustQty({
-      itemId: line.itemId,
-      warehouseId: shipment.warehouseId,
-      style: lineStockStyle(line.markdownCode),
-      qtyDelta: -line.qty,
-    });
+    await flushShipmentCriticalPersistence();
+    return { success: true };
+  } catch (error) {
+    return {
+      success: false,
+      issues: [actionIssue(persistenceErrorMessage(error, "Shipment post failed"))],
+    };
   }
-
-  const prevStatus = shipment.status;
-  shipmentRepository.update(shipmentId, { status: "posted" });
-  const soFulfillment = computeSalesOrderFulfillment(shipment.salesOrderId);
-  // Product rule: full fulfillment closes SO; partial/not-started stays confirmed.
-  const nextSoStatus = soFulfillment.state === "complete" ? "closed" : "confirmed";
-  salesOrderRepository.update(shipment.salesOrderId, {
-    status: nextSoStatus,
-  });
-  if (
-    nextSoStatus === "closed" &&
-    getAppSettings().inventory.releaseReservationsOnSalesOrderClose
-  ) {
-    reconcileSalesOrderReservations(shipment.salesOrderId, { reason: "sales_order_closed" });
-  }
-  appendAuditEvent({
-    entityType: "shipment",
-    entityId: shipmentId,
-    eventType: "document_posted",
-    actor: AUDIT_ACTOR_LOCAL_USER,
-    payload: {
-      documentNumber: shipment.number,
-      previousStatus: prevStatus,
-      newStatus: "posted" as const,
-      salesOrderId: shipment.salesOrderId,
-    },
-  });
-  return { success: true };
 }
 
 export function cancelDocument(
@@ -533,10 +581,10 @@ export function cancelDocument(
  * Full reversal of a posted shipment: compensating stock movements (shipment_reversal),
  * balances increased, status → reversed, linked SO reopened to confirmed. One-time only.
  */
-export function reverseDocument(
+export async function reverseDocument(
   shipmentId: string,
   input: ReversalDocumentReasonInput,
-): ReverseDocumentResult {
+): Promise<ReverseDocumentResult> {
   const resolved = resolveReversalDocumentReasonForService(
     input,
     getAppSettings().documents.requireReversalReason,
@@ -564,59 +612,66 @@ export function reverseDocument(
     }
   }
 
-  const now = new Date().toISOString();
-  const reasonCode = resolved.code;
-  const revComment = resolved.comment;
+  try {
+    await flushShipmentCriticalPersistence();
 
-  for (const line of lines) {
-    const qty = parseDocumentLineQty(line.qty)!;
-    stockMovementRepository.create({
-      datetime: now,
-      movementType: "shipment_reversal",
-      itemId: line.itemId,
-      warehouseId: shipment.warehouseId,
-      style: lineStockStyle(line.markdownCode),
-      qtyDelta: qty,
-      sourceDocumentType: "shipment",
-      sourceDocumentId: shipmentId,
-      comment: "Shipment reversal (compensating movement)",
-    });
-    stockBalanceRepository.adjustQty({
-      itemId: line.itemId,
-      warehouseId: shipment.warehouseId,
-      style: lineStockStyle(line.markdownCode),
-      qtyDelta: qty,
-    });
-  }
+    const now = new Date().toISOString();
+    const reasonCode = resolved.code;
+    const revComment = resolved.comment;
 
-  const prevStatus = shipment.status;
-  shipmentRepository.update(shipmentId, {
-    status: "reversed",
-    reversalReasonCode: reasonCode,
-    ...(revComment !== undefined ? { reversalReasonComment: revComment } : {}),
-  });
+    for (const line of lines) {
+      const qty = parseDocumentLineQty(line.qty)!;
+      stockMovementRepository.create({
+        datetime: now,
+        movementType: "shipment_reversal",
+        itemId: line.itemId,
+        warehouseId: shipment.warehouseId,
+        style: lineStockStyle(line.markdownCode),
+        qtyDelta: qty,
+        sourceDocumentType: "shipment",
+        sourceDocumentId: shipmentId,
+        comment: "Shipment reversal (compensating movement)",
+      });
+      stockBalanceRepository.adjustQty({
+        itemId: line.itemId,
+        warehouseId: shipment.warehouseId,
+        style: lineStockStyle(line.markdownCode),
+        qtyDelta: qty,
+      });
+    }
 
-  salesOrderRepository.update(shipment.salesOrderId, { status: "confirmed" });
-
-  reconcileSalesOrderReservations(shipment.salesOrderId, { reason: "shipment_reversal" });
-
-  appendAuditEvent({
-    entityType: "shipment",
-    entityId: shipmentId,
-    eventType: "document_reversed",
-    actor: AUDIT_ACTOR_LOCAL_USER,
-    payload: {
-      documentNumber: shipment.number,
-      previousStatus: prevStatus,
-      newStatus: "reversed" as const,
+    const prevStatus = shipment.status;
+    shipmentRepository.update(shipmentId, {
+      status: "reversed",
       reversalReasonCode: reasonCode,
-      reversalReasonComment: revComment ?? null,
-      movementLineCount: lines.length,
-      salesOrderId: shipment.salesOrderId,
-    },
-  });
+      ...(revComment !== undefined ? { reversalReasonComment: revComment } : {}),
+    });
 
-  return { success: true };
+    salesOrderRepository.update(shipment.salesOrderId, { status: "confirmed" });
+
+    reconcileSalesOrderReservations(shipment.salesOrderId, { reason: "shipment_reversal" });
+
+    appendAuditEvent({
+      entityType: "shipment",
+      entityId: shipmentId,
+      eventType: "document_reversed",
+      actor: AUDIT_ACTOR_LOCAL_USER,
+      payload: {
+        documentNumber: shipment.number,
+        previousStatus: prevStatus,
+        newStatus: "reversed" as const,
+        reversalReasonCode: reasonCode,
+        reversalReasonComment: revComment ?? null,
+        movementLineCount: lines.length,
+        salesOrderId: shipment.salesOrderId,
+      },
+    });
+
+    await flushShipmentCriticalPersistence();
+    return { success: true };
+  } catch (error) {
+    return { success: false, error: persistenceErrorMessage(error, "Shipment reverse failed") };
+  }
 }
 
 export type UpdateShipmentDraftLogisticsInput = {

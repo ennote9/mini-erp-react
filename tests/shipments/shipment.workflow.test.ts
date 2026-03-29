@@ -323,7 +323,7 @@ describe.sequential("Shipment workflow", () => {
     );
     expect(reservedBefore).toBe(10);
 
-    const postResult = modules.shipmentService.post(shipmentId);
+    const postResult = await modules.shipmentService.post(shipmentId);
     expect(postResult).toEqual({ success: true });
 
     expect(modules.shipmentRepository.getById(shipmentId)?.status).toBe("posted");
@@ -360,7 +360,7 @@ describe.sequential("Shipment workflow", () => {
     const soAudit = modules.listAuditEventsForEntity("sales_order", so.id);
     expect(soAudit.map((row) => row.eventType)).toContain("reservation_consumed");
 
-    const repostResult = modules.shipmentService.post(shipmentId);
+    const repostResult = await modules.shipmentService.post(shipmentId);
     expect(repostResult.success).toBe(false);
     if (repostResult.success) return;
     expect(repostResult.issues).toEqual(
@@ -447,10 +447,10 @@ describe.sequential("Shipment workflow", () => {
     if (!createResult.success) return;
 
     const shipmentId = createResult.shipmentId;
-    expect(modules.shipmentService.post(shipmentId)).toEqual({ success: true });
+    expect(await modules.shipmentService.post(shipmentId)).toEqual({ success: true });
     expect(modules.salesOrderRepository.getById(so.id)?.status).toBe("closed");
 
-    const reverseResult = modules.shipmentService.reverseDocument(shipmentId, {
+    const reverseResult = await modules.shipmentService.reverseDocument(shipmentId, {
       reversalReasonCode: "OTHER",
       reversalReasonComment: "Undo outbound",
     });
@@ -507,7 +507,7 @@ describe.sequential("Shipment workflow", () => {
     if (!reservationShipmentResult.success) return;
     modules.stockReservationRepository.releaseAllActiveForSalesOrder(reservationSo.id);
 
-    const missingReservationPost = modules.shipmentService.post(reservationShipmentResult.shipmentId);
+    const missingReservationPost = await modules.shipmentService.post(reservationShipmentResult.shipmentId);
     expect(missingReservationPost.success).toBe(false);
     if (missingReservationPost.success) return;
     expect(missingReservationPost.issues).toEqual(
@@ -536,7 +536,7 @@ describe.sequential("Shipment workflow", () => {
       qtyDelta: -5,
     });
 
-    const insufficientStockPost = modules.shipmentService.post(stockShipmentResult.shipmentId);
+    const insufficientStockPost = await modules.shipmentService.post(stockShipmentResult.shipmentId);
     expect(insufficientStockPost.success).toBe(false);
     if (insufficientStockPost.success) return;
     expect(insufficientStockPost.issues).toEqual(
@@ -802,14 +802,14 @@ describe.sequential("Shipment workflow", () => {
     expect(postedCreate.success).toBe(true);
     if (!postedCreate.success) return;
 
-    expect(modules.shipmentService.post(postedCreate.shipmentId)).toEqual({ success: true });
+    expect(await modules.shipmentService.post(postedCreate.shipmentId)).toEqual({ success: true });
     const postedFulfillment = modules.computeSalesOrderFulfillment(so.id);
     expect(postedFulfillment.totalShipped).toBe(10);
     expect(postedFulfillment.postedShipmentCount).toBe(1);
     expect(postedFulfillment.state).toBe("complete");
 
     expect(
-      modules.shipmentService.reverseDocument(postedCreate.shipmentId, { reversalReasonCode: "OTHER" }),
+      await modules.shipmentService.reverseDocument(postedCreate.shipmentId, { reversalReasonCode: "OTHER" }),
     ).toEqual({ success: true });
     const reversedFulfillment = modules.computeSalesOrderFulfillment(so.id);
     expect(reversedFulfillment.totalShipped).toBe(0);

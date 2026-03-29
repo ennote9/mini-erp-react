@@ -302,12 +302,14 @@ export function ReceiptPage() {
 
   const exportSelectedDisabled = selectedLineIds.length === 0;
 
-  const handlePost = () => {
+  const handlePost = async () => {
     if (!id) return;
-    const result = post(id);
+    const result = await post(id);
     if (result.success) {
       setActionIssues([]);
       setRefresh((r) => r + 1);
+    } else {
+      setActionIssues(result.issues);
     }
   };
   const handleCancelDocument = () => {
@@ -328,10 +330,10 @@ export function ReceiptPage() {
     }
   };
 
-  const handleReverseDocumentConfirm = (payload: ReverseDocumentReasonPayload) => {
+  const handleReverseDocumentConfirm = async (payload: ReverseDocumentReasonPayload) => {
     if (!id) return;
     setActionIssues([]);
-    const result = reverseDocument(id, payload);
+    const result = await reverseDocument(id, payload);
     if (result.success) {
       setActionIssues([]);
       setRefresh((r) => r + 1);

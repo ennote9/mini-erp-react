@@ -27,6 +27,7 @@ let nextId = 1;
 let persistChain: Promise<void> = Promise.resolve();
 let persistDepth = 0;
 let lastWriteError: string | null = null;
+let pendingWriteErrors: string[] = [];
 
 const PERSIST_PATH = getInventoryFilePath("stock-balances.json");
 
@@ -86,7 +87,11 @@ export function getLastStockBalancePersistError(): string | null {
 
 export async function flushPendingStockBalancePersist(): Promise<void> {
   await persistChain;
-  if (lastWriteError) throw new Error(lastWriteError);
+  if (pendingWriteErrors.length > 0) {
+    const message = pendingWriteErrors.join(" | ");
+    pendingWriteErrors = [];
+    throw new Error(message);
+  }
 }
 
 function schedulePersist(): void {
@@ -99,6 +104,7 @@ function schedulePersist(): void {
         lastWriteError = null;
       } catch (e) {
         lastWriteError = e instanceof Error ? e.message : String(e);
+        pendingWriteErrors.push(lastWriteError);
         if (import.meta.env.DEV) {
           console.error("[stockBalanceRepository] persist failed:", e);
         }

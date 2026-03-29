@@ -1,11 +1,20 @@
 import type { Issue } from "../../shared/issues";
 import { actionIssue } from "../../shared/issues";
-import { receiptRepository } from "./repository";
-import { purchaseOrderRepository } from "../purchase-orders/repository";
+import { flushPendingReceiptPersist, receiptRepository } from "./repository";
+import {
+  flushPendingPurchaseOrderPersist,
+  purchaseOrderRepository,
+} from "../purchase-orders/repository";
 import { warehouseRepository } from "../warehouses/repository";
 import { itemRepository } from "../items/repository";
-import { stockMovementRepository } from "../stock-movements/repository";
-import { stockBalanceRepository } from "../stock-balances/repository";
+import {
+  flushPendingStockMovementPersist,
+  stockMovementRepository,
+} from "../stock-movements/repository";
+import {
+  flushPendingStockBalancePersist,
+  stockBalanceRepository,
+} from "../stock-balances/repository";
 import { parseDocumentLineQty } from "../../shared/documentValidation";
 import { normalizeTrim } from "../../shared/validation";
 import {
@@ -15,7 +24,10 @@ import {
   type ReversalDocumentReasonInput,
 } from "../../shared/reasonCodes";
 import { getAppSettings } from "../../shared/settings/store";
-import { appendAuditEvent } from "../../shared/audit/eventLogRepository";
+import {
+  appendAuditEvent,
+  flushPendingAuditEventPersist,
+} from "../../shared/audit/eventLogRepository";
 import { AUDIT_ACTOR_LOCAL_USER } from "../../shared/audit/eventLogTypes";
 import { DEFAULT_STOCK_STYLE } from "@/shared/inventoryStyle";
 import {
@@ -36,6 +48,28 @@ export type CancelDocumentResult =
 export type ReverseDocumentResult =
   | { success: true }
   | { success: false; error: string };
+
+function persistenceErrorMessage(error: unknown, prefix: string): string {
+  const message = error instanceof Error ? error.message : String(error);
+  return `${prefix}: ${message}`;
+}
+
+async function flushReceiptCriticalPersistence(): Promise<void> {
+  const settled = await Promise.allSettled([
+    flushPendingStockMovementPersist(),
+    flushPendingStockBalancePersist(),
+    flushPendingReceiptPersist(),
+    flushPendingPurchaseOrderPersist(),
+    flushPendingAuditEventPersist(),
+  ]);
+  const failures = settled.flatMap((result) => {
+    if (result.status === "fulfilled") return [];
+    return [result.reason instanceof Error ? result.reason.message : String(result.reason)];
+  });
+  if (failures.length > 0) {
+    throw new Error(failures.join(" | "));
+  }
+}
 
 /**
  * Full-pass validation for a receipt (draft factual document).
@@ -219,57 +253,68 @@ export function validateReceiptFull(receiptId: string): Issue[] {
   return issues;
 }
 
-export function post(receiptId: string): PostResult {
+export async function post(receiptId: string): Promise<PostResult> {
   const issues = validateReceiptFull(receiptId);
   const hasErrors = issues.some((i) => i.severity === "error");
   if (hasErrors) return { success: false, issues };
 
-  const receipt = receiptRepository.getById(receiptId)!;
-  const lines = receiptRepository.listLines(receiptId);
-  const now = new Date().toISOString();
+  try {
+    await flushReceiptCriticalPersistence();
 
-  for (const line of lines) {
-    stockMovementRepository.create({
-      datetime: now,
-      movementType: "receipt",
-      itemId: line.itemId,
-      warehouseId: receipt.warehouseId,
-      style: DEFAULT_STOCK_STYLE,
-      qtyDelta: line.qty,
-      sourceDocumentType: "receipt",
-      sourceDocumentId: receiptId,
+    const receipt = receiptRepository.getById(receiptId)!;
+    const lines = receiptRepository.listLines(receiptId);
+    const now = new Date().toISOString();
+
+    for (const line of lines) {
+      stockMovementRepository.create({
+        datetime: now,
+        movementType: "receipt",
+        itemId: line.itemId,
+        warehouseId: receipt.warehouseId,
+        style: DEFAULT_STOCK_STYLE,
+        qtyDelta: line.qty,
+        sourceDocumentType: "receipt",
+        sourceDocumentId: receiptId,
+      });
+
+      stockBalanceRepository.adjustQty({
+        itemId: line.itemId,
+        warehouseId: receipt.warehouseId,
+        style: DEFAULT_STOCK_STYLE,
+        qtyDelta: line.qty,
+      });
+    }
+
+    const prevStatus = receipt.status;
+    receiptRepository.update(receiptId, { status: "posted" });
+    const poFulfillment = computePurchaseOrderFulfillment(receipt.purchaseOrderId);
+    const autoClose = getAppSettings().documents.autoClosePlanningOnFullFulfillment;
+    const nextPoStatus =
+      autoClose && poFulfillment.state === "complete" ? "closed" : "confirmed";
+    purchaseOrderRepository.update(receipt.purchaseOrderId, {
+      status: nextPoStatus,
+    });
+    appendAuditEvent({
+      entityType: "receipt",
+      entityId: receiptId,
+      eventType: "document_posted",
+      actor: AUDIT_ACTOR_LOCAL_USER,
+      payload: {
+        documentNumber: receipt.number,
+        previousStatus: prevStatus,
+        newStatus: "posted" as const,
+        purchaseOrderId: receipt.purchaseOrderId,
+      },
     });
 
-    stockBalanceRepository.adjustQty({
-      itemId: line.itemId,
-      warehouseId: receipt.warehouseId,
-      style: DEFAULT_STOCK_STYLE,
-      qtyDelta: line.qty,
-    });
+    await flushReceiptCriticalPersistence();
+    return { success: true };
+  } catch (error) {
+    return {
+      success: false,
+      issues: [actionIssue(persistenceErrorMessage(error, "Receipt post failed"))],
+    };
   }
-
-  const prevStatus = receipt.status;
-  receiptRepository.update(receiptId, { status: "posted" });
-  const poFulfillment = computePurchaseOrderFulfillment(receipt.purchaseOrderId);
-  const autoClose = getAppSettings().documents.autoClosePlanningOnFullFulfillment;
-  const nextPoStatus =
-    autoClose && poFulfillment.state === "complete" ? "closed" : "confirmed";
-  purchaseOrderRepository.update(receipt.purchaseOrderId, {
-    status: nextPoStatus,
-  });
-  appendAuditEvent({
-    entityType: "receipt",
-    entityId: receiptId,
-    eventType: "document_posted",
-    actor: AUDIT_ACTOR_LOCAL_USER,
-    payload: {
-      documentNumber: receipt.number,
-      previousStatus: prevStatus,
-      newStatus: "posted" as const,
-      purchaseOrderId: receipt.purchaseOrderId,
-    },
-  });
-  return { success: true };
 }
 
 export function cancelDocument(
@@ -313,10 +358,10 @@ export function cancelDocument(
  * Full reversal of a posted receipt: compensating stock movements (receipt_reversal),
  * balances reduced, status → reversed, linked PO reopened to confirmed. One-time only.
  */
-export function reverseDocument(
+export async function reverseDocument(
   receiptId: string,
   input: ReversalDocumentReasonInput,
-): ReverseDocumentResult {
+): Promise<ReverseDocumentResult> {
   const resolved = resolveReversalDocumentReasonForService(
     input,
     getAppSettings().documents.requireReversalReason,
@@ -357,57 +402,64 @@ export function reverseDocument(
     }
   }
 
-  const now = new Date().toISOString();
-  const reasonCode = resolved.code;
-  const revComment = resolved.comment;
+  try {
+    await flushReceiptCriticalPersistence();
 
-  for (const line of lines) {
-    const qty = parseDocumentLineQty(line.qty)!;
-    stockMovementRepository.create({
-      datetime: now,
-      movementType: "receipt_reversal",
-      itemId: line.itemId,
-      warehouseId: receipt.warehouseId,
-      style: DEFAULT_STOCK_STYLE,
-      qtyDelta: -qty,
-      sourceDocumentType: "receipt",
-      sourceDocumentId: receiptId,
-      comment: "Receipt reversal (compensating movement)",
-    });
-    stockBalanceRepository.adjustQty({
-      itemId: line.itemId,
-      warehouseId: receipt.warehouseId,
-      style: DEFAULT_STOCK_STYLE,
-      qtyDelta: -qty,
-    });
-  }
+    const now = new Date().toISOString();
+    const reasonCode = resolved.code;
+    const revComment = resolved.comment;
 
-  const prevStatus = receipt.status;
-  receiptRepository.update(receiptId, {
-    status: "reversed",
-    reversalReasonCode: reasonCode,
-    ...(revComment !== undefined ? { reversalReasonComment: revComment } : {}),
-  });
+    for (const line of lines) {
+      const qty = parseDocumentLineQty(line.qty)!;
+      stockMovementRepository.create({
+        datetime: now,
+        movementType: "receipt_reversal",
+        itemId: line.itemId,
+        warehouseId: receipt.warehouseId,
+        style: DEFAULT_STOCK_STYLE,
+        qtyDelta: -qty,
+        sourceDocumentType: "receipt",
+        sourceDocumentId: receiptId,
+        comment: "Receipt reversal (compensating movement)",
+      });
+      stockBalanceRepository.adjustQty({
+        itemId: line.itemId,
+        warehouseId: receipt.warehouseId,
+        style: DEFAULT_STOCK_STYLE,
+        qtyDelta: -qty,
+      });
+    }
 
-  purchaseOrderRepository.update(receipt.purchaseOrderId, { status: "confirmed" });
-
-  appendAuditEvent({
-    entityType: "receipt",
-    entityId: receiptId,
-    eventType: "document_reversed",
-    actor: AUDIT_ACTOR_LOCAL_USER,
-    payload: {
-      documentNumber: receipt.number,
-      previousStatus: prevStatus,
-      newStatus: "reversed" as const,
+    const prevStatus = receipt.status;
+    receiptRepository.update(receiptId, {
+      status: "reversed",
       reversalReasonCode: reasonCode,
-      reversalReasonComment: revComment ?? null,
-      movementLineCount: lines.length,
-      purchaseOrderId: receipt.purchaseOrderId,
-    },
-  });
+      ...(revComment !== undefined ? { reversalReasonComment: revComment } : {}),
+    });
 
-  return { success: true };
+    purchaseOrderRepository.update(receipt.purchaseOrderId, { status: "confirmed" });
+
+    appendAuditEvent({
+      entityType: "receipt",
+      entityId: receiptId,
+      eventType: "document_reversed",
+      actor: AUDIT_ACTOR_LOCAL_USER,
+      payload: {
+        documentNumber: receipt.number,
+        previousStatus: prevStatus,
+        newStatus: "reversed" as const,
+        reversalReasonCode: reasonCode,
+        reversalReasonComment: revComment ?? null,
+        movementLineCount: lines.length,
+        purchaseOrderId: receipt.purchaseOrderId,
+      },
+    });
+
+    await flushReceiptCriticalPersistence();
+    return { success: true };
+  } catch (error) {
+    return { success: false, error: persistenceErrorMessage(error, "Receipt reverse failed") };
+  }
 }
 
 export const receiptService = {

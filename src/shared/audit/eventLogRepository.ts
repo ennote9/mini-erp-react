@@ -14,6 +14,7 @@ let nextId = 1;
 let persistChain: Promise<void> = Promise.resolve();
 let persistDepth = 0;
 let lastWriteError: string | null = null;
+let pendingWriteErrors: string[] = [];
 
 function computeNextNumericId(records: Array<{ id: string }>): number {
   let max = 0;
@@ -64,7 +65,11 @@ export function getLastAuditEventPersistError(): string | null {
 
 export async function flushPendingAuditEventPersist(): Promise<void> {
   await persistChain;
-  if (lastWriteError) throw new Error(lastWriteError);
+  if (pendingWriteErrors.length > 0) {
+    const message = pendingWriteErrors.join(" | ");
+    pendingWriteErrors = [];
+    throw new Error(message);
+  }
 }
 
 function schedulePersist(): void {
@@ -76,6 +81,7 @@ function schedulePersist(): void {
         lastWriteError = null;
       } catch (e) {
         lastWriteError = e instanceof Error ? e.message : String(e);
+        pendingWriteErrors.push(lastWriteError);
         if (import.meta.env.DEV) {
           console.error("[auditEventRepository] persist failed:", e);
         }

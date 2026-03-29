@@ -203,8 +203,17 @@ describe.sequential("Receipt and Shipment durability failure paths", () => {
         throw new Error("purchase order update exploded");
       });
 
-    expect(() => modules.receiptService.post(receiptId)).toThrow("purchase order update exploded");
+    const postResult = await modules.receiptService.post(receiptId);
+    expect(postResult.success).toBe(false);
     expect(poUpdateSpy).toHaveBeenCalled();
+    if (postResult.success) return;
+    expect(postResult.issues).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          message: expect.stringContaining("Receipt post failed: purchase order update exploded"),
+        }),
+      ]),
+    );
 
     expect(modules.receiptRepository.getById(receiptId)?.status).toBe("posted");
     expect(
@@ -234,15 +243,18 @@ describe.sequential("Receipt and Shipment durability failure paths", () => {
     expect(createResult.success).toBe(true);
     if (!createResult.success) return;
     const receiptId = createResult.receiptId;
-    expect(modules.receiptService.post(receiptId)).toEqual({ success: true });
+    expect(await modules.receiptService.post(receiptId)).toEqual({ success: true });
 
     vi.spyOn(modules.stockBalanceRepository, "adjustQty").mockImplementation(() => {
       throw new Error("stock balance reversal exploded");
     });
 
-    expect(() =>
-      modules.receiptService.reverseDocument(receiptId, { reversalReasonCode: "OTHER" }),
-    ).toThrow("stock balance reversal exploded");
+    expect(
+      await modules.receiptService.reverseDocument(receiptId, { reversalReasonCode: "OTHER" }),
+    ).toEqual({
+      success: false,
+      error: "Receipt reverse failed: stock balance reversal exploded",
+    });
 
     expect(modules.receiptRepository.getById(receiptId)?.status).toBe("posted");
     expect(
@@ -280,8 +292,17 @@ describe.sequential("Receipt and Shipment durability failure paths", () => {
         throw new Error("sales order update exploded");
       });
 
-    expect(() => modules.shipmentService.post(shipmentId)).toThrow("sales order update exploded");
+    const postResult = await modules.shipmentService.post(shipmentId);
+    expect(postResult.success).toBe(false);
     expect(soUpdateSpy).toHaveBeenCalled();
+    if (postResult.success) return;
+    expect(postResult.issues).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          message: expect.stringContaining("Shipment post failed: sales order update exploded"),
+        }),
+      ]),
+    );
 
     expect(modules.shipmentRepository.getById(shipmentId)?.status).toBe("posted");
     expect(
@@ -323,15 +344,18 @@ describe.sequential("Receipt and Shipment durability failure paths", () => {
     expect(createResult.success).toBe(true);
     if (!createResult.success) return;
     const shipmentId = createResult.shipmentId;
-    expect(modules.shipmentService.post(shipmentId)).toEqual({ success: true });
+    expect(await modules.shipmentService.post(shipmentId)).toEqual({ success: true });
 
     vi.spyOn(modules.stockBalanceRepository, "adjustQty").mockImplementation(() => {
       throw new Error("shipment reversal balance exploded");
     });
 
-    expect(() =>
-      modules.shipmentService.reverseDocument(shipmentId, { reversalReasonCode: "OTHER" }),
-    ).toThrow("shipment reversal balance exploded");
+    expect(
+      await modules.shipmentService.reverseDocument(shipmentId, { reversalReasonCode: "OTHER" }),
+    ).toEqual({
+      success: false,
+      error: "Shipment reverse failed: shipment reversal balance exploded",
+    });
 
     expect(modules.shipmentRepository.getById(shipmentId)?.status).toBe("posted");
     expect(
@@ -363,20 +387,22 @@ describe.sequential("Receipt and Shipment durability failure paths", () => {
       message: "Injected stock-movement persist failure",
     });
 
-    const postResult = modules.receiptService.post(createResult.receiptId);
-    expect(postResult).toEqual({ success: true });
+    const postResult = await modules.receiptService.post(createResult.receiptId);
+    expect(postResult.success).toBe(false);
+    if (postResult.success) return;
+    expect(postResult.issues).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          message: expect.stringContaining("Injected stock-movement persist failure"),
+        }),
+      ]),
+    );
 
     expect(modules.receiptRepository.getById(createResult.receiptId)?.status).toBe("posted");
     expect(
       modules.stockMovementRepository.list().filter((row) => row.sourceDocumentId === createResult.receiptId),
     ).toHaveLength(1);
-
-    await expect(modules.flushAllPendingPersistence()).rejects.toMatchObject({
-      name: "PersistenceFlushError",
-      failures: expect.arrayContaining([
-        expect.objectContaining({ moduleId: "stock-movements" }),
-      ]),
-    });
+    await expect(modules.flushAllPendingPersistence()).resolves.toBeUndefined();
   });
 
   it("shipment post returns success before async document persistence failure is surfaced", async () => {
@@ -392,18 +418,19 @@ describe.sequential("Receipt and Shipment durability failure paths", () => {
     modules.mockFs.injectWriteFileFailure("documents/shipments.json.tmp", {
       message: "Injected shipment persist failure",
     });
-    const consoleErrorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
-
-    const postResult = modules.shipmentService.post(createResult.shipmentId);
-    expect(postResult).toEqual({ success: true });
-
-    expect(modules.shipmentRepository.getById(createResult.shipmentId)?.status).toBe("posted");
-    expect(modules.salesOrderRepository.getById(so.id)?.status).toBe("closed");
-
-    await expect(modules.flushAllPendingPersistence()).resolves.toBeUndefined();
-    expect(consoleErrorSpy).toHaveBeenCalledWith(
-      "[shipmentRepository] persist failed:",
-      expect.objectContaining({ message: "Injected shipment persist failure" }),
+    const postResult = await modules.shipmentService.post(createResult.shipmentId);
+    expect(postResult.success).toBe(false);
+    if (postResult.success) return;
+    expect(postResult.issues).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          message: expect.stringContaining("Injected shipment persist failure"),
+        }),
+      ]),
     );
+
+    expect(modules.shipmentRepository.getById(createResult.shipmentId)?.status).toBe("draft");
+    expect(modules.salesOrderRepository.getById(so.id)?.status).toBe("confirmed");
+    await expect(modules.flushAllPendingPersistence()).resolves.toBeUndefined();
   });
 });

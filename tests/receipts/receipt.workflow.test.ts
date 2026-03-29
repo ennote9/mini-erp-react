@@ -174,7 +174,7 @@ describe.sequential("Receipt workflow", () => {
     const beforeBalance =
       modules.stockBalanceRepository.getByItemWarehouseAndStyle("1", po.warehouseId, "GOOD")?.qtyOnHand ?? 0;
 
-    const postResult = modules.receiptService.post(receiptId);
+    const postResult = await modules.receiptService.post(receiptId);
     expect(postResult).toEqual({ success: true });
 
     const receipt = modules.receiptRepository.getById(receiptId);
@@ -202,7 +202,7 @@ describe.sequential("Receipt workflow", () => {
     const audit = modules.listAuditEventsForEntity("receipt", receiptId);
     expect(audit.map((row) => row.eventType)).toContain("document_posted");
 
-    const repostResult = modules.receiptService.post(receiptId);
+    const repostResult = await modules.receiptService.post(receiptId);
     expect(repostResult.success).toBe(false);
     if (repostResult.success) return;
     expect(repostResult.issues).toEqual(
@@ -259,10 +259,10 @@ describe.sequential("Receipt workflow", () => {
     if (!createResult.success) return;
 
     const receiptId = createResult.receiptId;
-    expect(modules.receiptService.post(receiptId)).toEqual({ success: true });
+    expect(await modules.receiptService.post(receiptId)).toEqual({ success: true });
     expect(modules.purchaseOrderRepository.getById(po.id)?.status).toBe("closed");
 
-    const reverseResult = modules.receiptService.reverseDocument(receiptId, {
+    const reverseResult = await modules.receiptService.reverseDocument(receiptId, {
       reversalReasonCode: "OTHER",
       reversalReasonComment: "Undo inbound",
     });
@@ -304,7 +304,7 @@ describe.sequential("Receipt workflow", () => {
     if (!createResult.success) return;
 
     const receiptId = createResult.receiptId;
-    expect(modules.receiptService.post(receiptId)).toEqual({ success: true });
+    expect(await modules.receiptService.post(receiptId)).toEqual({ success: true });
 
     modules.stockBalanceRepository.adjustQty({
       itemId: "1",
@@ -313,7 +313,7 @@ describe.sequential("Receipt workflow", () => {
       qtyDelta: -6,
     });
 
-    const reverseResult = modules.receiptService.reverseDocument(receiptId, {
+    const reverseResult = await modules.receiptService.reverseDocument(receiptId, {
       reversalReasonCode: "OTHER",
       reversalReasonComment: "Undo inbound",
     });
@@ -484,14 +484,14 @@ describe.sequential("Receipt workflow", () => {
     expect(postedCreate.success).toBe(true);
     if (!postedCreate.success) return;
 
-    expect(modules.receiptService.post(postedCreate.receiptId)).toEqual({ success: true });
+    expect(await modules.receiptService.post(postedCreate.receiptId)).toEqual({ success: true });
     const postedFulfillment = modules.computePurchaseOrderFulfillment(po.id);
     expect(postedFulfillment.totalReceived).toBe(10);
     expect(postedFulfillment.postedReceiptCount).toBe(1);
     expect(postedFulfillment.state).toBe("complete");
 
     expect(
-      modules.receiptService.reverseDocument(postedCreate.receiptId, { reversalReasonCode: "OTHER" }),
+      await modules.receiptService.reverseDocument(postedCreate.receiptId, { reversalReasonCode: "OTHER" }),
     ).toEqual({ success: true });
     const reversedFulfillment = modules.computePurchaseOrderFulfillment(po.id);
     expect(reversedFulfillment.totalReceived).toBe(0);
