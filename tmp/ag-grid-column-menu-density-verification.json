@@ -1,0 +1,27 @@
+{
+  "baseUrl": "http://127.0.0.1:1420",
+  "verifiedAt": "2026-03-29T16:35:56.319Z",
+  "header": {
+    "label": "Code",
+    "x": 391,
+    "width": 130
+  },
+  "popup": {
+    "x": 403,
+    "width": 280,
+    "height": 353,
+    "leftOffset": 12,
+    "rightOverhang": 162,
+    "className": "z-50 origin-(--radix-popover-content-transform-origin) rounded-md border border-input bg-popover text-popover-foreground shadow-md outline-hidden data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95 data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95 w-[17.5rem] space-y-2 p-2.5"
+  },
+  "density": {
+    "sortButtonHeight": 28,
+    "resetButtonHeight": 28,
+    "okButtonHeight": 28,
+    "valueInputHeight": 28
+  },
+  "logicStillWorks": {
+    "sortUrl": "http://127.0.0.1:1420/items?sort=code%3Aasc&cf=code%7Eequals%7EITEM-001",
+    "firstCode": "ITEM-001"
+  }
+}

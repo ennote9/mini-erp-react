@@ -4,7 +4,7 @@ import { ArrowDown, ArrowUp, ArrowUpDown, Check, ChevronDown } from "lucide-reac
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Popover, PopoverAnchor, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Textarea } from "@/components/ui/textarea";
 import { useTranslation } from "@/shared/i18n/context";
 import type {
@@ -498,15 +498,15 @@ function AgGridColumnFilterHeader(props: HeaderParams) {
               value={optionSearch}
               onChange={(event) => setOptionSearch(event.target.value)}
               placeholder={uiLabel(t, "gridFilters.searchOptions", "Search values")}
-              className="h-8 text-sm"
+              className="h-7 text-xs"
             />
-            <div className="max-h-44 overflow-y-auto rounded-md border border-input p-2">
+            <div className="max-h-40 overflow-y-auto rounded-md border border-input p-1.5">
               {visibleOptions.length > 0 ? (
-                <div className="flex flex-col gap-1.5">
+                <div className="flex flex-col gap-1">
                   {visibleOptions.map((option) => {
                     const checked = draft.values.includes(option.value);
                     return (
-                      <label key={option.value} className="flex items-center gap-2 text-sm">
+                      <label key={option.value} className="flex items-center gap-2 text-xs">
                         <input
                           type="checkbox"
                           checked={checked}
@@ -536,7 +536,7 @@ function AgGridColumnFilterHeader(props: HeaderParams) {
 
       return (
         <select
-          className="h-8 w-full rounded-md border border-input bg-background px-2 text-sm text-foreground"
+          className="h-7 w-full rounded-md border border-input bg-background px-2 text-xs text-foreground"
           value={draft.value}
           onChange={(event) => setDraft((current) => ({ ...current, value: event.target.value }))}
         >
@@ -562,27 +562,27 @@ function AgGridColumnFilterHeader(props: HeaderParams) {
           }
           rows={3}
           placeholder={uiLabel(t, "gridFilters.multiValuePlaceholder", "One value per line or separated by commas")}
-          className="text-sm"
+          className="min-h-[56px] text-xs"
         />
       );
     }
 
     if (isRangeOperator(draft.operator)) {
       return (
-        <div className="grid grid-cols-1 gap-2">
+        <div className="grid grid-cols-1 gap-1.5">
           <Input
             type={valueInputType}
             value={draft.value}
             onChange={(event) => setDraft((current) => ({ ...current, value: event.target.value }))}
             placeholder={uiLabel(t, "gridFilters.valueFrom", "From")}
-            className="h-8 text-sm"
+            className="h-7 text-xs"
           />
           <Input
             type={valueInputType}
             value={draft.valueTo}
             onChange={(event) => setDraft((current) => ({ ...current, valueTo: event.target.value }))}
             placeholder={uiLabel(t, "gridFilters.valueTo", "To")}
-            className="h-8 text-sm"
+            className="h-7 text-xs"
           />
         </div>
       );
@@ -594,124 +594,127 @@ function AgGridColumnFilterHeader(props: HeaderParams) {
         value={draft.value}
         onChange={(event) => setDraft((current) => ({ ...current, value: event.target.value }))}
         placeholder={uiLabel(t, "gridFilters.value", "Value")}
-        className="h-8 text-sm"
+        className="h-7 text-xs"
       />
     );
   };
 
   return (
-    <div className="flex h-full w-full items-center justify-between gap-1">
-      <span className={`truncate text-xs font-medium ${active ? "text-primary" : "text-foreground"}`}>
-        {props.displayName}
-      </span>
-      <Popover
-        open={open}
-        onOpenChange={(nextOpen) => {
-          if (nextOpen && config) setDraft(draftFromClause(config, filterClause));
-          setOpen(nextOpen);
-          if (!nextOpen) setOptionSearch("");
-        }}
-      >
-        <PopoverTrigger asChild>
-          <button
-            type="button"
-            className={`relative flex h-6 w-6 shrink-0 items-center justify-center rounded transition-colors ${
-              active || sortActive
-                ? "text-primary hover:bg-accent hover:text-primary"
-                : "text-muted-foreground hover:bg-accent hover:text-foreground"
-            }`}
-            aria-label={uiLabel(t, "gridFilters.columnMenu", "Column menu")}
-          >
-            <ChevronDown className="h-3.5 w-3.5" />
-            {active ? <span className="absolute right-0 top-0 h-1.5 w-1.5 rounded-full bg-primary" /> : null}
-          </button>
-        </PopoverTrigger>
-        <PopoverContent
-          align="start"
-          side="bottom"
-          className="w-80 space-y-3 p-3"
-          onOpenAutoFocus={(event) => event.preventDefault()}
-        >
-          <div className="space-y-1">
-            <div className="text-sm font-semibold">{props.displayName}</div>
-            <div className="text-xs text-muted-foreground">
-              {uiLabel(t, "gridFilters.columnMenuDescription", "Sort and filter this column")}
-            </div>
-          </div>
-          <div className="space-y-2 border-b border-border pb-3">
-            <div className="text-xs font-medium text-muted-foreground">
-              {uiLabel(t, "gridFilters.sortSection", "Sort")}
-            </div>
-            <div className="grid grid-cols-1 gap-1.5">
-              <Button
-                type="button"
-                variant={sortDirection === "asc" ? "default" : "outline"}
-                size="sm"
-                className="justify-start"
-                onClick={() => applySort("asc")}
-              >
-                <ArrowUp className="mr-1.5 h-3.5 w-3.5" />
-                {sortActionLabel(t, "asc")}
-              </Button>
-              <Button
-                type="button"
-                variant={sortDirection === "desc" ? "default" : "outline"}
-                size="sm"
-                className="justify-start"
-                onClick={() => applySort("desc")}
-              >
-                <ArrowDown className="mr-1.5 h-3.5 w-3.5" />
-                {sortActionLabel(t, "desc")}
-              </Button>
-              <Button
-                type="button"
-                variant={sortDirection === null ? "default" : "outline"}
-                size="sm"
-                className="justify-start"
-                onClick={() => applySort(null)}
-              >
-                <ArrowUpDown className="mr-1.5 h-3.5 w-3.5" />
-                {sortActionLabel(t, "clear")}
-              </Button>
-            </div>
-          </div>
-          <div className="space-y-1.5">
-            <div className="text-xs font-medium text-muted-foreground">
-              {uiLabel(t, "gridFilters.filterSection", "Filter")}
-            </div>
-            <Label className="text-xs">{uiLabel(t, "gridFilters.operatorLabel", "Operator")}</Label>
-            <select
-              className="h-8 w-full rounded-md border border-input bg-background px-2 text-sm text-foreground"
-              value={draft.operator}
-              onChange={(event) =>
-                setDraft({
-                  operator: event.target.value as AgGridFilterOperator,
-                  value: "",
-                  valueTo: "",
-                  values: [],
-                })
-              }
+    <Popover
+      open={open}
+      onOpenChange={(nextOpen) => {
+        if (nextOpen && config) setDraft(draftFromClause(config, filterClause));
+        setOpen(nextOpen);
+        if (!nextOpen) setOptionSearch("");
+      }}
+    >
+      <PopoverAnchor asChild>
+        <div className="flex h-full w-full items-center justify-between gap-0.5">
+          <span className={`truncate pr-1 text-xs font-medium ${active ? "text-primary" : "text-foreground"}`}>
+            {props.displayName}
+          </span>
+          <PopoverTrigger asChild>
+            <button
+              type="button"
+              className={`relative flex h-5.5 w-5.5 shrink-0 items-center justify-center rounded transition-colors ${
+                active || sortActive
+                  ? "text-primary hover:bg-accent hover:text-primary"
+                  : "text-muted-foreground hover:bg-accent hover:text-foreground"
+              }`}
+              aria-label={uiLabel(t, "gridFilters.columnMenu", "Column menu")}
             >
-              {operators.map((operator) => (
-                <option key={operator} value={operator}>
-                  {operatorLabel(t, operator)}
-                </option>
-              ))}
-            </select>
+              <ChevronDown className="h-3 w-3" />
+              {active ? <span className="absolute right-0 top-0 h-1.5 w-1.5 rounded-full bg-primary" /> : null}
+            </button>
+          </PopoverTrigger>
+        </div>
+      </PopoverAnchor>
+      <PopoverContent
+        align="start"
+        side="bottom"
+        sideOffset={2}
+        className="w-[17.5rem] space-y-2 p-2.5"
+        onOpenAutoFocus={(event) => event.preventDefault()}
+      >
+        <div className="space-y-0.5">
+          <div className="text-sm font-semibold leading-none">{props.displayName}</div>
+          <div className="text-[11px] leading-snug text-muted-foreground">
+            {uiLabel(t, "gridFilters.columnMenuDescription", "Sort and filter this column")}
           </div>
-          {renderValueInputs()}
-          <div className="flex items-center justify-end gap-2">
-            <Button type="button" variant="outline" size="sm" onClick={resetDraft}>
-              {uiLabel(t, "gridFilters.reset", "Reset")}
+        </div>
+        <div className="space-y-1.5 border-b border-border pb-2">
+          <div className="text-[11px] font-medium text-muted-foreground">
+            {uiLabel(t, "gridFilters.sortSection", "Sort")}
+          </div>
+          <div className="grid grid-cols-1 gap-1">
+            <Button
+              type="button"
+              variant={sortDirection === "asc" ? "default" : "outline"}
+              size="sm"
+              className="h-7 justify-start px-2 text-xs"
+              onClick={() => applySort("asc")}
+            >
+              <ArrowUp className="mr-1.5 h-3 w-3" />
+              {sortActionLabel(t, "asc")}
             </Button>
-            <Button type="button" size="sm" disabled={!isDraftComplete(draft)} onClick={applyDraft}>
-              <Check className="mr-1 h-3.5 w-3.5" />
-              {uiLabel(t, "gridFilters.ok", "OK")}
+            <Button
+              type="button"
+              variant={sortDirection === "desc" ? "default" : "outline"}
+              size="sm"
+              className="h-7 justify-start px-2 text-xs"
+              onClick={() => applySort("desc")}
+            >
+              <ArrowDown className="mr-1.5 h-3 w-3" />
+              {sortActionLabel(t, "desc")}
+            </Button>
+            <Button
+              type="button"
+              variant={sortDirection === null ? "default" : "outline"}
+              size="sm"
+              className="h-7 justify-start px-2 text-xs"
+              onClick={() => applySort(null)}
+            >
+              <ArrowUpDown className="mr-1.5 h-3 w-3" />
+              {sortActionLabel(t, "clear")}
             </Button>
           </div>
-        </PopoverContent>
-      </Popover>
-    </div>
+        </div>
+        <div className="space-y-1">
+          <div className="text-[11px] font-medium text-muted-foreground">
+            {uiLabel(t, "gridFilters.filterSection", "Filter")}
+          </div>
+          <Label className="text-[11px]">{uiLabel(t, "gridFilters.operatorLabel", "Operator")}</Label>
+          <select
+            className="h-7 w-full rounded-md border border-input bg-background px-2 text-xs text-foreground"
+            value={draft.operator}
+            onChange={(event) =>
+              setDraft({
+                operator: event.target.value as AgGridFilterOperator,
+                value: "",
+                valueTo: "",
+                values: [],
+              })
+            }
+          >
+            {operators.map((operator) => (
+              <option key={operator} value={operator}>
+                {operatorLabel(t, operator)}
+              </option>
+            ))}
+          </select>
+        </div>
+        {renderValueInputs()}
+        <div className="flex items-center justify-end gap-1.5">
+          <Button type="button" variant="outline" size="sm" className="h-7 px-2 text-xs" onClick={resetDraft}>
+            {uiLabel(t, "gridFilters.reset", "Reset")}
+          </Button>
+          <Button type="button" size="sm" className="h-7 px-2 text-xs" disabled={!isDraftComplete(draft)} onClick={applyDraft}>
+            <Check className="mr-1 h-3 w-3" />
+            {uiLabel(t, "gridFilters.ok", "OK")}
+          </Button>
+        </div>
+      </PopoverContent>
+    </Popover>
   );
 }
 
