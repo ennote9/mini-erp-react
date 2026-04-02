@@ -1,0 +1,92 @@
+{
+  "initialSettingsPage": {
+    "theme": {
+      "htmlClass": "light",
+      "isLight": true,
+      "isDark": false,
+      "storedSettings": "{\"version\":1,\"settings\":{\"general\":{\"locale\":\"ru\"}}}"
+    },
+    "selectedThemeLabel": "Светлая"
+  },
+  "themeOptionsRu": [
+    "Выбрать",
+    "Светлая",
+    "Тёмная",
+    "Системная"
+  ],
+  "darkSelection": {
+    "afterSelect": {
+      "htmlClass": "dark",
+      "isLight": false,
+      "isDark": true,
+      "storedSettings": "{\"version\":1,\"settings\":{\"general\":{\"workspaceMode\":\"advanced\",\"profileOverrides\":{\"documentEventLog\":true,\"reverseDocumentActions\":true,\"stockMovementsNav\":true,\"advancedStockBalanceAnalytics\":true,\"stockBalanceSourceModal\":true,\"allocationControls\":true},\"locale\":\"ru\",\"theme\":\"dark\",\"dateFormat\":\"iso\",\"numberFormat\":\"commaDot\",\"hotkeysEnabled\":true},\"documents\":{\"blockConfirmWhenPlanningHasBlockingErrors\":true,\"blockPostWhenFactualHasBlockingErrors\":true,\"showDocumentEventLog\":true,\"requireCancelReason\":true,\"requireReversalReason\":true,\"autoClosePlanningOnFullFulfillment\":true,\"singleDraftReceiptPerPurchaseOrder\":true,\"singleDraftShipmentPerSalesOrder\":true},\"inventory\":{\"reservationsEnabled\":true,\"requireReservationBeforeShipment\":true,\"allocationMode\":\"manual\",\"releaseReservationsOnSalesOrderCancel\":true,\"releaseReservationsOnSalesOrderClose\":true,\"reconcileReservationsOnSalesOrderSaveConfirm\":true},\"commercial\":{\"moneyDecimalPlaces\":2,\"zeroPriceLinesRequireReason\":true,\"partnerTermsOverwrite\":\"document_wins\"},\"dataAudit\":{\"auditLogEnabled\":true,\"showAppVersion\":true}}}"
+    },
+    "afterReload": {
+      "htmlClass": "dark",
+      "isLight": false,
+      "isDark": true,
+      "storedSettings": "{\"version\":1,\"settings\":{\"general\":{\"workspaceMode\":\"advanced\",\"profileOverrides\":{\"documentEventLog\":true,\"reverseDocumentActions\":true,\"stockMovementsNav\":true,\"advancedStockBalanceAnalytics\":true,\"stockBalanceSourceModal\":true,\"allocationControls\":true},\"locale\":\"ru\",\"theme\":\"dark\",\"dateFormat\":\"iso\",\"numberFormat\":\"commaDot\",\"hotkeysEnabled\":true},\"documents\":{\"blockConfirmWhenPlanningHasBlockingErrors\":true,\"blockPostWhenFactualHasBlockingErrors\":true,\"showDocumentEventLog\":true,\"requireCancelReason\":true,\"requireReversalReason\":true,\"autoClosePlanningOnFullFulfillment\":true,\"singleDraftReceiptPerPurchaseOrder\":true,\"singleDraftShipmentPerSalesOrder\":true},\"inventory\":{\"reservationsEnabled\":true,\"requireReservationBeforeShipment\":true,\"allocationMode\":\"manual\",\"releaseReservationsOnSalesOrderCancel\":true,\"releaseReservationsOnSalesOrderClose\":true,\"reconcileReservationsOnSalesOrderSaveConfirm\":true},\"commercial\":{\"moneyDecimalPlaces\":2,\"zeroPriceLinesRequireReason\":true,\"partnerTermsOverwrite\":\"document_wins\"},\"dataAudit\":{\"auditLogEnabled\":true,\"showAppVersion\":true}}}"
+    },
+    "selectedThemeLabel": "Тёмная"
+  },
+  "lightSelection": {
+    "afterSelect": {
+      "htmlClass": "light",
+      "isLight": true,
+      "isDark": false,
+      "storedSettings": "{\"version\":1,\"settings\":{\"general\":{\"workspaceMode\":\"advanced\",\"profileOverrides\":{\"documentEventLog\":true,\"reverseDocumentActions\":true,\"stockMovementsNav\":true,\"advancedStockBalanceAnalytics\":true,\"stockBalanceSourceModal\":true,\"allocationControls\":true},\"locale\":\"ru\",\"theme\":\"light\",\"dateFormat\":\"iso\",\"numberFormat\":\"commaDot\",\"hotkeysEnabled\":true},\"documents\":{\"blockConfirmWhenPlanningHasBlockingErrors\":true,\"blockPostWhenFactualHasBlockingErrors\":true,\"showDocumentEventLog\":true,\"requireCancelReason\":true,\"requireReversalReason\":true,\"autoClosePlanningOnFullFulfillment\":true,\"singleDraftReceiptPerPurchaseOrder\":true,\"singleDraftShipmentPerSalesOrder\":true},\"inventory\":{\"reservationsEnabled\":true,\"requireReservationBeforeShipment\":true,\"allocationMode\":\"manual\",\"releaseReservationsOnSalesOrderCancel\":true,\"releaseReservationsOnSalesOrderClose\":true,\"reconcileReservationsOnSalesOrderSaveConfirm\":true},\"commercial\":{\"moneyDecimalPlaces\":2,\"zeroPriceLinesRequireReason\":true,\"partnerTermsOverwrite\":\"document_wins\"},\"dataAudit\":{\"auditLogEnabled\":true,\"showAppVersion\":true}}}"
+    },
+    "afterReload": {
+      "htmlClass": "light",
+      "isLight": true,
+      "isDark": false,
+      "storedSettings": "{\"version\":1,\"settings\":{\"general\":{\"workspaceMode\":\"advanced\",\"profileOverrides\":{\"documentEventLog\":true,\"reverseDocumentActions\":true,\"stockMovementsNav\":true,\"advancedStockBalanceAnalytics\":true,\"stockBalanceSourceModal\":true,\"allocationControls\":true},\"locale\":\"ru\",\"theme\":\"light\",\"dateFormat\":\"iso\",\"numberFormat\":\"commaDot\",\"hotkeysEnabled\":true},\"documents\":{\"blockConfirmWhenPlanningHasBlockingErrors\":true,\"blockPostWhenFactualHasBlockingErrors\":true,\"showDocumentEventLog\":true,\"requireCancelReason\":true,\"requireReversalReason\":true,\"autoClosePlanningOnFullFulfillment\":true,\"singleDraftReceiptPerPurchaseOrder\":true,\"singleDraftShipmentPerSalesOrder\":true},\"inventory\":{\"reservationsEnabled\":true,\"requireReservationBeforeShipment\":true,\"allocationMode\":\"manual\",\"releaseReservationsOnSalesOrderCancel\":true,\"releaseReservationsOnSalesOrderClose\":true,\"reconcileReservationsOnSalesOrderSaveConfirm\":true},\"commercial\":{\"moneyDecimalPlaces\":2,\"zeroPriceLinesRequireReason\":true,\"partnerTermsOverwrite\":\"document_wins\"},\"dataAudit\":{\"auditLogEnabled\":true,\"showAppVersion\":true}}}"
+    },
+    "selectedThemeLabel": "Светлая"
+  },
+  "systemSelection": {
+    "afterSelect": {
+      "htmlClass": "light",
+      "isLight": true,
+      "isDark": false,
+      "storedSettings": "{\"version\":1,\"settings\":{\"general\":{\"workspaceMode\":\"advanced\",\"profileOverrides\":{\"documentEventLog\":true,\"reverseDocumentActions\":true,\"stockMovementsNav\":true,\"advancedStockBalanceAnalytics\":true,\"stockBalanceSourceModal\":true,\"allocationControls\":true},\"locale\":\"ru\",\"theme\":\"system\",\"dateFormat\":\"iso\",\"numberFormat\":\"commaDot\",\"hotkeysEnabled\":true},\"documents\":{\"blockConfirmWhenPlanningHasBlockingErrors\":true,\"blockPostWhenFactualHasBlockingErrors\":true,\"showDocumentEventLog\":true,\"requireCancelReason\":true,\"requireReversalReason\":true,\"autoClosePlanningOnFullFulfillment\":true,\"singleDraftReceiptPerPurchaseOrder\":true,\"singleDraftShipmentPerSalesOrder\":true},\"inventory\":{\"reservationsEnabled\":true,\"requireReservationBeforeShipment\":true,\"allocationMode\":\"manual\",\"releaseReservationsOnSalesOrderCancel\":true,\"releaseReservationsOnSalesOrderClose\":true,\"reconcileReservationsOnSalesOrderSaveConfirm\":true},\"commercial\":{\"moneyDecimalPlaces\":2,\"zeroPriceLinesRequireReason\":true,\"partnerTermsOverwrite\":\"document_wins\"},\"dataAudit\":{\"auditLogEnabled\":true,\"showAppVersion\":true}}}"
+    },
+    "afterReload": {
+      "htmlClass": "light",
+      "isLight": true,
+      "isDark": false,
+      "storedSettings": "{\"version\":1,\"settings\":{\"general\":{\"workspaceMode\":\"advanced\",\"profileOverrides\":{\"documentEventLog\":true,\"reverseDocumentActions\":true,\"stockMovementsNav\":true,\"advancedStockBalanceAnalytics\":true,\"stockBalanceSourceModal\":true,\"allocationControls\":true},\"locale\":\"ru\",\"theme\":\"system\",\"dateFormat\":\"iso\",\"numberFormat\":\"commaDot\",\"hotkeysEnabled\":true},\"documents\":{\"blockConfirmWhenPlanningHasBlockingErrors\":true,\"blockPostWhenFactualHasBlockingErrors\":true,\"showDocumentEventLog\":true,\"requireCancelReason\":true,\"requireReversalReason\":true,\"autoClosePlanningOnFullFulfillment\":true,\"singleDraftReceiptPerPurchaseOrder\":true,\"singleDraftShipmentPerSalesOrder\":true},\"inventory\":{\"reservationsEnabled\":true,\"requireReservationBeforeShipment\":true,\"allocationMode\":\"manual\",\"releaseReservationsOnSalesOrderCancel\":true,\"releaseReservationsOnSalesOrderClose\":true,\"reconcileReservationsOnSalesOrderSaveConfirm\":true},\"commercial\":{\"moneyDecimalPlaces\":2,\"zeroPriceLinesRequireReason\":true,\"partnerTermsOverwrite\":\"document_wins\"},\"dataAudit\":{\"auditLogEnabled\":true,\"showAppVersion\":true}}}"
+    },
+    "selectedThemeLabel": "Системная"
+  },
+  "pagesAfterLight": [
+    {
+      "route": "/items",
+      "theme": {
+        "htmlClass": "light",
+        "isLight": true,
+        "isDark": false,
+        "storedSettings": "{\"version\":1,\"settings\":{\"general\":{\"workspaceMode\":\"advanced\",\"profileOverrides\":{\"documentEventLog\":true,\"reverseDocumentActions\":true,\"stockMovementsNav\":true,\"advancedStockBalanceAnalytics\":true,\"stockBalanceSourceModal\":true,\"allocationControls\":true},\"locale\":\"ru\",\"theme\":\"light\",\"dateFormat\":\"iso\",\"numberFormat\":\"commaDot\",\"hotkeysEnabled\":true},\"documents\":{\"blockConfirmWhenPlanningHasBlockingErrors\":true,\"blockPostWhenFactualHasBlockingErrors\":true,\"showDocumentEventLog\":true,\"requireCancelReason\":true,\"requireReversalReason\":true,\"autoClosePlanningOnFullFulfillment\":true,\"singleDraftReceiptPerPurchaseOrder\":true,\"singleDraftShipmentPerSalesOrder\":true},\"inventory\":{\"reservationsEnabled\":true,\"requireReservationBeforeShipment\":true,\"allocationMode\":\"manual\",\"releaseReservationsOnSalesOrderCancel\":true,\"releaseReservationsOnSalesOrderClose\":true,\"reconcileReservationsOnSalesOrderSaveConfirm\":true},\"commercial\":{\"moneyDecimalPlaces\":2,\"zeroPriceLinesRequireReason\":true,\"partnerTermsOverwrite\":\"document_wins\"},\"dataAudit\":{\"auditLogEnabled\":true,\"showAppVersion\":true}}}"
+      }
+    },
+    {
+      "route": "/purchase-orders",
+      "theme": {
+        "htmlClass": "light",
+        "isLight": true,
+        "isDark": false,
+        "storedSettings": "{\"version\":1,\"settings\":{\"general\":{\"workspaceMode\":\"advanced\",\"profileOverrides\":{\"documentEventLog\":true,\"reverseDocumentActions\":true,\"stockMovementsNav\":true,\"advancedStockBalanceAnalytics\":true,\"stockBalanceSourceModal\":true,\"allocationControls\":true},\"locale\":\"ru\",\"theme\":\"light\",\"dateFormat\":\"iso\",\"numberFormat\":\"commaDot\",\"hotkeysEnabled\":true},\"documents\":{\"blockConfirmWhenPlanningHasBlockingErrors\":true,\"blockPostWhenFactualHasBlockingErrors\":true,\"showDocumentEventLog\":true,\"requireCancelReason\":true,\"requireReversalReason\":true,\"autoClosePlanningOnFullFulfillment\":true,\"singleDraftReceiptPerPurchaseOrder\":true,\"singleDraftShipmentPerSalesOrder\":true},\"inventory\":{\"reservationsEnabled\":true,\"requireReservationBeforeShipment\":true,\"allocationMode\":\"manual\",\"releaseReservationsOnSalesOrderCancel\":true,\"releaseReservationsOnSalesOrderClose\":true,\"reconcileReservationsOnSalesOrderSaveConfirm\":true},\"commercial\":{\"moneyDecimalPlaces\":2,\"zeroPriceLinesRequireReason\":true,\"partnerTermsOverwrite\":\"document_wins\"},\"dataAudit\":{\"auditLogEnabled\":true,\"showAppVersion\":true}}}"
+      }
+    },
+    {
+      "route": "/stock-balances",
+      "theme": {
+        "htmlClass": "light",
+        "isLight": true,
+        "isDark": false,
+        "storedSettings": "{\"version\":1,\"settings\":{\"general\":{\"workspaceMode\":\"advanced\",\"profileOverrides\":{\"documentEventLog\":true,\"reverseDocumentActions\":true,\"stockMovementsNav\":true,\"advancedStockBalanceAnalytics\":true,\"stockBalanceSourceModal\":true,\"allocationControls\":true},\"locale\":\"ru\",\"theme\":\"light\",\"dateFormat\":\"iso\",\"numberFormat\":\"commaDot\",\"hotkeysEnabled\":true},\"documents\":{\"blockConfirmWhenPlanningHasBlockingErrors\":true,\"blockPostWhenFactualHasBlockingErrors\":true,\"showDocumentEventLog\":true,\"requireCancelReason\":true,\"requireReversalReason\":true,\"autoClosePlanningOnFullFulfillment\":true,\"singleDraftReceiptPerPurchaseOrder\":true,\"singleDraftShipmentPerSalesOrder\":true},\"inventory\":{\"reservationsEnabled\":true,\"requireReservationBeforeShipment\":true,\"allocationMode\":\"manual\",\"releaseReservationsOnSalesOrderCancel\":true,\"releaseReservationsOnSalesOrderClose\":true,\"reconcileReservationsOnSalesOrderSaveConfirm\":true},\"commercial\":{\"moneyDecimalPlaces\":2,\"zeroPriceLinesRequireReason\":true,\"partnerTermsOverwrite\":\"document_wins\"},\"dataAudit\":{\"auditLogEnabled\":true,\"showAppVersion\":true}}}"
+      }
+    }
+  ],
+  "consoleErrors": []
+}

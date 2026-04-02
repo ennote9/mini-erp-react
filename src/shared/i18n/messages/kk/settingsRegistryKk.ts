@@ -9,7 +9,7 @@ export const kkSettingsEntriesFull: MessageTree = {
   general__theme: {
     label: "Тақырып",
     description:
-      "Қараңғы — стандартты ERP көрінісі. «Жүйелік» ЖЖ тақырыбына сәйкес келеді.",
+      "Ашық және қараңғы — қолданбаның сақталатын тақырыптары. «Жүйелік» ЖЖ тақырыбына сәйкес келеді.",
   },
   general__dateFormat: {
     label: "Күн пішімі",
@@ -148,7 +148,7 @@ export const kkSettingsEntriesFull: MessageTree = {
 
 export const kkSettingsOptionsFull: MessageTree = {
   general__locale: { en: "English", ru: "Русский", kk: "Қазақша" },
-  general__theme: { dark: "Қараңғы", system: "Жүйелік" },
+  general__theme: { light: "Жарық", dark: "Қараңғы", system: "Жүйелік" },
   general__dateFormat: {
     iso: "ISO (ЖЖЖЖ-АА-КК)",
     eu: "ЕО (КК.АА.ЖЖЖЖ)",

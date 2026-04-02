@@ -14,8 +14,8 @@ export type SettingsSectionId =
   | "commercial"
   | "dataAudit";
 
-/** Dark-first app; system follows OS preference. */
-export type ThemePreference = "dark" | "system";
+/** Explicit saved app theme; system follows OS preference. */
+export type ThemePreference = "light" | "dark" | "system";
 
 /**
  * Product complexity / visibility profile. Drives which UI and settings are shown (phase 1: mostly visibility).

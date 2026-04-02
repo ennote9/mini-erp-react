@@ -1,5 +1,6 @@
 import { forwardRef } from "react";
 import type { ReactNode } from "react";
+import { useSettings } from "@/shared/settings/SettingsContext";
 
 type AgGridContainerProps = {
   /** Theme/scoping class for dark styling (e.g. "stock-movements-grid"). Must match a block in App.css. */
@@ -14,10 +15,16 @@ type AgGridContainerProps = {
  */
 export const AgGridContainer = forwardRef<HTMLDivElement, AgGridContainerProps>(
   function AgGridContainer({ themeClass, children }, ref) {
+    const { settings } = useSettings();
+    const isLight =
+      settings.general.theme !== "dark" &&
+      typeof document !== "undefined" &&
+      document.documentElement.classList.contains("light");
+
     return (
       <div
         ref={ref}
-        className={`ag-theme-quartz-dark ${themeClass} flex min-h-0 w-full flex-1 flex-col`.trim()}
+        className={`${isLight ? "ag-theme-quartz" : "ag-theme-quartz-dark"} erp-ag-grid ${themeClass} flex min-h-0 w-full flex-1 flex-col`.trim()}
       >
         {children}
       </div>

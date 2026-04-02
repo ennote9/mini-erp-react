@@ -64,7 +64,7 @@ export const settingsEn = {
     },
     general__theme: {
       label: "Theme",
-      description: "Dark keeps the standard ERP look. System follows your OS light/dark mode.",
+      description: "Light and Dark are saved application themes. System follows your OS light/dark mode.",
     },
     general__dateFormat: {
       label: "Date format",
@@ -197,7 +197,7 @@ export const settingsEn = {
   },
   options: {
     general__locale: { en: "English", ru: "Русский", kk: "Қазақша" },
-    general__theme: { dark: "Dark", system: "System" },
+    general__theme: { light: "Light", dark: "Dark", system: "System" },
     general__dateFormat: {
       iso: "ISO (YYYY-MM-DD)",
       eu: "EU (DD.MM.YYYY)",

@@ -21,7 +21,7 @@ function isRecord(v: unknown): v is Record<string, unknown> {
 }
 
 function asThemePreference(v: unknown): ThemePreference | undefined {
-  return v === "dark" || v === "system" ? v : undefined;
+  return v === "light" || v === "dark" || v === "system" ? v : undefined;
 }
 
 function asDateFormatId(v: unknown): DateFormatId | undefined {

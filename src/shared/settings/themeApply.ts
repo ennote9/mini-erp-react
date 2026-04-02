@@ -33,5 +33,10 @@ export function applyThemeToDocument(theme: ThemePreference): void {
     return;
   }
 
-  applyDarkClass(theme === "dark");
+  if (theme === "dark") {
+    applyDarkClass(true);
+    return;
+  }
+
+  applyDarkClass(false);
 }

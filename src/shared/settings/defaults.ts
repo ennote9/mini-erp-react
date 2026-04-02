@@ -18,7 +18,7 @@ export const DEFAULT_APP_SETTINGS: AppSettings = {
     workspaceMode: "advanced",
     profileOverrides: { ...DEFAULT_PROFILE_OVERRIDES_MAX },
     locale: "en",
-    theme: "dark",
+    theme: "light",
     dateFormat: "iso",
     numberFormat: "commaDot",
     hotkeysEnabled: true,

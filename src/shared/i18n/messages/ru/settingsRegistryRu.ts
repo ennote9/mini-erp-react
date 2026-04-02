@@ -9,7 +9,7 @@ export const ruSettingsEntriesFull: MessageTree = {
   general__theme: {
     label: "Тема",
     description:
-      "Тёмная — стандартный вид ERP. «Системная» следует светлой/тёмной теме ОС.",
+      "Светлая и тёмная — сохранённые темы приложения. «Системная» следует светлой/тёмной теме ОС.",
   },
   general__dateFormat: {
     label: "Формат даты",
@@ -148,7 +148,7 @@ export const ruSettingsEntriesFull: MessageTree = {
 
 export const ruSettingsOptionsFull: MessageTree = {
   general__locale: { en: "English", ru: "Русский", kk: "Қазақша" },
-  general__theme: { dark: "Тёмная", system: "Системная" },
+  general__theme: { light: "Светлая", dark: "Тёмная", system: "Системная" },
   general__dateFormat: {
     iso: "ISO (ГГГГ-ММ-ДД)",
     eu: "ЕС (ДД.ММ.ГГГГ)",

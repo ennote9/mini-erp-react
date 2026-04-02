@@ -60,9 +60,10 @@ export const SETTINGS_REGISTRY: SettingRegistryEntry[] = [
     section: "general",
     valueType: "enum",
     label: "Theme",
-    description: "Dark keeps the standard ERP look. System follows your OS light/dark mode.",
+    description: "Light and Dark are saved application themes. System follows your OS light/dark mode.",
     readiness: "active",
     options: [
+      { value: "light", label: "Light" },
       { value: "dark", label: "Dark" },
       { value: "system", label: "System" },
     ],
