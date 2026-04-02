@@ -1,0 +1,40 @@
+{
+  "results": [
+    {
+      "route": "/items",
+      "filePath": "tmp/dark-after/items.png",
+      "htmlClass": "dark"
+    },
+    {
+      "route": "/purchase-orders",
+      "filePath": "tmp/dark-after/purchase-orders.png",
+      "htmlClass": "dark"
+    },
+    {
+      "route": "/sales-orders",
+      "filePath": "tmp/dark-after/sales-orders.png",
+      "htmlClass": "dark"
+    },
+    {
+      "route": "/receipts",
+      "filePath": "tmp/dark-after/receipts.png",
+      "htmlClass": "dark"
+    },
+    {
+      "route": "/shipments",
+      "filePath": "tmp/dark-after/shipments.png",
+      "htmlClass": "dark"
+    },
+    {
+      "route": "/stock-balances",
+      "filePath": "tmp/dark-after/stock-balances.png",
+      "htmlClass": "dark"
+    },
+    {
+      "route": "/purchase-orders/1",
+      "filePath": "tmp/dark-after/purchase-orders__1.png",
+      "htmlClass": "dark"
+    }
+  ],
+  "consoleErrors": []
+}

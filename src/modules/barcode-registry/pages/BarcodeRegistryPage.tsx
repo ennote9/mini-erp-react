@@ -8,7 +8,7 @@ import { ChevronDown, File, FileSpreadsheet, FolderOpen, ScanBarcode, TicketPerc
 import { save } from "@tauri-apps/plugin-dialog";
 import { invoke } from "@tauri-apps/api/core";
 import { revealItemInDir } from "@tauri-apps/plugin-opener";
-import { itemRepository, type ItemBarcodeSymbology } from "@/modules/items";
+import { type ItemBarcodeSymbology } from "@/modules/items";
 import { useTranslation } from "@/shared/i18n/context";
 import { barcodeRegistryListExcelLabels } from "@/shared/i18n/excelListExportLabels";
 import { useAppReadModelRevision } from "@/shared/inventoryMasterPageBlocks/useAppReadModelRevision";
@@ -50,12 +50,6 @@ import {
   replaceUrlAgGridColumnFilters,
 } from "@/shared/navigation/agGridColumnFilters";
 
-type EntryTypeFilter = "all" | BarcodeRegistryEntryType;
-type ActiveFilter = "all" | "active" | "inactive";
-
-const selectClassName =
-  "h-8 rounded-md border border-input bg-background px-2 text-sm text-foreground shadow-sm outline-none transition-colors focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/40";
-
 function EntryTypeCellRenderer(params: ICellRendererParams<BarcodeRegistryRow, BarcodeRegistryEntryType>) {
   if (params.value === "MARKDOWN_CODE") {
     return (
@@ -73,22 +67,10 @@ function EntryTypeCellRenderer(params: ICellRendererParams<BarcodeRegistryRow, B
   );
 }
 
-function filterRows(
-  rows: BarcodeRegistryRow[],
-  searchQuery: string,
-  entryType: EntryTypeFilter,
-  active: ActiveFilter,
-  itemId: string,
-  source: string,
-): BarcodeRegistryRow[] {
+function filterRows(rows: BarcodeRegistryRow[], searchQuery: string): BarcodeRegistryRow[] {
   const q = searchQuery.trim().toLowerCase();
   return rows.filter((row) => {
     if (q !== "" && !row.code.toLowerCase().includes(q)) return false;
-    if (entryType !== "all" && row.entryType !== entryType) return false;
-    if (active === "active" && !row.isActive) return false;
-    if (active === "inactive" && row.isActive) return false;
-    if (itemId !== "all" && row.itemId !== itemId) return false;
-    if (source !== "all" && row.source !== source) return false;
     return true;
   });
 }
@@ -105,14 +87,6 @@ export function BarcodeRegistryPage() {
   useListPageSearchHotkey(listSearchInputRef);
 
   const searchQuery = searchParams.get("q") ?? "";
-  const rawTypeFilter = searchParams.get("type");
-  const entryTypeFilter: EntryTypeFilter =
-    rawTypeFilter === "ITEM_BARCODE" || rawTypeFilter === "MARKDOWN_CODE" ? rawTypeFilter : "all";
-  const rawActiveFilter = searchParams.get("active");
-  const activeFilter: ActiveFilter =
-    rawActiveFilter === "active" || rawActiveFilter === "inactive" ? rawActiveFilter : "all";
-  const itemFilterId = searchParams.get("itemId") ?? "all";
-  const sourceFilter = searchParams.get("source") ?? "all";
   const [selectedCount, setSelectedCount] = useState(0);
   const [exportOpen, setExportOpen] = useState(false);
   const [exportSuccess, setExportSuccess] = useState<{ path: string; filename: string } | null>(null);
@@ -157,18 +131,6 @@ export function BarcodeRegistryPage() {
 
   const rows = useMemo(() => listBarcodeRegistryRows(), [appRevision]);
 
-  const itemOptions = useMemo(() => {
-    const uniqueIds = new Set(rows.map((row) => row.itemId));
-    return itemRepository
-      .list()
-      .filter((item) => uniqueIds.has(item.id))
-      .sort((a, b) => a.code.localeCompare(b.code))
-      .map((item) => ({
-        value: item.id,
-        label: `${item.code} — ${item.name}`,
-      }));
-  }, [rows, appRevision]);
-
   const sourceOptions = useMemo(() => {
     const values = [...new Set(rows.map((row) => row.source))];
     return values
@@ -179,10 +141,7 @@ export function BarcodeRegistryPage() {
       }));
   }, [rows, sourceLabel, locale]);
 
-  const filteredRows = useMemo(
-    () => filterRows(rows, searchQuery, entryTypeFilter, activeFilter, itemFilterId, sourceFilter),
-    [rows, searchQuery, entryTypeFilter, activeFilter, itemFilterId, sourceFilter],
-  );
+  const filteredRows = useMemo(() => filterRows(rows, searchQuery), [rows, searchQuery]);
 
   const barcodeColumnFilterConfigs = useMemo<Record<string, AgGridColumnFilterConfig<BarcodeRegistryRow>>>(
     () => ({
@@ -226,13 +185,6 @@ export function BarcodeRegistryPage() {
     [filteredRows, columnFilterModel, barcodeColumnFilterConfigs],
   );
 
-  const setQueryValue = useCallback(
-    (key: string, value: string, defaultValue: string) => {
-      replaceQueryParam(searchParams, setSearchParams, key, value, defaultValue);
-    },
-    [searchParams, setSearchParams],
-  );
-
   const handleSortChanged = useCallback(() => {
     const api = gridRef.current?.api;
     if (!api) return;
@@ -240,13 +192,7 @@ export function BarcodeRegistryPage() {
     replaceQueryParam(searchParams, setSearchParams, "sort", serialized);
   }, [searchParams, setSearchParams]);
 
-  const hasFilter =
-    searchQuery.trim() !== "" ||
-    entryTypeFilter !== "all" ||
-    activeFilter !== "all" ||
-    itemFilterId !== "all" ||
-    sourceFilter !== "all" ||
-    hasActiveAgGridColumnFilters(columnFilterModel);
+  const hasFilter = searchQuery.trim() !== "" || hasActiveAgGridColumnFilters(columnFilterModel);
 
   const buildExportRows = useCallback(
     (inputRows: BarcodeRegistryRow[]): BarcodeRegistryExportRow[] =>
@@ -472,7 +418,7 @@ export function BarcodeRegistryPage() {
               inputRef={listSearchInputRef}
               placeholder={t("ops.list.barcodeRegistry.searchPlaceholder")}
               value={searchQuery}
-              onChange={(value) => setQueryValue("q", value, "")}
+              onChange={(value) => replaceQueryParam(searchParams, setSearchParams, "q", value, "")}
               aria-label={t("ops.list.barcodeRegistry.searchAria")}
               resultCount={displayRows.length}
             />
@@ -571,54 +517,6 @@ export function BarcodeRegistryPage() {
                 </Popover>
               </div>
             </div>
-          </div>
-          <div className="flex flex-wrap items-center gap-2">
-            <select
-              className={selectClassName}
-              aria-label={t("ops.list.barcodeRegistry.entryTypeFilterAria")}
-              value={entryTypeFilter}
-              onChange={(event) => setQueryValue("type", event.target.value, "all")}
-            >
-              <option value="all">{t("ops.list.barcodeRegistry.filterAllEntryTypes")}</option>
-              <option value="ITEM_BARCODE">{t("ops.list.barcodeRegistry.entryTypeItemBarcode")}</option>
-              <option value="MARKDOWN_CODE">{t("ops.list.barcodeRegistry.entryTypeMarkdownCode")}</option>
-            </select>
-            <select
-              className={selectClassName}
-              aria-label={t("ops.list.barcodeRegistry.activeFilterAria")}
-              value={activeFilter}
-              onChange={(event) => setQueryValue("active", event.target.value, "all")}
-            >
-              <option value="all">{t("ops.list.barcodeRegistry.filterAllActiveStates")}</option>
-              <option value="active">{t("ops.list.barcodeRegistry.filterActiveOnly")}</option>
-              <option value="inactive">{t("ops.list.barcodeRegistry.filterInactiveOnly")}</option>
-            </select>
-            <select
-              className={selectClassName}
-              aria-label={t("ops.list.barcodeRegistry.itemFilterAria")}
-              value={itemFilterId}
-              onChange={(event) => setQueryValue("itemId", event.target.value, "all")}
-            >
-              <option value="all">{t("ops.list.barcodeRegistry.filterAllItems")}</option>
-              {itemOptions.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
-            <select
-              className={selectClassName}
-              aria-label={t("ops.list.barcodeRegistry.sourceFilterAria")}
-              value={sourceFilter}
-              onChange={(event) => setQueryValue("source", event.target.value, "all")}
-            >
-              <option value="all">{t("ops.list.barcodeRegistry.filterAllSources")}</option>
-              {sourceOptions.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
           </div>
         </div>
       }

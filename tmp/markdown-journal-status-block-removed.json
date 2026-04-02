@@ -1,0 +1,14 @@
+{
+  "state": {
+    "controlsText": [
+      "Журналы",
+      "Коды уценки",
+      "Создать"
+    ],
+    "statusButtons": [],
+    "searchVisible": true,
+    "viewTabsVisible": true
+  },
+  "consoleErrors": [],
+  "screenshotPath": "/home/shaxr/code/mini-erp-react/tmp/markdown-journal-status-block-removed.png"
+}

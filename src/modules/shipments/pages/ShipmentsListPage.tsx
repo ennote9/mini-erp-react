@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useRef, useCallback, useEffect } from "react";
+import { useMemo, useState, useRef, useCallback } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { AgGridReact } from "ag-grid-react";
 import type { ColDef, ICellRendererParams, SelectionChangedEvent } from "ag-grid-community";
@@ -11,7 +11,6 @@ import {
   buildShipmentListRowExtras,
   type ShipmentListRowExtras,
 } from "../shipmentListRowExtras";
-import type { FactualDocumentStatus } from "../../../shared/domain";
 import { ListPageLayout } from "../../../shared/ui/list/ListPageLayout";
 import { EmptyState } from "../../../shared/ui/feedback/EmptyState";
 import {
@@ -30,10 +29,6 @@ import { BackButton } from "../../../shared/ui/list/BackButton";
 import { ListPageSearch } from "../../../shared/ui/list/ListPageSearch";
 import { useListPageSearchHotkey } from "../../../shared/hotkeys";
 import { Button } from "@/components/ui/button";
-import {
-  ButtonGroup,
-  ButtonGroupSeparator,
-} from "@/components/ui/button-group";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { ChevronDown, FileSpreadsheet, File, FolderOpen, X } from "lucide-react";
 import { buildShipmentsListXlsxBuffer, type ShipmentsExportRow } from "../shipmentsListExport";
@@ -43,7 +38,6 @@ import { revealItemInDir } from "@tauri-apps/plugin-opener";
 import { useTranslation } from "@/shared/i18n/context";
 import { buildReadableUniqueFilename, ensureUniqueExportPath } from "@/shared/export/filenameBuilder";
 import { shipmentsListExcelLabels } from "@/shared/i18n/excelListExportLabels";
-import { readOptionalFactualStatusFromQuery } from "@/shared/navigation/listQueryStatus";
 import { toGeneratedCodeSearchTokens } from "@/shared/generatedVisibleCodes";
 import {
   hasActiveAgGridColumnFilters,
@@ -51,8 +45,6 @@ import {
   replaceUrlAgGridColumnFilters,
   type AgGridColumnFilterClause,
 } from "@/shared/navigation/agGridColumnFilters";
-
-type StatusFilter = "all" | FactualDocumentStatus;
 
 type RowData = Shipment & {
   salesOrderNumber: string;
@@ -76,11 +68,6 @@ function filterBySearch(rows: RowData[], query: string): RowData[] {
     if (r.deliveryMetaSearchBlob.includes(q)) return true;
     return false;
   });
-}
-
-function filterByStatus(rows: RowData[], statusFilter: StatusFilter): RowData[] {
-  if (statusFilter === "all") return rows;
-  return rows.filter((r) => r.status === statusFilter);
 }
 
 function filterByWarehouseId(rows: RowData[], warehouseId: string | null): RowData[] {
@@ -154,16 +141,6 @@ export function ShipmentsListPage() {
   }, [searchParams]);
 
   const [searchQuery, setSearchQuery] = useState("");
-  const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
-
-  const statusFromQuery = useMemo(
-    () => readOptionalFactualStatusFromQuery(searchParams),
-    [searchParams],
-  );
-  useEffect(() => {
-    if (statusFromQuery === undefined) return;
-    setStatusFilter(statusFromQuery);
-  }, [statusFromQuery]);
   const columnFilterModel = useMemo(() => readUrlAgGridColumnFilters(searchParams), [searchParams]);
   const [exportSuccess, setExportSuccess] = useState<{ path: string; filename: string } | null>(null);
   const [exportOpen, setExportOpen] = useState(false);
@@ -196,13 +173,11 @@ export function ShipmentsListPage() {
   const filteredRows = useMemo(() => {
     const bySearch = filterBySearch(rowsWithNames, searchQuery);
     const byWarehouse = filterByWarehouseId(bySearch, warehouseFilterId);
-    const byCarrier = filterByCarrierId(byWarehouse, carrierFilterId);
-    return filterByStatus(byCarrier, statusFilter);
-  }, [rowsWithNames, searchQuery, statusFilter, warehouseFilterId, carrierFilterId]);
+    return filterByCarrierId(byWarehouse, carrierFilterId);
+  }, [rowsWithNames, searchQuery, warehouseFilterId, carrierFilterId]);
 
-  const statusOptions = useMemo(
-    (): { value: StatusFilter; label: string }[] => [
-      { value: "all", label: t("doc.list.all") },
+  const factualStatusOptions = useMemo(
+    () => [
       { value: "draft", label: t("status.factual.draft") },
       { value: "posted", label: t("status.factual.posted") },
       { value: "reversed", label: t("status.factual.reversed") },
@@ -230,12 +205,10 @@ export function ShipmentsListPage() {
       deliveryAddressPreview: { kind: "text" },
       status: {
         kind: "enum",
-        options: statusOptions
-          .filter((option) => option.value !== "all")
-          .map((option) => ({ value: option.value, label: option.label })),
+        options: factualStatusOptions,
       },
     }),
-    [rowsWithNames, statusOptions],
+    [rowsWithNames, factualStatusOptions],
   );
 
   const displayRows = useMemo(
@@ -245,7 +218,6 @@ export function ShipmentsListPage() {
 
   const isEmpty = displayRows.length === 0;
   const hasFilter =
-    statusFilter !== "all" ||
     searchQuery.trim() !== "" ||
     warehouseFilterId != null ||
     carrierFilterId != null ||
@@ -357,7 +329,6 @@ export function ShipmentsListPage() {
     if (
       carrierFilterId != null &&
       warehouseFilterId == null &&
-      statusFilter === "all" &&
       searchQuery.trim() === ""
     ) {
       return t("ops.list.shipments.hintCarrierOnly");
@@ -365,7 +336,6 @@ export function ShipmentsListPage() {
     if (
       warehouseFilterId != null &&
       carrierFilterId == null &&
-      statusFilter === "all" &&
       searchQuery.trim() === ""
     ) {
       return t("ops.list.shipments.hintWarehouseOnly");
@@ -375,7 +345,6 @@ export function ShipmentsListPage() {
     hasFilter,
     warehouseFilterId,
     carrierFilterId,
-    statusFilter,
     searchQuery,
     t,
     locale,
@@ -496,21 +465,6 @@ export function ShipmentsListPage() {
       controls={
         <>
           <BackButton to="/" aria-label={t("doc.list.backToDashboard")} />
-          <ButtonGroup className="list-page__filter-group" aria-label={t("ops.list.filterStatusAria")}>
-            {statusOptions.map(({ value, label }, index) => (
-              <React.Fragment key={value}>
-                {index > 0 && <ButtonGroupSeparator />}
-                <Button
-                  type="button"
-                  variant={statusFilter === value ? "default" : "outline"}
-                  size="sm"
-                  onClick={() => setStatusFilter(value)}
-                >
-                  {label}
-                </Button>
-              </React.Fragment>
-            ))}
-          </ButtonGroup>
           <ListPageSearch
             inputRef={listSearchInputRef}
             placeholder={t("ops.list.shipments.searchPlaceholder")}

@@ -1,0 +1,53 @@
+{
+  "results": [
+    {
+      "route": "/brands",
+      "screenshotPath": "/home/shaxr/code/mini-erp-react/tmp/brands.png",
+      "state": {
+        "bodyBg": "rgb(10, 10, 10)",
+        "pageContentBg": "rgb(10, 10, 10)",
+        "topbarBg": "rgb(10, 10, 10)",
+        "sidebarBg": "rgb(10, 10, 10)",
+        "listFrameBg": null,
+        "listContentBg": "rgb(10, 10, 10)"
+      }
+    },
+    {
+      "route": "/barcodes",
+      "screenshotPath": "/home/shaxr/code/mini-erp-react/tmp/barcodes.png",
+      "state": {
+        "bodyBg": "rgb(10, 10, 10)",
+        "pageContentBg": "rgb(10, 10, 10)",
+        "topbarBg": "rgb(10, 10, 10)",
+        "sidebarBg": "rgb(10, 10, 10)",
+        "listFrameBg": null,
+        "listContentBg": "rgb(10, 10, 10)"
+      }
+    },
+    {
+      "route": "/items",
+      "screenshotPath": "/home/shaxr/code/mini-erp-react/tmp/items.png",
+      "state": {
+        "bodyBg": "rgb(10, 10, 10)",
+        "pageContentBg": "rgb(10, 10, 10)",
+        "topbarBg": "rgb(10, 10, 10)",
+        "sidebarBg": "rgb(10, 10, 10)",
+        "listFrameBg": null,
+        "listContentBg": "rgb(10, 10, 10)"
+      }
+    },
+    {
+      "route": "/purchase-orders",
+      "screenshotPath": "/home/shaxr/code/mini-erp-react/tmp/purchase-orders.png",
+      "state": {
+        "bodyBg": "rgb(10, 10, 10)",
+        "pageContentBg": "rgb(10, 10, 10)",
+        "topbarBg": "rgb(10, 10, 10)",
+        "sidebarBg": "rgb(10, 10, 10)",
+        "listFrameBg": null,
+        "listContentBg": "rgb(10, 10, 10)"
+      }
+    }
+  ],
+  "consoleErrors": []
+}

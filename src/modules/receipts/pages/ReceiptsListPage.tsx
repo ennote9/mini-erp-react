@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useRef, useCallback, useEffect } from "react";
+import { useMemo, useState, useRef, useCallback } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { AgGridReact } from "ag-grid-react";
 import type { ColDef, SelectionChangedEvent } from "ag-grid-community";
@@ -6,7 +6,6 @@ import { receiptRepository } from "../repository";
 import { purchaseOrderRepository } from "../../purchase-orders/repository";
 import { warehouseRepository } from "../../warehouses/repository";
 import type { Receipt } from "../model";
-import type { FactualDocumentStatus } from "../../../shared/domain";
 import { ListPageLayout } from "../../../shared/ui/list/ListPageLayout";
 import { EmptyState } from "../../../shared/ui/feedback/EmptyState";
 import {
@@ -25,10 +24,6 @@ import { BackButton } from "../../../shared/ui/list/BackButton";
 import { ListPageSearch } from "../../../shared/ui/list/ListPageSearch";
 import { useListPageSearchHotkey } from "../../../shared/hotkeys";
 import { Button } from "@/components/ui/button";
-import {
-  ButtonGroup,
-  ButtonGroupSeparator,
-} from "@/components/ui/button-group";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { ChevronDown, FileSpreadsheet, File, FolderOpen, X } from "lucide-react";
 import { buildReceiptsListXlsxBuffer, type ReceiptsExportRow } from "../receiptsListExport";
@@ -38,7 +33,6 @@ import { revealItemInDir } from "@tauri-apps/plugin-opener";
 import { useTranslation } from "@/shared/i18n/context";
 import { buildReadableUniqueFilename, ensureUniqueExportPath } from "@/shared/export/filenameBuilder";
 import { receiptsListExcelLabels } from "@/shared/i18n/excelListExportLabels";
-import { readOptionalFactualStatusFromQuery } from "@/shared/navigation/listQueryStatus";
 import { toGeneratedCodeSearchTokens } from "@/shared/generatedVisibleCodes";
 import {
   hasActiveAgGridColumnFilters,
@@ -46,8 +40,6 @@ import {
   replaceUrlAgGridColumnFilters,
   type AgGridColumnFilterClause,
 } from "@/shared/navigation/agGridColumnFilters";
-
-type StatusFilter = "all" | FactualDocumentStatus;
 
 type RowData = Receipt & {
   purchaseOrderNumber: string;
@@ -66,11 +58,6 @@ function filterBySearch(rows: RowData[], query: string): RowData[] {
     const poCompact = po.replace(/[^a-z0-9]/g, "");
     return po.includes(q) || codeTokens.some((t) => po.includes(t) || poCompact.includes(t));
   });
-}
-
-function filterByStatus(rows: RowData[], statusFilter: StatusFilter): RowData[] {
-  if (statusFilter === "all") return rows;
-  return rows.filter((r) => r.status === statusFilter);
 }
 
 function filterByWarehouseId(rows: RowData[], warehouseId: string | null): RowData[] {
@@ -101,16 +88,6 @@ export function ReceiptsListPage() {
   }, [searchParams]);
 
   const [searchQuery, setSearchQuery] = useState("");
-  const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
-
-  const statusFromQuery = useMemo(
-    () => readOptionalFactualStatusFromQuery(searchParams),
-    [searchParams],
-  );
-  useEffect(() => {
-    if (statusFromQuery === undefined) return;
-    setStatusFilter(statusFromQuery);
-  }, [statusFromQuery]);
   const columnFilterModel = useMemo(() => readUrlAgGridColumnFilters(searchParams), [searchParams]);
   const [exportSuccess, setExportSuccess] = useState<{ path: string; filename: string } | null>(null);
   const [exportOpen, setExportOpen] = useState(false);
@@ -138,13 +115,11 @@ export function ReceiptsListPage() {
 
   const filteredRows = useMemo(() => {
     const bySearch = filterBySearch(rowsWithNames, searchQuery);
-    const byWarehouse = filterByWarehouseId(bySearch, warehouseFilterId);
-    return filterByStatus(byWarehouse, statusFilter);
-  }, [rowsWithNames, searchQuery, statusFilter, warehouseFilterId]);
+    return filterByWarehouseId(bySearch, warehouseFilterId);
+  }, [rowsWithNames, searchQuery, warehouseFilterId]);
 
-  const statusOptions = useMemo(
-    (): { value: StatusFilter; label: string }[] => [
-      { value: "all", label: t("doc.list.all") },
+  const factualStatusOptions = useMemo(
+    () => [
       { value: "draft", label: t("status.factual.draft") },
       { value: "posted", label: t("status.factual.posted") },
       { value: "reversed", label: t("status.factual.reversed") },
@@ -167,12 +142,10 @@ export function ReceiptsListPage() {
       },
       status: {
         kind: "enum",
-        options: statusOptions
-          .filter((option) => option.value !== "all")
-          .map((option) => ({ value: option.value, label: option.label })),
+        options: factualStatusOptions,
       },
     }),
-    [rowsWithNames, statusOptions],
+    [rowsWithNames, factualStatusOptions],
   );
 
   const displayRows = useMemo(
@@ -182,7 +155,6 @@ export function ReceiptsListPage() {
 
   const isEmpty = displayRows.length === 0;
   const hasFilter =
-    statusFilter !== "all" ||
     searchQuery.trim() !== "" ||
     warehouseFilterId != null ||
     hasActiveAgGridColumnFilters(columnFilterModel);
@@ -277,11 +249,11 @@ export function ReceiptsListPage() {
     if (!hasFilter) {
       return t("ops.list.receipts.hintCreate");
     }
-    if (warehouseFilterId != null && statusFilter === "all" && searchQuery.trim() === "") {
+    if (warehouseFilterId != null && searchQuery.trim() === "") {
       return t("ops.list.receipts.hintWarehouseOnly");
     }
     return t("ops.list.receipts.hintSearchStatusWarehouse");
-  }, [hasFilter, warehouseFilterId, statusFilter, searchQuery, t, locale]);
+  }, [hasFilter, warehouseFilterId, searchQuery, t, locale]);
 
   const handleApplyColumnFilter = useCallback(
     (colId: string, clause: AgGridColumnFilterClause) => {
@@ -359,21 +331,6 @@ export function ReceiptsListPage() {
       controls={
         <>
           <BackButton to="/" aria-label={t("doc.list.backToDashboard")} />
-          <ButtonGroup className="list-page__filter-group" aria-label={t("ops.list.filterStatusAria")}>
-            {statusOptions.map(({ value, label }, index) => (
-              <React.Fragment key={value}>
-                {index > 0 && <ButtonGroupSeparator />}
-                <Button
-                  type="button"
-                  variant={statusFilter === value ? "default" : "outline"}
-                  size="sm"
-                  onClick={() => setStatusFilter(value)}
-                >
-                  {label}
-                </Button>
-              </React.Fragment>
-            ))}
-          </ButtonGroup>
           <ListPageSearch
             inputRef={listSearchInputRef}
             placeholder={t("ops.list.receipts.searchPlaceholder")}

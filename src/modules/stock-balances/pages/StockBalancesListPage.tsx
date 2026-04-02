@@ -2,7 +2,7 @@
  * Stock Balances list — AG Grid migration (same pattern as Stock Movements).
  * Repository-backed data, search, empty states, dark theme. Plain text columns only.
  */
-import { Fragment, useMemo, useState, useRef, useCallback, useEffect } from "react";
+import { useMemo, useState, useRef, useCallback } from "react";
 import type { RowClassParams, RowClickedEvent } from "ag-grid-community";
 import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { AgGridReact } from "ag-grid-react";
@@ -32,8 +32,6 @@ import { ListPageSearch } from "../../../shared/ui/list/ListPageSearch";
 import { useListPageSearchHotkey } from "../../../shared/hotkeys";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Button } from "@/components/ui/button";
-import { ButtonGroup, ButtonGroupSeparator } from "@/components/ui/button-group";
-import { SelectField } from "@/components/ui/select-field";
 import { ChevronDown, FileSpreadsheet, File, FolderOpen, X } from "lucide-react";
 import { buildStockBalancesListXlsxBuffer, type StockBalancesExportRow } from "../stockBalancesListExport";
 import {
@@ -74,20 +72,6 @@ type RowData = StockBalance & {
   netShortageQty: number;
   coverageStatus: StockBalanceCoverageStatus;
 };
-
-function filterByStyle(rows: RowData[], style: StockStyle | ""): RowData[] {
-  if (style === "") return rows;
-  return rows.filter((r) => r.style === style);
-}
-
-type StockBalanceQuickFilter =
-  | "all"
-  | "shortage"
-  | "outgoing"
-  | "incoming"
-  | "avail_lte_zero"
-  | "needs_replenishment"
-  | "coverage_at_risk";
 
 function filterBySearch(
   rows: RowData[],
@@ -135,21 +119,6 @@ function filterByCategoryId(rows: RowData[], categoryId: string | null): RowData
   });
 }
 
-function filterByQuickFilter(rows: RowData[], f: StockBalanceQuickFilter): RowData[] {
-  if (f === "all") return rows;
-  if (f === "shortage") return rows.filter((r) => r.deficitQty > 0);
-  if (f === "outgoing") return rows.filter((r) => r.outgoingQty > 0);
-  if (f === "incoming") return rows.filter((r) => r.incomingQty > 0);
-  if (f === "avail_lte_zero") return rows.filter((r) => r.availableQty <= 0);
-  if (f === "needs_replenishment") return rows.filter((r) => r.netShortageQty > 0);
-  if (f === "coverage_at_risk")
-    return rows.filter(
-      (r) =>
-        r.outgoingQty > r.availableQty && r.incomingQty > 0 && r.netShortageQty === 0,
-    );
-  return rows;
-}
-
 function buildExportRowsFromBalances(
   rows: RowData[],
   coverageLabel: (s: StockBalanceCoverageStatus) => string,
@@ -184,53 +153,12 @@ export function StockBalancesListPage() {
   );
   const styleLabel = useCallback((s: StockStyle) => t(`ops.stock.styles.${s}`), [t]);
 
-  const quickFilterOptions = useMemo(
-    (): Array<{ value: StockBalanceQuickFilter; label: string; aria: string }> => [
-      { value: "all", label: t("ops.stockBalances.quick.all.label"), aria: t("ops.stockBalances.quick.all.aria") },
-      {
-        value: "shortage",
-        label: t("ops.stockBalances.quick.shortage.label"),
-        aria: t("ops.stockBalances.quick.shortage.aria"),
-      },
-      {
-        value: "outgoing",
-        label: t("ops.stockBalances.quick.outgoing.label"),
-        aria: t("ops.stockBalances.quick.outgoing.aria"),
-      },
-      {
-        value: "incoming",
-        label: t("ops.stockBalances.quick.incoming.label"),
-        aria: t("ops.stockBalances.quick.incoming.aria"),
-      },
-      {
-        value: "avail_lte_zero",
-        label: t("ops.stockBalances.quick.avail_lte_zero.label"),
-        aria: t("ops.stockBalances.quick.avail_lte_zero.aria"),
-      },
-      {
-        value: "needs_replenishment",
-        label: t("ops.stockBalances.quick.needs_replenishment.label"),
-        aria: t("ops.stockBalances.quick.needs_replenishment.aria"),
-      },
-      {
-        value: "coverage_at_risk",
-        label: t("ops.stockBalances.quick.coverage_at_risk.label"),
-        aria: t("ops.stockBalances.quick.coverage_at_risk.aria"),
-      },
-    ],
-    [t, locale],
-  );
   const workspaceMode = settings.general.workspaceMode;
   const profileOverrides = settings.general.profileOverrides;
   const showOperationalGrid = getEffectiveWorkspaceFeatureEnabled(
     workspaceMode,
     profileOverrides,
     "stockBalancesOperationalGrid",
-  );
-  const showQuickFilters = getEffectiveWorkspaceFeatureEnabled(
-    workspaceMode,
-    profileOverrides,
-    "stockBalancesQuickFilters",
   );
   const [searchParams, setSearchParams] = useSearchParams();
   const itemFilterId = useMemo(() => {
@@ -259,21 +187,6 @@ export function StockBalancesListPage() {
   }, [searchParams]);
 
   const searchQuery = searchParams.get("q") ?? "";
-  const rawStyleFilter = searchParams.get("style");
-  const styleFilter: StockStyle | "" =
-    rawStyleFilter && STOCK_STYLE_VALUES.includes(rawStyleFilter as StockStyle)
-      ? (rawStyleFilter as StockStyle)
-      : "";
-  const rawQuickFilter = searchParams.get("quick");
-  const quickFilter: StockBalanceQuickFilter =
-    rawQuickFilter === "shortage" ||
-    rawQuickFilter === "outgoing" ||
-    rawQuickFilter === "incoming" ||
-    rawQuickFilter === "avail_lte_zero" ||
-    rawQuickFilter === "needs_replenishment" ||
-    rawQuickFilter === "coverage_at_risk"
-      ? rawQuickFilter
-      : "all";
   const [exportSuccess, setExportSuccess] = useState<{ path: string; filename: string } | null>(null);
   const [exportOpen, setExportOpen] = useState(false);
   const [selectedCount, setSelectedCount] = useState(0);
@@ -363,51 +276,10 @@ export function StockBalancesListPage() {
     () => filterByWarehouseId(rowsAfterItem, warehouseFilterId),
     [rowsAfterItem, warehouseFilterId],
   );
-  const rowsAfterStyle = useMemo(
-    () => filterByStyle(rowsAfterWarehouse, styleFilter),
-    [rowsAfterWarehouse, styleFilter],
-  );
-
-  const quickFilterCounts = useMemo((): Record<StockBalanceQuickFilter, number> => {
-    let shortage = 0;
-    let outgoing = 0;
-    let incoming = 0;
-    let availLteZero = 0;
-    let needsRepl = 0;
-    let atRisk = 0;
-    for (const r of rowsAfterStyle) {
-      if (r.deficitQty > 0) shortage++;
-      if (r.outgoingQty > 0) outgoing++;
-      if (r.incomingQty > 0) incoming++;
-      if (r.availableQty <= 0) availLteZero++;
-      if (r.netShortageQty > 0) needsRepl++;
-      if (
-        r.outgoingQty > r.availableQty &&
-        r.incomingQty > 0 &&
-        r.netShortageQty === 0
-      )
-        atRisk++;
-    }
-    return {
-      all: rowsAfterStyle.length,
-      shortage,
-      outgoing,
-      incoming,
-      avail_lte_zero: availLteZero,
-      needs_replenishment: needsRepl,
-      coverage_at_risk: atRisk,
-    };
-  }, [rowsAfterStyle]);
 
   const filteredRows = useMemo(() => {
-    const bySearch = filterBySearch(
-      rowsAfterStyle,
-      searchQuery,
-      coverageLabel,
-      styleLabel,
-    );
-    return filterByQuickFilter(bySearch, quickFilter);
-  }, [rowsAfterStyle, searchQuery, quickFilter, coverageLabel, styleLabel]);
+    return filterBySearch(rowsAfterWarehouse, searchQuery, coverageLabel, styleLabel);
+  }, [rowsAfterWarehouse, searchQuery, coverageLabel, styleLabel]);
 
   const stockBalanceColumnFilterConfigs = useMemo<Record<string, AgGridColumnFilterConfig<RowData>>>(
     () => ({
@@ -453,12 +325,6 @@ export function StockBalancesListPage() {
 
   const isEmpty = displayRows.length === 0;
 
-  useEffect(() => {
-    if (!showQuickFilters && quickFilter !== "all") {
-      replaceQueryParam(searchParams, setSearchParams, "quick", "all", "all");
-    }
-  }, [quickFilter, searchParams, setSearchParams, showQuickFilters]);
-
   const onRowClicked = useCallback(
     (e: RowClickedEvent<RowData>) => {
       if (hasMeaningfulTextSelection()) return;
@@ -473,8 +339,6 @@ export function StockBalancesListPage() {
     itemFilterId != null ||
     brandFilterId != null ||
     categoryFilterId != null ||
-    styleFilter !== "" ||
-    quickFilter !== "all" ||
     hasActiveAgGridColumnFilters(columnFilterModel);
 
   const brandFilterLabel = useMemo((): string => {
@@ -628,7 +492,6 @@ export function StockBalancesListPage() {
       (category ? categoryFilterId != null : categoryFilterId == null) &&
       (item ? itemFilterId != null : itemFilterId == null) &&
       (warehouse ? warehouseFilterId != null : warehouseFilterId == null) &&
-      quickFilter === "all" &&
       noSearch;
 
     if (noUrlExcept(true, false, false, false)) {
@@ -639,16 +502,6 @@ export function StockBalancesListPage() {
     }
     if (noUrlExcept(false, false, true, false)) {
       return t("ops.stockBalances.empty.hintItemOnly");
-    }
-    if (
-      quickFilter !== "all" &&
-      noSearch &&
-      brandFilterId == null &&
-      categoryFilterId == null &&
-      itemFilterId == null &&
-      warehouseFilterId == null
-    ) {
-      return t("ops.stockBalances.empty.hintQuickOnly");
     }
     if (noUrlExcept(false, false, false, true)) {
       return t("ops.stockBalances.empty.hintWarehouseOnly");
@@ -661,7 +514,6 @@ export function StockBalancesListPage() {
     itemFilterId,
     warehouseFilterId,
     searchQuery,
-    quickFilter,
     t,
   ]);
 
@@ -782,35 +634,6 @@ export function StockBalancesListPage() {
       controls={
         <>
           <BackButton to="/" aria-label={t("doc.list.backToDashboard")} />
-          {showQuickFilters ? (
-            <ButtonGroup className="list-page__filter-group shrink-0" aria-label={t("ops.stockBalances.quickFiltersAria")}>
-              {quickFilterOptions.map((opt, index) => (
-                <Fragment key={opt.value}>
-                  {index > 0 && <ButtonGroupSeparator />}
-                  <Button
-                    type="button"
-                    variant={quickFilter === opt.value ? "default" : "outline"}
-                    size="sm"
-                    className="px-2 text-xs gap-1"
-                    title={opt.aria}
-                    aria-pressed={quickFilter === opt.value}
-                    onClick={() => setQueryValue("quick", opt.value, "all")}
-                  >
-                    <span>{opt.label}</span>
-                    <span
-                      className={
-                        quickFilter === opt.value
-                          ? "tabular-nums font-normal opacity-90"
-                          : "tabular-nums text-muted-foreground font-normal"
-                      }
-                    >
-                      ({quickFilterCounts[opt.value]})
-                    </span>
-                  </Button>
-                </Fragment>
-              ))}
-            </ButtonGroup>
-          ) : null}
           <ListPageSearch
             inputRef={listSearchInputRef}
             placeholder={t("ops.stockBalances.searchPlaceholder")}
@@ -818,17 +641,6 @@ export function StockBalancesListPage() {
             onChange={(value) => setQueryValue("q", value)}
             aria-label={t("ops.stockBalances.searchAria")}
             resultCount={displayRows.length}
-          />
-          <SelectField
-            value={styleFilter}
-            onChange={(value) => setQueryValue("style", value, "")}
-            options={STOCK_STYLE_VALUES.map((value) => ({
-              value,
-              label: styleLabel(value),
-            }))}
-            placeholder={t("ops.stockBalances.filterAllStyles")}
-            aria-label={t("ops.stockBalances.styleFilterAria")}
-            className="w-[180px]"
           />
           <div className="flex flex-row items-center gap-2 shrink-0 ml-auto">
             {brandFilterId != null && (

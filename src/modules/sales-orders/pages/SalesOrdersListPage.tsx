@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useRef, useCallback, useEffect } from "react";
+import { useMemo, useState, useRef, useCallback } from "react";
 import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { AgGridReact } from "ag-grid-react";
 import type { ColDef, SelectionChangedEvent } from "ag-grid-community";
@@ -9,7 +9,6 @@ import { warehouseRepository } from "../../warehouses/repository";
 import { itemRepository } from "../../items/repository";
 import { normalizeDateForSO } from "../dateUtils";
 import type { SalesOrder } from "../model";
-import type { PlanningDocumentStatus } from "../../../shared/domain";
 import { ListPageLayout } from "../../../shared/ui/list/ListPageLayout";
 import { EmptyState } from "../../../shared/ui/feedback/EmptyState";
 import {
@@ -28,10 +27,6 @@ import { BackButton } from "../../../shared/ui/list/BackButton";
 import { ListPageSearch } from "../../../shared/ui/list/ListPageSearch";
 import { useListPageSearchHotkey } from "../../../shared/hotkeys";
 import { Button } from "@/components/ui/button";
-import {
-  ButtonGroup,
-  ButtonGroupSeparator,
-} from "@/components/ui/button-group";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { ChevronDown, FileSpreadsheet, File, FolderOpen, X } from "lucide-react";
 import { buildSalesOrdersListXlsxBuffer, type SalesOrdersExportRow } from "../salesOrdersListExport";
@@ -41,7 +36,6 @@ import { revealItemInDir } from "@tauri-apps/plugin-opener";
 import { useTranslation } from "@/shared/i18n/context";
 import { buildReadableUniqueFilename, ensureUniqueExportPath } from "@/shared/export/filenameBuilder";
 import { salesOrdersListExcelLabels } from "@/shared/i18n/excelListExportLabels";
-import { readOptionalPlanningStatusFromQuery } from "@/shared/navigation/listQueryStatus";
 import { toGeneratedCodeSearchTokens } from "@/shared/generatedVisibleCodes";
 import { applyUrlGridSort, getCurrentGridSort, readUrlGridSort, serializeUrlGridSort } from "@/shared/navigation/agGridSort";
 import {
@@ -52,8 +46,6 @@ import {
 } from "@/shared/navigation/agGridColumnFilters";
 import { appendReturnTo, buildNavigationStateKey, buildReturnToValue, replaceQueryParam } from "@/shared/navigation/returnTo";
 import { useSessionScrollRestore } from "@/shared/navigation/useSessionScrollRestore";
-
-type StatusFilter = "all" | PlanningDocumentStatus;
 
 type RowData = SalesOrder & {
   customerName: string;
@@ -82,14 +74,6 @@ function filterBySearch(rows: RowData[], query: string): RowData[] {
     if (r.recipientSearchBlob.includes(q)) return true;
     return false;
   });
-}
-
-function filterByStatus(
-  rows: RowData[],
-  statusFilter: StatusFilter,
-): RowData[] {
-  if (statusFilter === "all") return rows;
-  return rows.filter((r) => r.status === statusFilter);
 }
 
 function filterByCustomerId(rows: RowData[], customerId: string | null): RowData[] {
@@ -160,16 +144,6 @@ export function SalesOrdersListPage() {
   }, [itemFilterId]);
 
   const searchQuery = searchParams.get("q") ?? "";
-  const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
-
-  const statusFromQuery = useMemo(
-    () => readOptionalPlanningStatusFromQuery(searchParams),
-    [searchParams],
-  );
-  useEffect(() => {
-    if (statusFromQuery === undefined) return;
-    setStatusFilter(statusFromQuery);
-  }, [statusFromQuery]);
   const [exportSuccess, setExportSuccess] = useState<{ path: string; filename: string } | null>(null);
   const [exportOpen, setExportOpen] = useState(false);
   const [selectedCount, setSelectedCount] = useState(0);
@@ -261,11 +235,10 @@ export function SalesOrdersListPage() {
     next = filterByWarehouseId(next, warehouseFilterId);
     next = filterByCarrierId(next, carrierFilterId);
     next = filterByDocumentIdSet(next, salesOrderIdsContainingItem);
-    return filterByStatus(next, statusFilter);
+    return next;
   }, [
     rowsWithNames,
     searchQuery,
-    statusFilter,
     customerFilterId,
     warehouseFilterId,
     carrierFilterId,
@@ -273,7 +246,6 @@ export function SalesOrdersListPage() {
   ]);
 
   const hasFilter =
-    statusFilter !== "all" ||
     searchQuery.trim() !== "" ||
     customerFilterId != null ||
     warehouseFilterId != null ||
@@ -327,6 +299,15 @@ export function SalesOrdersListPage() {
   }, [searchParams, setSearchParams]);
 
   const emDash = t("domain.audit.summary.emDash");
+  const planningStatusOptions = useMemo(
+    () => [
+      { value: "draft", label: t("status.planning.draft") },
+      { value: "confirmed", label: t("status.planning.confirmed") },
+      { value: "closed", label: t("status.planning.closed") },
+      { value: "cancelled", label: t("status.planning.cancelled") },
+    ],
+    [t, locale],
+  );
 
   const itemFilterLabel = useMemo((): string => {
     if (itemFilterId == null) return "";
@@ -399,7 +380,6 @@ export function SalesOrdersListPage() {
       warehouseFilterId == null &&
       itemFilterId == null &&
       carrierFilterId == null &&
-      statusFilter === "all" &&
       searchQuery.trim() === ""
     ) {
       return t("ops.list.salesOrders.hintCustomerOnly");
@@ -409,7 +389,6 @@ export function SalesOrdersListPage() {
       itemFilterId == null &&
       customerFilterId == null &&
       carrierFilterId == null &&
-      statusFilter === "all" &&
       searchQuery.trim() === ""
     ) {
       return t("ops.list.salesOrders.hintWarehouseOnly");
@@ -419,7 +398,6 @@ export function SalesOrdersListPage() {
       warehouseFilterId == null &&
       customerFilterId == null &&
       carrierFilterId == null &&
-      statusFilter === "all" &&
       searchQuery.trim() === ""
     ) {
       return t("ops.list.salesOrders.hintItemOnly");
@@ -429,7 +407,6 @@ export function SalesOrdersListPage() {
       customerFilterId == null &&
       warehouseFilterId == null &&
       itemFilterId == null &&
-      statusFilter === "all" &&
       searchQuery.trim() === ""
     ) {
       return t("ops.list.salesOrders.hintCarrierOnly");
@@ -441,22 +418,10 @@ export function SalesOrdersListPage() {
     warehouseFilterId,
     carrierFilterId,
     itemFilterId,
-    statusFilter,
     searchQuery,
     t,
     locale,
   ]);
-
-  const statusOptions = useMemo(
-    (): { value: StatusFilter; label: string }[] => [
-      { value: "all", label: t("doc.list.all") },
-      { value: "draft", label: t("status.planning.draft") },
-      { value: "confirmed", label: t("status.planning.confirmed") },
-      { value: "closed", label: t("status.planning.closed") },
-      { value: "cancelled", label: t("status.planning.cancelled") },
-    ],
-    [t, locale],
-  );
 
   const salesOrderColumnFilterConfigs = useMemo<Record<string, AgGridColumnFilterConfig<RowData>>>(
     () => ({
@@ -481,12 +446,10 @@ export function SalesOrdersListPage() {
       recipientPhoneLabel: { kind: "text" },
       status: {
         kind: "enum",
-        options: statusOptions
-          .filter((option) => option.value !== "all")
-          .map((option) => ({ value: option.value, label: option.label })),
+        options: planningStatusOptions,
       },
     }),
-    [rowsWithNames, statusOptions],
+    [rowsWithNames, planningStatusOptions],
   );
 
   const displayRows = useMemo(
@@ -617,21 +580,6 @@ export function SalesOrdersListPage() {
       controls={
         <>
           <BackButton to="/" aria-label={t("doc.list.backToDashboard")} />
-          <ButtonGroup className="list-page__filter-group" aria-label={t("ops.list.filterStatusAria")}>
-            {statusOptions.map(({ value, label }, index) => (
-              <React.Fragment key={value}>
-                {index > 0 && <ButtonGroupSeparator />}
-                <Button
-                  type="button"
-                  variant={statusFilter === value ? "default" : "outline"}
-                  size="sm"
-                  onClick={() => setQueryValue("status", value, "all")}
-                >
-                  {label}
-                </Button>
-              </React.Fragment>
-            ))}
-          </ButtonGroup>
           <ListPageSearch
             inputRef={listSearchInputRef}
             placeholder={t("ops.list.salesOrders.searchPlaceholder")}

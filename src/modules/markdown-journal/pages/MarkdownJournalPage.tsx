@@ -105,9 +105,6 @@ export function MarkdownJournalPage() {
   const [view, setView] = useState<MarkdownRegisterView>(
     viewFromQuery === "codes" || viewFromQuery === "lines" ? "codes" : "journals",
   );
-  const [filterStatus, setFilterStatus] = useState<MarkdownJournalStatus | "all">(
-    ((searchParams.get("status") as MarkdownJournalStatus | "all" | null) ?? "all"),
-  );
   const listSearchInputRef = useRef<HTMLInputElement>(null);
   const gridRef = useRef<AgGridReact<JournalRow | MarkdownCodeRow> | null>(null);
   const gridContainerRef = useRef<HTMLDivElement | null>(null);
@@ -128,15 +125,6 @@ export function MarkdownJournalPage() {
     const nextView = viewFromQuery === "codes" || viewFromQuery === "lines" ? "codes" : "journals";
     setView(nextView);
   }, [viewFromQuery]);
-
-  useEffect(() => {
-    const rawStatus = searchParams.get("status");
-    const nextStatus =
-      rawStatus && MARKDOWN_JOURNAL_STATUS_FILTERS.includes(rawStatus as MarkdownJournalStatus | "all")
-        ? (rawStatus as MarkdownJournalStatus | "all")
-        : "all";
-    setFilterStatus(nextStatus);
-  }, [searchParams]);
 
   const createTarget = useMemo(() => {
     if (!prefillItemId) return "/markdown-journal/new";
@@ -189,9 +177,6 @@ export function MarkdownJournalPage() {
       );
       base = base.filter((row) => allowed.has(row.id));
     }
-    if (filterStatus !== "all") {
-      base = base.filter((row) => row.status === filterStatus);
-    }
     const q = search.trim().toLowerCase();
     if (q) {
       base = base.filter((row) => {
@@ -203,7 +188,7 @@ export function MarkdownJournalPage() {
       });
     }
     return base;
-  }, [filterStatus, journalRows, prefillItemId, search, appRevision]);
+  }, [journalRows, prefillItemId, search, appRevision]);
 
   const journalColumnFilterConfigs = useMemo<Record<string, AgGridColumnFilterConfig<JournalRow>>>(
     () => ({
@@ -339,7 +324,6 @@ export function MarkdownJournalPage() {
   const isEmpty = activeRows.length === 0;
   const hasFilter =
     search.trim() !== "" ||
-    filterStatus !== "all" ||
     prefillItemId !== "" ||
     hasActiveAgGridColumnFilters(columnFilterModel);
 
@@ -555,24 +539,6 @@ export function MarkdownJournalPage() {
                     {value === "journals"
                       ? t("markdown.journal.journalsTab")
                       : t("markdown.journal.markdownCodesTab")}
-                  </Button>
-                </div>
-              ))}
-            </ButtonGroup>
-            <ButtonGroup className="list-page__filter-group" aria-label={t("ops.list.filterStatusAria")}>
-              {MARKDOWN_JOURNAL_STATUS_FILTERS.map((value, index) => (
-                <div key={value} className="contents">
-                  {index > 0 && <ButtonGroupSeparator />}
-                  <Button
-                    type="button"
-                    variant={filterStatus === value ? "default" : "outline"}
-                    size="sm"
-                    onClick={() => setQueryValue("status", value, "all")}
-                    disabled={view !== "journals"}
-                  >
-                    {value === "all"
-                      ? t("markdown.filters.allStatuses")
-                      : journalStatusLabel(value, t)}
                   </Button>
                 </div>
               ))}

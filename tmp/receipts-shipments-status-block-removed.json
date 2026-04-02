@@ -1,0 +1,27 @@
+{
+  "results": [
+    {
+      "route": "/receipts",
+      "state": {
+        "controlsText": [
+          "Экспорт"
+        ],
+        "statusButtons": [],
+        "searchVisible": true
+      },
+      "screenshotPath": "/home/shaxr/code/mini-erp-react/tmp/receipts-status-block-removed.png"
+    },
+    {
+      "route": "/shipments",
+      "state": {
+        "controlsText": [
+          "Экспорт"
+        ],
+        "statusButtons": [],
+        "searchVisible": true
+      },
+      "screenshotPath": "/home/shaxr/code/mini-erp-react/tmp/shipments-status-block-removed.png"
+    }
+  ],
+  "consoleErrors": []
+}

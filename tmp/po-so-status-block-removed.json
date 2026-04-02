@@ -1,0 +1,29 @@
+{
+  "results": [
+    {
+      "route": "/purchase-orders",
+      "state": {
+        "controlsText": [
+          "Экспорт",
+          "Создать"
+        ],
+        "statusButtons": [],
+        "searchVisible": true
+      },
+      "screenshotPath": "/home/shaxr/code/mini-erp-react/tmp/purchase-orders-status-block-removed.png"
+    },
+    {
+      "route": "/sales-orders",
+      "state": {
+        "controlsText": [
+          "Экспорт",
+          "Создать"
+        ],
+        "statusButtons": [],
+        "searchVisible": true
+      },
+      "screenshotPath": "/home/shaxr/code/mini-erp-react/tmp/sales-orders-status-block-removed.png"
+    }
+  ],
+  "consoleErrors": []
+}
