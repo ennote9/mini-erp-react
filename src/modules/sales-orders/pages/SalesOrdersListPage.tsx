@@ -34,6 +34,7 @@ import { save } from "@tauri-apps/plugin-dialog";
 import { invoke } from "@tauri-apps/api/core";
 import { revealItemInDir } from "@tauri-apps/plugin-opener";
 import { useTranslation } from "@/shared/i18n/context";
+import { useAppDisplayFormatters } from "@/shared/formatting";
 import { buildReadableUniqueFilename, ensureUniqueExportPath } from "@/shared/export/filenameBuilder";
 import { salesOrdersListExcelLabels } from "@/shared/i18n/excelListExportLabels";
 import { toGeneratedCodeSearchTokens } from "@/shared/generatedVisibleCodes";
@@ -122,6 +123,7 @@ export function SalesOrdersListPage() {
   const location = useLocation();
   const navigate = useNavigate();
   const { t, locale } = useTranslation();
+  const { formatDate } = useAppDisplayFormatters();
   const [searchParams, setSearchParams] = useSearchParams();
   const customerFilterId = useMemo(() => parseQueryId(searchParams, "customerId"), [searchParams]);
   const warehouseFilterId = useMemo(() => parseQueryId(searchParams, "warehouseId"), [searchParams]);
@@ -513,7 +515,7 @@ export function SalesOrdersListPage() {
         field: "date",
         headerName: t("doc.columns.date"),
         width: 140,
-        valueFormatter: (params) => normalizeDateForSO(params.value),
+        valueFormatter: (params) => formatDate(normalizeDateForSO(params.value), { empty: "" }),
       },
       {
         field: "customerName",
@@ -553,7 +555,7 @@ export function SalesOrdersListPage() {
         cellRenderer: AgGridPlanningStatusCellRenderer,
       },
     ],
-    [t, locale],
+    [t, locale, formatDate],
   );
 
   const columnDefs = useMemo(

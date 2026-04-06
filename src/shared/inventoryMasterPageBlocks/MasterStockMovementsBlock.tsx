@@ -10,7 +10,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { useTranslation } from "@/shared/i18n/context";
-import { formatMasterInventoryDateTime, formatMasterInventoryQtyDelta } from "./formatting";
+import { useMasterInventoryFormatters } from "./formatting";
 
 export type MasterStockMovementsBlockLabels = {
   title: string;
@@ -56,6 +56,7 @@ function rowKeyDown(e: KeyboardEvent, action: () => void) {
  */
 export function MasterStockMovementsBlock(props: MasterStockMovementsBlockProps) {
   const { t } = useTranslation();
+  const { formatDateTimeDisplay, formatQtyDelta } = useMasterInventoryFormatters();
   const { labels, onOpenAll, movementTypeLabel, variant, rows, hideHeaderOpenButton = false } = props;
 
   return (
@@ -130,14 +131,14 @@ export function MasterStockMovementsBlock(props: MasterStockMovementsBlockProps)
                         onKeyDown={(e) => rowKeyDown(e, () => rowNav(row))}
                       >
                         <td className="whitespace-nowrap tabular-nums">
-                          {formatMasterInventoryDateTime(row.datetime)}
+                          {formatDateTimeDisplay(row.datetime)}
                         </td>
                         <td>{movementTypeLabel(row.movementTypeCode)}</td>
                         <td className="truncate max-w-[14rem]" title={row.warehouseName}>
                           {row.warehouseName}
                         </td>
                         <td className="text-right tabular-nums">
-                          {formatMasterInventoryQtyDelta(row.qtyDelta)}
+                          {formatQtyDelta(row.qtyDelta)}
                         </td>
                         <td className="truncate max-w-[18rem]" title={row.sourceDocumentLabel}>
                           {row.sourceDocumentLabel}
@@ -160,7 +161,7 @@ export function MasterStockMovementsBlock(props: MasterStockMovementsBlockProps)
                         onKeyDown={(e) => rowKeyDown(e, () => rowNav(row))}
                       >
                         <td className="whitespace-nowrap tabular-nums">
-                          {formatMasterInventoryDateTime(row.datetime)}
+                          {formatDateTimeDisplay(row.datetime)}
                         </td>
                         <td className="list-table__cell--code font-mono text-xs">{row.itemCode}</td>
                         <td className="truncate max-w-[12rem]" title={row.itemName}>
@@ -171,7 +172,7 @@ export function MasterStockMovementsBlock(props: MasterStockMovementsBlockProps)
                           {row.warehouseName}
                         </td>
                         <td className="text-right tabular-nums">
-                          {formatMasterInventoryQtyDelta(row.qtyDelta)}
+                          {formatQtyDelta(row.qtyDelta)}
                         </td>
                         <td className="truncate max-w-[16rem]" title={row.sourceDocumentLabel}>
                           {row.sourceDocumentLabel}

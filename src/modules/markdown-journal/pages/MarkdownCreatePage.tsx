@@ -13,6 +13,7 @@ import { SalesOrderItemAutocomplete } from "@/modules/sales-orders/components/Sa
 import { BackButton } from "@/shared/ui/list/BackButton";
 import { DocumentPageLayout } from "@/shared/ui/object/DocumentPageLayout";
 import { useTranslation } from "@/shared/i18n/context";
+import { useAppDisplayFormatters } from "@/shared/formatting";
 import { itemRepository } from "@/modules/items/repository";
 import { warehouseRepository } from "@/modules/warehouses/repository";
 import { useAppReadModelRevision } from "@/shared/inventoryMasterPageBlocks/useAppReadModelRevision";
@@ -246,8 +247,9 @@ function buildMarkdownPrintSheetHtml(params: {
   journalNumber: string;
   rows: MarkdownCodeRow[];
   t: (key: string) => string;
+  formatMoney: (value: number | null | undefined, fractionDigits?: number, empty?: string) => string;
 }): string {
-  const { journalNumber, rows, t } = params;
+  const { journalNumber, rows, t, formatMoney } = params;
   const html = rows
     .map((row) => {
       const barcodeSvg = buildCode39BarcodeSvg(row.markdownCode);
@@ -256,7 +258,7 @@ function buildMarkdownPrintSheetHtml(params: {
           <div class="sticker__barcode">${barcodeSvg}</div>
           <div class="sticker__code">${escapeHtml(row.markdownCode)}</div>
           <div class="sticker__item">${escapeHtml(`${row.itemCode} — ${row.itemName}`)}</div>
-          <div class="sticker__meta">${escapeHtml(`${t("markdown.fields.markdownPrice")}: ${row.markdownPrice.toFixed(2)}`)}</div>
+          <div class="sticker__meta">${escapeHtml(`${t("markdown.fields.markdownPrice")}: ${formatMoney(row.markdownPrice, 2, "0")}`)}</div>
         </article>
       `;
     })
@@ -349,6 +351,7 @@ function journalStatusLabel(
 
 export function MarkdownCreatePage() {
   const { t } = useTranslation();
+  const { formatMoney } = useAppDisplayFormatters();
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -604,7 +607,7 @@ export function MarkdownCreatePage() {
         width: 140,
         minWidth: 130,
         valueFormatter: (params) =>
-          typeof params.value === "number" ? params.value.toFixed(2) : "",
+          typeof params.value === "number" ? formatMoney(params.value, 2, "") : "",
       },
       {
         field: "reason",
@@ -613,7 +616,7 @@ export function MarkdownCreatePage() {
         width: 220,
       },
     ],
-    [t],
+    [t, formatMoney],
   );
 
   const codeColumnDefs = useMemo<ColDef<MarkdownCodeRow>[]>(
@@ -657,7 +660,7 @@ export function MarkdownCreatePage() {
         width: 140,
         minWidth: 130,
         valueFormatter: (params) =>
-          typeof params.value === "number" ? params.value.toFixed(2) : "",
+          typeof params.value === "number" ? formatMoney(params.value, 2, "") : "",
       },
       {
         field: "reason",
@@ -696,7 +699,7 @@ export function MarkdownCreatePage() {
         width: 200,
       },
     ],
-    [t],
+    [t, formatMoney],
   );
 
   const effectiveLines =
@@ -765,6 +768,7 @@ export function MarkdownCreatePage() {
           journalNumber: printResult.journal.number,
           rows: printableRows,
           t,
+          formatMoney,
         }),
       );
       popup.document.close();
@@ -779,7 +783,7 @@ export function MarkdownCreatePage() {
       }
       setPrintDialogOpen(false);
     },
-    [id, journal, selectedCodeIds, t],
+    [id, journal, selectedCodeIds, t, formatMoney],
   );
 
   const breadcrumbItems = useMemo(

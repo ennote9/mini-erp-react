@@ -38,6 +38,7 @@ import { useTranslation } from "@/shared/i18n/context";
 import { buildReadableUniqueFilename, ensureUniqueExportPath } from "@/shared/export/filenameBuilder";
 import { itemsListExcelLabels } from "@/shared/i18n/excelListExportLabels";
 import { useAppReadModelRevision } from "@/shared/inventoryMasterPageBlocks/useAppReadModelRevision";
+import { useAppDisplayFormatters } from "@/shared/formatting";
 import {
   isMarkdownCodeFormat,
   resolveMarkdownRecordByScanInput,
@@ -98,6 +99,7 @@ function buildExportRowsFromItems(items: Item[], activeYes: string, activeNo: st
 
 export function ItemsListPage() {
   const { t, locale } = useTranslation();
+  const { formatMoney } = useAppDisplayFormatters();
   const location = useLocation();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -411,7 +413,7 @@ export function ItemsListPage() {
         width: 120,
         valueFormatter: (params) =>
           params.value != null && typeof params.value === "number"
-            ? params.value.toFixed(2)
+            ? formatMoney(params.value, 2, "")
             : "",
       },
       {
@@ -420,7 +422,7 @@ export function ItemsListPage() {
         width: 100,
         valueFormatter: (params) =>
           params.value != null && typeof params.value === "number"
-            ? params.value.toFixed(2)
+            ? formatMoney(params.value, 2, "")
             : "",
       },
       {
@@ -430,7 +432,7 @@ export function ItemsListPage() {
         cellRenderer: AgGridActiveBooleanCellRenderer,
       },
     ],
-    [t, locale],
+    [t, locale, formatMoney],
   );
 
   const handleApplyColumnFilter = useCallback(

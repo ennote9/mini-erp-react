@@ -73,8 +73,8 @@ export const SETTINGS_REGISTRY: SettingRegistryEntry[] = [
     section: "general",
     valueType: "enum",
     label: "Date format",
-    description: "Stored for future use. Dates on screens are not yet fully driven by this setting.",
-    readiness: "storedOnly",
+    description: "Controls date display format across application screens.",
+    readiness: "active",
     options: [
       { value: "iso", label: "ISO (YYYY-MM-DD)" },
       { value: "eu", label: "EU (DD.MM.YYYY)" },
@@ -86,8 +86,8 @@ export const SETTINGS_REGISTRY: SettingRegistryEntry[] = [
     section: "general",
     valueType: "enum",
     label: "Number format",
-    description: "Stored for future use. Grid and entry formatting still use the app default.",
-    readiness: "storedOnly",
+    description: "Controls numeric display format across application screens.",
+    readiness: "active",
     options: [
       { value: "spaceComma", label: "1 234,56 (space + comma)" },
       { value: "commaDot", label: "1,234.56 (comma + dot)" },

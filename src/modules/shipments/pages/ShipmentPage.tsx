@@ -56,6 +56,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { revealItemInDir } from "@tauri-apps/plugin-opener";
 import { factualDocumentIssuesForStrip } from "../../../shared/factualDocumentPageIssues";
 import { useTranslation } from "@/shared/i18n/context";
+import { useAppDisplayFormatters } from "@/shared/formatting";
 import { buildReadableUniqueFilename, ensureUniqueExportPath } from "@/shared/export/filenameBuilder";
 import type { TFunction } from "@/shared/i18n/resolve";
 import { shipmentExcelExportLabels } from "@/shared/i18n/excelPlanningExportLabels";
@@ -174,6 +175,7 @@ function buildExportRowsFromLinesWithItem(lines: LineWithItem[]): ShipmentExport
 
 export function ShipmentPage() {
   const { t, locale } = useTranslation();
+  const { formatDate } = useAppDisplayFormatters();
   const { id } = useParams<{ id: string }>();
   const { settings } = useSettings();
   const workspaceMode = settings.general.workspaceMode;
@@ -705,7 +707,7 @@ export function ShipmentPage() {
             </div>
             <div className="doc-summary__row">
               <dt className="doc-summary__term">{t("doc.columns.date")}</dt>
-              <dd className="doc-summary__value">{doc.date}</dd>
+              <dd className="doc-summary__value">{formatDate(doc.date)}</dd>
             </div>
             <div className="doc-summary__row">
               <dt className="doc-summary__term">{t("doc.shipment.relatedSalesOrder")}</dt>

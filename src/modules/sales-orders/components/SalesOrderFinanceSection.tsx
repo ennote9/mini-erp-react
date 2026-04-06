@@ -2,7 +2,7 @@ import { useCallback, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { Dialog } from "radix-ui";
 import { useTranslation } from "@/shared/i18n/context";
-import type { AppLocaleId } from "@/shared/i18n/locales";
+import { useAppDisplayFormatters } from "@/shared/formatting";
 import { useAppReadModelRevision } from "@/shared/inventoryMasterPageBlocks/useAppReadModelRevision";
 import { salesOrderPaymentRepository } from "../salesOrderPaymentRepository";
 import {
@@ -34,22 +34,10 @@ const ERROR_KEY: Record<PaymentServiceErrorCode, string> = {
   DELETE_FAILED: "finance.errors.deleteFailed",
 };
 
-function formatMoney(n: number): string {
-  const dp = getCommercialMoneyDecimalPlaces();
-  return roundMoney(n).toFixed(dp);
-}
-
 function defaultDatetimeLocal(): string {
   const d = new Date();
   const pad = (n: number) => String(n).padStart(2, "0");
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
-}
-
-function formatPaidAtDisplay(locale: AppLocaleId, iso: string): string {
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return iso;
-  const tag = locale === "kk" ? "kk-KZ" : locale === "ru" ? "ru-RU" : "en-US";
-  return d.toLocaleString(tag, { dateStyle: "short", timeStyle: "short" });
 }
 
 export type SalesOrderFinanceSectionProps = {
@@ -62,6 +50,8 @@ export type SalesOrderFinanceSectionProps = {
 export function SalesOrderFinanceSection(props: SalesOrderFinanceSectionProps) {
   const { salesOrderId, cancelled, orderTotalAmount, hasLines } = props;
   const { t, locale } = useTranslation();
+  const { formatDateTime, formatMoney } = useAppDisplayFormatters();
+  const moneyFractionDigits = getCommercialMoneyDecimalPlaces();
   const revision = useAppReadModelRevision();
 
   const payments = useMemo(
@@ -189,15 +179,15 @@ export function SalesOrderFinanceSection(props: SalesOrderFinanceSectionProps) {
                 </span>
                 <span className="tabular-nums">
                   <span className="text-muted-foreground">{t("finance.orderTotal")}: </span>
-                  {formatMoney(summary.totalAmount)}
+                  {formatMoney(roundMoney(summary.totalAmount), moneyFractionDigits)}
                 </span>
                 <span className="tabular-nums">
                   <span className="text-muted-foreground">{t("finance.paidTotal")}: </span>
-                  {formatMoney(summary.paidAmount)}
+                  {formatMoney(roundMoney(summary.paidAmount), moneyFractionDigits)}
                 </span>
                 <span className="tabular-nums">
                   <span className="text-muted-foreground">{t("finance.remaining")}: </span>
-                  {formatMoney(summary.remainingAmount)}
+                  {formatMoney(roundMoney(summary.remainingAmount), moneyFractionDigits)}
                 </span>
               </div>
             </div>
@@ -225,9 +215,11 @@ export function SalesOrderFinanceSection(props: SalesOrderFinanceSectionProps) {
                       {payments.map((p) => (
                         <tr key={p.id} className="border-b border-border/80 last:border-0">
                           <td className="px-1 py-px tabular-nums whitespace-nowrap align-middle">
-                            {formatPaidAtDisplay(locale, p.paidAt)}
+                            {formatDateTime(p.paidAt)}
                           </td>
-                          <td className="px-1 py-px tabular-nums align-middle">{formatMoney(p.amount)}</td>
+                          <td className="px-1 py-px tabular-nums align-middle">
+                            {formatMoney(roundMoney(p.amount), moneyFractionDigits)}
+                          </td>
                           <td className="px-1 py-px align-middle">{t(`finance.paymentMethod.${p.method}`)}</td>
                           <td className="max-w-[10rem] truncate px-1 py-px align-middle" title={p.reference ?? ""}>
                             {p.reference ?? "—"}

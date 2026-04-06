@@ -1,6 +1,6 @@
 import type { ItemPageBalanceSummary } from "@/modules/items/itemInventoryRelated";
 import { useTranslation } from "@/shared/i18n/context";
-import { formatMasterInventoryQty } from "./formatting";
+import { useMasterInventoryFormatters } from "./formatting";
 
 type Props = {
   summary: ItemPageBalanceSummary;
@@ -13,6 +13,7 @@ type Props = {
  */
 export function MasterStockBalanceSummaryChips({ summary, ariaLabel }: Props) {
   const { t } = useTranslation();
+  const { formatQty } = useMasterInventoryFormatters();
 
   return (
     <div className="flex flex-wrap gap-1.5" aria-label={ariaLabel}>
@@ -23,31 +24,31 @@ export function MasterStockBalanceSummaryChips({ summary, ariaLabel }: Props) {
       <span className="inline-flex items-baseline gap-1 rounded border border-border/50 bg-muted/25 px-2 py-0.5 text-[11px] tabular-nums leading-none">
         <span className="text-muted-foreground">{t("master.item.chipTotalOnHand")}</span>
         <span className="font-medium text-foreground/90">
-          {formatMasterInventoryQty(summary.totalOnHand)}
+          {formatQty(summary.totalOnHand)}
         </span>
       </span>
       <span className="inline-flex items-baseline gap-1 rounded border border-border/50 bg-muted/25 px-2 py-0.5 text-[11px] tabular-nums leading-none">
         <span className="text-muted-foreground">{t("master.item.chipTotalReserved")}</span>
         <span className="font-medium text-foreground/90">
-          {formatMasterInventoryQty(summary.totalReserved)}
+          {formatQty(summary.totalReserved)}
         </span>
       </span>
       <span className="inline-flex items-baseline gap-1 rounded border border-border/50 bg-muted/25 px-2 py-0.5 text-[11px] tabular-nums leading-none">
         <span className="text-muted-foreground">{t("master.item.chipTotalAvailable")}</span>
         <span className="font-medium text-foreground/90">
-          {formatMasterInventoryQty(summary.totalAvailable)}
+          {formatQty(summary.totalAvailable)}
         </span>
       </span>
       <span className="inline-flex items-baseline gap-1 rounded border border-border/50 bg-muted/25 px-2 py-0.5 text-[11px] tabular-nums leading-none">
         <span className="text-muted-foreground">{t("master.item.chipTotalOutgoing")}</span>
         <span className="font-medium text-foreground/90">
-          {formatMasterInventoryQty(summary.totalOutgoing)}
+          {formatQty(summary.totalOutgoing)}
         </span>
       </span>
       <span className="inline-flex items-baseline gap-1 rounded border border-border/50 bg-muted/25 px-2 py-0.5 text-[11px] tabular-nums leading-none">
         <span className="text-muted-foreground">{t("master.item.chipTotalIncoming")}</span>
         <span className="font-medium text-foreground/90">
-          {formatMasterInventoryQty(summary.totalIncoming)}
+          {formatQty(summary.totalIncoming)}
         </span>
       </span>
     </div>

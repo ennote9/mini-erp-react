@@ -1,7 +1,7 @@
 import { useParams, Link } from "react-router-dom";
 import { useMemo, useEffect, useState, useCallback, useRef } from "react";
 import { useTranslation } from "@/shared/i18n/context";
-import type { AppLocaleId } from "@/shared/i18n/locales";
+import { useAppDisplayFormatters } from "@/shared/formatting";
 import { salesOrderRepository } from "../repository";
 import { salesOrderPaymentRepository } from "../salesOrderPaymentRepository";
 import { customerRepository } from "../../customers/repository";
@@ -27,23 +27,6 @@ import {
 import { useAppReadModelRevision } from "@/shared/inventoryMasterPageBlocks/useAppReadModelRevision";
 import "@/shared/print/customerDocumentPrint.css";
 
-function formatHandoffDateTime(locale: AppLocaleId, d: Date): string {
-  const tag = locale === "kk" ? "kk-KZ" : locale === "ru" ? "ru-RU" : "en-US";
-  return d.toLocaleString(tag, { dateStyle: "short", timeStyle: "short" });
-}
-
-function formatMoneyAmount(n: number): string {
-  const dp = getCommercialMoneyDecimalPlaces();
-  return roundMoney(n).toFixed(dp);
-}
-
-function formatPaidAtLine(locale: AppLocaleId, iso: string): string {
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return iso;
-  const tag = locale === "kk" ? "kk-KZ" : locale === "ru" ? "ru-RU" : "en-US";
-  return d.toLocaleString(tag, { dateStyle: "short", timeStyle: "short" });
-}
-
 function planningStatusLabel(t: (key: string) => string, status: string): string {
   switch (status) {
     case "draft":
@@ -61,7 +44,8 @@ function planningStatusLabel(t: (key: string) => string, status: string): string
 
 export function SalesOrderCustomerInvoicePage() {
   const { id } = useParams<{ id: string }>();
-  const { t, locale } = useTranslation();
+  const { t } = useTranslation();
+  const { formatDate, formatDateTime, formatMoney } = useAppDisplayFormatters();
   const emDash = t("domain.audit.summary.emDash");
   const revision = useAppReadModelRevision();
   const [printTime, setPrintTime] = useState(() => new Date());
@@ -139,7 +123,7 @@ export function SalesOrderCustomerInvoicePage() {
       payments,
       paymentSummary,
     };
-  }, [id, emDash, t, locale, revision]);
+  }, [id, emDash, t, revision]);
 
   const snapshotDocNumber = view?.doc.number ?? "document";
 
@@ -197,8 +181,9 @@ export function SalesOrderCustomerInvoicePage() {
   }
 
   const { doc } = view;
-  const printedAt = formatHandoffDateTime(locale, printTime);
+  const printedAt = formatDateTime(printTime.toISOString(), { empty: emDash });
   const paymentStatusLabel = t(`finance.paymentStatus.${view.paymentSummary.status}`);
+  const moneyDp = getCommercialMoneyDecimalPlaces();
 
   return (
     <div className="customer-doc mx-auto w-full max-w-5xl px-5 py-6 text-foreground sm:px-8 print:max-w-none print:px-0 print:py-0">
@@ -230,7 +215,7 @@ export function SalesOrderCustomerInvoicePage() {
           <div className="mt-2 flex flex-wrap gap-x-6 gap-y-1 text-sm text-muted-foreground print:text-black/70">
             <span>
               <span className="font-medium text-foreground/85 print:text-black">{t("doc.columns.date")}:</span>{" "}
-              <span className="tabular-nums">{doc.date}</span>
+              <span className="tabular-nums">{formatDate(doc.date)}</span>
             </span>
             <span>
               <span className="font-medium text-foreground/85 print:text-black">{t("doc.columns.status")}:</span>{" "}
@@ -317,15 +302,21 @@ export function SalesOrderCustomerInvoicePage() {
               </div>
               <div>
                 <dt className="text-xs font-medium text-muted-foreground print:text-black/55">{t("finance.orderTotal")}</dt>
-                <dd className="font-semibold tabular-nums">{formatMoneyAmount(view.paymentSummary.totalAmount)}</dd>
+                <dd className="font-semibold tabular-nums">
+                  {formatMoney(view.paymentSummary.totalAmount, moneyDp)}
+                </dd>
               </div>
               <div>
                 <dt className="text-xs font-medium text-muted-foreground print:text-black/55">{t("finance.paidTotal")}</dt>
-                <dd className="font-semibold tabular-nums">{formatMoneyAmount(view.paymentSummary.paidAmount)}</dd>
+                <dd className="font-semibold tabular-nums">
+                  {formatMoney(view.paymentSummary.paidAmount, moneyDp)}
+                </dd>
               </div>
               <div>
                 <dt className="text-xs font-medium text-muted-foreground print:text-black/55">{t("finance.remaining")}</dt>
-                <dd className="font-semibold tabular-nums">{formatMoneyAmount(view.paymentSummary.remainingAmount)}</dd>
+                <dd className="font-semibold tabular-nums">
+                  {formatMoney(view.paymentSummary.remainingAmount, moneyDp)}
+                </dd>
               </div>
             </dl>
           </div>
@@ -352,8 +343,12 @@ export function SalesOrderCustomerInvoicePage() {
                     <td className="customer-doc__td font-mono text-xs">{row.itemCode}</td>
                     <td className="customer-doc__td">{row.itemName}</td>
                     <td className="customer-doc__td customer-doc__td--numeric">{row.qty}</td>
-                    <td className="customer-doc__td customer-doc__td--numeric">{formatMoneyAmount(row.unitPrice)}</td>
-                    <td className="customer-doc__td customer-doc__td--numeric">{formatMoneyAmount(row.lineTotal)}</td>
+                    <td className="customer-doc__td customer-doc__td--numeric">
+                      {formatMoney(row.unitPrice, moneyDp)}
+                    </td>
+                    <td className="customer-doc__td customer-doc__td--numeric">
+                      {formatMoney(row.lineTotal, moneyDp)}
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -362,7 +357,7 @@ export function SalesOrderCustomerInvoicePage() {
           <div className="mt-3 flex justify-end border-t border-border pt-2 text-sm print:border-black/20">
             <span className="font-semibold">
               {t("doc.page.totalAmount")}:{" "}
-              <span className="tabular-nums">{formatMoneyAmount(view.grandTotal)}</span>
+              <span className="tabular-nums">{formatMoney(view.grandTotal, moneyDp)}</span>
             </span>
           </div>
         </section>
@@ -386,9 +381,11 @@ export function SalesOrderCustomerInvoicePage() {
                   {view.payments.map((p) => (
                     <tr key={p.id} className="customer-doc__tr">
                       <td className="customer-doc__td tabular-nums whitespace-nowrap">
-                        {formatPaidAtLine(locale, p.paidAt)}
+                        {formatDateTime(p.paidAt)}
                       </td>
-                      <td className="customer-doc__td customer-doc__td--numeric">{formatMoneyAmount(p.amount)}</td>
+                      <td className="customer-doc__td customer-doc__td--numeric">
+                        {formatMoney(p.amount, moneyDp)}
+                      </td>
                       <td className="customer-doc__td">{t(`finance.paymentMethod.${p.method}`)}</td>
                       <td className="customer-doc__td">{p.reference ?? emDash}</td>
                     </tr>

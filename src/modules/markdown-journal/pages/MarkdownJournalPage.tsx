@@ -11,6 +11,7 @@ import { markdownJournalRepository } from "../journalRepository";
 import { markdownJournalLineRepository } from "../journalLineRepository";
 import type { MarkdownJournalStatus } from "../model";
 import { useTranslation } from "@/shared/i18n/context";
+import { useAppDisplayFormatters } from "@/shared/formatting";
 import { useAppReadModelRevision } from "@/shared/inventoryMasterPageBlocks/useAppReadModelRevision";
 import { ListPageLayout } from "@/shared/ui/list/ListPageLayout";
 import { BackButton } from "@/shared/ui/list/BackButton";
@@ -94,6 +95,7 @@ function warehouseLabelFor(id: string): string {
 
 export function MarkdownJournalPage() {
   const { t } = useTranslation();
+  const { formatMoney } = useAppDisplayFormatters();
   const location = useLocation();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -448,7 +450,7 @@ export function MarkdownJournalPage() {
         width: 140,
         minWidth: 130,
         valueFormatter: (params) =>
-          typeof params.value === "number" ? params.value.toFixed(2) : "",
+          typeof params.value === "number" ? formatMoney(params.value, 2, "") : "",
       },
       {
         field: "warehouseLabel",
@@ -475,7 +477,7 @@ export function MarkdownJournalPage() {
         width: 200,
       },
     ],
-    [t],
+    [t, formatMoney],
   );
 
   const journalColumnDefs = useMemo(

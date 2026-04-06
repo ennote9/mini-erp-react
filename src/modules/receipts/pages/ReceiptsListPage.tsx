@@ -31,6 +31,7 @@ import { save } from "@tauri-apps/plugin-dialog";
 import { invoke } from "@tauri-apps/api/core";
 import { revealItemInDir } from "@tauri-apps/plugin-opener";
 import { useTranslation } from "@/shared/i18n/context";
+import { useAppDisplayFormatters } from "@/shared/formatting";
 import { buildReadableUniqueFilename, ensureUniqueExportPath } from "@/shared/export/filenameBuilder";
 import { receiptsListExcelLabels } from "@/shared/i18n/excelListExportLabels";
 import { toGeneratedCodeSearchTokens } from "@/shared/generatedVisibleCodes";
@@ -79,6 +80,7 @@ function buildExportRowsFromReceipts(rows: RowData[]): ReceiptsExportRow[] {
 export function ReceiptsListPage() {
   const navigate = useNavigate();
   const { t, locale } = useTranslation();
+  const { formatDate } = useAppDisplayFormatters();
   const [searchParams, setSearchParams] = useSearchParams();
   const warehouseFilterId = useMemo(() => {
     const raw = searchParams.get("warehouseId");
@@ -286,6 +288,7 @@ export function ReceiptsListPage() {
         field: "date",
         headerName: t("doc.columns.date"),
         width: 140,
+        valueFormatter: (params) => formatDate(params.value, { empty: "" }),
       },
       {
         field: "purchaseOrderNumber",
@@ -304,7 +307,7 @@ export function ReceiptsListPage() {
         cellRenderer: AgGridFactualStatusCellRenderer,
       },
     ],
-    [t, locale],
+    [t, locale, formatDate],
   );
 
   const columnDefs = useMemo(

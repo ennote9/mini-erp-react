@@ -3,6 +3,7 @@ import type { ItemImage } from "../model";
 import { Button } from "@/components/ui/button";
 import { ChevronLeft, ChevronRight, ExternalLink, Star, Trash2, Upload } from "lucide-react";
 import { useTranslation } from "@/shared/i18n/context";
+import { useAppDisplayFormatters } from "@/shared/formatting";
 
 type LoadState = "idle" | "loading" | "ready" | "error";
 
@@ -27,10 +28,17 @@ type Props = {
 function formatBytes(
   n: number,
   t: (path: string, params?: Record<string, string | number | undefined>) => string,
+  formatNumber: (
+    value: number | null | undefined,
+    options?: { minFractionDigits?: number; maxFractionDigits?: number; empty?: string },
+  ) => string,
 ): string {
   if (n < 1024) return t("master.item.images.bytesB", { n });
-  if (n < 1024 * 1024) return t("master.item.images.bytesKb", { n: Number((n / 1024).toFixed(1)) });
-  return t("master.item.images.bytesMb", { n: Number((n / (1024 * 1024)).toFixed(1)) });
+  if (n < 1024 * 1024)
+    return t("master.item.images.bytesKb", { n: formatNumber(n / 1024, { maxFractionDigits: 1, empty: "0" }) });
+  return t("master.item.images.bytesMb", {
+    n: formatNumber(n / (1024 * 1024), { maxFractionDigits: 1, empty: "0" }),
+  });
 }
 
 export function ItemImagePreview({
@@ -50,6 +58,7 @@ export function ItemImagePreview({
   busy,
 }: Props) {
   const { t } = useTranslation();
+  const { formatNumber } = useAppDisplayFormatters();
   const [imgDecodeFailed, setImgDecodeFailed] = useState(false);
 
   useEffect(() => {
@@ -105,7 +114,7 @@ export function ItemImagePreview({
           {image.fileName}
         </p>
         <p>
-          {formatBytes(image.sizeBytes, t)}
+          {formatBytes(image.sizeBytes, t, formatNumber)}
           {dim ? ` · ${dim}` : ""}
         </p>
       </div>

@@ -128,6 +128,7 @@ import {
   type SalesOrderAllocationView,
   type SoLineAllocationRow,
 } from "../../../shared/soAllocation";
+import { useAppDisplayFormatters } from "@/shared/formatting";
 
 type LineWithItem = SalesOrderLine & { itemName: string };
 
@@ -179,6 +180,7 @@ function soLinesDisplayColumnDefs(
   fulfillmentByItemId: Map<string, SoLineFulfillment>,
   allocationByItemId: Map<string, SoLineAllocationRow>,
   includeAllocationColumns: boolean,
+  formatMoney: (value: number | null | undefined, fractionDigits?: number, empty?: string) => string,
 ): ColDef<LineFormRow>[] {
   const dash = t("domain.audit.summary.emDash");
   const allocationCols: ColDef<LineFormRow>[] = includeAllocationColumns
@@ -334,8 +336,8 @@ function soLinesDisplayColumnDefs(
       editable: false,
       valueFormatter: (p) =>
         typeof p.value === "number" && !Number.isNaN(p.value)
-          ? p.value.toFixed(2)
-          : "0.00",
+          ? formatMoney(p.value, 2, "0")
+          : formatMoney(0, 2, "0"),
     },
     {
       headerName: t("doc.columns.lineAmount"),
@@ -346,9 +348,9 @@ function soLinesDisplayColumnDefs(
       valueGetter: (p) => {
         const qty = p.data?.qty;
         const unitPrice = p.data?.unitPrice;
-        if (typeof qty !== "number" || typeof unitPrice !== "number") return "0.00";
+        if (typeof qty !== "number" || typeof unitPrice !== "number") return formatMoney(0, 2, "0");
         const amount = lineAmountMoney(qty, unitPrice);
-        return Number.isNaN(amount) ? "0.00" : amount.toFixed(2);
+        return Number.isNaN(amount) ? formatMoney(0, 2, "0") : formatMoney(amount, 2, "0");
       },
     },
     {
@@ -373,6 +375,7 @@ function soLinesReadOnlyColumnDefs(
   fulfillment: SalesOrderFulfillment | null,
   allocation: SalesOrderAllocationView | null,
   includeAllocationColumns: boolean,
+  formatMoney: (value: number | null | undefined, fractionDigits?: number, empty?: string) => string,
 ): ColDef<LineWithItem>[] {
   const dash = t("domain.audit.summary.emDash");
   const allocationCols: ColDef<LineWithItem>[] = includeAllocationColumns
@@ -502,8 +505,8 @@ function soLinesReadOnlyColumnDefs(
       maxWidth: 120,
       valueFormatter: (p) =>
         typeof p.value === "number" && !Number.isNaN(p.value)
-          ? p.value.toFixed(2)
-          : "0.00",
+          ? formatMoney(p.value, 2, "0")
+          : formatMoney(0, 2, "0"),
     },
     {
       headerName: t("doc.columns.lineAmount"),
@@ -513,9 +516,9 @@ function soLinesReadOnlyColumnDefs(
       valueGetter: (p) => {
         const qty = p.data?.qty;
         const unitPrice = p.data?.unitPrice;
-        if (typeof qty !== "number" || typeof unitPrice !== "number") return "0.00";
+        if (typeof qty !== "number" || typeof unitPrice !== "number") return formatMoney(0, 2, "0");
         const amount = lineAmountMoney(qty, unitPrice);
-        return Number.isNaN(amount) ? "0.00" : amount.toFixed(2);
+        return Number.isNaN(amount) ? formatMoney(0, 2, "0") : formatMoney(amount, 2, "0");
       },
     },
     {
@@ -613,6 +616,7 @@ export function SalesOrderPage() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const { t, locale } = useTranslation();
+  const { formatDate, formatMoney } = useAppDisplayFormatters();
   const { settings } = useSettings();
   const [refresh, setRefresh] = useState(0);
   const isNew = id === "new";
@@ -948,8 +952,8 @@ export function SalesOrderPage() {
       normalizeDateForSO(form.date),
       parsePaymentTermsDaysToStore(form.paymentTermsDays),
     );
-    return d ?? t("domain.audit.summary.emDash");
-  }, [form.date, form.paymentTermsDays, t, locale]);
+    return d ? formatDate(d) : t("domain.audit.summary.emDash");
+  }, [form.date, form.paymentTermsDays, formatDate, t]);
 
   const activeCustomers = useMemo(
     () => customerRepository.list().filter((c) => c.isActive),
@@ -1463,8 +1467,9 @@ export function SalesOrderPage() {
         soFulfillmentByItemId,
         soAllocationByItemId,
         showSalesOrderAllocationUi,
+        formatMoney,
       ),
-    [t, locale, soFulfillmentByItemId, soAllocationByItemId, showSalesOrderAllocationUi],
+    [t, locale, soFulfillmentByItemId, soAllocationByItemId, showSalesOrderAllocationUi, formatMoney],
   );
 
   const readOnlyLinesColumnDefs = useMemo(
@@ -1474,8 +1479,9 @@ export function SalesOrderPage() {
         soFulfillment,
         soAllocationView,
         showSalesOrderAllocationUi,
+        formatMoney,
       ),
-    [t, locale, soFulfillment, soAllocationView, showSalesOrderAllocationUi],
+    [t, locale, soFulfillment, soAllocationView, showSalesOrderAllocationUi, formatMoney],
   );
 
   const soNumberForFile = doc?.number ?? "new";
@@ -2076,19 +2082,28 @@ export function SalesOrderPage() {
                         {t("finance.orderTotal")}
                       </span>
                       <span className="w-full max-w-[140px] text-xs font-semibold leading-tight tabular-nums text-foreground">
-                        {roundMoney(soDetailsPaymentSummary.totalAmount).toFixed(getCommercialMoneyDecimalPlaces())}
+                        {formatMoney(
+                          roundMoney(soDetailsPaymentSummary.totalAmount),
+                          getCommercialMoneyDecimalPlaces(),
+                        )}
                       </span>
                       <span className="text-xs leading-tight text-muted-foreground whitespace-nowrap">
                         {t("finance.paidTotal")}
                       </span>
                       <span className="w-full max-w-[140px] text-xs font-medium leading-tight tabular-nums text-foreground">
-                        {roundMoney(soDetailsPaymentSummary.paidAmount).toFixed(getCommercialMoneyDecimalPlaces())}
+                        {formatMoney(
+                          roundMoney(soDetailsPaymentSummary.paidAmount),
+                          getCommercialMoneyDecimalPlaces(),
+                        )}
                       </span>
                       <span className="text-xs leading-tight text-muted-foreground whitespace-nowrap">
                         {t("finance.remaining")}
                       </span>
                       <span className="w-full max-w-[140px] text-xs font-medium leading-tight tabular-nums text-foreground">
-                        {roundMoney(soDetailsPaymentSummary.remainingAmount).toFixed(getCommercialMoneyDecimalPlaces())}
+                        {formatMoney(
+                          roundMoney(soDetailsPaymentSummary.remainingAmount),
+                          getCommercialMoneyDecimalPlaces(),
+                        )}
                       </span>
                       <span className="text-xs leading-tight text-muted-foreground whitespace-nowrap">
                         {t("finance.paymentStatusLabel")}
@@ -2149,7 +2164,7 @@ export function SalesOrderPage() {
                       </div>
                       <div className="doc-summary__row py-0.5">
                         <dt className="doc-summary__term">{t("doc.columns.date")}</dt>
-                        <dd className="doc-summary__value">{normalizeDateForSO(doc!.date)}</dd>
+                        <dd className="doc-summary__value">{formatDate(doc!.date)}</dd>
                       </div>
                       <div className="doc-summary__row py-0.5">
                         <dt className="doc-summary__term">{t("doc.columns.customer")}</dt>
@@ -2180,7 +2195,7 @@ export function SalesOrderPage() {
                         <dt className="doc-summary__term">{t("doc.so.preliminaryShipmentDate")}</dt>
                         <dd className="doc-summary__value tabular-nums">
                           {doc!.preliminaryShipmentDate?.trim()
-                            ? normalizeDateForSO(doc!.preliminaryShipmentDate)
+                            ? formatDate(doc!.preliminaryShipmentDate)
                             : emDashSummary}
                         </dd>
                       </div>
@@ -2188,7 +2203,7 @@ export function SalesOrderPage() {
                         <dt className="doc-summary__term">{t("doc.so.actualShipmentDate")}</dt>
                         <dd className="doc-summary__value tabular-nums">
                           {doc!.actualShipmentDate?.trim()
-                            ? normalizeDateForSO(doc!.actualShipmentDate)
+                            ? formatDate(doc!.actualShipmentDate)
                             : emDashSummary}
                         </dd>
                       </div>
@@ -2252,7 +2267,7 @@ export function SalesOrderPage() {
                           <dt className="doc-summary__term">{t("doc.page.dueDate")}</dt>
                           <dd className="doc-summary__value tabular-nums">
                             {doc!.dueDate != null && doc!.dueDate !== ""
-                              ? doc!.dueDate
+                              ? formatDate(doc!.dueDate)
                               : t("domain.audit.summary.emDash")}
                           </dd>
                         </div>
@@ -2261,19 +2276,28 @@ export function SalesOrderPage() {
                         {t("finance.orderTotal")}
                       </span>
                       <span className="w-full max-w-[140px] text-xs font-semibold leading-tight tabular-nums text-foreground">
-                        {roundMoney(soDetailsPaymentSummary.totalAmount).toFixed(getCommercialMoneyDecimalPlaces())}
+                        {formatMoney(
+                          roundMoney(soDetailsPaymentSummary.totalAmount),
+                          getCommercialMoneyDecimalPlaces(),
+                        )}
                       </span>
                       <span className="text-xs leading-tight text-muted-foreground whitespace-nowrap">
                         {t("finance.paidTotal")}
                       </span>
                       <span className="w-full max-w-[140px] text-xs font-medium leading-tight tabular-nums text-foreground">
-                        {roundMoney(soDetailsPaymentSummary.paidAmount).toFixed(getCommercialMoneyDecimalPlaces())}
+                        {formatMoney(
+                          roundMoney(soDetailsPaymentSummary.paidAmount),
+                          getCommercialMoneyDecimalPlaces(),
+                        )}
                       </span>
                       <span className="text-xs leading-tight text-muted-foreground whitespace-nowrap">
                         {t("finance.remaining")}
                       </span>
                       <span className="w-full max-w-[140px] text-xs font-medium leading-tight tabular-nums text-foreground">
-                        {roundMoney(soDetailsPaymentSummary.remainingAmount).toFixed(getCommercialMoneyDecimalPlaces())}
+                        {formatMoney(
+                          roundMoney(soDetailsPaymentSummary.remainingAmount),
+                          getCommercialMoneyDecimalPlaces(),
+                        )}
                       </span>
                       <span className="text-xs leading-tight text-muted-foreground whitespace-nowrap">
                         {t("finance.paymentStatusLabel")}
@@ -2812,7 +2836,7 @@ export function SalesOrderPage() {
                   {t("doc.page.totalQty")}: {totals.totalQty}
                 </span>
                 <span>
-                  {t("doc.page.totalAmount")}: {totals.totalAmount.toFixed(2)}
+                  {t("doc.page.totalAmount")}: {formatMoney(totals.totalAmount, 2)}
                 </span>
               </div>
             )}
@@ -2840,7 +2864,7 @@ export function SalesOrderPage() {
                     {t("doc.page.totalQty")}: {readonlyTotals.totalQty}
                   </span>
                   <span>
-                    {t("doc.page.totalAmount")}: {readonlyTotals.totalAmount.toFixed(2)}
+                    {t("doc.page.totalAmount")}: {formatMoney(readonlyTotals.totalAmount, 2)}
                   </span>
                 </div>
               </>

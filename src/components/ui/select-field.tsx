@@ -72,18 +72,6 @@ export function SelectField({
           className="erp-dark-scrollbar overflow-y-auto py-0.5"
           style={{ maxHeight: LIST_MAX_HEIGHT_PX }}
         >
-          <li role="option">
-            <button
-              type="button"
-              className={cn(
-                "flex w-full cursor-pointer items-center px-2 py-1.5 text-left text-sm hover:bg-accent hover:text-accent-foreground",
-                !value && "bg-accent text-accent-foreground"
-              )}
-              onClick={() => handleSelect("")}
-            >
-              {placeholder}
-            </button>
-          </li>
           {options.map((opt) => (
             <li key={opt.value} role="option" aria-selected={value === opt.value}>
               <button

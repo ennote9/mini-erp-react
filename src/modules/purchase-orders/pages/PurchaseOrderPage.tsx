@@ -115,6 +115,7 @@ import {
 import { useSettings } from "../../../shared/settings/SettingsContext";
 import { getEffectiveWorkspaceFeatureEnabled } from "../../../shared/workspace";
 import { computePurchaseOrderTotalFromLines } from "../purchaseOrderFinance";
+import { useAppDisplayFormatters } from "@/shared/formatting";
 
 type LineWithItem = PurchaseOrderLine & { itemName: string };
 
@@ -198,14 +199,10 @@ function buildExportRowsFromLinesWithItem(lines: LineWithItem[]): PoExportLineRo
   });
 }
 
-function displayLocalDateTime(value?: string | null): string {
-  if (typeof value !== "string" || value.trim() === "") return "—";
-  return value.replace("T", " ");
-}
-
 function poLinesDisplayColumnDefs(
   t: TFunction,
   fulfillmentByItemId: Map<string, PoLineFulfillment>,
+  formatMoney: (value: number | null | undefined, fractionDigits?: number, empty?: string) => string,
 ): ColDef<LineFormRow>[] {
   const dash = t("domain.audit.summary.emDash");
   const centerCell = "po-grid-cell--center";
@@ -342,8 +339,8 @@ function poLinesDisplayColumnDefs(
       cellClass: numericCell,
       valueFormatter: (p) =>
         typeof p.value === "number" && !Number.isNaN(p.value)
-          ? p.value.toFixed(2)
-          : "0.00",
+          ? formatMoney(p.value, 2, "0")
+          : formatMoney(0, 2, "0"),
     },
     {
       headerName: t("doc.columns.lineAmount"),
@@ -356,9 +353,9 @@ function poLinesDisplayColumnDefs(
       valueGetter: (p) => {
         const qty = p.data?.qty;
         const unitPrice = p.data?.unitPrice;
-        if (typeof qty !== "number" || typeof unitPrice !== "number") return "0.00";
+        if (typeof qty !== "number" || typeof unitPrice !== "number") return formatMoney(0, 2, "0");
         const amount = lineAmountMoney(qty, unitPrice);
-        return Number.isNaN(amount) ? "0.00" : amount.toFixed(2);
+        return Number.isNaN(amount) ? formatMoney(0, 2, "0") : formatMoney(amount, 2, "0");
       },
     },
     {
@@ -383,6 +380,7 @@ function poLinesDisplayColumnDefs(
 function poLinesReadOnlyColumnDefs(
   t: TFunction,
   fulfillment: PurchaseOrderFulfillment | null,
+  formatMoney: (value: number | null | undefined, fractionDigits?: number, empty?: string) => string,
 ): ColDef<LineWithItem>[] {
   const dash = t("domain.audit.summary.emDash");
   const centerCell = "po-grid-cell--center";
@@ -501,8 +499,8 @@ function poLinesReadOnlyColumnDefs(
       cellClass: numericCell,
       valueFormatter: (p) =>
         typeof p.value === "number" && !Number.isNaN(p.value)
-          ? p.value.toFixed(2)
-          : "0.00",
+          ? formatMoney(p.value, 2, "0")
+          : formatMoney(0, 2, "0"),
     },
     {
       headerName: t("doc.columns.lineAmount"),
@@ -514,9 +512,9 @@ function poLinesReadOnlyColumnDefs(
       valueGetter: (p) => {
         const qty = p.data?.qty;
         const unitPrice = p.data?.unitPrice;
-        if (typeof qty !== "number" || typeof unitPrice !== "number") return "0.00";
+        if (typeof qty !== "number" || typeof unitPrice !== "number") return formatMoney(0, 2, "0");
         const amount = lineAmountMoney(qty, unitPrice);
-        return Number.isNaN(amount) ? "0.00" : amount.toFixed(2);
+        return Number.isNaN(amount) ? formatMoney(0, 2, "0") : formatMoney(amount, 2, "0");
       },
     },
     {
@@ -569,6 +567,7 @@ export function PurchaseOrderPage() {
   const [searchParams] = useSearchParams();
   const { t, locale } = useTranslation();
   const { settings } = useSettings();
+  const { formatDate, formatDateTime, formatMoney } = useAppDisplayFormatters();
   const workspaceMode = settings.general.workspaceMode;
   const showDocumentEventLogSection = useMemo(
     () =>
@@ -786,8 +785,8 @@ export function PurchaseOrderPage() {
       normalizeDateForPO(form.date),
       parsePaymentTermsDaysToStore(form.paymentTermsDays),
     );
-    return d ?? "—";
-  }, [form.date, form.paymentTermsDays]);
+    return d ? formatDate(d) : "—";
+  }, [form.date, form.paymentTermsDays, formatDate]);
 
   const activeSuppliers = useMemo(
     () => supplierRepository.list().filter((s) => s.isActive),
@@ -1290,13 +1289,13 @@ export function PurchaseOrderPage() {
   }, [poFulfillment]);
 
   const linesColumnDefs = useMemo(
-    () => poLinesDisplayColumnDefs(t, fulfillmentByItemId),
-    [fulfillmentByItemId, t, locale],
+    () => poLinesDisplayColumnDefs(t, fulfillmentByItemId, formatMoney),
+    [fulfillmentByItemId, t, locale, formatMoney],
   );
 
   const readOnlyLinesColumnDefs = useMemo(
-    () => poLinesReadOnlyColumnDefs(t, poFulfillment),
-    [t, locale, poFulfillment],
+    () => poLinesReadOnlyColumnDefs(t, poFulfillment, formatMoney),
+    [t, locale, poFulfillment, formatMoney],
   );
 
   usePlanningDocumentHotkeys({
@@ -1744,7 +1743,7 @@ export function PurchaseOrderPage() {
                     </div>
                     <div className="doc-summary__row py-0.5">
                       <dt className="doc-summary__term">{t("doc.columns.date")}</dt>
-                      <dd className="doc-summary__value">{normalizeDateForPO(doc!.date)}</dd>
+                      <dd className="doc-summary__value">{formatDate(doc!.date)}</dd>
                     </div>
                   </dl>
                 </section>
@@ -1771,14 +1770,14 @@ export function PurchaseOrderPage() {
                       <dt className="doc-summary__term">{t("doc.po.preliminaryDeliveryDate")}</dt>
                       <dd className="doc-summary__value tabular-nums">
                         {doc!.preliminaryDeliveryDate != null && doc!.preliminaryDeliveryDate !== ""
-                          ? normalizeDateForPO(doc!.preliminaryDeliveryDate)
+                          ? formatDate(doc!.preliminaryDeliveryDate)
                           : t("domain.audit.summary.emDash")}
                       </dd>
                     </div>
                     <div className="doc-summary__row py-0.5">
                       <dt className="doc-summary__term">{t("doc.po.actualArrivalDateTime")}</dt>
                       <dd className="doc-summary__value tabular-nums">
-                        {displayLocalDateTime(doc!.actualArrivalDateTime)}
+                        {formatDateTime(doc!.actualArrivalDateTime, { empty: "—" })}
                       </dd>
                     </div>
                   </dl>
@@ -1807,11 +1806,11 @@ export function PurchaseOrderPage() {
                     <dl className="doc-summary doc-summary--compact doc-summary--dense so-doc-summary-compact m-0 min-w-0 max-w-[140px] self-start">
                       <div className="doc-summary__row py-0.5">
                         <dt className="doc-summary__term">{t("doc.page.dueDate")}</dt>
-                        <dd className="doc-summary__value tabular-nums">
-                          {doc!.dueDate != null && doc!.dueDate !== ""
-                            ? doc!.dueDate
-                            : t("domain.audit.summary.emDash")}
-                        </dd>
+                          <dd className="doc-summary__value tabular-nums">
+                            {doc!.dueDate != null && doc!.dueDate !== ""
+                              ? formatDate(doc!.dueDate)
+                              : t("domain.audit.summary.emDash")}
+                          </dd>
                       </div>
                     </dl>
                   </div>
@@ -2267,7 +2266,7 @@ export function PurchaseOrderPage() {
                   {t("doc.page.totalQty")}: {totals.totalQty}
                 </span>
                 <span>
-                  {t("doc.page.totalAmount")}: {totals.totalAmount.toFixed(2)}
+                  {t("doc.page.totalAmount")}: {formatMoney(totals.totalAmount, 2)}
                 </span>
               </div>
             )}
@@ -2296,7 +2295,7 @@ export function PurchaseOrderPage() {
                     {t("doc.page.totalQty")}: {readonlyTotals.totalQty}
                   </span>
                   <span>
-                    {t("doc.page.totalAmount")}: {readonlyTotals.totalAmount.toFixed(2)}
+                    {t("doc.page.totalAmount")}: {formatMoney(readonlyTotals.totalAmount, 2)}
                   </span>
                 </div>
               </>

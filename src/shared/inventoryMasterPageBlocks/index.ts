@@ -1,8 +1,4 @@
-export {
-  formatMasterInventoryDateTime,
-  formatMasterInventoryQty,
-  formatMasterInventoryQtyDelta,
-} from "./formatting";
+export { useMasterInventoryFormatters } from "./formatting";
 export { useAppReadModelRevision } from "./useAppReadModelRevision";
 export { MasterStockBalanceSummaryChips } from "./MasterStockBalanceSummaryChips";
 export {

@@ -1,24 +1,27 @@
-/** Shared number/datetime display for master pages (Item / Brand / Category inventory blocks). */
+import { useAppDisplayFormatters } from "@/shared/formatting";
 
-const DATE_TIME_FORMAT: Intl.DateTimeFormatOptions = {
-  day: "2-digit",
-  month: "short",
-  year: "numeric",
-  hour: "2-digit",
-  minute: "2-digit",
-};
+/** Shared display formatting for master inventory blocks (Item / Brand / Category). */
+export function useMasterInventoryFormatters() {
+  const { formatDateTime, formatNumber } = useAppDisplayFormatters();
 
-export function formatMasterInventoryQty(n: number): string {
-  return Number.isInteger(n) ? String(n) : n.toFixed(2);
-}
+  const formatQty = (n: number): string =>
+    formatNumber(n, {
+      minFractionDigits: Number.isInteger(n) ? 0 : 2,
+      maxFractionDigits: 2,
+      empty: "0",
+    });
 
-export function formatMasterInventoryQtyDelta(v: number): string {
-  const base = formatMasterInventoryQty(v);
-  return v > 0 ? `+${base}` : base;
-}
+  const formatQtyDelta = (v: number): string => {
+    const base = formatQty(v);
+    return v > 0 ? `+${base}` : base;
+  };
 
-export function formatMasterInventoryDateTime(iso: string | null | undefined): string {
-  if (iso == null) return "";
-  const d = new Date(iso);
-  return Number.isNaN(d.getTime()) ? String(iso) : d.toLocaleString(undefined, DATE_TIME_FORMAT);
+  const formatDateTimeDisplay = (iso: string | null | undefined): string =>
+    iso == null ? "" : formatDateTime(iso, { empty: "" });
+
+  return {
+    formatQty,
+    formatQtyDelta,
+    formatDateTimeDisplay,
+  };
 }

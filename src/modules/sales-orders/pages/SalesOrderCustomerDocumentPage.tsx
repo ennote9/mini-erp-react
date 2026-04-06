@@ -1,7 +1,7 @@
 import { useParams, Link } from "react-router-dom";
 import { useMemo, useEffect, useState, useCallback, useRef } from "react";
 import { useTranslation } from "@/shared/i18n/context";
-import type { AppLocaleId } from "@/shared/i18n/locales";
+import { useAppDisplayFormatters } from "@/shared/formatting";
 import { salesOrderRepository } from "../repository";
 import { customerRepository } from "../../customers/repository";
 import { warehouseRepository } from "../../warehouses/repository";
@@ -24,16 +24,6 @@ import {
 } from "@/shared/ui/object/DocumentExportSuccessStrip";
 import "@/shared/print/customerDocumentPrint.css";
 
-function formatHandoffDateTime(locale: AppLocaleId, d: Date): string {
-  const tag = locale === "kk" ? "kk-KZ" : locale === "ru" ? "ru-RU" : "en-US";
-  return d.toLocaleString(tag, { dateStyle: "short", timeStyle: "short" });
-}
-
-function formatMoneyAmount(n: number): string {
-  const dp = getCommercialMoneyDecimalPlaces();
-  return roundMoney(n).toFixed(dp);
-}
-
 function planningStatusLabel(t: (key: string) => string, status: string): string {
   switch (status) {
     case "draft":
@@ -51,7 +41,8 @@ function planningStatusLabel(t: (key: string) => string, status: string): string
 
 export function SalesOrderCustomerDocumentPage() {
   const { id } = useParams<{ id: string }>();
-  const { t, locale } = useTranslation();
+  const { t } = useTranslation();
+  const { formatDate, formatDateTime, formatMoney } = useAppDisplayFormatters();
   const emDash = t("domain.audit.summary.emDash");
   const [printTime, setPrintTime] = useState(() => new Date());
   const downloadRootRef = useRef<HTMLDivElement>(null);
@@ -122,7 +113,7 @@ export function SalesOrderCustomerDocumentPage() {
       grandTotal,
       statusDisplay: planningStatusLabel(t, doc.status),
     };
-  }, [id, emDash, t, locale]);
+  }, [id, emDash, t]);
 
   const snapshotDocNumber = view?.doc.number ?? "document";
 
@@ -180,7 +171,8 @@ export function SalesOrderCustomerDocumentPage() {
   }
 
   const { doc } = view;
-  const printedAt = formatHandoffDateTime(locale, printTime);
+  const printedAt = formatDateTime(printTime.toISOString(), { empty: emDash });
+  const moneyDp = getCommercialMoneyDecimalPlaces();
 
   return (
     <div className="customer-doc mx-auto w-full max-w-5xl px-5 py-6 text-foreground sm:px-8 print:max-w-none print:px-0 print:py-0">
@@ -214,7 +206,7 @@ export function SalesOrderCustomerDocumentPage() {
         <div className="mt-2 flex flex-wrap gap-x-6 gap-y-1 text-sm text-muted-foreground print:text-black/70">
           <span>
             <span className="font-medium text-foreground/85 print:text-black">{t("doc.columns.date")}:</span>{" "}
-            <span className="tabular-nums">{doc.date}</span>
+            <span className="tabular-nums">{formatDate(doc.date)}</span>
           </span>
           <span>
             <span className="font-medium text-foreground/85 print:text-black">{t("doc.columns.status")}:</span>{" "}
@@ -296,8 +288,12 @@ export function SalesOrderCustomerDocumentPage() {
                   <td className="customer-doc__td font-mono text-xs">{row.itemCode}</td>
                   <td className="customer-doc__td">{row.itemName}</td>
                   <td className="customer-doc__td customer-doc__td--numeric">{row.qty}</td>
-                  <td className="customer-doc__td customer-doc__td--numeric">{formatMoneyAmount(row.unitPrice)}</td>
-                  <td className="customer-doc__td customer-doc__td--numeric">{formatMoneyAmount(row.lineTotal)}</td>
+                  <td className="customer-doc__td customer-doc__td--numeric">
+                    {formatMoney(row.unitPrice, moneyDp)}
+                  </td>
+                  <td className="customer-doc__td customer-doc__td--numeric">
+                    {formatMoney(row.lineTotal, moneyDp)}
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -306,7 +302,7 @@ export function SalesOrderCustomerDocumentPage() {
         <div className="mt-3 flex justify-end border-t border-border pt-2 text-sm print:border-black/20">
           <span className="font-semibold">
             {t("doc.page.totalAmount")}:{" "}
-            <span className="tabular-nums">{formatMoneyAmount(view.grandTotal)}</span>
+            <span className="tabular-nums">{formatMoney(view.grandTotal, moneyDp)}</span>
           </span>
         </div>
       </section>

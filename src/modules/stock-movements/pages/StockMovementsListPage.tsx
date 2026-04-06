@@ -40,6 +40,7 @@ import { save } from "@tauri-apps/plugin-dialog";
 import { invoke } from "@tauri-apps/api/core";
 import { revealItemInDir } from "@tauri-apps/plugin-opener";
 import { useTranslation } from "@/shared/i18n/context";
+import { useAppDisplayFormatters } from "@/shared/formatting";
 import { buildReadableUniqueFilename, ensureUniqueExportPath } from "@/shared/export/filenameBuilder";
 import { stockMovementsListExcelLabels } from "@/shared/i18n/excelListExportLabels";
 import { normalizeTrim } from "../../../shared/validation";
@@ -232,6 +233,7 @@ function buildExportRowsFromMovements(
 
 export function StockMovementsListPage() {
   const { t, locale } = useTranslation();
+  const { formatDateTime: formatDateTimeUi, formatNumber } = useAppDisplayFormatters();
   const [searchParams, setSearchParams] = useSearchParams();
   const itemFilterId = useMemo(() => {
     const raw = searchParams.get("itemId");
@@ -562,6 +564,15 @@ export function StockMovementsListPage() {
     [columnFilterModel, searchParams, setSearchParams],
   );
 
+  const formatQtyDeltaUi = useCallback(
+    (value: number | null | undefined): string => {
+      if (value == null || Number.isNaN(value) || !Number.isFinite(value)) return "";
+      const base = formatNumber(value, { minFractionDigits: Number.isInteger(value) ? 0 : 2, maxFractionDigits: 2 });
+      return value > 0 ? `+${base}` : base;
+    },
+    [formatNumber],
+  );
+
   const handleResetColumnFilter = useCallback(
     (colId: string) => {
       const nextModel = { ...columnFilterModel };
@@ -578,7 +589,7 @@ export function StockMovementsListPage() {
         field: "datetime",
         headerName: t("doc.columns.dateTime"),
         width: 200,
-        valueFormatter: (params) => formatDateTime(params.value),
+        valueFormatter: (params) => formatDateTimeUi(params.value, { empty: "" }),
       },
       {
         field: "movementType",
@@ -605,12 +616,7 @@ export function StockMovementsListPage() {
         field: "qtyDelta",
         headerName: t("doc.columns.qtyDelta"),
         width: 110,
-        valueFormatter: (params) =>
-          params.value != null
-            ? params.value > 0
-              ? `+${params.value}`
-              : String(params.value)
-            : "",
+        valueFormatter: (params) => formatQtyDeltaUi(params.value),
       },
       {
         colId: "sourceDocumentLabel",
@@ -629,7 +635,7 @@ export function StockMovementsListPage() {
         cellRenderer: RelatedOrderCellRenderer,
       },
     ],
-    [t, locale],
+    [t, locale, formatDateTimeUi, formatQtyDeltaUi],
   );
 
   const columnDefs = useMemo(

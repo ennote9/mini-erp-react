@@ -10,7 +10,7 @@ import {
 } from "@/components/ui/card";
 import { useTranslation } from "@/shared/i18n/context";
 import { MasterStockBalanceSummaryChips } from "./MasterStockBalanceSummaryChips";
-import { formatMasterInventoryQty } from "./formatting";
+import { useMasterInventoryFormatters } from "./formatting";
 
 export type MasterStockBalancesBlockLabels = {
   title: string;
@@ -57,6 +57,7 @@ export function MasterStockBalancesBlock({
   hideHeaderOpenButton = false,
 }: Props) {
   const { t } = useTranslation();
+  const { formatQty } = useMasterInventoryFormatters();
   const rowNavigate = onBalanceRowClick ?? ((_row: ItemPageBalanceRow) => onOpenAll());
 
   return (
@@ -120,11 +121,11 @@ export function MasterStockBalancesBlock({
                     <td className="truncate max-w-[14rem]" title={row.warehouseName}>
                       {row.warehouseName}
                     </td>
-                    <td className="text-right tabular-nums">{formatMasterInventoryQty(row.qtyOnHand)}</td>
-                    <td className="text-right tabular-nums">{formatMasterInventoryQty(row.reservedQty)}</td>
-                    <td className="text-right tabular-nums">{formatMasterInventoryQty(row.availableQty)}</td>
-                    <td className="text-right tabular-nums">{formatMasterInventoryQty(row.outgoingQty)}</td>
-                    <td className="text-right tabular-nums">{formatMasterInventoryQty(row.incomingQty)}</td>
+                    <td className="text-right tabular-nums">{formatQty(row.qtyOnHand)}</td>
+                    <td className="text-right tabular-nums">{formatQty(row.reservedQty)}</td>
+                    <td className="text-right tabular-nums">{formatQty(row.availableQty)}</td>
+                    <td className="text-right tabular-nums">{formatQty(row.outgoingQty)}</td>
+                    <td className="text-right tabular-nums">{formatQty(row.incomingQty)}</td>
                   </tr>
                 ))}
               </tbody>

@@ -1,8 +1,9 @@
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import type { ChangeEvent } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Download, Paperclip, Trash2, Upload } from "lucide-react";
+import { useAppDisplayFormatters } from "@/shared/formatting";
 
 export type DocumentAttachmentRecord = {
   id: string;
@@ -39,14 +40,18 @@ export type DocumentAttachmentsSectionProps = {
   onDeleteAttachment: (attachmentId: string) => void;
 };
 
-function formatSize(sizeBytes: number, locale: string): string {
+function formatSize(
+  sizeBytes: number,
+  formatNumber: (
+    value: number | null | undefined,
+    options?: { minFractionDigits?: number; maxFractionDigits?: number; empty?: string },
+  ) => string,
+): string {
   if (sizeBytes < 1024) return `${sizeBytes} B`;
   if (sizeBytes < 1024 * 1024) {
-    return `${new Intl.NumberFormat(locale, { maximumFractionDigits: 1 }).format(sizeBytes / 1024)} KB`;
+    return `${formatNumber(sizeBytes / 1024, { maxFractionDigits: 1, empty: "0" })} KB`;
   }
-  return `${new Intl.NumberFormat(locale, { maximumFractionDigits: 1 }).format(
-    sizeBytes / (1024 * 1024),
-  )} MB`;
+  return `${formatNumber(sizeBytes / (1024 * 1024), { maxFractionDigits: 1, empty: "0" })} MB`;
 }
 
 function blobFromBase64(contentBase64: string, mimeType?: string): Blob {
@@ -76,15 +81,11 @@ function readFileAsBase64(file: File): Promise<string> {
 }
 
 export function DocumentAttachmentsSection(props: DocumentAttachmentsSectionProps) {
-  const { attachments, canMutate, locale, labels, onAddAttachments, onDeleteAttachment } = props;
+  const { attachments, canMutate, labels, onAddAttachments, onDeleteAttachment } = props;
+  const { formatNumber, formatDateTime } = useAppDisplayFormatters();
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-
-  const localeTag = useMemo(
-    () => (locale === "kk" ? "kk-KZ" : locale === "ru" ? "ru-RU" : "en-US"),
-    [locale],
-  );
 
   const handleOpenPicker = useCallback(() => {
     fileInputRef.current?.click();
@@ -185,13 +186,10 @@ export function DocumentAttachmentsSection(props: DocumentAttachmentsSectionProp
                       </div>
                     </td>
                     <td className="px-2 py-2 align-middle tabular-nums text-muted-foreground">
-                      {formatSize(attachment.sizeBytes, locale)}
+                      {formatSize(attachment.sizeBytes, formatNumber)}
                     </td>
                     <td className="px-2 py-2 align-middle text-muted-foreground">
-                      {new Date(attachment.addedAt).toLocaleString(localeTag, {
-                        dateStyle: "short",
-                        timeStyle: "short",
-                      })}
+                      {formatDateTime(attachment.addedAt)}
                     </td>
                     <td className="px-2 py-2 align-middle">
                       <div className="flex items-center gap-1">

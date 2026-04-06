@@ -3,6 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { listAuditEventsForEntity } from "../../audit/eventLogRepository";
 import { auditEventLabel } from "../../audit/eventLogLabels";
 import { auditEventSummaryI18n, useTranslation } from "@/shared/i18n";
+import { useAppDisplayFormatters } from "@/shared/formatting";
 import type { AuditEntityType, AuditEventRecord } from "../../audit/eventLogTypes";
 
 type Props = {
@@ -12,21 +13,9 @@ type Props = {
   refresh: number;
 };
 
-function formatWhen(iso: string): string {
-  try {
-    const d = new Date(iso);
-    if (Number.isNaN(d.getTime())) return iso;
-    return d.toLocaleString(undefined, {
-      dateStyle: "short",
-      timeStyle: "medium",
-    });
-  } catch {
-    return iso;
-  }
-}
-
 export function DocumentEventLogSection({ entityType, entityId, refresh }: Props) {
   const { t } = useTranslation();
+  const { formatDateTime } = useAppDisplayFormatters();
   const entries = useMemo((): AuditEventRecord[] => {
     if (!entityId) return [];
     return listAuditEventsForEntity(entityType, entityId);
@@ -49,7 +38,9 @@ export function DocumentEventLogSection({ entityType, entityId, refresh }: Props
                 key={e.id}
                 className="doc-event-log__row flex flex-wrap gap-x-2 gap-y-0.5 border-b border-border/50 pb-1.5 last:border-0"
               >
-                <span className="text-muted-foreground tabular-nums shrink-0">{formatWhen(e.createdAt)}</span>
+                <span className="text-muted-foreground tabular-nums shrink-0">
+                  {formatDateTime(e.createdAt, { includeSeconds: true })}
+                </span>
                 <span className="font-medium text-foreground shrink-0">{auditEventLabel(e.eventType, t)}</span>
                 <span className="text-foreground/90 min-w-0 break-words">
                   {auditEventSummaryI18n(e.payload, t)}

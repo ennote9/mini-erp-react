@@ -19,6 +19,7 @@ import {
 } from "@/modules/markdown-journal/markdownLookup";
 import { useAppReadModelRevision } from "@/shared/inventoryMasterPageBlocks/useAppReadModelRevision";
 import { itemBarcodeTokensForOperationalLookup } from "@/modules/items/lib/itemBarcodeLookup";
+import { useAppDisplayFormatters } from "@/shared/formatting";
 
 export type PurchaseOrderItemAutocompleteRef = { focus: () => void };
 
@@ -37,10 +38,6 @@ const MAX_OPTIONS = 10;
 
 function getItemLabel(item: Item): string {
   return `${item.code} - ${item.name}`;
-}
-
-function formatPurchasePrice(p: number | undefined): string {
-  return typeof p === "number" && !Number.isNaN(p) ? p.toFixed(2) : "0.00";
 }
 
 function searchItemsForPurchaseLine(items: Item[], rawQuery: string): Item[] {
@@ -127,6 +124,7 @@ export const PurchaseOrderItemAutocomplete = forwardRef<
   ref,
 ) {
   const appRevision = useAppReadModelRevision();
+  const { formatMoney } = useAppDisplayFormatters();
   const [inputValue, setInputValue] = useState("");
   const [isOpen, setIsOpen] = useState(false);
   const [highlightedIndex, setHighlightedIndex] = useState(0);
@@ -419,7 +417,7 @@ export const PurchaseOrderItemAutocomplete = forwardRef<
 
                   const brandName = brand?.name ?? brand?.code ?? "—";
                   const categoryName = category?.name ?? category?.code ?? "—";
-                  const purchasePrice = formatPurchasePrice(item.purchasePrice);
+                  const purchasePrice = formatMoney(item.purchasePrice ?? 0, 2, "0");
 
                   const highlighted = highlightedIndex === rowIdx;
 
@@ -479,4 +477,3 @@ export const PurchaseOrderItemAutocomplete = forwardRef<
     </div>
   );
 });
-

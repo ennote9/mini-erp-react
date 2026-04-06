@@ -41,6 +41,7 @@ import {
   type StockBalanceCoverageStatus,
 } from "../../../shared/stockBalancesOperationalMetrics";
 import { useTranslation } from "@/shared/i18n/context";
+import { useAppDisplayFormatters } from "@/shared/formatting";
 import { buildReadableUniqueFilename, ensureUniqueExportPath } from "@/shared/export/filenameBuilder";
 import { stockBalancesListExcelLabels } from "@/shared/i18n/excelListExportLabels";
 import { save } from "@tauri-apps/plugin-dialog";
@@ -143,6 +144,7 @@ function buildExportRowsFromBalances(
 
 export function StockBalancesListPage() {
   const { t, locale } = useTranslation();
+  const { formatNumber } = useAppDisplayFormatters();
   const { settings } = useSettings();
   const location = useLocation();
   const navigate = useNavigate();
@@ -531,7 +533,9 @@ export function StockBalancesListPage() {
     type: "numericColumn",
     cellClass: "tabular-nums",
     valueFormatter: (p) =>
-      typeof p.value === "number" && !Number.isNaN(p.value) ? String(p.value) : "—",
+      typeof p.value === "number" && !Number.isNaN(p.value)
+        ? formatNumber(p.value, { minFractionDigits: 0, maxFractionDigits: 0 })
+        : "—",
   });
 
   const handleApplyColumnFilter = useCallback(
@@ -608,7 +612,7 @@ export function StockBalancesListPage() {
         cellRenderer: AgGridStockCoverageCellRenderer,
       },
     ];
-  }, [showOperationalGrid, t, locale, coverageLabel, styleLabel]);
+  }, [showOperationalGrid, t, locale, coverageLabel, styleLabel, formatNumber]);
 
   const columnDefs = useMemo(
     () =>

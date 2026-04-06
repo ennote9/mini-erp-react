@@ -20,6 +20,7 @@ import {
 import type { MarkdownRecord } from "@/modules/markdown-journal/model";
 import { useAppReadModelRevision } from "@/shared/inventoryMasterPageBlocks/useAppReadModelRevision";
 import { itemBarcodeTokensForOperationalLookup } from "@/modules/items/lib/itemBarcodeLookup";
+import { useAppDisplayFormatters } from "@/shared/formatting";
 
 export type SalesOrderItemAutocompleteRef = { focus: () => void };
 
@@ -119,10 +120,6 @@ function searchItemsForSalesOrderLine(items: Item[], rawQuery: string): Item[] {
   ];
 }
 
-function formatSalePrice(p: number | undefined): string {
-  return typeof p === "number" && !Number.isNaN(p) ? p.toFixed(2) : "0.00";
-}
-
 export const SalesOrderItemAutocomplete = forwardRef<
   SalesOrderItemAutocompleteRef,
   Props
@@ -141,6 +138,7 @@ export const SalesOrderItemAutocomplete = forwardRef<
   ref,
 ) {
   const appRevision = useAppReadModelRevision();
+  const { formatMoney } = useAppDisplayFormatters();
   const [inputValue, setInputValue] = useState("");
   const [isOpen, setIsOpen] = useState(false);
   const [highlightedIndex, setHighlightedIndex] = useState(0);
@@ -458,7 +456,7 @@ export const SalesOrderItemAutocomplete = forwardRef<
                     brand?.name ?? brand?.code ?? "—";
                   const categoryName =
                     category?.name ?? category?.code ?? "—";
-                  const salePrice = formatSalePrice(item.salePrice);
+                  const salePrice = formatMoney(item.salePrice ?? 0, 2, "0");
 
                   const highlighted = highlightedIndex === rowIdx;
 
@@ -518,4 +516,3 @@ export const SalesOrderItemAutocomplete = forwardRef<
     </div>
   );
 });
-

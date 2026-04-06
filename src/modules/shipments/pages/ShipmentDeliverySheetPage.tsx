@@ -1,7 +1,7 @@
 import { useParams, Link } from "react-router-dom";
 import { useMemo, useEffect, useState, useCallback, useRef } from "react";
 import { useTranslation } from "@/shared/i18n/context";
-import type { AppLocaleId } from "@/shared/i18n/locales";
+import { useAppDisplayFormatters } from "@/shared/formatting";
 import { shipmentRepository } from "../repository";
 import { salesOrderRepository } from "../../sales-orders/repository";
 import { customerRepository } from "../../customers/repository";
@@ -18,11 +18,6 @@ import {
   type DocumentExportSuccessState,
 } from "@/shared/ui/object/DocumentExportSuccessStrip";
 import "../shipmentDeliverySheetPrint.css";
-
-function formatHandoffDateTime(locale: AppLocaleId, d: Date): string {
-  const tag = locale === "kk" ? "kk-KZ" : locale === "ru" ? "ru-RU" : "en-US";
-  return d.toLocaleString(tag, { dateStyle: "short", timeStyle: "short" });
-}
 
 function statusLabel(
   t: (key: string) => string,
@@ -46,7 +41,8 @@ type CopyFieldId = "tracking" | "address" | "phone";
 
 export function ShipmentDeliverySheetPage() {
   const { id } = useParams<{ id: string }>();
-  const { t, locale } = useTranslation();
+  const { t } = useTranslation();
+  const { formatDate, formatDateTime } = useAppDisplayFormatters();
   const emDash = t("domain.audit.summary.emDash");
   const [printTime, setPrintTime] = useState(() => new Date());
   const [copiedField, setCopiedField] = useState<CopyFieldId | null>(null);
@@ -118,7 +114,7 @@ export function ShipmentDeliverySheetPage() {
       lines,
       statusDisplay: statusLabel(t, doc.status),
     };
-  }, [id, emDash, t, locale]);
+  }, [id, emDash, t]);
 
   const handlePrint = useCallback(() => {
     setPrintTime(new Date());
@@ -181,7 +177,7 @@ export function ShipmentDeliverySheetPage() {
   }
 
   const { doc } = view;
-  const printedAt = formatHandoffDateTime(locale, printTime);
+  const printedAt = formatDateTime(printTime.toISOString(), { empty: emDash });
 
   return (
     <div className="delivery-sheet mx-auto w-full max-w-5xl px-5 py-6 text-foreground sm:px-8 print:max-w-none print:px-0 print:py-0">
@@ -229,7 +225,7 @@ export function ShipmentDeliverySheetPage() {
                   {t("doc.columns.date")}
                 </div>
                 <div className="mt-0.5 text-base font-bold tabular-nums text-foreground print:text-[11pt] print:text-black">
-                  {doc.date}
+                  {formatDate(doc.date)}
                 </div>
               </div>
               <div className="border-t border-border/60 pt-1 print:border-black/18">

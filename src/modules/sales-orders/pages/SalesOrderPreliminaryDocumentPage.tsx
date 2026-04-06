@@ -1,6 +1,7 @@
 import { useParams, Link } from "react-router-dom";
 import { useMemo, useEffect, useState, useCallback, useRef } from "react";
 import { useTranslation } from "@/shared/i18n/context";
+import { useAppDisplayFormatters } from "@/shared/formatting";
 import { salesOrderRepository } from "../repository";
 import { customerRepository } from "../../customers/repository";
 import { itemRepository } from "../../items/repository";
@@ -21,14 +22,10 @@ import {
 } from "@/shared/ui/object/DocumentExportSuccessStrip";
 import "@/shared/print/customerDocumentPrint.css";
 
-function formatMoneyAmount(n: number): string {
-  const dp = getCommercialMoneyDecimalPlaces();
-  return roundMoney(n).toFixed(dp);
-}
-
 export function SalesOrderPreliminaryDocumentPage() {
   const { id } = useParams<{ id: string }>();
   const { t } = useTranslation();
+  const { formatDate, formatMoney } = useAppDisplayFormatters();
   const downloadRootRef = useRef<HTMLDivElement>(null);
   const [downloadSuccess, setDownloadSuccess] = useState<DocumentExportSuccessState | null>(null);
 
@@ -128,6 +125,7 @@ export function SalesOrderPreliminaryDocumentPage() {
   }
 
   const { doc } = view;
+  const moneyDp = getCommercialMoneyDecimalPlaces();
 
   return (
     <div className="customer-doc mx-auto w-full max-w-5xl px-5 py-6 text-foreground sm:px-8 print:max-w-none print:px-0 print:py-0">
@@ -160,7 +158,7 @@ export function SalesOrderPreliminaryDocumentPage() {
           <h1 className="mt-2 text-3xl font-bold tracking-tight print:text-[20pt] print:text-black">{doc.number}</h1>
           <div className="mt-2 text-sm text-muted-foreground print:text-black/70">
             <span className="font-medium text-foreground/85 print:text-black">{t("doc.columns.date")}:</span>{" "}
-            <span className="tabular-nums">{doc.date}</span>
+            <span className="tabular-nums">{formatDate(doc.date)}</span>
           </div>
         </header>
 
@@ -193,8 +191,12 @@ export function SalesOrderPreliminaryDocumentPage() {
                     <td className="customer-doc__td font-mono text-xs">{row.itemCode}</td>
                     <td className="customer-doc__td">{row.itemName}</td>
                     <td className="customer-doc__td customer-doc__td--numeric">{row.qty}</td>
-                    <td className="customer-doc__td customer-doc__td--numeric">{formatMoneyAmount(row.unitPrice)}</td>
-                    <td className="customer-doc__td customer-doc__td--numeric">{formatMoneyAmount(row.lineTotal)}</td>
+                    <td className="customer-doc__td customer-doc__td--numeric">
+                      {formatMoney(row.unitPrice, moneyDp)}
+                    </td>
+                    <td className="customer-doc__td customer-doc__td--numeric">
+                      {formatMoney(row.lineTotal, moneyDp)}
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -208,7 +210,7 @@ export function SalesOrderPreliminaryDocumentPage() {
               </div>
               <div>
                 <span className="font-medium">{t("doc.page.totalAmount")}:</span>{" "}
-                <span className="tabular-nums font-semibold">{formatMoneyAmount(view.grandTotal)}</span>
+                <span className="tabular-nums font-semibold">{formatMoney(view.grandTotal, moneyDp)}</span>
               </div>
             </div>
           </div>

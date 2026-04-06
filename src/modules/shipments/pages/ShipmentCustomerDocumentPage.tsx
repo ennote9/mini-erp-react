@@ -1,7 +1,7 @@
 import { useParams, Link } from "react-router-dom";
 import { useMemo, useEffect, useState, useCallback, useRef } from "react";
 import { useTranslation } from "@/shared/i18n/context";
-import type { AppLocaleId } from "@/shared/i18n/locales";
+import { useAppDisplayFormatters } from "@/shared/formatting";
 import { shipmentRepository } from "../repository";
 import { salesOrderRepository } from "../../sales-orders/repository";
 import { customerRepository } from "../../customers/repository";
@@ -18,11 +18,6 @@ import {
   type DocumentExportSuccessState,
 } from "@/shared/ui/object/DocumentExportSuccessStrip";
 import "@/shared/print/customerDocumentPrint.css";
-
-function formatHandoffDateTime(locale: AppLocaleId, d: Date): string {
-  const tag = locale === "kk" ? "kk-KZ" : locale === "ru" ? "ru-RU" : "en-US";
-  return d.toLocaleString(tag, { dateStyle: "short", timeStyle: "short" });
-}
 
 function factualStatusLabel(t: (key: string) => string, status: string): string {
   switch (status) {
@@ -41,7 +36,8 @@ function factualStatusLabel(t: (key: string) => string, status: string): string 
 
 export function ShipmentCustomerDocumentPage() {
   const { id } = useParams<{ id: string }>();
-  const { t, locale } = useTranslation();
+  const { t } = useTranslation();
+  const { formatDate, formatDateTime } = useAppDisplayFormatters();
   const emDash = t("domain.audit.summary.emDash");
   const [printTime, setPrintTime] = useState(() => new Date());
   const downloadRootRef = useRef<HTMLDivElement>(null);
@@ -104,7 +100,7 @@ export function ShipmentCustomerDocumentPage() {
       lines,
       statusDisplay: factualStatusLabel(t, doc.status),
     };
-  }, [id, emDash, t, locale]);
+  }, [id, emDash, t]);
 
   const snapshotDocNumber = view?.doc.number ?? "document";
 
@@ -162,7 +158,7 @@ export function ShipmentCustomerDocumentPage() {
   }
 
   const { doc } = view;
-  const printedAt = formatHandoffDateTime(locale, printTime);
+  const printedAt = formatDateTime(printTime.toISOString(), { empty: emDash });
 
   return (
     <div className="customer-doc mx-auto w-full max-w-5xl px-5 py-6 text-foreground sm:px-8 print:max-w-none print:px-0 print:py-0">
@@ -196,7 +192,7 @@ export function ShipmentCustomerDocumentPage() {
         <div className="mt-2 flex flex-wrap gap-x-6 gap-y-1 text-sm text-muted-foreground print:text-black/70">
           <span>
             <span className="font-medium text-foreground/85 print:text-black">{t("doc.columns.date")}:</span>{" "}
-            <span className="tabular-nums">{doc.date}</span>
+            <span className="tabular-nums">{formatDate(doc.date)}</span>
           </span>
           <span>
             <span className="font-medium text-foreground/85 print:text-black">{t("doc.columns.status")}:</span>{" "}

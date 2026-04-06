@@ -36,6 +36,7 @@ import { save } from "@tauri-apps/plugin-dialog";
 import { invoke } from "@tauri-apps/api/core";
 import { revealItemInDir } from "@tauri-apps/plugin-opener";
 import { useTranslation } from "@/shared/i18n/context";
+import { useAppDisplayFormatters } from "@/shared/formatting";
 import { buildReadableUniqueFilename, ensureUniqueExportPath } from "@/shared/export/filenameBuilder";
 import { shipmentsListExcelLabels } from "@/shared/i18n/excelListExportLabels";
 import { toGeneratedCodeSearchTokens } from "@/shared/generatedVisibleCodes";
@@ -125,6 +126,7 @@ function TrackingListCellRenderer(params: ICellRendererParams<RowData>) {
 export function ShipmentsListPage() {
   const navigate = useNavigate();
   const { t, locale } = useTranslation();
+  const { formatDate } = useAppDisplayFormatters();
   const [searchParams, setSearchParams] = useSearchParams();
   const warehouseFilterId = useMemo(() => {
     const raw = searchParams.get("warehouseId");
@@ -381,6 +383,7 @@ export function ShipmentsListPage() {
         field: "date",
         headerName: t("doc.columns.date"),
         width: 140,
+        valueFormatter: (params) => formatDate(params.value, { empty: "" }),
       },
       {
         field: "salesOrderNumber",
@@ -438,7 +441,7 @@ export function ShipmentsListPage() {
         cellRenderer: AgGridFactualStatusCellRenderer,
       },
     ],
-    [t, locale],
+    [t, locale, formatDate],
   );
 
   const columnDefs = useMemo(
