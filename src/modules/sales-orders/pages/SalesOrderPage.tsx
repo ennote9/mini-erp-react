@@ -1,5 +1,6 @@
 import { useParams, useNavigate, useSearchParams } from "react-router-dom";
 import { useMemo, useState, useEffect, useRef, useCallback } from "react";
+import * as Dialog from "@radix-ui/react-dialog";
 import { AgGridReact } from "ag-grid-react";
 import type { ColDef, SelectionChangedEvent } from "ag-grid-community";
 import { salesOrderRepository } from "../repository";
@@ -158,6 +159,25 @@ type FormState = {
   lines: LineFormRow[];
 };
 
+type AgreementDefaults = {
+  agreementId: string;
+  pricingType: "discount_percent" | "fixed_price" | "price_list";
+  discountPercent?: number;
+  paymentTermsDays?: number;
+  currency: string;
+} | null;
+
+type PendingCustomerChange = {
+  customerId: string;
+  agreementDefaults: AgreementDefaults;
+  paymentTermsDays: string;
+  carrierId: string;
+  recipientName: string;
+  recipientPhone: string;
+  deliveryAddress: string;
+  deliveryComment: string;
+};
+
 function defaultForm(): FormState {
   return {
     date: todayYYYYMMDD(),
@@ -174,6 +194,57 @@ function defaultForm(): FormState {
     comment: "",
     lines: [],
   };
+}
+
+function applyAgreementUnitPrice(basePrice: number, defaults: AgreementDefaults): number {
+  const normalized = roundMoney(Number.isFinite(basePrice) && basePrice >= 0 ? basePrice : 0);
+  if (!defaults) return normalized;
+  if (defaults.pricingType !== "discount_percent") return normalized;
+  const d = defaults.discountPercent;
+  if (d === undefined || !Number.isFinite(d) || d <= 0) return normalized;
+  const bounded = Math.min(100, Math.max(0, d));
+  return roundMoney((normalized * (100 - bounded)) / 100);
+}
+
+function getLineBaseUnitPrice(line: LineFormRow): number {
+  const markdownCode = line.markdownCode?.trim().toUpperCase();
+  if (markdownCode) {
+    const record = markdownRepository.getByCode(markdownCode);
+    const markdownPrice = record?.markdownPrice;
+    if (typeof markdownPrice === "number" && Number.isFinite(markdownPrice) && markdownPrice >= 0) {
+      return markdownPrice;
+    }
+  }
+  const item = itemRepository.getById(line.itemId);
+  const salePrice = item?.salePrice;
+  if (typeof salePrice === "number" && Number.isFinite(salePrice) && salePrice >= 0) {
+    return salePrice;
+  }
+  return 0;
+}
+
+function applyAgreementDefaultsToLine(line: LineFormRow, defaults: AgreementDefaults): LineFormRow {
+  const unitPrice = applyAgreementUnitPrice(getLineBaseUnitPrice(line), defaults);
+  return {
+    ...line,
+    unitPrice,
+    zeroPriceReasonCode: unitPrice === 0 ? line.zeroPriceReasonCode : "",
+  };
+}
+
+function applyAgreementDefaultsToLines(lines: LineFormRow[], defaults: AgreementDefaults): LineFormRow[] {
+  return lines.map((line) => applyAgreementDefaultsToLine(line, defaults));
+}
+
+function agreementSignature(defaults: AgreementDefaults): string {
+  if (!defaults) return "none";
+  return [
+    defaults.agreementId,
+    defaults.pricingType,
+    defaults.discountPercent ?? "",
+    defaults.paymentTermsDays ?? "",
+    defaults.currency,
+  ].join("|");
 }
 
 function soLinesDisplayColumnDefs(
@@ -674,18 +745,13 @@ export function SalesOrderPage() {
     allowedValues: ["lines", "execution", "payments", "attachments", "events"] as const,
     defaultValue: "lines",
   });
-  const [activeAgreementDefaults, setActiveAgreementDefaults] = useState<{
-    agreementId: string;
-    pricingType: "discount_percent" | "fixed_price" | "price_list";
-    discountPercent?: number;
-    paymentTermsDays?: number;
-    currency: string;
-  } | null>(null);
+  const [activeAgreementDefaults, setActiveAgreementDefaults] = useState<AgreementDefaults>(null);
+  const [customerChangeConfirmOpen, setCustomerChangeConfirmOpen] = useState(false);
+  const [pendingCustomerChange, setPendingCustomerChange] = useState<PendingCustomerChange | null>(null);
   const linesGridRef = useRef<AgGridReact<LineFormRow> | null>(null);
   const lineEntryItemPickerRef = useRef<SalesOrderItemAutocompleteRef | null>(null);
   const lineEntryQtyInputRef = useRef<HTMLInputElement | null>(null);
   const lineEntryDropdownRightEdgeRef = useRef<HTMLDivElement | null>(null);
-  const prevCustomerIdRef = useRef<string | null>(null);
   const postedMarkdownCodes = useMemo(() => {
     const used = new Set<string>();
     for (const shipment of shipmentRepository.list()) {
@@ -752,21 +818,124 @@ export function SalesOrderPage() {
   ]);
 
   const applyAgreementUnitPriceDefault = useCallback(
-    (basePrice: number): number => {
-      const normalized = roundMoney(Number.isFinite(basePrice) && basePrice >= 0 ? basePrice : 0);
-      if (!activeAgreementDefaults) return normalized;
-      if (activeAgreementDefaults.pricingType !== "discount_percent") return normalized;
-      const d = activeAgreementDefaults.discountPercent;
-      if (d === undefined || !Number.isFinite(d) || d <= 0) return normalized;
-      const bounded = Math.min(100, Math.max(0, d));
-      return roundMoney((normalized * (100 - bounded)) / 100);
-    },
+    (basePrice: number): number => applyAgreementUnitPrice(basePrice, activeAgreementDefaults),
     [activeAgreementDefaults],
   );
 
-  useEffect(() => {
-    prevCustomerIdRef.current = null;
-  }, [id]);
+  const resolveAgreementDefaultsFor = useCallback(
+    (customerId: string, date: string): AgreementDefaults => {
+      const cid = customerId.trim();
+      if (cid === "") return null;
+      const agreementForDate = customerAgreementService.resolveActiveCustomerAgreement(
+        cid,
+        normalizeDateForSO(date),
+      );
+      if (!agreementForDate) return null;
+      return {
+        agreementId: agreementForDate.id,
+        pricingType: agreementForDate.pricingType,
+        discountPercent: agreementForDate.discountPercent,
+        paymentTermsDays: agreementForDate.paymentTermsDays,
+        currency: agreementForDate.currency,
+      };
+    },
+    [],
+  );
+
+  const buildPendingCustomerChange = useCallback(
+    (customerId: string, date: string): PendingCustomerChange => {
+      const cid = customerId.trim();
+      const agreementDefaults = resolveAgreementDefaultsFor(cid, date);
+      const customer = cid ? customerRepository.getById(cid) : undefined;
+      const terms = agreementDefaults?.paymentTermsDays ?? customer?.paymentTermsDays;
+      const paymentTermsDays =
+        terms !== undefined && Number.isFinite(terms) && Number.isInteger(terms) && terms >= 0
+          ? String(terms)
+          : "";
+
+      let carrierId = "";
+      if (customer && cid) {
+        const preferred = customer.preferredCarrierId?.trim() ?? "";
+        if (preferred !== "" && carrierRepository.getById(preferred)) {
+          carrierId = preferred;
+        }
+      }
+
+      return {
+        customerId: cid,
+        agreementDefaults,
+        paymentTermsDays,
+        carrierId,
+        recipientName: customer?.defaultRecipientName ?? "",
+        recipientPhone: customer?.phone ?? customer?.defaultRecipientPhone ?? "",
+        deliveryAddress: customer?.shippingAddress ?? customer?.defaultDeliveryAddress ?? "",
+        deliveryComment: customer?.defaultDeliveryComment ?? "",
+      };
+    },
+    [resolveAgreementDefaultsFor],
+  );
+
+  const applyPendingCustomerChange = useCallback(
+    (next: PendingCustomerChange, recalculateLines: boolean) => {
+      setActiveAgreementDefaults(next.agreementDefaults);
+      setForm((f) => ({
+        ...f,
+        customerId: next.customerId,
+        paymentTermsDays: next.paymentTermsDays,
+        carrierId: next.carrierId,
+        recipientName: next.recipientName,
+        recipientPhone: next.recipientPhone,
+        deliveryAddress: next.deliveryAddress,
+        deliveryComment: next.deliveryComment,
+        lines: recalculateLines ? applyAgreementDefaultsToLines(f.lines, next.agreementDefaults) : f.lines,
+      }));
+      if (recalculateLines) {
+        setEditingLineId(null);
+        setLineEntryItemId("");
+        setLineEntryQty(1);
+        setLineEntryUnitPrice(0);
+        setLineEntryMarkdownCode(null);
+        setLineEntryZeroPriceReason("");
+        linesGridRef.current?.api?.deselectAll();
+      }
+      setCustomerChangeConfirmOpen(false);
+      setPendingCustomerChange(null);
+    },
+    [],
+  );
+
+  const handleCustomerChange = useCallback(
+    (nextCustomerIdRaw: string) => {
+      const nextCustomerId = nextCustomerIdRaw.trim();
+      const currentCustomerId = form.customerId.trim();
+      if (nextCustomerId === currentCustomerId) return;
+
+      const next = buildPendingCustomerChange(nextCustomerId, form.date);
+      const currentAgreementSig = agreementSignature(activeAgreementDefaults);
+      const nextAgreementSig = agreementSignature(next.agreementDefaults);
+      const agreementChanged = currentAgreementSig !== nextAgreementSig;
+      const hasLines = form.lines.length > 0;
+
+      if (hasLines && agreementChanged) {
+        setPendingCustomerChange(next);
+        setCustomerChangeConfirmOpen(true);
+        return;
+      }
+
+      applyPendingCustomerChange(next, false);
+    },
+    [activeAgreementDefaults, applyPendingCustomerChange, buildPendingCustomerChange, form.customerId, form.date, form.lines.length],
+  );
+
+  const handleKeepCustomerLinePricing = useCallback(() => {
+    if (!pendingCustomerChange) return;
+    applyPendingCustomerChange(pendingCustomerChange, false);
+  }, [applyPendingCustomerChange, pendingCustomerChange]);
+
+  const handleRecalculateCustomerLinePricing = useCallback(() => {
+    if (!pendingCustomerChange) return;
+    applyPendingCustomerChange(pendingCustomerChange, true);
+  }, [applyPendingCustomerChange, pendingCustomerChange]);
 
   useEffect(() => {
     setActionIssues([]);
@@ -787,8 +956,9 @@ export function SalesOrderPage() {
   useEffect(() => {
     if (isNew) {
       nextLineIdRef.current = 0;
-      prevCustomerIdRef.current = null;
       setForm(defaultForm());
+      setPendingCustomerChange(null);
+      setCustomerChangeConfirmOpen(false);
       setEditingLineId(null);
       setLineEntryItemId("");
       setLineEntryQty(1);
@@ -796,6 +966,7 @@ export function SalesOrderPage() {
       setLineEntryMarkdownCode(null);
       setLineEntryZeroPriceReason("");
       setDuplicateChoicePending(null);
+      setActiveAgreementDefaults(null);
       return;
     }
     if (doc?.status === "draft" && id) {
@@ -840,6 +1011,8 @@ export function SalesOrderPage() {
       setLineEntryMarkdownCode(null);
       setLineEntryZeroPriceReason("");
       setDuplicateChoicePending(null);
+      setPendingCustomerChange(null);
+      setCustomerChangeConfirmOpen(false);
     }
   }, [
     id,
@@ -919,54 +1092,8 @@ export function SalesOrderPage() {
 
   useEffect(() => {
     if (!isEditable) return;
-    const cid = form.customerId.trim();
-    const agreementForDate = cid
-      ? customerAgreementService.resolveActiveCustomerAgreement(cid, normalizeDateForSO(form.date))
-      : undefined;
-    setActiveAgreementDefaults(
-      agreementForDate
-        ? {
-            agreementId: agreementForDate.id,
-            pricingType: agreementForDate.pricingType,
-            discountPercent: agreementForDate.discountPercent,
-            paymentTermsDays: agreementForDate.paymentTermsDays,
-            currency: agreementForDate.currency,
-          }
-        : null,
-    );
-    if (prevCustomerIdRef.current === null) {
-      prevCustomerIdRef.current = cid;
-      return;
-    }
-    if (prevCustomerIdRef.current === cid) return;
-    prevCustomerIdRef.current = cid;
-
-    const cust = cid ? customerRepository.getById(cid) : undefined;
-    const d = agreementForDate?.paymentTermsDays ?? cust?.paymentTermsDays;
-    const paymentTermsDays =
-      d !== undefined && Number.isFinite(d) && Number.isInteger(d) && d >= 0 ? String(d) : "";
-
-    let carrierId = "";
-    if (cust && cid) {
-      const p = cust.preferredCarrierId?.trim() ?? "";
-      if (p !== "" && carrierRepository.getById(p)) carrierId = p;
-    }
-
-    const recipientName = cust?.defaultRecipientName ?? "";
-    const recipientPhone = cust?.phone ?? cust?.defaultRecipientPhone ?? "";
-    const deliveryAddress = cust?.shippingAddress ?? cust?.defaultDeliveryAddress ?? "";
-    const deliveryComment = cust?.defaultDeliveryComment ?? "";
-
-    setForm((f) => ({
-      ...f,
-      paymentTermsDays,
-      carrierId,
-      recipientName,
-      recipientPhone,
-      deliveryAddress,
-      deliveryComment,
-    }));
-  }, [form.customerId, form.date, isEditable]);
+    setActiveAgreementDefaults(resolveAgreementDefaultsFor(form.customerId, form.date));
+  }, [form.customerId, form.date, isEditable, resolveAgreementDefaultsFor]);
 
   const carrierSelectOptions = useMemo(() => {
     const all = carrierRepository.list();
@@ -1371,7 +1498,7 @@ export function SalesOrderPage() {
           _lineId: nextLineIdRef.current++,
           itemId: grouped.itemId,
           qty: grouped.qty,
-          unitPrice: roundMoney(
+          unitPrice: applyAgreementUnitPriceDefault(
             typeof grouped.unitPrice === "number" && Number.isFinite(grouped.unitPrice) && grouped.unitPrice >= 0
               ? grouped.unitPrice
               : 0,
@@ -1943,7 +2070,7 @@ export function SalesOrderPage() {
                         <SelectField
                           id="so-customer"
                           value={form.customerId}
-                          onChange={(customerId) => setForm((f) => ({ ...f, customerId }))}
+                          onChange={handleCustomerChange}
                           options={activeCustomers.map((c) => ({
                             value: c.id,
                             label: `${c.code} - ${c.name}`,
@@ -2929,6 +3056,33 @@ export function SalesOrderPage() {
         onOpenChange={setIsLineImportModalOpen}
         onApply={handleApplyImportedLines}
       />
+      <Dialog.Root
+        open={customerChangeConfirmOpen}
+        onOpenChange={(open) => {
+          setCustomerChangeConfirmOpen(open);
+          if (!open) setPendingCustomerChange(null);
+        }}
+      >
+        <Dialog.Portal>
+          <Dialog.Overlay className="fixed inset-0 z-50 bg-black/50 backdrop-blur-[1px]" />
+          <Dialog.Content className="fixed left-1/2 top-1/2 z-50 w-[min(28rem,calc(100vw-2rem))] -translate-x-1/2 -translate-y-1/2 rounded-lg border bg-background p-5 shadow-lg focus:outline-none">
+            <Dialog.Title className="text-base font-semibold text-foreground">
+              Пересчитать строки по условиям договора клиента?
+            </Dialog.Title>
+            <Dialog.Description className="mt-2 text-sm text-muted-foreground">
+              Клиент изменён и условия договора отличаются. Выберите, нужно ли пересчитать цены в уже добавленных строках.
+            </Dialog.Description>
+            <div className="mt-4 flex justify-end gap-2">
+              <Button type="button" variant="outline" onClick={handleKeepCustomerLinePricing}>
+                Оставить как есть
+              </Button>
+              <Button type="button" onClick={handleRecalculateCustomerLinePricing}>
+                Пересчитать
+              </Button>
+            </div>
+          </Dialog.Content>
+        </Dialog.Portal>
+      </Dialog.Root>
       <CancelDocumentReasonDialog
         open={cancelReasonDialogOpen}
         onOpenChange={setCancelReasonDialogOpen}
