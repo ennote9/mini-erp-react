@@ -5,6 +5,7 @@ import type { ColDef, SelectionChangedEvent } from "ag-grid-community";
 import { salesOrderRepository } from "../repository";
 import { allocateStock, confirm, cancelDocument, createShipment, saveDraft } from "../service";
 import { customerRepository } from "../../customers/repository";
+import { customerAgreementService } from "../../customer-agreements/service";
 import { carrierRepository } from "../../carriers/repository";
 import { translateCarrierType } from "../../carriers";
 import { warehouseRepository } from "../../warehouses/repository";
@@ -673,6 +674,13 @@ export function SalesOrderPage() {
     allowedValues: ["lines", "execution", "payments", "attachments", "events"] as const,
     defaultValue: "lines",
   });
+  const [activeAgreementDefaults, setActiveAgreementDefaults] = useState<{
+    agreementId: string;
+    pricingType: "discount_percent" | "fixed_price" | "price_list";
+    discountPercent?: number;
+    paymentTermsDays?: number;
+    currency: string;
+  } | null>(null);
   const linesGridRef = useRef<AgGridReact<LineFormRow> | null>(null);
   const lineEntryItemPickerRef = useRef<SalesOrderItemAutocompleteRef | null>(null);
   const lineEntryQtyInputRef = useRef<HTMLInputElement | null>(null);
@@ -742,6 +750,19 @@ export function SalesOrderPage() {
     normalizedLineEntryZeroPriceReason,
     t,
   ]);
+
+  const applyAgreementUnitPriceDefault = useCallback(
+    (basePrice: number): number => {
+      const normalized = roundMoney(Number.isFinite(basePrice) && basePrice >= 0 ? basePrice : 0);
+      if (!activeAgreementDefaults) return normalized;
+      if (activeAgreementDefaults.pricingType !== "discount_percent") return normalized;
+      const d = activeAgreementDefaults.discountPercent;
+      if (d === undefined || !Number.isFinite(d) || d <= 0) return normalized;
+      const bounded = Math.min(100, Math.max(0, d));
+      return roundMoney((normalized * (100 - bounded)) / 100);
+    },
+    [activeAgreementDefaults],
+  );
 
   useEffect(() => {
     prevCustomerIdRef.current = null;
@@ -899,6 +920,20 @@ export function SalesOrderPage() {
   useEffect(() => {
     if (!isEditable) return;
     const cid = form.customerId.trim();
+    const agreementForDate = cid
+      ? customerAgreementService.resolveActiveCustomerAgreement(cid, normalizeDateForSO(form.date))
+      : undefined;
+    setActiveAgreementDefaults(
+      agreementForDate
+        ? {
+            agreementId: agreementForDate.id,
+            pricingType: agreementForDate.pricingType,
+            discountPercent: agreementForDate.discountPercent,
+            paymentTermsDays: agreementForDate.paymentTermsDays,
+            currency: agreementForDate.currency,
+          }
+        : null,
+    );
     if (prevCustomerIdRef.current === null) {
       prevCustomerIdRef.current = cid;
       return;
@@ -907,7 +942,7 @@ export function SalesOrderPage() {
     prevCustomerIdRef.current = cid;
 
     const cust = cid ? customerRepository.getById(cid) : undefined;
-    const d = cust?.paymentTermsDays;
+    const d = agreementForDate?.paymentTermsDays ?? cust?.paymentTermsDays;
     const paymentTermsDays =
       d !== undefined && Number.isFinite(d) && Number.isInteger(d) && d >= 0 ? String(d) : "";
 
@@ -931,7 +966,7 @@ export function SalesOrderPage() {
       deliveryAddress,
       deliveryComment,
     }));
-  }, [form.customerId, isEditable]);
+  }, [form.customerId, form.date, isEditable]);
 
   const carrierSelectOptions = useMemo(() => {
     const all = carrierRepository.list();
@@ -1282,7 +1317,7 @@ export function SalesOrderPage() {
     setLineEntryZeroPriceReason("");
     const item = itemId ? itemRepository.getById(itemId) : undefined;
     const price = item?.salePrice;
-    const up = roundMoney(
+    const up = applyAgreementUnitPriceDefault(
       typeof price === "number" && !Number.isNaN(price) && price >= 0 ? price : 0,
     );
     setLineEntryUnitPrice(up);
@@ -1304,8 +1339,10 @@ export function SalesOrderPage() {
     setLineEntryMarkdownCode(record.markdownCode);
     setLineEntryQty(1);
     setLineEntryUnitPrice(
-      roundMoney(
-        typeof record.markdownPrice === "number" && !Number.isNaN(record.markdownPrice) && record.markdownPrice >= 0
+      applyAgreementUnitPriceDefault(
+        typeof record.markdownPrice === "number" &&
+          !Number.isNaN(record.markdownPrice) &&
+          record.markdownPrice >= 0
           ? record.markdownPrice
           : 0,
       ),
@@ -1314,7 +1351,7 @@ export function SalesOrderPage() {
     if (editingLineId === null) {
       setTimeout(() => lineEntryQtyInputRef.current?.focus(), 0);
     }
-  }, [editingLineId, getMarkdownSelectionIssue]);
+  }, [applyAgreementUnitPriceDefault, editingLineId, getMarkdownSelectionIssue]);
 
   const handleApplyImportedLines = ({ lines, skippedRows }: { lines: ResolvedImportLine[]; skippedRows: number }) => {
     if (lines.length === 0) return;
@@ -1862,7 +1899,7 @@ export function SalesOrderPage() {
       }
       summary={null}
     >
-      <div className="doc-so-page flex w-full min-w-0 flex-col gap-2">
+      <div className="doc-so-page flex w-full min-w-0 flex-1 flex-col gap-2 min-h-0">
       {isEditable ? (
           <Card className="w-full border-0 bg-transparent shadow-none">
             <CardHeader className="px-3 py-2 pb-1.5">
@@ -2350,7 +2387,7 @@ export function SalesOrderPage() {
             </CardContent>
           </Card>
       )}
-      <div className="doc-so-working-area mt-0 max-w-full border-t border-border/60 pt-2">
+      <div className="doc-so-working-area mt-0 flex min-h-0 flex-1 max-w-full flex-col border-t border-border/60 pt-2">
         <div
           className="mb-2 flex flex-wrap gap-1 border-b border-border"
           role="tablist"
@@ -2815,7 +2852,7 @@ export function SalesOrderPage() {
               </Card>
               </div>
             )}
-<div className="doc-lines__grid doc-lines__grid--fixed-h h-[22rem] min-h-[22rem]">
+            <div className="doc-lines__grid">
               <AgGridContainer themeClass="doc-lines-grid">
                 <AgGridReact<LineFormRow>
                   ref={linesGridRef}
@@ -2848,7 +2885,7 @@ export function SalesOrderPage() {
               <p className="doc-lines__empty">{t("doc.page.noLines")}</p>
             ) : (
               <>
-                <div className="doc-lines__grid doc-lines__grid--fixed-h h-[22rem] min-h-[22rem]">
+                <div className="doc-lines__grid">
                   <AgGridContainer themeClass="doc-lines-grid">
                     <AgGridReact<LineWithItem>
                       {...agGridDefaultGridOptions}
@@ -2879,7 +2916,7 @@ export function SalesOrderPage() {
         initialTab={lineImportInitialTab}
         items={documentLineItems}
         getDefaultUnitPrice={(item) =>
-          roundMoney(
+          applyAgreementUnitPriceDefault(
             typeof item.salePrice === "number" &&
               Number.isFinite(item.salePrice) &&
               item.salePrice >= 0

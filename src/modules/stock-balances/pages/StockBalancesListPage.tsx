@@ -25,6 +25,7 @@ import {
   agGridSelectionColumnDef,
   decorateAgGridColumnDefsWithFilters,
   hasMeaningfulTextSelection,
+  useAgGridBackNavigationLayoutFix,
   type AgGridColumnFilterConfig,
 } from "../../../shared/ui/ag-grid";
 import { BackButton } from "../../../shared/ui/list/BackButton";
@@ -201,6 +202,7 @@ export function StockBalancesListPage() {
     [location.pathname, searchParams],
   );
   useSessionScrollRestore(listStateKey, gridContainerRef);
+  useAgGridBackNavigationLayoutFix(gridRef, gridContainerRef);
   const currentReturnTo = useMemo(
     () => buildReturnToValue(location.pathname, location.search),
     [location.pathname, location.search],

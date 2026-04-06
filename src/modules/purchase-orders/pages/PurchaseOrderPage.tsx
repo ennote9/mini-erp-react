@@ -1863,7 +1863,7 @@ export function PurchaseOrderPage() {
           </CardContent>
         </Card>
       )}
-      <div className="doc-po-working-area mt-0 max-w-full border-t border-border/60 pt-2">
+      <div className="doc-po-working-area mt-0 flex min-h-0 flex-1 max-w-full flex-col border-t border-border/60 pt-2">
         <div
           className="mb-2 flex flex-wrap gap-1 border-b border-border"
           role="tablist"
@@ -2244,7 +2244,7 @@ export function PurchaseOrderPage() {
               </Card>
               </div>
             )}
-            <div className="doc-lines__grid doc-lines__grid--fixed-h h-[22rem] min-h-[22rem]">
+            <div className="doc-lines__grid">
               <AgGridContainer themeClass="doc-lines-grid doc-lines-grid--po">
                 <AgGridReact<LineFormRow>
                   {...agGridDefaultGridOptions}
@@ -2279,7 +2279,7 @@ export function PurchaseOrderPage() {
               <p className="doc-lines__empty">{t("doc.page.noLines")}</p>
             ) : (
               <>
-                <div className="doc-lines__grid doc-lines__grid--fixed-h h-[22rem] min-h-[22rem]">
+                <div className="doc-lines__grid">
                   <AgGridContainer themeClass="doc-lines-grid doc-lines-grid--po">
                     <AgGridReact<LineWithItem>
                       {...agGridDefaultGridOptions}

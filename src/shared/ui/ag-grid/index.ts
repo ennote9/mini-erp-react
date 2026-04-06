@@ -1,4 +1,5 @@
 export { AgGridContainer } from "./AgGridContainer";
+export { useAgGridBackNavigationLayoutFix } from "./useAgGridBackNavigationLayoutFix";
 export {
   agGridDefaultColDef,
   agGridDefaultGridOptions,

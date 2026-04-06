@@ -33,6 +33,8 @@ import { Save, X } from "lucide-react";
 import { useTranslation } from "@/shared/i18n/context";
 import { cn } from "@/lib/utils";
 import { Tabs } from "radix-ui";
+import { CustomerAgreementsSection } from "../components/CustomerAgreementsSection";
+import { CustomerAttachmentsSection } from "../components/CustomerAttachmentsSection";
 
 type FormState = {
   code: string;
@@ -289,7 +291,7 @@ export function CustomerPage() {
           </Button>
         </div>
       ) : null}
-      <Card className="mt-4 max-w-2xl border-0 shadow-none">
+      <Card className="mt-4 w-full max-w-5xl border-0 shadow-none">
         <Tabs.Root defaultValue="main">
           <CardHeader className="p-2 pb-0.5 space-y-2">
             <Tabs.List
@@ -319,6 +321,30 @@ export function CustomerPage() {
                   )}
                 >
                   {t("master.customer.tabDefaultDelivery")}
+                </Tabs.Trigger>
+                <ButtonGroupSeparator />
+                <Tabs.Trigger
+                  value="agreements"
+                  className={cn(
+                    "inline-flex h-8 flex-1 items-center justify-center rounded-none border-0 bg-background px-3 text-sm font-medium transition-colors sm:flex-initial",
+                    "text-foreground hover:bg-accent hover:text-accent-foreground",
+                    "data-[state=active]:bg-primary data-[state=active]:text-primary-foreground",
+                    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
+                  )}
+                >
+                  {t("master.customer.tabAgreements")}
+                </Tabs.Trigger>
+                <ButtonGroupSeparator />
+                <Tabs.Trigger
+                  value="attachments"
+                  className={cn(
+                    "inline-flex h-8 flex-1 items-center justify-center rounded-none border-0 bg-background px-3 text-sm font-medium transition-colors sm:flex-initial",
+                    "text-foreground hover:bg-accent hover:text-accent-foreground",
+                    "data-[state=active]:bg-primary data-[state=active]:text-primary-foreground",
+                    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
+                  )}
+                >
+                  {t("master.customer.tabAttachments")}
                 </Tabs.Trigger>
               </ButtonGroup>
             </Tabs.List>
@@ -549,6 +575,20 @@ export function CustomerPage() {
                   </div>
                 </div>
               </div>
+            </Tabs.Content>
+            <Tabs.Content value="agreements" className="mt-2 outline-none focus-visible:outline-none sm:mt-0">
+              {isNew || !id ? (
+                <p className="text-sm text-muted-foreground">{t("master.customer.saveFirstForExtendedTabs")}</p>
+              ) : (
+                <CustomerAgreementsSection customerId={id} />
+              )}
+            </Tabs.Content>
+            <Tabs.Content value="attachments" className="mt-2 outline-none focus-visible:outline-none sm:mt-0">
+              {isNew || !id ? (
+                <p className="text-sm text-muted-foreground">{t("master.customer.saveFirstForExtendedTabs")}</p>
+              ) : (
+                <CustomerAttachmentsSection customerId={id} />
+              )}
             </Tabs.Content>
           </CardContent>
         </Tabs.Root>
