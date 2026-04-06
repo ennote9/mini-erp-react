@@ -1,0 +1,81 @@
+{
+  "before": {
+    "label": "expanded",
+    "sidebarWidth": 248,
+    "insetWidth": 1344,
+    "triggerVisible": false,
+    "activeHasDataAttr": true,
+    "accountDisplay": null,
+    "topLabelsVisible": true
+  },
+  "after": {
+    "label": "collapsed",
+    "sidebarWidth": 68,
+    "insetWidth": 1516,
+    "triggerVisible": false,
+    "activeHasDataAttr": true,
+    "accountDisplay": null,
+    "topLabelsVisible": true
+  },
+  "tooltipTexts": [
+    "Показать или скрыть панель навигации",
+    "Показать или скрыть панель навигации",
+    "Штрихкоды",
+    "Штрихкоды"
+  ],
+  "onPurchaseOrders": {
+    "label": "collapsed-purchase-orders",
+    "sidebarWidth": 68,
+    "insetWidth": 1516,
+    "triggerVisible": false,
+    "activeHasDataAttr": true,
+    "accountDisplay": null,
+    "topLabelsVisible": true
+  },
+  "onStockBalances": {
+    "label": "collapsed-stock-balances",
+    "sidebarWidth": 68,
+    "insetWidth": 1516,
+    "triggerVisible": false,
+    "activeHasDataAttr": true,
+    "accountDisplay": null,
+    "topLabelsVisible": true
+  },
+  "afterReload": {
+    "label": "collapsed-after-reload",
+    "sidebarWidth": 68,
+    "insetWidth": 1516,
+    "triggerVisible": false,
+    "activeHasDataAttr": true,
+    "accountDisplay": null,
+    "topLabelsVisible": true
+  },
+  "reExpanded": {
+    "label": "re-expanded",
+    "sidebarWidth": 248,
+    "insetWidth": 1344,
+    "triggerVisible": false,
+    "activeHasDataAttr": true,
+    "accountDisplay": null,
+    "topLabelsVisible": true
+  },
+  "keyboardCollapsed": {
+    "label": "keyboard-collapsed",
+    "sidebarWidth": 68,
+    "insetWidth": 1516,
+    "triggerVisible": false,
+    "activeHasDataAttr": true,
+    "accountDisplay": null,
+    "topLabelsVisible": true
+  },
+  "keyboardExpanded": {
+    "label": "keyboard-expanded",
+    "sidebarWidth": 248,
+    "insetWidth": 1344,
+    "triggerVisible": false,
+    "activeHasDataAttr": true,
+    "accountDisplay": null,
+    "topLabelsVisible": true
+  },
+  "consoleErrors": []
+}

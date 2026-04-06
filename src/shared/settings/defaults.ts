@@ -19,6 +19,7 @@ export const DEFAULT_APP_SETTINGS: AppSettings = {
     profileOverrides: { ...DEFAULT_PROFILE_OVERRIDES_MAX },
     locale: "en",
     theme: "light",
+    sidebarState: "expanded",
     dateFormat: "iso",
     numberFormat: "commaDot",
     hotkeysEnabled: true,

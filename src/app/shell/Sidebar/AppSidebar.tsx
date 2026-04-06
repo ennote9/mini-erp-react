@@ -30,6 +30,7 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
+  useSidebar,
 } from "@/components/ui/sidebar";
 import { useSettings } from "@/shared/settings";
 import { useTranslation } from "@/shared/i18n";
@@ -99,10 +100,10 @@ function SidebarNavLink({
       : location.pathname === to || location.pathname.startsWith(to + "/");
 
   return (
-    <SidebarMenuButton asChild isActive={isActive}>
+    <SidebarMenuButton asChild isActive={isActive} tooltip={label}>
       <NavLink to={to} end={end ?? to === "/"}>
         <Icon className="size-4 shrink-0" />
-        <span className="truncate">{label}</span>
+        <span className="truncate group-data-[collapsible=icon]:hidden">{label}</span>
       </NavLink>
     </SidebarMenuButton>
   );
@@ -119,23 +120,28 @@ function workspaceModeLabel(t: (k: string) => string, mode: WorkspaceModeId): st
 export function AppSidebar() {
   const { t } = useTranslation();
   const { settings } = useSettings();
+  const { open, toggleSidebar } = useSidebar();
   const mode = settings.general.workspaceMode;
   const overrides = settings.general.profileOverrides;
   const modeLabel = workspaceModeLabel(t, mode);
 
   return (
-    <Sidebar collapsible="none" variant="inset">
+    <Sidebar collapsible="icon" variant="inset">
       <SidebarHeader>
-        <SidebarMenu>
+        <SidebarMenu className="flex-1">
           <SidebarMenuItem>
             <SidebarMenuButton
+              type="button"
               size="lg"
-              className="rounded-lg hover:bg-sidebar-accent/80 data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
+              tooltip={open ? t("app.name") : t("shell.a11y.toggleSidebar")}
+              aria-label={open ? t("shell.a11y.toggleSidebar") : t("shell.a11y.toggleSidebar")}
+              onClick={toggleSidebar}
+              className="cursor-pointer rounded-lg border border-transparent bg-sidebar-accent/20 hover:border-sidebar-border/70 hover:bg-sidebar-accent/65 focus-visible:ring-2 focus-visible:ring-sidebar-ring active:bg-sidebar-accent/85 active:scale-[0.99] data-[state=open]:bg-sidebar-accent/70 data-[state=open]:text-sidebar-accent-foreground group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-2"
             >
-              <div className="flex aspect-square size-9 items-center justify-center rounded-lg bg-sidebar-primary text-sidebar-primary-foreground shadow-sm ring-1 ring-sidebar-border/50">
+              <div className="flex aspect-square size-9 items-center justify-center rounded-lg bg-sidebar-primary text-sidebar-primary-foreground shadow-sm ring-1 ring-sidebar-border/45 transition-transform duration-200 group-hover/menu-button:scale-[1.02] group-active/menu-button:scale-[0.99]">
                 <LayoutDashboard className="size-4" />
               </div>
-              <div className="grid min-w-0 flex-1 gap-0.5 text-left">
+              <div className="grid min-w-0 flex-1 gap-0.5 text-left group-data-[collapsible=icon]:hidden">
                 <span className="truncate text-sm font-semibold leading-tight text-sidebar-foreground">
                   {t("app.name")}
                 </span>
@@ -194,12 +200,13 @@ export function AppSidebar() {
           <SidebarMenuItem>
             <SidebarMenuButton
               size="lg"
-              className="rounded-lg border border-sidebar-border/80 bg-sidebar-accent/40 hover:bg-sidebar-accent/70 data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
+              tooltip={t("shell.account")}
+              className="rounded-lg border border-sidebar-border/60 bg-sidebar-accent/20 hover:bg-sidebar-accent/55 data-[state=open]:bg-sidebar-accent/70 data-[state=open]:text-sidebar-accent-foreground"
             >
-              <div className="flex aspect-square size-9 items-center justify-center rounded-lg border border-sidebar-border bg-sidebar/80 text-sidebar-foreground">
+              <div className="flex aspect-square size-9 items-center justify-center rounded-lg border border-sidebar-border/70 bg-sidebar/75 text-sidebar-foreground">
                 <User className="size-4" />
               </div>
-              <div className="grid min-w-0 flex-1 gap-0.5 text-left">
+              <div className="grid min-w-0 flex-1 gap-0.5 text-left group-data-[collapsible=icon]:hidden">
                 <span className="truncate text-sm font-medium leading-tight text-sidebar-foreground">
                   {t("shell.account")}
                 </span>

@@ -5,6 +5,7 @@ import type {
   DateFormatId,
   NumberFormatId,
   PartnerTermsOverwriteId,
+  SidebarState,
   ThemePreference,
 } from "./types";
 
@@ -22,6 +23,10 @@ function isRecord(v: unknown): v is Record<string, unknown> {
 
 function asThemePreference(v: unknown): ThemePreference | undefined {
   return v === "light" || v === "dark" || v === "system" ? v : undefined;
+}
+
+function asSidebarState(v: unknown): SidebarState | undefined {
+  return v === "expanded" || v === "collapsed" ? v : undefined;
 }
 
 function asDateFormatId(v: unknown): DateFormatId | undefined {
@@ -63,6 +68,7 @@ export function normalizeAppSettingsFromUnknown(raw: unknown): AppSettings {
       profileOverrides: { ...base.general.profileOverrides },
       locale: normalizeAppLocale((g as Record<string, unknown>).locale),
       theme: asThemePreference(g.theme) ?? base.general.theme,
+      sidebarState: asSidebarState(g.sidebarState) ?? base.general.sidebarState,
       dateFormat: asDateFormatId(g.dateFormat) ?? base.general.dateFormat,
       numberFormat: asNumberFormatId(g.numberFormat) ?? base.general.numberFormat,
       hotkeysEnabled: asBool(g.hotkeysEnabled) ?? base.general.hotkeysEnabled,

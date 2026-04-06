@@ -10,6 +10,7 @@ import {
   PersistenceFlushError,
 } from "@/shared/persistenceCoordinator";
 import { useTranslation } from "@/shared/i18n";
+import { useSettings } from "@/shared/settings";
 
 /**
  * App shell: shadcn Sidebar (left) + main workspace (right).
@@ -17,9 +18,11 @@ import { useTranslation } from "@/shared/i18n";
  */
 export function AppShell() {
   const { t } = useTranslation();
+  const { settings, patch } = useSettings();
   const [showSavingOverlay, setShowSavingOverlay] = useState(false);
   const isFlushingRef = useRef(false);
   const closeAfterFlushRef = useRef(false);
+  const sidebarExpanded = settings.general.sidebarState !== "collapsed";
 
   useEffect(() => {
     let unlisten: (() => void) | undefined;
@@ -73,7 +76,12 @@ export function AppShell() {
   }, []);
 
   return (
-    <SidebarProvider>
+    <SidebarProvider
+      open={sidebarExpanded}
+      onOpenChange={(open) =>
+        patch({ general: { sidebarState: open ? "expanded" : "collapsed" } })
+      }
+    >
       <AppSidebar />
       <SidebarInset>
         <div className="app-workspace flex min-h-svh flex-1 flex-col">

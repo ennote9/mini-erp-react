@@ -16,6 +16,7 @@ export type SettingsSectionId =
 
 /** Explicit saved app theme; system follows OS preference. */
 export type ThemePreference = "light" | "dark" | "system";
+export type SidebarState = "expanded" | "collapsed";
 
 /**
  * Product complexity / visibility profile. Drives which UI and settings are shown (phase 1: mostly visibility).
@@ -54,6 +55,7 @@ export type AppSettings = {
     /** UI language (en / ru / kk). */
     locale: AppLocaleId;
     theme: ThemePreference;
+    sidebarState: SidebarState;
     dateFormat: DateFormatId;
     numberFormat: NumberFormatId;
     hotkeysEnabled: boolean;
