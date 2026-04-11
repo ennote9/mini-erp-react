@@ -1,4 +1,4 @@
-import { useMemo, useState, useRef, useCallback } from "react";
+import { useMemo, useState, useRef, useCallback, useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { AgGridReact } from "ag-grid-react";
 import type { ColDef, SelectionChangedEvent } from "ag-grid-community";
@@ -6,7 +6,6 @@ import { customerRepository } from "../repository";
 import type { Customer } from "../model";
 import { carrierRepository } from "../../carriers/repository";
 import { ListPageLayout } from "../../../shared/ui/list/ListPageLayout";
-import { EmptyState } from "../../../shared/ui/feedback/EmptyState";
 import {
   AgGridContainer,
   AgGridActiveBooleanCellRenderer,
@@ -17,6 +16,8 @@ import {
   agGridSelectionColumnDef,
   decorateAgGridColumnDefsWithFilters,
   hasMeaningfulTextSelection,
+  getAgGridNoRowsOverlayContent,
+  buildAgGridNoRowsOverlayTemplate,
   type AgGridColumnFilterConfig,
 } from "../../../shared/ui/ag-grid";
 import { BackButton } from "../../../shared/ui/list/BackButton";
@@ -119,9 +120,8 @@ export function CustomersListPage() {
     [filteredRows, columnFilterModel, customerColumnFilterConfigs],
   );
 
-  const isEmpty = displayRows.length === 0;
-  const hasFilter =
-    searchQuery.trim() !== "" ||
+  const searchActive = searchQuery.trim() !== "";
+  const filtersActive =
     preferredCarrierFilterId != null ||
     hasActiveAgGridColumnFilters(columnFilterModel);
 
@@ -210,17 +210,32 @@ export function CustomersListPage() {
 
   const exportSelectedDisabled = selectedCount === 0;
 
-  const emptyTitle = hasFilter ? t("ops.list.customers.emptyFiltered") : t("ops.list.customers.emptyDefault");
-  const emptyHint = useMemo(() => {
-    if (!hasFilter) return t("ops.list.customers.hintCreate");
-    if (
-      preferredCarrierFilterId != null &&
-      searchQuery.trim() === ""
-    ) {
-      return t("ops.list.customers.hintPreferredCarrierOnly");
+  const noRowsOverlayTemplate = useMemo(
+    () =>
+      buildAgGridNoRowsOverlayTemplate(
+        getAgGridNoRowsOverlayContent(
+          {
+            baseRowCount: customerRepository.list().length,
+            visibleRowCount: displayRows.length,
+            searchActive,
+            filtersActive,
+          },
+          t,
+        ),
+      ),
+    [displayRows.length, searchActive, filtersActive, t, locale],
+  );
+
+  useEffect(() => {
+    const api = gridRef.current?.api;
+    if (!api) return;
+    api.setGridOption("overlayNoRowsTemplate", noRowsOverlayTemplate ?? "");
+    if (displayRows.length === 0) {
+      api.showNoRowsOverlay();
+      return;
     }
-    return t("ops.list.customers.hintFilter");
-  }, [hasFilter, preferredCarrierFilterId, searchQuery, t]);
+    api.hideOverlay();
+  }, [displayRows.length, noRowsOverlayTemplate]);
 
   const emDash = t("domain.audit.summary.emDash");
 
@@ -463,16 +478,22 @@ export function CustomersListPage() {
         </>
       }
     >
-      {isEmpty ? (
-        <EmptyState title={emptyTitle} hint={emptyHint} />
-      ) : (
-        <AgGridContainer themeClass="customers-grid">
-          <AgGridReact<Customer>
-            {...agGridDefaultGridOptions}
-            ref={gridRef}
-            rowData={displayRows}
-            columnDefs={columnDefs}
+      <AgGridContainer themeClass="customers-grid" gridRef={gridRef}>
+        <AgGridReact<Customer>
+          {...agGridDefaultGridOptions}
+          ref={gridRef}
+          rowData={displayRows}
+          columnDefs={columnDefs}
             defaultColDef={agGridDefaultColDef}
+            overlayNoRowsTemplate={noRowsOverlayTemplate}
+            onGridReady={(event) => {
+              event.api.setGridOption("overlayNoRowsTemplate", noRowsOverlayTemplate ?? "");
+              if (displayRows.length === 0) {
+                event.api.showNoRowsOverlay();
+                return;
+              }
+              event.api.hideOverlay();
+            }}
             rowSelection={{ mode: "multiRow", checkboxes: true, headerCheckbox: true, enableClickSelection: true }}
             selectionColumnDef={agGridSelectionColumnDef}
             getRowId={(params) => params.data.id}
@@ -482,8 +503,7 @@ export function CustomersListPage() {
             }}
             onSelectionChanged={onSelectionChanged}
           />
-        </AgGridContainer>
-      )}
+      </AgGridContainer>
     </ListPageLayout>
   );
 }

@@ -1,0 +1,109 @@
+{
+  "verified": [
+    {
+      "step": "items-initial",
+      "measure": {
+        "ok": true,
+        "headerViewportWidth": 1291,
+        "headerContainerWidth": 1291,
+        "centerViewportWidth": 1291,
+        "centerContainerWidth": 1291,
+        "headerGap": 0,
+        "centerGap": 0
+      }
+    },
+    {
+      "step": "items-after-back",
+      "measure": {
+        "ok": true,
+        "headerViewportWidth": 1291,
+        "headerContainerWidth": 1291,
+        "centerViewportWidth": 1291,
+        "centerContainerWidth": 1291,
+        "headerGap": 0,
+        "centerGap": 0
+      }
+    },
+    {
+      "step": "items-after-resize",
+      "measure": {
+        "ok": true,
+        "headerViewportWidth": 1371,
+        "headerContainerWidth": 1371,
+        "centerViewportWidth": 1371,
+        "centerContainerWidth": 1371,
+        "headerGap": 0,
+        "centerGap": 0
+      }
+    },
+    {
+      "step": "items-after-sidebar-toggle-1",
+      "measure": {
+        "ok": true,
+        "headerViewportWidth": 1543,
+        "headerContainerWidth": 1543,
+        "centerViewportWidth": 1543,
+        "centerContainerWidth": 1543,
+        "headerGap": 0,
+        "centerGap": 0
+      }
+    },
+    {
+      "step": "items-after-sidebar-toggle-2",
+      "measure": {
+        "ok": true,
+        "headerViewportWidth": 1371,
+        "headerContainerWidth": 1371,
+        "centerViewportWidth": 1371,
+        "centerContainerWidth": 1371,
+        "headerGap": 0,
+        "centerGap": 0
+      }
+    },
+    {
+      "step": "items-manual-resize-protection",
+      "beforeWidth": 144,
+      "afterManualWidth": 264,
+      "afterResizeWidth": 264,
+      "drift": 0
+    },
+    {
+      "step": "stock-balances-initial",
+      "measure": {
+        "ok": true,
+        "headerViewportWidth": 1371,
+        "headerContainerWidth": 1371,
+        "centerViewportWidth": 1371,
+        "centerContainerWidth": 1371,
+        "headerGap": 0,
+        "centerGap": 0
+      }
+    },
+    {
+      "step": "sales-orders-initial",
+      "measure": {
+        "ok": true,
+        "headerViewportWidth": 1371,
+        "headerContainerWidth": 1371,
+        "centerViewportWidth": 1371,
+        "centerContainerWidth": 1371,
+        "headerGap": 0,
+        "centerGap": 0
+      }
+    },
+    {
+      "step": "purchase-orders-initial",
+      "measure": {
+        "ok": true,
+        "headerViewportWidth": 1371,
+        "headerContainerWidth": 1371,
+        "centerViewportWidth": 1371,
+        "centerContainerWidth": 1371,
+        "headerGap": 0,
+        "centerGap": 0
+      }
+    }
+  ],
+  "notes": [],
+  "consoleErrors": []
+}

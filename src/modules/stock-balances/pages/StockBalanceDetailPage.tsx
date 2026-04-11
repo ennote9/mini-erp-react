@@ -1,9 +1,7 @@
 import { useMemo } from "react";
-import { useLocation, useParams } from "react-router-dom";
+import { useParams } from "react-router-dom";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
-import { BackButton } from "../../../shared/ui/list/BackButton";
-import { Breadcrumb } from "../../../shared/ui/object/Breadcrumb";
 import { itemRepository } from "../../items/repository";
 import { warehouseRepository } from "../../warehouses/repository";
 import { stockBalanceRepository } from "../repository";
@@ -18,7 +16,6 @@ import {
   StockBalanceDetailContent,
   type StockBalanceDrillDownSnapshot,
 } from "../components/StockBalanceDetailContent";
-import { readReturnToParam } from "@/shared/navigation/returnTo";
 
 function coverageBadgeVariant(
   s: StockBalanceCoverageStatus,
@@ -31,12 +28,6 @@ function coverageBadgeVariant(
 export function StockBalanceDetailPage() {
   const { t } = useTranslation();
   const { id } = useParams<{ id: string }>();
-  const location = useLocation();
-  const searchParams = useMemo(() => new URLSearchParams(location.search), [location.search]);
-  const returnTo = readReturnToParam(searchParams);
-
-  const backHref =
-    returnTo ?? (location.search === "" ? "/stock-balances" : `/stock-balances${location.search}`);
 
   const row = useMemo((): StockBalanceDrillDownSnapshot | null => {
     if (!id) return null;
@@ -69,15 +60,6 @@ export function StockBalanceDetailPage() {
   if (!row) {
     return (
       <div className="doc-page">
-        <div className="doc-page__breadcrumb">
-          <BackButton
-            to={returnTo ?? undefined}
-            fallbackTo="/stock-balances"
-            preferHistory={!returnTo}
-            aria-label={t("ops.stockBalances.detail.backToListAria")}
-          />
-          <Breadcrumb items={[{ label: t("routes.stockBalances"), to: backHref }]} />
-        </div>
         <div className="doc-page doc-page--not-found">
           <p>{t("ops.stockBalances.detail.notFound")}</p>
         </div>
@@ -87,23 +69,8 @@ export function StockBalanceDetailPage() {
 
   const coverageLabel = t(`ops.stock.coverage.${row.coverageStatus}`);
   const styleLabel = t(`ops.stock.styles.${row.style}`);
-  const breadcrumbItems = [
-    { label: t("routes.stockBalances"), to: backHref },
-    { label: `${row.itemCode} — ${row.warehouseName} — ${styleLabel}` },
-  ];
-
   return (
     <div className="doc-page">
-      <div className="doc-page__breadcrumb">
-        <BackButton
-          to={returnTo ?? undefined}
-          fallbackTo="/stock-balances"
-          preferHistory={!returnTo}
-          aria-label={t("ops.stockBalances.detail.backToListAria")}
-        />
-        <Breadcrumb items={breadcrumbItems} />
-      </div>
-
       <div className="doc-page__header">
         <div className="doc-header">
           <div>

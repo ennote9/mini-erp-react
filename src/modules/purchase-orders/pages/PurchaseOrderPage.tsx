@@ -16,7 +16,6 @@ import { brandRepository } from "../../brands/repository";
 import { categoryRepository } from "../../categories/repository";
 import type { PurchaseOrderLine } from "../model";
 import { DocumentPageLayout } from "../../../shared/ui/object/DocumentPageLayout";
-import { BackButton } from "../../../shared/ui/list/BackButton";
 import { AgGridContainer } from "../../../shared/ui/ag-grid/AgGridContainer";
 import { Button } from "@/components/ui/button";
 import { DatePickerField } from "@/components/ui/date-picker-field";
@@ -1326,27 +1325,13 @@ export function PurchaseOrderPage() {
     );
   }
 
-  const breadcrumbItems = [
-    { label: t("shell.purchasing"), to: "/purchase-orders" },
-    { label: t("shell.nav.purchaseOrders"), to: "/purchase-orders" },
-    { label: isNew ? t("doc.page.new") : doc!.number },
-  ];
-
   const displayTitle = isNew
     ? t("doc.po.titleNew")
     : t("doc.po.titleNumbered", { number: doc!.number });
 
   return (
     <DocumentPageLayout
-      breadcrumbItems={breadcrumbItems}
-      breadcrumbPrefix={
-        <BackButton
-          to={returnTo ?? undefined}
-          fallbackTo="/purchase-orders"
-          preferHistory={!returnTo}
-          aria-label={t("doc.po.backToListAria")}
-        />
-      }
+      breadcrumbItems={[]}
       header={
         <div className="doc-header">
           <div className="doc-header__title-row">

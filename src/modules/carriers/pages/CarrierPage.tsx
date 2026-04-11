@@ -3,7 +3,6 @@ import { useMemo, useState, useEffect } from "react";
 import { carrierRepository } from "../repository";
 import { saveCarrier } from "../service";
 import { CARRIER_TYPE_IDS } from "../model";
-import { Breadcrumb } from "../../../shared/ui/object/Breadcrumb";
 import { BackButton } from "../../../shared/ui/list/BackButton";
 import { Button } from "@/components/ui/button";
 import { ButtonGroup, ButtonGroupSeparator } from "@/components/ui/button-group";
@@ -194,12 +193,6 @@ export function CarrierPage() {
     );
   }
 
-  const breadcrumbItems = [
-    { label: t("master.breadcrumb.masterData"), to: "/carriers" },
-    { label: t("master.carrier.listBreadcrumb"), to: "/carriers" },
-    { label: isNew ? t("master.common.newLabel") : carrier!.code },
-  ];
-
   const displayTitle = isNew
     ? t("master.carrier.titleNew")
     : t("master.carrier.titleWithCode", { code: carrier!.code });
@@ -213,7 +206,43 @@ export function CarrierPage() {
     <div className="doc-page">
       <div className="doc-page__breadcrumb">
         <BackButton to="/carriers" aria-label={t("master.carrier.backToListAria")} />
-        <Breadcrumb items={breadcrumbItems} />
+        {!isNew && carrier ? (
+          <div className="ml-1 flex flex-wrap gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="h-7 shrink-0 px-2.5 text-xs"
+              onClick={() =>
+                navigate(`/customers?preferredCarrierId=${encodeURIComponent(carrier.id)}`)
+              }
+            >
+              {t("master.carrier.openAllCustomers")}
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="h-7 shrink-0 px-2.5 text-xs"
+              onClick={() =>
+                navigate(`/sales-orders?carrierId=${encodeURIComponent(carrier.id)}`)
+              }
+            >
+              {t("master.carrier.openAllSalesOrders")}
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="h-7 shrink-0 px-2.5 text-xs"
+              onClick={() =>
+                navigate(`/shipments?carrierId=${encodeURIComponent(carrier.id)}`)
+              }
+            >
+              {t("master.carrier.openAllShipments")}
+            </Button>
+          </div>
+        ) : null}
       </div>
       <div className="doc-page__header">
         <div className="doc-header">
@@ -221,43 +250,6 @@ export function CarrierPage() {
             <div className="doc-header__title-row">
               <h2 className="doc-header__title">{displayTitle}</h2>
             </div>
-            {!isNew && carrier ? (
-              <div className="mt-6 flex flex-wrap gap-2">
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  className="h-7 shrink-0 px-2.5 text-xs"
-                  onClick={() =>
-                    navigate(`/customers?preferredCarrierId=${encodeURIComponent(carrier.id)}`)
-                  }
-                >
-                  {t("master.carrier.openAllCustomers")}
-                </Button>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  className="h-7 shrink-0 px-2.5 text-xs"
-                  onClick={() =>
-                    navigate(`/sales-orders?carrierId=${encodeURIComponent(carrier.id)}`)
-                  }
-                >
-                  {t("master.carrier.openAllSalesOrders")}
-                </Button>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  className="h-7 shrink-0 px-2.5 text-xs"
-                  onClick={() =>
-                    navigate(`/shipments?carrierId=${encodeURIComponent(carrier.id)}`)
-                  }
-                >
-                  {t("master.carrier.openAllShipments")}
-                </Button>
-              </div>
-            ) : null}
           </div>
           <div className="doc-header__right">
             {(hasErrors(combinedIssues) || hasWarnings(combinedIssues)) && (

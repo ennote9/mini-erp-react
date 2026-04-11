@@ -2,7 +2,7 @@
  * Stock Balances list — AG Grid migration (same pattern as Stock Movements).
  * Repository-backed data, search, empty states, dark theme. Plain text columns only.
  */
-import { useMemo, useState, useRef, useCallback } from "react";
+import { useMemo, useState, useRef, useCallback, useEffect } from "react";
 import type { RowClassParams, RowClickedEvent } from "ag-grid-community";
 import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { AgGridReact } from "ag-grid-react";
@@ -14,7 +14,6 @@ import { categoryRepository } from "../../categories/repository";
 import { warehouseRepository } from "../../warehouses/repository";
 import type { StockBalance } from "../model";
 import { ListPageLayout } from "../../../shared/ui/list/ListPageLayout";
-import { EmptyState } from "../../../shared/ui/feedback/EmptyState";
 import {
   AgGridContainer,
   AgGridStockCoverageCellRenderer,
@@ -26,6 +25,8 @@ import {
   decorateAgGridColumnDefsWithFilters,
   hasMeaningfulTextSelection,
   useAgGridBackNavigationLayoutFix,
+  getAgGridNoRowsOverlayContent,
+  buildAgGridNoRowsOverlayTemplate,
   type AgGridColumnFilterConfig,
 } from "../../../shared/ui/ag-grid";
 import { BackButton } from "../../../shared/ui/list/BackButton";
@@ -327,8 +328,6 @@ export function StockBalancesListPage() {
     [filteredRows, columnFilterModel, stockBalanceColumnFilterConfigs],
   );
 
-  const isEmpty = displayRows.length === 0;
-
   const onRowClicked = useCallback(
     (e: RowClickedEvent<RowData>) => {
       if (hasMeaningfulTextSelection()) return;
@@ -337,8 +336,8 @@ export function StockBalancesListPage() {
     },
     [navigate, currentReturnTo],
   );
-  const hasFilter =
-    searchQuery.trim() !== "" ||
+  const searchActive = searchQuery.trim() !== "";
+  const filtersActive =
     warehouseFilterId != null ||
     itemFilterId != null ||
     brandFilterId != null ||
@@ -478,48 +477,32 @@ export function StockBalancesListPage() {
 
   const exportSelectedDisabled = selectedCount === 0;
 
-  const emptyTitle = hasFilter
-    ? t("ops.stockBalances.empty.titleFiltered")
-    : t("ops.stockBalances.empty.titleDefault");
-  const emptyHint = useMemo(() => {
-    if (!hasFilter) {
-      return t("ops.stockBalances.empty.hintPosted");
-    }
-    const noSearch = searchQuery.trim() === "";
-    const noUrlExcept = (
-      brand: boolean,
-      category: boolean,
-      item: boolean,
-      warehouse: boolean,
-    ) =>
-      (brand ? brandFilterId != null : brandFilterId == null) &&
-      (category ? categoryFilterId != null : categoryFilterId == null) &&
-      (item ? itemFilterId != null : itemFilterId == null) &&
-      (warehouse ? warehouseFilterId != null : warehouseFilterId == null) &&
-      noSearch;
+  const noRowsOverlayTemplate = useMemo(
+    () =>
+      buildAgGridNoRowsOverlayTemplate(
+        getAgGridNoRowsOverlayContent(
+          {
+            baseRowCount: rowsWithNames.length,
+            visibleRowCount: displayRows.length,
+            searchActive,
+            filtersActive,
+          },
+          t,
+        ),
+      ),
+    [rowsWithNames.length, displayRows.length, searchActive, filtersActive, t, locale],
+  );
 
-    if (noUrlExcept(true, false, false, false)) {
-      return t("ops.stockBalances.empty.hintBrandOnly");
+  useEffect(() => {
+    const api = gridRef.current?.api;
+    if (!api) return;
+    api.setGridOption("overlayNoRowsTemplate", noRowsOverlayTemplate ?? "");
+    if (displayRows.length === 0) {
+      api.showNoRowsOverlay();
+      return;
     }
-    if (noUrlExcept(false, true, false, false)) {
-      return t("ops.stockBalances.empty.hintCategoryOnly");
-    }
-    if (noUrlExcept(false, false, true, false)) {
-      return t("ops.stockBalances.empty.hintItemOnly");
-    }
-    if (noUrlExcept(false, false, false, true)) {
-      return t("ops.stockBalances.empty.hintWarehouseOnly");
-    }
-    return t("ops.stockBalances.empty.hintGeneral");
-  }, [
-    hasFilter,
-    brandFilterId,
-    categoryFilterId,
-    itemFilterId,
-    warehouseFilterId,
-    searchQuery,
-    t,
-  ]);
+    api.hideOverlay();
+  }, [displayRows.length, noRowsOverlayTemplate]);
 
   const qtyCol = (
     field: keyof RowData,
@@ -848,29 +831,32 @@ export function StockBalancesListPage() {
         </>
       }
     >
-      {isEmpty ? (
-        <EmptyState title={emptyTitle} hint={emptyHint} />
-      ) : (
-        <>
-          <AgGridContainer ref={gridContainerRef} themeClass="stock-balances-grid">
-            <AgGridReact<RowData>
-              {...agGridDefaultGridOptions}
-              ref={gridRef}
-              rowData={displayRows}
-              columnDefs={columnDefs}
-              defaultColDef={agGridDefaultColDef}
-              onGridReady={(event) => applyUrlGridSort(event.api, initialSortModel)}
-              onSortChanged={handleSortChanged}
-              rowSelection={{ mode: "multiRow", checkboxes: true, headerCheckbox: true, enableClickSelection: true }}
-              selectionColumnDef={agGridSelectionColumnDef}
-              getRowId={(params) => params.data.id}
-              getRowClass={getRowClass}
-              onSelectionChanged={onSelectionChanged}
-              onRowClicked={onRowClicked}
-            />
-          </AgGridContainer>
-        </>
-      )}
+      <AgGridContainer ref={gridContainerRef} themeClass="stock-balances-grid" gridRef={gridRef}>
+        <AgGridReact<RowData>
+          {...agGridDefaultGridOptions}
+          ref={gridRef}
+          rowData={displayRows}
+          columnDefs={columnDefs}
+          defaultColDef={agGridDefaultColDef}
+          overlayNoRowsTemplate={noRowsOverlayTemplate}
+          onGridReady={(event) => {
+            applyUrlGridSort(event.api, initialSortModel);
+            event.api.setGridOption("overlayNoRowsTemplate", noRowsOverlayTemplate ?? "");
+            if (displayRows.length === 0) {
+              event.api.showNoRowsOverlay();
+              return;
+            }
+            event.api.hideOverlay();
+          }}
+          onSortChanged={handleSortChanged}
+          rowSelection={{ mode: "multiRow", checkboxes: true, headerCheckbox: true, enableClickSelection: true }}
+          selectionColumnDef={agGridSelectionColumnDef}
+          getRowId={(params) => params.data.id}
+          getRowClass={getRowClass}
+          onSelectionChanged={onSelectionChanged}
+          onRowClicked={onRowClicked}
+        />
+      </AgGridContainer>
     </ListPageLayout>
   );
 }

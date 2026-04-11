@@ -1,4 +1,4 @@
-import { useMemo, useState, useRef, useCallback } from "react";
+import { useMemo, useState, useRef, useCallback, useEffect } from "react";
 import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { AgGridReact } from "ag-grid-react";
 import type { ColDef, SelectionChangedEvent } from "ag-grid-community";
@@ -10,7 +10,6 @@ import { itemRepository } from "../../items/repository";
 import { normalizeDateForSO } from "../dateUtils";
 import type { SalesOrder } from "../model";
 import { ListPageLayout } from "../../../shared/ui/list/ListPageLayout";
-import { EmptyState } from "../../../shared/ui/feedback/EmptyState";
 import {
   AgGridContainer,
   AgGridPlanningStatusCellRenderer,
@@ -21,6 +20,8 @@ import {
   agGridSelectionColumnDef,
   decorateAgGridColumnDefsWithFilters,
   hasMeaningfulTextSelection,
+  getAgGridNoRowsOverlayContent,
+  buildAgGridNoRowsOverlayTemplate,
   type AgGridColumnFilterConfig,
 } from "../../../shared/ui/ag-grid";
 import { BackButton } from "../../../shared/ui/list/BackButton";
@@ -247,8 +248,8 @@ export function SalesOrdersListPage() {
     salesOrderIdsContainingItem,
   ]);
 
-  const hasFilter =
-    searchQuery.trim() !== "" ||
+  const searchActive = searchQuery.trim() !== "";
+  const filtersActive =
     customerFilterId != null ||
     warehouseFilterId != null ||
     carrierFilterId != null ||
@@ -370,61 +371,6 @@ export function SalesOrdersListPage() {
 
   const listExcelLabels = useMemo(() => salesOrdersListExcelLabels(t), [t, locale]);
 
-  const emptyTitle = hasFilter
-    ? t("ops.list.salesOrders.emptyFiltered")
-    : t("ops.list.salesOrders.emptyDefault");
-  const emptyHint = useMemo(() => {
-    if (!hasFilter) {
-      return t("ops.list.salesOrders.hintCreate");
-    }
-    if (
-      customerFilterId != null &&
-      warehouseFilterId == null &&
-      itemFilterId == null &&
-      carrierFilterId == null &&
-      searchQuery.trim() === ""
-    ) {
-      return t("ops.list.salesOrders.hintCustomerOnly");
-    }
-    if (
-      warehouseFilterId != null &&
-      itemFilterId == null &&
-      customerFilterId == null &&
-      carrierFilterId == null &&
-      searchQuery.trim() === ""
-    ) {
-      return t("ops.list.salesOrders.hintWarehouseOnly");
-    }
-    if (
-      itemFilterId != null &&
-      warehouseFilterId == null &&
-      customerFilterId == null &&
-      carrierFilterId == null &&
-      searchQuery.trim() === ""
-    ) {
-      return t("ops.list.salesOrders.hintItemOnly");
-    }
-    if (
-      carrierFilterId != null &&
-      customerFilterId == null &&
-      warehouseFilterId == null &&
-      itemFilterId == null &&
-      searchQuery.trim() === ""
-    ) {
-      return t("ops.list.salesOrders.hintCarrierOnly");
-    }
-    return t("ops.list.salesOrders.hintUrlFilters");
-  }, [
-    hasFilter,
-    customerFilterId,
-    warehouseFilterId,
-    carrierFilterId,
-    itemFilterId,
-    searchQuery,
-    t,
-    locale,
-  ]);
-
   const salesOrderColumnFilterConfigs = useMemo<Record<string, AgGridColumnFilterConfig<RowData>>>(
     () => ({
       number: { kind: "text" },
@@ -459,7 +405,32 @@ export function SalesOrdersListPage() {
     [filteredRows, columnFilterModel, salesOrderColumnFilterConfigs],
   );
 
-  const isEmpty = displayRows.length === 0;
+  const noRowsOverlayTemplate = useMemo(
+    () =>
+      buildAgGridNoRowsOverlayTemplate(
+        getAgGridNoRowsOverlayContent(
+          {
+            baseRowCount: rowsWithNames.length,
+            visibleRowCount: displayRows.length,
+            searchActive,
+            filtersActive,
+          },
+          t,
+        ),
+      ),
+    [rowsWithNames.length, displayRows.length, searchActive, filtersActive, t, locale],
+  );
+
+  useEffect(() => {
+    const api = gridRef.current?.api;
+    if (!api) return;
+    api.setGridOption("overlayNoRowsTemplate", noRowsOverlayTemplate ?? "");
+    if (displayRows.length === 0) {
+      api.showNoRowsOverlay();
+      return;
+    }
+    api.hideOverlay();
+  }, [displayRows.length, noRowsOverlayTemplate]);
 
   const getExportRowsCurrentView = useCallback((): SalesOrdersExportRow[] => {
     const api = gridRef.current?.api;
@@ -791,17 +762,23 @@ export function SalesOrdersListPage() {
         </>
       }
     >
-      {isEmpty ? (
-        <EmptyState title={emptyTitle} hint={emptyHint} />
-      ) : (
-        <AgGridContainer ref={gridContainerRef} themeClass="sales-orders-grid">
-            <AgGridReact<RowData>
-              {...agGridDefaultGridOptions}
-              ref={gridRef}
-              rowData={displayRows}
-              columnDefs={columnDefs}
+      <AgGridContainer ref={gridContainerRef} themeClass="sales-orders-grid" gridRef={gridRef}>
+          <AgGridReact<RowData>
+            {...agGridDefaultGridOptions}
+            ref={gridRef}
+            rowData={displayRows}
+            columnDefs={columnDefs}
             defaultColDef={agGridDefaultColDef}
-            onGridReady={(event) => applyUrlGridSort(event.api, initialSortModel)}
+            overlayNoRowsTemplate={noRowsOverlayTemplate}
+            onGridReady={(event) => {
+              applyUrlGridSort(event.api, initialSortModel);
+              event.api.setGridOption("overlayNoRowsTemplate", noRowsOverlayTemplate ?? "");
+              if (displayRows.length === 0) {
+                event.api.showNoRowsOverlay();
+                return;
+              }
+              event.api.hideOverlay();
+            }}
             onSortChanged={handleSortChanged}
             rowSelection={{ mode: "multiRow", checkboxes: true, headerCheckbox: true, enableClickSelection: true }}
             selectionColumnDef={agGridSelectionColumnDef}
@@ -812,8 +789,7 @@ export function SalesOrdersListPage() {
             }}
             onSelectionChanged={onSelectionChanged}
           />
-        </AgGridContainer>
-      )}
+      </AgGridContainer>
     </ListPageLayout>
   );
 }

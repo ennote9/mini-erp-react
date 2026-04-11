@@ -4,7 +4,6 @@ import { customerRepository } from "../repository";
 import { saveCustomer } from "../service";
 import { carrierRepository } from "../../carriers/repository";
 import { translateCarrierType } from "../../carriers";
-import { Breadcrumb } from "../../../shared/ui/object/Breadcrumb";
 import { BackButton } from "../../../shared/ui/list/BackButton";
 import { Button } from "@/components/ui/button";
 import { ButtonGroup, ButtonGroupSeparator } from "@/components/ui/button-group";
@@ -240,19 +239,27 @@ export function CustomerPage() {
     );
   }
 
-  const breadcrumbItems = [
-    { label: t("master.breadcrumb.masterData"), to: "/customers" },
-    { label: t("master.customer.listBreadcrumb"), to: "/customers" },
-    { label: isNew ? t("master.common.newLabel") : customer!.code },
-  ];
-
   const displayTitle = isNew ? t("master.customer.titleNew") : t("master.customer.titleWithCode", { code: customer!.code });
 
   return (
     <div className="doc-page">
       <div className="doc-page__breadcrumb">
         <BackButton to="/customers" aria-label={t("master.customer.backToListAria")} />
-        <Breadcrumb items={breadcrumbItems} />
+        {!isNew && customer ? (
+          <div className="ml-1 flex flex-wrap gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="h-7 shrink-0 px-2.5 text-xs"
+              onClick={() =>
+                navigate(`/sales-orders?customerId=${encodeURIComponent(customer.id)}`)
+              }
+            >
+              {t("master.customer.openAllSalesOrders")}
+            </Button>
+          </div>
+        ) : null}
       </div>
       <div className="doc-page__header">
         <div className="doc-header">
@@ -276,21 +283,6 @@ export function CustomerPage() {
           </div>
         </div>
       </div>
-      {!isNew && customer ? (
-        <div className="flex flex-wrap gap-2">
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            className="h-7 shrink-0 px-2.5 text-xs"
-            onClick={() =>
-              navigate(`/sales-orders?customerId=${encodeURIComponent(customer.id)}`)
-            }
-          >
-            {t("master.customer.openAllSalesOrders")}
-          </Button>
-        </div>
-      ) : null}
       <Card className="mt-4 w-full max-w-5xl border-0 shadow-none">
         <Tabs.Root defaultValue="main">
           <CardHeader className="p-2 pb-0.5 space-y-2">

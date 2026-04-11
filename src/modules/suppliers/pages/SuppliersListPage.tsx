@@ -2,14 +2,13 @@
  * Suppliers list — AG Grid migration. Uses shared AgGridContainer and defaultColDef.
  * Preserves search, All/Active/Inactive filters, New button, row navigation, empty state.
  */
-import { useMemo, useState, useRef, useCallback } from "react";
+import { useMemo, useState, useRef, useCallback, useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { AgGridReact } from "ag-grid-react";
 import type { ColDef, SelectionChangedEvent } from "ag-grid-community";
 import { supplierRepository } from "../repository";
 import type { Supplier } from "../model";
 import { ListPageLayout } from "../../../shared/ui/list/ListPageLayout";
-import { EmptyState } from "../../../shared/ui/feedback/EmptyState";
 import {
   AgGridContainer,
   AgGridActiveBooleanCellRenderer,
@@ -20,6 +19,8 @@ import {
   agGridSelectionColumnDef,
   decorateAgGridColumnDefsWithFilters,
   hasMeaningfulTextSelection,
+  getAgGridNoRowsOverlayContent,
+  buildAgGridNoRowsOverlayTemplate,
   type AgGridColumnFilterConfig,
 } from "../../../shared/ui/ag-grid";
 import { BackButton } from "../../../shared/ui/list/BackButton";
@@ -95,8 +96,8 @@ export function SuppliersListPage() {
     [filteredRows, columnFilterModel, supplierColumnFilterConfigs],
   );
 
-  const isEmpty = displayRows.length === 0;
-  const hasFilter = searchQuery.trim() !== "" || hasActiveAgGridColumnFilters(columnFilterModel);
+  const searchActive = searchQuery.trim() !== "";
+  const filtersActive = hasActiveAgGridColumnFilters(columnFilterModel);
 
   const getExportRowsCurrentView = useCallback((): SuppliersExportRow[] => {
     const api = gridRef.current?.api;
@@ -170,8 +171,32 @@ export function SuppliersListPage() {
 
   const exportSelectedDisabled = selectedCount === 0;
 
-  const emptyTitle = hasFilter ? t("ops.list.suppliers.emptyFiltered") : t("ops.list.suppliers.emptyDefault");
-  const emptyHint = hasFilter ? t("ops.list.suppliers.hintFilter") : t("ops.list.suppliers.hintCreate");
+  const noRowsOverlayTemplate = useMemo(
+    () =>
+      buildAgGridNoRowsOverlayTemplate(
+        getAgGridNoRowsOverlayContent(
+          {
+            baseRowCount: supplierRepository.list().length,
+            visibleRowCount: displayRows.length,
+            searchActive,
+            filtersActive,
+          },
+          t,
+        ),
+      ),
+    [displayRows.length, searchActive, filtersActive, t, locale],
+  );
+
+  useEffect(() => {
+    const api = gridRef.current?.api;
+    if (!api) return;
+    api.setGridOption("overlayNoRowsTemplate", noRowsOverlayTemplate ?? "");
+    if (displayRows.length === 0) {
+      api.showNoRowsOverlay();
+      return;
+    }
+    api.hideOverlay();
+  }, [displayRows.length, noRowsOverlayTemplate]);
 
   const emDash = t("domain.audit.summary.emDash");
 
@@ -388,16 +413,22 @@ export function SuppliersListPage() {
         </>
       }
     >
-      {isEmpty ? (
-        <EmptyState title={emptyTitle} hint={emptyHint} />
-      ) : (
-        <AgGridContainer themeClass="suppliers-grid">
-          <AgGridReact<Supplier>
-            {...agGridDefaultGridOptions}
-            ref={gridRef}
-            rowData={displayRows}
-            columnDefs={columnDefs}
+      <AgGridContainer themeClass="suppliers-grid" gridRef={gridRef}>
+        <AgGridReact<Supplier>
+          {...agGridDefaultGridOptions}
+          ref={gridRef}
+          rowData={displayRows}
+          columnDefs={columnDefs}
             defaultColDef={agGridDefaultColDef}
+            overlayNoRowsTemplate={noRowsOverlayTemplate}
+            onGridReady={(event) => {
+              event.api.setGridOption("overlayNoRowsTemplate", noRowsOverlayTemplate ?? "");
+              if (displayRows.length === 0) {
+                event.api.showNoRowsOverlay();
+                return;
+              }
+              event.api.hideOverlay();
+            }}
             rowSelection={{ mode: "multiRow", checkboxes: true, headerCheckbox: true, enableClickSelection: true }}
             selectionColumnDef={agGridSelectionColumnDef}
             getRowId={(params) => params.data.id}
@@ -407,8 +438,7 @@ export function SuppliersListPage() {
             }}
             onSelectionChanged={onSelectionChanged}
           />
-        </AgGridContainer>
-      )}
+      </AgGridContainer>
     </ListPageLayout>
   );
 }

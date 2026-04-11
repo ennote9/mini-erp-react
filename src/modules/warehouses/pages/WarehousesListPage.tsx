@@ -1,11 +1,10 @@
-import { useMemo, useState, useRef, useCallback } from "react";
+import { useMemo, useState, useRef, useCallback, useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { AgGridReact } from "ag-grid-react";
 import type { ColDef, SelectionChangedEvent } from "ag-grid-community";
 import { warehouseRepository } from "../repository";
 import type { Warehouse } from "../model";
 import { ListPageLayout } from "../../../shared/ui/list/ListPageLayout";
-import { EmptyState } from "../../../shared/ui/feedback/EmptyState";
 import {
   AgGridContainer,
   AgGridActiveBooleanCellRenderer,
@@ -16,6 +15,8 @@ import {
   agGridSelectionColumnDef,
   decorateAgGridColumnDefsWithFilters,
   hasMeaningfulTextSelection,
+  getAgGridNoRowsOverlayContent,
+  buildAgGridNoRowsOverlayTemplate,
   type AgGridColumnFilterConfig,
 } from "../../../shared/ui/ag-grid";
 import { BackButton } from "../../../shared/ui/list/BackButton";
@@ -100,8 +101,8 @@ export function WarehousesListPage() {
     [filteredRows, columnFilterModel, warehouseColumnFilterConfigs],
   );
 
-  const isEmpty = displayRows.length === 0;
-  const hasFilter = searchQuery.trim() !== "" || hasActiveAgGridColumnFilters(columnFilterModel);
+  const searchActive = searchQuery.trim() !== "";
+  const filtersActive = hasActiveAgGridColumnFilters(columnFilterModel);
 
   const getExportRowsCurrentView = useCallback((): WarehousesExportRow[] => {
     const api = gridRef.current?.api;
@@ -175,8 +176,32 @@ export function WarehousesListPage() {
 
   const exportSelectedDisabled = selectedCount === 0;
 
-  const emptyTitle = hasFilter ? t("ops.list.warehouses.emptyFiltered") : t("ops.list.warehouses.emptyDefault");
-  const emptyHint = hasFilter ? t("ops.list.warehouses.hintFilter") : t("ops.list.warehouses.hintCreate");
+  const noRowsOverlayTemplate = useMemo(
+    () =>
+      buildAgGridNoRowsOverlayTemplate(
+        getAgGridNoRowsOverlayContent(
+          {
+            baseRowCount: warehouseRepository.list().length,
+            visibleRowCount: displayRows.length,
+            searchActive,
+            filtersActive,
+          },
+          t,
+        ),
+      ),
+    [displayRows.length, searchActive, filtersActive, t, locale],
+  );
+
+  useEffect(() => {
+    const api = gridRef.current?.api;
+    if (!api) return;
+    api.setGridOption("overlayNoRowsTemplate", noRowsOverlayTemplate ?? "");
+    if (displayRows.length === 0) {
+      api.showNoRowsOverlay();
+      return;
+    }
+    api.hideOverlay();
+  }, [displayRows.length, noRowsOverlayTemplate]);
 
   const handleApplyColumnFilter = useCallback(
     (colId: string, clause: AgGridColumnFilterClause) => {
@@ -378,16 +403,22 @@ export function WarehousesListPage() {
         </>
       }
     >
-      {isEmpty ? (
-        <EmptyState title={emptyTitle} hint={emptyHint} />
-      ) : (
-        <AgGridContainer themeClass="warehouses-grid">
-          <AgGridReact<Warehouse>
-            {...agGridDefaultGridOptions}
-            ref={gridRef}
-            rowData={displayRows}
-            columnDefs={columnDefs}
+      <AgGridContainer themeClass="warehouses-grid" gridRef={gridRef}>
+        <AgGridReact<Warehouse>
+          {...agGridDefaultGridOptions}
+          ref={gridRef}
+          rowData={displayRows}
+          columnDefs={columnDefs}
             defaultColDef={agGridDefaultColDef}
+            overlayNoRowsTemplate={noRowsOverlayTemplate}
+            onGridReady={(event) => {
+              event.api.setGridOption("overlayNoRowsTemplate", noRowsOverlayTemplate ?? "");
+              if (displayRows.length === 0) {
+                event.api.showNoRowsOverlay();
+                return;
+              }
+              event.api.hideOverlay();
+            }}
             rowSelection={{ mode: "multiRow", checkboxes: true, headerCheckbox: true, enableClickSelection: true }}
             selectionColumnDef={agGridSelectionColumnDef}
             getRowId={(params) => params.data.id}
@@ -397,8 +428,7 @@ export function WarehousesListPage() {
             }}
             onSelectionChanged={onSelectionChanged}
           />
-        </AgGridContainer>
-      )}
+      </AgGridContainer>
     </ListPageLayout>
   );
 }

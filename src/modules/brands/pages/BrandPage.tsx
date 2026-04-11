@@ -2,7 +2,6 @@ import { useParams, useNavigate } from "react-router-dom";
 import { useMemo, useState, useEffect, useCallback } from "react";
 import { brandRepository } from "../repository";
 import { saveBrand } from "../service";
-import { Breadcrumb } from "../../../shared/ui/object/Breadcrumb";
 import { BackButton } from "../../../shared/ui/list/BackButton";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -138,19 +137,45 @@ export function BrandPage() {
     );
   }
 
-  const breadcrumbItems = [
-    { label: t("master.breadcrumb.masterData"), to: "/brands" },
-    { label: t("master.brand.listBreadcrumb"), to: "/brands" },
-    { label: isNew ? t("master.common.newLabel") : brand!.code },
-  ];
-
   const displayTitle = isNew ? t("master.brand.titleNew") : t("master.brand.titleWithCode", { code: brand!.code });
 
   return (
     <div className="doc-page">
       <div className="doc-page__breadcrumb">
         <BackButton to="/brands" aria-label={t("master.brand.backToListAria")} />
-        <Breadcrumb items={breadcrumbItems} />
+        {!isNew && brand ? (
+          <div className="ml-1 flex flex-wrap gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="h-7 shrink-0 px-2.5 text-xs"
+              onClick={() =>
+                navigate(`/items?brandId=${encodeURIComponent(brand.id)}`)
+              }
+            >
+              {t("master.related.openAllItems")}
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="h-7 shrink-0 px-2.5 text-xs"
+              onClick={openStockBalancesForBrand}
+            >
+              {t("master.brand.openAllStockBalances")}
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="h-7 shrink-0 px-2.5 text-xs"
+              onClick={openStockMovementsForBrand}
+            >
+              {t("master.brand.openAllStockMovements")}
+            </Button>
+          </div>
+        ) : null}
       </div>
       <div className="doc-page__header">
         <div className="doc-header">
@@ -174,39 +199,6 @@ export function BrandPage() {
           </div>
         </div>
       </div>
-      {!isNew && brand ? (
-        <div className="flex flex-wrap gap-2">
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            className="h-7 shrink-0 px-2.5 text-xs"
-            onClick={() =>
-              navigate(`/items?brandId=${encodeURIComponent(brand.id)}`)
-            }
-          >
-            {t("master.related.openAllItems")}
-          </Button>
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            className="h-7 shrink-0 px-2.5 text-xs"
-            onClick={openStockBalancesForBrand}
-          >
-            {t("master.brand.openAllStockBalances")}
-          </Button>
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            className="h-7 shrink-0 px-2.5 text-xs"
-            onClick={openStockMovementsForBrand}
-          >
-            {t("master.brand.openAllStockMovements")}
-          </Button>
-        </div>
-      ) : null}
       <Card className="mt-4 max-w-2xl border-0 shadow-none">
         <CardHeader className="p-2 pb-0.5">
           <CardTitle className="text-[0.9rem] font-semibold">{t("master.common.detailsTitle")}</CardTitle>

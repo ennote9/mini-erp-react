@@ -1,4 +1,4 @@
-import { useMemo, useState, useRef, useCallback } from "react";
+import { useMemo, useState, useRef, useCallback, useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { AgGridReact } from "ag-grid-react";
 import type { ColDef, SelectionChangedEvent } from "ag-grid-community";
@@ -7,7 +7,6 @@ import { purchaseOrderRepository } from "../../purchase-orders/repository";
 import { warehouseRepository } from "../../warehouses/repository";
 import type { Receipt } from "../model";
 import { ListPageLayout } from "../../../shared/ui/list/ListPageLayout";
-import { EmptyState } from "../../../shared/ui/feedback/EmptyState";
 import {
   AgGridContainer,
   AgGridFactualStatusCellRenderer,
@@ -18,6 +17,8 @@ import {
   agGridSelectionColumnDef,
   decorateAgGridColumnDefsWithFilters,
   hasMeaningfulTextSelection,
+  getAgGridNoRowsOverlayContent,
+  buildAgGridNoRowsOverlayTemplate,
   type AgGridColumnFilterConfig,
 } from "../../../shared/ui/ag-grid";
 import { BackButton } from "../../../shared/ui/list/BackButton";
@@ -155,9 +156,8 @@ export function ReceiptsListPage() {
     [filteredRows, columnFilterModel, receiptColumnFilterConfigs],
   );
 
-  const isEmpty = displayRows.length === 0;
-  const hasFilter =
-    searchQuery.trim() !== "" ||
+  const searchActive = searchQuery.trim() !== "";
+  const filtersActive =
     warehouseFilterId != null ||
     hasActiveAgGridColumnFilters(columnFilterModel);
 
@@ -244,18 +244,32 @@ export function ReceiptsListPage() {
 
   const exportSelectedDisabled = selectedCount === 0;
 
-  const emptyTitle = hasFilter
-    ? t("ops.list.receipts.emptyFiltered")
-    : t("ops.list.receipts.emptyDefault");
-  const emptyHint = useMemo(() => {
-    if (!hasFilter) {
-      return t("ops.list.receipts.hintCreate");
+  const noRowsOverlayTemplate = useMemo(
+    () =>
+      buildAgGridNoRowsOverlayTemplate(
+        getAgGridNoRowsOverlayContent(
+          {
+            baseRowCount: rowsWithNames.length,
+            visibleRowCount: displayRows.length,
+            searchActive,
+            filtersActive,
+          },
+          t,
+        ),
+      ),
+    [rowsWithNames.length, displayRows.length, searchActive, filtersActive, t, locale],
+  );
+
+  useEffect(() => {
+    const api = gridRef.current?.api;
+    if (!api) return;
+    api.setGridOption("overlayNoRowsTemplate", noRowsOverlayTemplate ?? "");
+    if (displayRows.length === 0) {
+      api.showNoRowsOverlay();
+      return;
     }
-    if (warehouseFilterId != null && searchQuery.trim() === "") {
-      return t("ops.list.receipts.hintWarehouseOnly");
-    }
-    return t("ops.list.receipts.hintSearchStatusWarehouse");
-  }, [hasFilter, warehouseFilterId, searchQuery, t, locale]);
+    api.hideOverlay();
+  }, [displayRows.length, noRowsOverlayTemplate]);
 
   const handleApplyColumnFilter = useCallback(
     (colId: string, clause: AgGridColumnFilterClause) => {
@@ -462,16 +476,22 @@ export function ReceiptsListPage() {
         </>
       }
     >
-      {isEmpty ? (
-        <EmptyState title={emptyTitle} hint={emptyHint} />
-      ) : (
-        <AgGridContainer themeClass="receipts-grid">
-          <AgGridReact<RowData>
-            {...agGridDefaultGridOptions}
-            ref={gridRef}
-            rowData={displayRows}
-            columnDefs={columnDefs}
+      <AgGridContainer themeClass="receipts-grid" gridRef={gridRef}>
+        <AgGridReact<RowData>
+          {...agGridDefaultGridOptions}
+          ref={gridRef}
+          rowData={displayRows}
+          columnDefs={columnDefs}
             defaultColDef={agGridDefaultColDef}
+            overlayNoRowsTemplate={noRowsOverlayTemplate}
+            onGridReady={(event) => {
+              event.api.setGridOption("overlayNoRowsTemplate", noRowsOverlayTemplate ?? "");
+              if (displayRows.length === 0) {
+                event.api.showNoRowsOverlay();
+                return;
+              }
+              event.api.hideOverlay();
+            }}
             rowSelection={{ mode: "multiRow", checkboxes: true, headerCheckbox: true, enableClickSelection: true }}
             selectionColumnDef={agGridSelectionColumnDef}
             getRowId={(params) => params.data.id}
@@ -481,8 +501,7 @@ export function ReceiptsListPage() {
             }}
             onSelectionChanged={onSelectionChanged}
           />
-        </AgGridContainer>
-      )}
+      </AgGridContainer>
     </ListPageLayout>
   );
 }

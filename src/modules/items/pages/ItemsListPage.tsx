@@ -2,7 +2,7 @@
  * Items list — AG Grid migration. Uses shared AgGridContainer and defaultColDef.
  * Preserves search, New button, row navigation, empty state.
  */
-import { useMemo, useState, useRef, useCallback } from "react";
+import { useMemo, useState, useRef, useCallback, useEffect } from "react";
 import { useLocation, useNavigate, useSearchParams, Link } from "react-router-dom";
 import { AgGridReact } from "ag-grid-react";
 import type { ColDef, ICellRendererParams, SelectionChangedEvent } from "ag-grid-community";
@@ -11,7 +11,6 @@ import { brandRepository } from "../../brands/repository";
 import { categoryRepository } from "../../categories/repository";
 import type { Item } from "../model";
 import { ListPageLayout } from "../../../shared/ui/list/ListPageLayout";
-import { EmptyState } from "../../../shared/ui/feedback/EmptyState";
 import {
   AgGridContainer,
   AgGridActiveBooleanCellRenderer,
@@ -22,6 +21,8 @@ import {
   agGridSelectionColumnDef,
   decorateAgGridColumnDefsWithFilters,
   hasMeaningfulTextSelection,
+  getAgGridNoRowsOverlayContent,
+  buildAgGridNoRowsOverlayTemplate,
   type AgGridColumnFilterConfig,
 } from "../../../shared/ui/ag-grid";
 import { BackButton } from "../../../shared/ui/list/BackButton";
@@ -224,9 +225,8 @@ export function ItemsListPage() {
     return resolveMarkdownRecordByScanInput(q) == null;
   }, [searchQuery, appReadRevision]);
 
-  const isEmpty = displayItems.length === 0;
-  const hasActiveFilter =
-    searchQuery.trim() !== "" ||
+  const searchActive = searchQuery.trim() !== "";
+  const filtersActive =
     brandFilterId != null ||
     categoryFilterId != null ||
     hasActiveAgGridColumnFilters(columnFilterModel);
@@ -329,24 +329,32 @@ export function ItemsListPage() {
 
   const exportSelectedDisabled = selectedCount === 0;
 
-  const emptyTitle = hasActiveFilter
-    ? t("ops.list.items.emptyFiltered")
-    : t("ops.list.items.emptyDefault");
-  const emptyHint = useMemo(() => {
-    if (!hasActiveFilter) {
-      return t("ops.list.items.hintCreateFirst");
+  const noRowsOverlayTemplate = useMemo(
+    () =>
+      buildAgGridNoRowsOverlayTemplate(
+        getAgGridNoRowsOverlayContent(
+          {
+            baseRowCount: itemRepository.list().length,
+            visibleRowCount: displayItems.length,
+            searchActive,
+            filtersActive,
+          },
+          t,
+        ),
+      ),
+    [displayItems.length, searchActive, filtersActive, t, locale],
+  );
+
+  useEffect(() => {
+    const api = gridRef.current?.api;
+    if (!api) return;
+    api.setGridOption("overlayNoRowsTemplate", noRowsOverlayTemplate ?? "");
+    if (displayItems.length === 0) {
+      api.showNoRowsOverlay();
+      return;
     }
-    if (brandFilterId != null && categoryFilterId != null) {
-      return t("ops.list.items.hintBrandCategory");
-    }
-    if (brandFilterId != null) {
-      return t("ops.list.items.hintBrand");
-    }
-    if (categoryFilterId != null) {
-      return t("ops.list.items.hintCategory");
-    }
-    return t("ops.list.master.hintClearFilters");
-  }, [hasActiveFilter, brandFilterId, categoryFilterId, t]);
+    api.hideOverlay();
+  }, [displayItems.length, noRowsOverlayTemplate]);
 
   const baseColumnDefs = useMemo<ColDef<Item>[]>(
     () => [
@@ -668,17 +676,23 @@ export function ItemsListPage() {
             </Link>
           </div>
         ) : null}
-        {isEmpty ? (
-          <EmptyState title={emptyTitle} hint={emptyHint} />
-        ) : (
-          <AgGridContainer ref={gridContainerRef} themeClass="items-grid">
+        <AgGridContainer ref={gridContainerRef} themeClass="items-grid" gridRef={gridRef}>
           <AgGridReact<Item>
             {...agGridDefaultGridOptions}
             ref={gridRef}
             rowData={displayItems}
             columnDefs={columnDefs}
             defaultColDef={agGridDefaultColDef}
-            onGridReady={(event) => applyUrlGridSort(event.api, initialSortModel)}
+            overlayNoRowsTemplate={noRowsOverlayTemplate}
+            onGridReady={(event) => {
+              applyUrlGridSort(event.api, initialSortModel);
+              event.api.setGridOption("overlayNoRowsTemplate", noRowsOverlayTemplate ?? "");
+              if (displayItems.length === 0) {
+                event.api.showNoRowsOverlay();
+                return;
+              }
+              event.api.hideOverlay();
+            }}
             onSortChanged={syncSortToUrl}
             rowSelection={{ mode: "multiRow", checkboxes: true, headerCheckbox: true, enableClickSelection: true }}
             selectionColumnDef={agGridSelectionColumnDef}
@@ -689,8 +703,7 @@ export function ItemsListPage() {
             }}
             onSelectionChanged={onSelectionChanged}
           />
-          </AgGridContainer>
-        )}
+        </AgGridContainer>
       </>
     </ListPageLayout>
   );

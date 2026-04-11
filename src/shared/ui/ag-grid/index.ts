@@ -1,6 +1,12 @@
 export { AgGridContainer } from "./AgGridContainer";
 export { useAgGridBackNavigationLayoutFix } from "./useAgGridBackNavigationLayoutFix";
 export {
+  getAgGridNoRowsOverlayContent,
+  buildAgGridNoRowsOverlayTemplate,
+  type AgGridNoRowsOverlayInput,
+  type AgGridNoRowsOverlayContent,
+} from "./noRowsOverlay";
+export {
   agGridDefaultColDef,
   agGridDefaultGridOptions,
   agGridRowNumberColDef,

@@ -14,10 +14,8 @@ import { useTranslation } from "@/shared/i18n/context";
 import { useAppDisplayFormatters } from "@/shared/formatting";
 import { useAppReadModelRevision } from "@/shared/inventoryMasterPageBlocks/useAppReadModelRevision";
 import { ListPageLayout } from "@/shared/ui/list/ListPageLayout";
-import { BackButton } from "@/shared/ui/list/BackButton";
 import { ListPageSearch } from "@/shared/ui/list/ListPageSearch";
 import { useListPageSearchHotkey } from "@/shared/hotkeys";
-import { EmptyState } from "@/shared/ui/feedback/EmptyState";
 import {
   AgGridContainer,
   applyAgGridColumnFilters,
@@ -26,6 +24,8 @@ import {
   agGridRowNumberColDef,
   decorateAgGridColumnDefsWithFilters,
   hasMeaningfulTextSelection,
+  getAgGridNoRowsOverlayContent,
+  buildAgGridNoRowsOverlayTemplate,
   type AgGridColumnFilterConfig,
 } from "@/shared/ui/ag-grid";
 import {
@@ -323,18 +323,38 @@ export function MarkdownJournalPage() {
   );
 
   const activeRows = view === "journals" ? displayJournalRows : displayCodeRows;
-  const isEmpty = activeRows.length === 0;
-  const hasFilter =
-    search.trim() !== "" ||
+  const searchActive = search.trim() !== "";
+  const filtersActive =
     prefillItemId !== "" ||
     hasActiveAgGridColumnFilters(columnFilterModel);
 
-  const emptyTitle = hasFilter
-    ? t("ops.list.master.emptyFiltered")
-    : t("ops.list.master.emptyDefault");
-  const emptyHint = hasFilter
-    ? t("ops.list.master.hintClearFilters")
-    : t("ops.list.master.hintCreateFirst");
+  const baseRowsCount = view === "journals" ? journalRows.length : codeRows.length;
+  const noRowsOverlayTemplate = useMemo(
+    () =>
+      buildAgGridNoRowsOverlayTemplate(
+        getAgGridNoRowsOverlayContent(
+          {
+            baseRowCount: baseRowsCount,
+            visibleRowCount: activeRows.length,
+            searchActive,
+            filtersActive,
+          },
+          t,
+        ),
+      ),
+    [baseRowsCount, activeRows.length, searchActive, filtersActive, t],
+  );
+
+  useEffect(() => {
+    const api = gridRef.current?.api;
+    if (!api) return;
+    api.setGridOption("overlayNoRowsTemplate", noRowsOverlayTemplate ?? "");
+    if (activeRows.length === 0) {
+      api.showNoRowsOverlay();
+      return;
+    }
+    api.hideOverlay();
+  }, [activeRows.length, noRowsOverlayTemplate]);
 
   const handleApplyColumnFilter = useCallback(
     (colId: string, clause: AgGridColumnFilterClause) => {
@@ -522,7 +542,6 @@ export function MarkdownJournalPage() {
       controls={
         <div className="list-page__controls-stack flex w-full min-w-0 flex-col gap-2">
           <div className="flex flex-wrap items-center gap-2">
-            <BackButton to="/" aria-label={t("doc.list.backToDashboard")} />
             <ButtonGroup className="list-page__filter-group" aria-label={t("markdown.journal.title")}>
               {(["journals", "codes"] as const).map((value, index) => (
                 <div key={value} className="contents">
@@ -589,33 +608,38 @@ export function MarkdownJournalPage() {
         </div>
       }
     >
-      {isEmpty ? (
-        <EmptyState title={emptyTitle} hint={emptyHint} />
-      ) : (
-        <AgGridContainer ref={gridContainerRef} themeClass="markdown-journal-grid">
-          <AgGridReact<JournalRow | MarkdownCodeRow>
-            {...agGridDefaultGridOptions}
-            ref={gridRef}
-            rowData={activeRows}
-            columnDefs={(view === "journals" ? journalColumnDefs : codeColumnDefs) as ColDef<JournalRow | MarkdownCodeRow>[]}
-            defaultColDef={agGridDefaultColDef}
-            onGridReady={(event) => applyUrlGridSort(event.api, initialSortModel)}
-            onSortChanged={handleSortChanged}
-            getRowId={(params) => params.data.id}
-            onRowClicked={(event) => {
-              if (hasMeaningfulTextSelection()) return;
-              if (event.data) {
-                if (view === "journals") {
-                  navigate(appendReturnTo(`/markdown-journal/journals/${event.data.id}`, currentReturnTo));
-                } else {
-                  const row = event.data as MarkdownCodeRow;
-                  navigate(appendReturnTo(`/markdown-journal/journals/${row.journalId}`, currentReturnTo));
-                }
+      <AgGridContainer ref={gridContainerRef} themeClass="markdown-journal-grid" gridRef={gridRef}>
+        <AgGridReact<JournalRow | MarkdownCodeRow>
+          {...agGridDefaultGridOptions}
+          ref={gridRef}
+          rowData={activeRows}
+          columnDefs={(view === "journals" ? journalColumnDefs : codeColumnDefs) as ColDef<JournalRow | MarkdownCodeRow>[]}
+          defaultColDef={agGridDefaultColDef}
+          overlayNoRowsTemplate={noRowsOverlayTemplate}
+          onGridReady={(event) => {
+            applyUrlGridSort(event.api, initialSortModel);
+            event.api.setGridOption("overlayNoRowsTemplate", noRowsOverlayTemplate ?? "");
+            if (activeRows.length === 0) {
+              event.api.showNoRowsOverlay();
+              return;
+            }
+            event.api.hideOverlay();
+          }}
+          onSortChanged={handleSortChanged}
+          getRowId={(params) => params.data.id}
+          onRowClicked={(event) => {
+            if (hasMeaningfulTextSelection()) return;
+            if (event.data) {
+              if (view === "journals") {
+                navigate(appendReturnTo(`/markdown-journal/journals/${event.data.id}`, currentReturnTo));
+              } else {
+                const row = event.data as MarkdownCodeRow;
+                navigate(appendReturnTo(`/markdown-journal/journals/${row.journalId}`, currentReturnTo));
               }
-            }}
-          />
-        </AgGridContainer>
-      )}
+            }
+          }}
+        />
+      </AgGridContainer>
     </ListPageLayout>
   );
 }

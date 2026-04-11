@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useMemo, useRef, useState, useEffect } from "react";
 import { AgGridReact } from "ag-grid-react";
 import type { ColDef, ICellRendererParams, RowClickedEvent, SelectionChangedEvent } from "ag-grid-community";
 import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
@@ -23,9 +23,10 @@ import {
   agGridSelectionColumnDef,
   decorateAgGridColumnDefsWithFilters,
   hasMeaningfulTextSelection,
+  getAgGridNoRowsOverlayContent,
+  buildAgGridNoRowsOverlayTemplate,
   type AgGridColumnFilterConfig,
 } from "@/shared/ui/ag-grid";
-import { EmptyState } from "@/shared/ui/feedback/EmptyState";
 import { BackButton } from "@/shared/ui/list/BackButton";
 import { ListPageLayout } from "@/shared/ui/list/ListPageLayout";
 import { ListPageSearch } from "@/shared/ui/list/ListPageSearch";
@@ -192,7 +193,32 @@ export function BarcodeRegistryPage() {
     replaceQueryParam(searchParams, setSearchParams, "sort", serialized);
   }, [searchParams, setSearchParams]);
 
-  const hasFilter = searchQuery.trim() !== "" || hasActiveAgGridColumnFilters(columnFilterModel);
+  const noRowsOverlayTemplate = useMemo(
+    () =>
+      buildAgGridNoRowsOverlayTemplate(
+        getAgGridNoRowsOverlayContent(
+          {
+            baseRowCount: rows.length,
+            visibleRowCount: displayRows.length,
+            searchActive: searchQuery.trim() !== "",
+            filtersActive: hasActiveAgGridColumnFilters(columnFilterModel),
+          },
+          t,
+        ),
+      ),
+    [rows.length, displayRows.length, searchQuery, columnFilterModel, t, locale],
+  );
+
+  useEffect(() => {
+    const api = gridRef.current?.api;
+    if (!api) return;
+    api.setGridOption("overlayNoRowsTemplate", noRowsOverlayTemplate ?? "");
+    if (displayRows.length === 0) {
+      api.showNoRowsOverlay();
+      return;
+    }
+    api.hideOverlay();
+  }, [displayRows.length, noRowsOverlayTemplate]);
 
   const buildExportRows = useCallback(
     (inputRows: BarcodeRegistryRow[]): BarcodeRegistryExportRow[] =>
@@ -521,29 +547,24 @@ export function BarcodeRegistryPage() {
         </div>
       }
     >
-      {displayRows.length === 0 ? (
-        <EmptyState
-          title={
-            hasFilter
-              ? t("ops.list.barcodeRegistry.emptyFiltered")
-              : t("ops.list.barcodeRegistry.emptyDefault")
-          }
-          hint={
-            hasFilter
-              ? t("ops.list.master.hintClearFilters")
-              : t("ops.list.barcodeRegistry.hintReadOnly")
-          }
-        />
-      ) : (
-        <AgGridContainer ref={gridContainerRef} themeClass="barcode-registry-grid">
-          <AgGridReact<BarcodeRegistryRow>
-            {...agGridDefaultGridOptions}
-            context={{ entryTypeLabel }}
-            ref={gridRef}
-            rowData={displayRows}
-            columnDefs={columnDefs}
+      <AgGridContainer ref={gridContainerRef} themeClass="barcode-registry-grid" gridRef={gridRef}>
+        <AgGridReact<BarcodeRegistryRow>
+          {...agGridDefaultGridOptions}
+          context={{ entryTypeLabel }}
+          ref={gridRef}
+          rowData={displayRows}
+          columnDefs={columnDefs}
             defaultColDef={agGridDefaultColDef}
-            onGridReady={(event) => applyUrlGridSort(event.api, initialSortModel)}
+            overlayNoRowsTemplate={noRowsOverlayTemplate}
+            onGridReady={(event) => {
+              applyUrlGridSort(event.api, initialSortModel);
+              event.api.setGridOption("overlayNoRowsTemplate", noRowsOverlayTemplate ?? "");
+              if (displayRows.length === 0) {
+                event.api.showNoRowsOverlay();
+                return;
+              }
+              event.api.hideOverlay();
+            }}
             onSortChanged={handleSortChanged}
             rowSelection={{ mode: "multiRow", checkboxes: true, headerCheckbox: true, enableClickSelection: true }}
             selectionColumnDef={agGridSelectionColumnDef}
@@ -551,8 +572,7 @@ export function BarcodeRegistryPage() {
             onSelectionChanged={onSelectionChanged}
             onRowClicked={onRowClicked}
           />
-        </AgGridContainer>
-      )}
+      </AgGridContainer>
     </ListPageLayout>
   );
 }

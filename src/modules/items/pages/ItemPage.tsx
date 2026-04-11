@@ -4,7 +4,6 @@ import { itemRepository } from "../repository";
 import { brandRepository } from "../../brands/repository";
 import { categoryRepository } from "../../categories/repository";
 import { nextTesterCodeForBaseItem, saveItemAwaitPersist } from "../service";
-import { Breadcrumb } from "../../../shared/ui/object/Breadcrumb";
 import { BackButton } from "../../../shared/ui/list/BackButton";
 import { Button } from "@/components/ui/button";
 import { ButtonGroup, ButtonGroupSeparator } from "@/components/ui/button-group";
@@ -283,18 +282,6 @@ export function ItemPage() {
     );
   }
 
-  const breadcrumbItems = [
-    { label: t("master.breadcrumb.masterData"), to: "/items" },
-    { label: t("master.item.listBreadcrumb"), to: "/items" },
-    {
-      label: isNew
-        ? createKind === "TESTER"
-          ? t("master.item.breadcrumbNewTester")
-          : t("master.item.breadcrumbNewSellable")
-        : item!.code,
-    },
-  ];
-
   const displayTitle = isNew
     ? createKind === "TESTER"
       ? t("master.item.titleNewTester")
@@ -332,7 +319,37 @@ export function ItemPage() {
           preferHistory={!returnTo}
           aria-label={t("master.item.backToListAria")}
         />
-        <Breadcrumb items={breadcrumbItems} />
+        {itemRecordId ? (
+          <div className="ml-1 flex flex-wrap gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="h-7 shrink-0 px-2.5 text-xs"
+              onClick={openStockBalancesForItem}
+            >
+              {t("master.item.openAllStockBalances")}
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="h-7 shrink-0 px-2.5 text-xs"
+              onClick={openStockMovementsForItem}
+            >
+              {t("master.item.openAllStockMovements")}
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="h-7 shrink-0 px-2.5 text-xs"
+              onClick={openMarkdownForItem}
+            >
+              {t("master.item.openAllMarkdown")}
+            </Button>
+          </div>
+        ) : null}
       </div>
       <div className="doc-page__header">
         <div className="doc-header">
@@ -340,37 +357,6 @@ export function ItemPage() {
             <div className="doc-header__title-row">
               <h2 className="doc-header__title">{displayTitle}</h2>
             </div>
-            {itemRecordId ? (
-              <div className="mt-6 flex flex-wrap gap-2">
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  className="h-7 shrink-0 px-2.5 text-xs"
-                  onClick={openStockBalancesForItem}
-                >
-                  {t("master.item.openAllStockBalances")}
-                </Button>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  className="h-7 shrink-0 px-2.5 text-xs"
-                  onClick={openStockMovementsForItem}
-                >
-                  {t("master.item.openAllStockMovements")}
-                </Button>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  className="h-7 shrink-0 px-2.5 text-xs"
-                  onClick={openMarkdownForItem}
-                >
-                  {t("master.item.openAllMarkdown")}
-                </Button>
-              </div>
-            ) : null}
           </div>
           <div className="doc-header__right">
             {(hasErrors(combinedIssues) || hasWarnings(combinedIssues)) && (

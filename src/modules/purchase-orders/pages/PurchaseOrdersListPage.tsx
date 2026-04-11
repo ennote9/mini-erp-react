@@ -1,4 +1,4 @@
-import { useMemo, useState, useRef, useCallback } from "react";
+import { useMemo, useState, useRef, useCallback, useEffect } from "react";
 import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { AgGridReact } from "ag-grid-react";
 import type { ColDef, SelectionChangedEvent } from "ag-grid-community";
@@ -9,7 +9,6 @@ import { itemRepository } from "../../items/repository";
 import { normalizeDateForPO } from "../dateUtils";
 import type { PurchaseOrder } from "../model";
 import { ListPageLayout } from "../../../shared/ui/list/ListPageLayout";
-import { EmptyState } from "../../../shared/ui/feedback/EmptyState";
 import {
   AgGridContainer,
   AgGridPlanningStatusCellRenderer,
@@ -20,6 +19,8 @@ import {
   agGridSelectionColumnDef,
   decorateAgGridColumnDefsWithFilters,
   hasMeaningfulTextSelection,
+  getAgGridNoRowsOverlayContent,
+  buildAgGridNoRowsOverlayTemplate,
   type AgGridColumnFilterConfig,
 } from "../../../shared/ui/ag-grid";
 import { BackButton } from "../../../shared/ui/list/BackButton";
@@ -221,9 +222,8 @@ export function PurchaseOrdersListPage() {
     [filteredRows, columnFilterModel, purchaseOrderColumnFilterConfigs],
   );
 
-  const isEmpty = displayRows.length === 0;
-  const hasFilter =
-    searchQuery.trim() !== "" ||
+  const searchActive = searchQuery.trim() !== "";
+  const filtersActive =
     supplierFilterId != null ||
     warehouseFilterId != null ||
     itemFilterId != null ||
@@ -345,47 +345,32 @@ export function PurchaseOrdersListPage() {
 
   const exportSelectedDisabled = selectedCount === 0;
 
-  const emptyTitle = hasFilter
-    ? t("ops.list.purchaseOrders.emptyFiltered")
-    : t("ops.list.purchaseOrders.emptyDefault");
-  const emptyHint = useMemo(() => {
-    if (!hasFilter) {
-      return t("ops.list.purchaseOrders.hintCreate");
+  const noRowsOverlayTemplate = useMemo(
+    () =>
+      buildAgGridNoRowsOverlayTemplate(
+        getAgGridNoRowsOverlayContent(
+          {
+            baseRowCount: rowsWithNames.length,
+            visibleRowCount: displayRows.length,
+            searchActive,
+            filtersActive,
+          },
+          t,
+        ),
+      ),
+    [rowsWithNames.length, displayRows.length, searchActive, filtersActive, t, locale],
+  );
+
+  useEffect(() => {
+    const api = gridRef.current?.api;
+    if (!api) return;
+    api.setGridOption("overlayNoRowsTemplate", noRowsOverlayTemplate ?? "");
+    if (displayRows.length === 0) {
+      api.showNoRowsOverlay();
+      return;
     }
-    if (
-      supplierFilterId != null &&
-      warehouseFilterId == null &&
-      itemFilterId == null &&
-      searchQuery.trim() === ""
-    ) {
-      return t("ops.list.purchaseOrders.hintSupplierOnly");
-    }
-    if (
-      warehouseFilterId != null &&
-      itemFilterId == null &&
-      supplierFilterId == null &&
-      searchQuery.trim() === ""
-    ) {
-      return t("ops.list.purchaseOrders.hintWarehouseOnly");
-    }
-    if (
-      itemFilterId != null &&
-      warehouseFilterId == null &&
-      supplierFilterId == null &&
-      searchQuery.trim() === ""
-    ) {
-      return t("ops.list.purchaseOrders.hintItemOnly");
-    }
-    return t("ops.list.purchaseOrders.hintUrlFilters");
-  }, [
-    hasFilter,
-    supplierFilterId,
-    warehouseFilterId,
-    itemFilterId,
-    searchQuery,
-    t,
-    locale,
-  ]);
+    api.hideOverlay();
+  }, [displayRows.length, noRowsOverlayTemplate]);
 
   const baseColumnDefs = useMemo<ColDef<RowData>[]>(
     () => [
@@ -649,17 +634,23 @@ export function PurchaseOrdersListPage() {
         </>
       }
     >
-      {isEmpty ? (
-        <EmptyState title={emptyTitle} hint={emptyHint} />
-      ) : (
-        <AgGridContainer ref={gridContainerRef} themeClass="purchase-orders-grid">
-          <AgGridReact<RowData>
-            {...agGridDefaultGridOptions}
-            ref={gridRef}
-            rowData={displayRows}
-            columnDefs={columnDefs}
+      <AgGridContainer ref={gridContainerRef} themeClass="purchase-orders-grid" gridRef={gridRef}>
+        <AgGridReact<RowData>
+          {...agGridDefaultGridOptions}
+          ref={gridRef}
+          rowData={displayRows}
+          columnDefs={columnDefs}
             defaultColDef={agGridDefaultColDef}
-            onGridReady={(event) => applyUrlGridSort(event.api, initialSortModel)}
+            overlayNoRowsTemplate={noRowsOverlayTemplate}
+            onGridReady={(event) => {
+              applyUrlGridSort(event.api, initialSortModel);
+              event.api.setGridOption("overlayNoRowsTemplate", noRowsOverlayTemplate ?? "");
+              if (displayRows.length === 0) {
+                event.api.showNoRowsOverlay();
+                return;
+              }
+              event.api.hideOverlay();
+            }}
             onSortChanged={handleSortChanged}
             rowSelection={{ mode: "multiRow", checkboxes: true, headerCheckbox: true, enableClickSelection: true }}
             selectionColumnDef={agGridSelectionColumnDef}
@@ -670,8 +661,7 @@ export function PurchaseOrdersListPage() {
             }}
             onSelectionChanged={onSelectionChanged}
           />
-        </AgGridContainer>
-      )}
+      </AgGridContainer>
     </ListPageLayout>
   );
 }

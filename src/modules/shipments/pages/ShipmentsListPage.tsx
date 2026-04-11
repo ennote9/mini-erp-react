@@ -1,4 +1,4 @@
-import { useMemo, useState, useRef, useCallback } from "react";
+import { useMemo, useState, useRef, useCallback, useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { AgGridReact } from "ag-grid-react";
 import type { ColDef, ICellRendererParams, SelectionChangedEvent } from "ag-grid-community";
@@ -12,7 +12,6 @@ import {
   type ShipmentListRowExtras,
 } from "../shipmentListRowExtras";
 import { ListPageLayout } from "../../../shared/ui/list/ListPageLayout";
-import { EmptyState } from "../../../shared/ui/feedback/EmptyState";
 import {
   AgGridContainer,
   AgGridFactualStatusCellRenderer,
@@ -23,9 +22,10 @@ import {
   agGridSelectionColumnDef,
   decorateAgGridColumnDefsWithFilters,
   hasMeaningfulTextSelection,
+  getAgGridNoRowsOverlayContent,
+  buildAgGridNoRowsOverlayTemplate,
   type AgGridColumnFilterConfig,
 } from "../../../shared/ui/ag-grid";
-import { BackButton } from "../../../shared/ui/list/BackButton";
 import { ListPageSearch } from "../../../shared/ui/list/ListPageSearch";
 import { useListPageSearchHotkey } from "../../../shared/hotkeys";
 import { Button } from "@/components/ui/button";
@@ -218,9 +218,8 @@ export function ShipmentsListPage() {
     [filteredRows, columnFilterModel, shipmentColumnFilterConfigs],
   );
 
-  const isEmpty = displayRows.length === 0;
-  const hasFilter =
-    searchQuery.trim() !== "" ||
+  const searchActive = searchQuery.trim() !== "";
+  const filtersActive =
     warehouseFilterId != null ||
     carrierFilterId != null ||
     hasActiveAgGridColumnFilters(columnFilterModel);
@@ -321,36 +320,32 @@ export function ShipmentsListPage() {
 
   const exportSelectedDisabled = selectedCount === 0;
 
-  const emptyTitle = hasFilter
-    ? t("ops.list.shipments.emptyFiltered")
-    : t("ops.list.shipments.emptyDefault");
-  const emptyHint = useMemo(() => {
-    if (!hasFilter) {
-      return t("ops.list.shipments.hintCreate");
+  const noRowsOverlayTemplate = useMemo(
+    () =>
+      buildAgGridNoRowsOverlayTemplate(
+        getAgGridNoRowsOverlayContent(
+          {
+            baseRowCount: rowsWithNames.length,
+            visibleRowCount: displayRows.length,
+            searchActive,
+            filtersActive,
+          },
+          t,
+        ),
+      ),
+    [rowsWithNames.length, displayRows.length, searchActive, filtersActive, t, locale],
+  );
+
+  useEffect(() => {
+    const api = gridRef.current?.api;
+    if (!api) return;
+    api.setGridOption("overlayNoRowsTemplate", noRowsOverlayTemplate ?? "");
+    if (displayRows.length === 0) {
+      api.showNoRowsOverlay();
+      return;
     }
-    if (
-      carrierFilterId != null &&
-      warehouseFilterId == null &&
-      searchQuery.trim() === ""
-    ) {
-      return t("ops.list.shipments.hintCarrierOnly");
-    }
-    if (
-      warehouseFilterId != null &&
-      carrierFilterId == null &&
-      searchQuery.trim() === ""
-    ) {
-      return t("ops.list.shipments.hintWarehouseOnly");
-    }
-    return t("ops.list.shipments.hintSearchStatusWarehouse");
-  }, [
-    hasFilter,
-    warehouseFilterId,
-    carrierFilterId,
-    searchQuery,
-    t,
-    locale,
-  ]);
+    api.hideOverlay();
+  }, [displayRows.length, noRowsOverlayTemplate]);
 
   const handleApplyColumnFilter = useCallback(
     (colId: string, clause: AgGridColumnFilterClause) => {
@@ -467,7 +462,6 @@ export function ShipmentsListPage() {
       header={null}
       controls={
         <>
-          <BackButton to="/" aria-label={t("doc.list.backToDashboard")} />
           <ListPageSearch
             inputRef={listSearchInputRef}
             placeholder={t("ops.list.shipments.searchPlaceholder")}
@@ -620,16 +614,22 @@ export function ShipmentsListPage() {
         </>
       }
     >
-      {isEmpty ? (
-        <EmptyState title={emptyTitle} hint={emptyHint} />
-      ) : (
-        <AgGridContainer themeClass="shipments-grid">
-          <AgGridReact<RowData>
-            {...agGridDefaultGridOptions}
-            ref={gridRef}
-            rowData={displayRows}
-            columnDefs={columnDefs}
+      <AgGridContainer themeClass="shipments-grid" gridRef={gridRef}>
+        <AgGridReact<RowData>
+          {...agGridDefaultGridOptions}
+          ref={gridRef}
+          rowData={displayRows}
+          columnDefs={columnDefs}
             defaultColDef={agGridDefaultColDef}
+            overlayNoRowsTemplate={noRowsOverlayTemplate}
+            onGridReady={(event) => {
+              event.api.setGridOption("overlayNoRowsTemplate", noRowsOverlayTemplate ?? "");
+              if (displayRows.length === 0) {
+                event.api.showNoRowsOverlay();
+                return;
+              }
+              event.api.hideOverlay();
+            }}
             rowSelection={{ mode: "multiRow", checkboxes: true, headerCheckbox: true, enableClickSelection: true }}
             selectionColumnDef={agGridSelectionColumnDef}
             getRowId={(params) => params.data.id}
@@ -639,8 +639,7 @@ export function ShipmentsListPage() {
             }}
             onSelectionChanged={onSelectionChanged}
           />
-        </AgGridContainer>
-      )}
+      </AgGridContainer>
     </ListPageLayout>
   );
 }

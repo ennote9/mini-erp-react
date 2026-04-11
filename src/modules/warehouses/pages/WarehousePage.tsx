@@ -2,7 +2,6 @@ import { useParams, useNavigate } from "react-router-dom";
 import { useMemo, useState, useEffect } from "react";
 import { warehouseRepository } from "../repository";
 import { saveWarehouse } from "../service";
-import { Breadcrumb } from "../../../shared/ui/object/Breadcrumb";
 import { BackButton } from "../../../shared/ui/list/BackButton";
 import { Button } from "@/components/ui/button";
 import { ButtonGroup, ButtonGroupSeparator } from "@/components/ui/button-group";
@@ -183,12 +182,6 @@ export function WarehousePage() {
     );
   }
 
-  const breadcrumbItems = [
-    { label: t("master.breadcrumb.masterData"), to: "/warehouses" },
-    { label: t("master.warehouse.listBreadcrumb"), to: "/warehouses" },
-    { label: isNew ? t("master.common.newLabel") : warehouse!.code },
-  ];
-
   const displayTitle = isNew ? t("master.warehouse.titleNew") : t("master.warehouse.titleWithCode", { code: warehouse!.code });
   const tabItems = [
     { value: "main", label: t("master.warehouse.tabMain") },
@@ -200,7 +193,54 @@ export function WarehousePage() {
     <div className="doc-page">
       <div className="doc-page__breadcrumb">
         <BackButton to="/warehouses" aria-label={t("master.warehouse.backToListAria")} />
-        <Breadcrumb items={breadcrumbItems} />
+        {!isNew && warehouse ? (
+          <div className="ml-1 flex flex-wrap gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="h-7 shrink-0 px-2.5 text-xs"
+              onClick={() =>
+                navigate(`/stock-balances?warehouseId=${encodeURIComponent(warehouse.id)}`)
+              }
+            >
+              {t("master.warehouse.openStockBalances")}
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="h-7 shrink-0 px-2.5 text-xs"
+              onClick={() =>
+                navigate(`/stock-movements?warehouseId=${encodeURIComponent(warehouse.id)}`)
+              }
+            >
+              {t("master.warehouse.openStockMovements")}
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="h-7 shrink-0 px-2.5 text-xs"
+              onClick={() =>
+                navigate(`/receipts?warehouseId=${encodeURIComponent(warehouse.id)}`)
+              }
+            >
+              {t("master.warehouse.openAllReceipts")}
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="h-7 shrink-0 px-2.5 text-xs"
+              onClick={() =>
+                navigate(`/shipments?warehouseId=${encodeURIComponent(warehouse.id)}`)
+              }
+            >
+              {t("master.warehouse.openAllShipments")}
+            </Button>
+          </div>
+        ) : null}
       </div>
       <div className="doc-page__header">
         <div className="doc-header">
@@ -208,54 +248,6 @@ export function WarehousePage() {
             <div className="doc-header__title-row">
               <h2 className="doc-header__title">{displayTitle}</h2>
             </div>
-            {!isNew && warehouse ? (
-              <div className="mt-6 flex flex-wrap gap-2">
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  className="h-7 shrink-0 px-2.5 text-xs"
-                  onClick={() =>
-                    navigate(`/stock-balances?warehouseId=${encodeURIComponent(warehouse.id)}`)
-                  }
-                >
-                  {t("master.warehouse.openStockBalances")}
-                </Button>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  className="h-7 shrink-0 px-2.5 text-xs"
-                  onClick={() =>
-                    navigate(`/stock-movements?warehouseId=${encodeURIComponent(warehouse.id)}`)
-                  }
-                >
-                  {t("master.warehouse.openStockMovements")}
-                </Button>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  className="h-7 shrink-0 px-2.5 text-xs"
-                  onClick={() =>
-                    navigate(`/receipts?warehouseId=${encodeURIComponent(warehouse.id)}`)
-                  }
-                >
-                  {t("master.warehouse.openAllReceipts")}
-                </Button>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  className="h-7 shrink-0 px-2.5 text-xs"
-                  onClick={() =>
-                    navigate(`/shipments?warehouseId=${encodeURIComponent(warehouse.id)}`)
-                  }
-                >
-                  {t("master.warehouse.openAllShipments")}
-                </Button>
-              </div>
-            ) : null}
           </div>
           <div className="doc-header__right">
             {(hasErrors(combinedIssues) || hasWarnings(combinedIssues)) && (

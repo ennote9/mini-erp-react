@@ -1,7 +1,7 @@
 /**
  * Stock Movements — Stage 4: Readability polish — Movement Type badge, wider columns, readable datetime.
  */
-import { useMemo, useState, useRef, useCallback } from "react";
+import { useMemo, useState, useRef, useCallback, useEffect } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { AgGridReact } from "ag-grid-react";
 import type { ColDef, ICellRendererParams, SelectionChangedEvent } from "ag-grid-community";
@@ -17,7 +17,6 @@ import { purchaseOrderRepository } from "../../purchase-orders/repository";
 import type { StockMovement } from "../model";
 import type { SourceDocumentType } from "../../../shared/domain";
 import { ListPageLayout } from "../../../shared/ui/list/ListPageLayout";
-import { EmptyState } from "../../../shared/ui/feedback/EmptyState";
 import {
   AgGridContainer,
   AgGridMovementTypeCellRenderer,
@@ -27,9 +26,10 @@ import {
   agGridRowNumberColDef,
   agGridSelectionColumnDef,
   decorateAgGridColumnDefsWithFilters,
+  getAgGridNoRowsOverlayContent,
+  buildAgGridNoRowsOverlayTemplate,
   type AgGridColumnFilterConfig,
 } from "../../../shared/ui/ag-grid";
-import { BackButton } from "../../../shared/ui/list/BackButton";
 import { ListPageSearch } from "../../../shared/ui/list/ListPageSearch";
 import { useListPageSearchHotkey } from "../../../shared/hotkeys";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -359,9 +359,8 @@ export function StockMovementsListPage() {
     [filteredRows, columnFilterModel, stockMovementColumnFilterConfigs],
   );
 
-  const isEmpty = displayRows.length === 0;
-  const hasFilter =
-    searchQuery.trim() !== "" ||
+  const searchActive = searchQuery.trim() !== "";
+  const filtersActive =
     warehouseFilterId != null ||
     itemFilterId != null ||
     brandFilterId != null ||
@@ -499,60 +498,32 @@ export function StockMovementsListPage() {
 
   const exportSelectedDisabled = selectedCount === 0;
 
-  const emptyTitle = hasFilter
-    ? t("ops.stockMovements.empty.titleFiltered")
-    : t("ops.stockMovements.empty.titleDefault");
-  const emptyHint = useMemo(() => {
-    if (!hasFilter) {
-      return t("ops.stockMovements.empty.hintPosted");
+  const noRowsOverlayTemplate = useMemo(
+    () =>
+      buildAgGridNoRowsOverlayTemplate(
+        getAgGridNoRowsOverlayContent(
+          {
+            baseRowCount: rowsWithNames.length,
+            visibleRowCount: displayRows.length,
+            searchActive,
+            filtersActive,
+          },
+          t,
+        ),
+      ),
+    [rowsWithNames.length, displayRows.length, searchActive, filtersActive, t, locale],
+  );
+
+  useEffect(() => {
+    const api = gridRef.current?.api;
+    if (!api) return;
+    api.setGridOption("overlayNoRowsTemplate", noRowsOverlayTemplate ?? "");
+    if (displayRows.length === 0) {
+      api.showNoRowsOverlay();
+      return;
     }
-    const noSearch = searchQuery.trim() === "";
-    const onlyBrand =
-      brandFilterId != null &&
-      categoryFilterId == null &&
-      itemFilterId == null &&
-      warehouseFilterId == null &&
-      noSearch;
-    if (onlyBrand) {
-      return t("ops.stockMovements.empty.hintBrandOnly");
-    }
-    const onlyCategory =
-      categoryFilterId != null &&
-      brandFilterId == null &&
-      itemFilterId == null &&
-      warehouseFilterId == null &&
-      noSearch;
-    if (onlyCategory) {
-      return t("ops.stockMovements.empty.hintCategoryOnly");
-    }
-    if (
-      itemFilterId != null &&
-      noSearch &&
-      warehouseFilterId == null &&
-      brandFilterId == null &&
-      categoryFilterId == null
-    ) {
-      return t("ops.stockMovements.empty.hintItemOnly");
-    }
-    if (
-      warehouseFilterId != null &&
-      noSearch &&
-      itemFilterId == null &&
-      brandFilterId == null &&
-      categoryFilterId == null
-    ) {
-      return t("ops.stockMovements.empty.hintWarehouseOnly");
-    }
-    return t("ops.stockMovements.empty.hintGeneral");
-  }, [
-    hasFilter,
-    brandFilterId,
-    categoryFilterId,
-    itemFilterId,
-    warehouseFilterId,
-    searchQuery,
-    t,
-  ]);
+    api.hideOverlay();
+  }, [displayRows.length, noRowsOverlayTemplate]);
 
   const handleApplyColumnFilter = useCallback(
     (colId: string, clause: AgGridColumnFilterClause) => {
@@ -661,7 +632,6 @@ export function StockMovementsListPage() {
       header={null}
       controls={
         <>
-          <BackButton to="/" aria-label={t("doc.list.backToDashboard")} />
           <ListPageSearch
             inputRef={listSearchInputRef}
             placeholder={t("ops.stockMovements.searchPlaceholder")}
@@ -870,23 +840,28 @@ export function StockMovementsListPage() {
         </>
       }
     >
-      {isEmpty ? (
-        <EmptyState title={emptyTitle} hint={emptyHint} />
-      ) : (
-        <AgGridContainer themeClass="stock-movements-grid">
-          <AgGridReact<RowData>
-            {...agGridDefaultGridOptions}
-            ref={gridRef}
-            rowData={displayRows}
-            columnDefs={columnDefs}
+      <AgGridContainer themeClass="stock-movements-grid" gridRef={gridRef}>
+        <AgGridReact<RowData>
+          {...agGridDefaultGridOptions}
+          ref={gridRef}
+          rowData={displayRows}
+          columnDefs={columnDefs}
             defaultColDef={agGridDefaultColDef}
+            overlayNoRowsTemplate={noRowsOverlayTemplate}
+            onGridReady={(event) => {
+              event.api.setGridOption("overlayNoRowsTemplate", noRowsOverlayTemplate ?? "");
+              if (displayRows.length === 0) {
+                event.api.showNoRowsOverlay();
+                return;
+              }
+              event.api.hideOverlay();
+            }}
             rowSelection={{ mode: "multiRow", checkboxes: true, headerCheckbox: true, enableClickSelection: true }}
             selectionColumnDef={agGridSelectionColumnDef}
             getRowId={(params) => params.data.id}
             onSelectionChanged={onSelectionChanged}
           />
-        </AgGridContainer>
-      )}
+      </AgGridContainer>
     </ListPageLayout>
   );
 }

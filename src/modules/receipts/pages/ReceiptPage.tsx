@@ -11,7 +11,6 @@ import { brandRepository } from "../../brands/repository";
 import { categoryRepository } from "../../categories/repository";
 import type { ReceiptLine } from "../model";
 import { DocumentPageLayout } from "../../../shared/ui/object/DocumentPageLayout";
-import { BackButton } from "../../../shared/ui/list/BackButton";
 import { StatusBadge } from "../../../shared/ui/feedback/StatusBadge";
 import { DocumentIssueStrip } from "../../../shared/ui/feedback/DocumentIssueStrip";
 import {
@@ -363,16 +362,9 @@ export function ReceiptPage() {
     );
   }
 
-  const breadcrumbItems = [
-    { label: t("shell.purchasing"), to: "/purchase-orders" },
-    { label: t("shell.nav.receipts"), to: "/receipts" },
-    { label: doc.number },
-  ];
-
   return (
     <DocumentPageLayout
-      breadcrumbItems={breadcrumbItems}
-      breadcrumbPrefix={<BackButton to="/receipts" aria-label={t("doc.receipt.backToListAria")} />}
+      breadcrumbItems={[]}
       header={
         <div className="doc-header">
           <div className="doc-header__title-row">

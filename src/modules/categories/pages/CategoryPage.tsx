@@ -2,7 +2,6 @@ import { useParams, useNavigate } from "react-router-dom";
 import { useMemo, useState, useEffect, useCallback } from "react";
 import { categoryRepository } from "../repository";
 import { saveCategory } from "../service";
-import { Breadcrumb } from "../../../shared/ui/object/Breadcrumb";
 import { BackButton } from "../../../shared/ui/list/BackButton";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -139,19 +138,45 @@ export function CategoryPage() {
     );
   }
 
-  const breadcrumbItems = [
-    { label: t("master.breadcrumb.masterData"), to: "/categories" },
-    { label: t("master.category.listBreadcrumb"), to: "/categories" },
-    { label: isNew ? t("master.common.newLabel") : category!.code },
-  ];
-
   const displayTitle = isNew ? t("master.category.titleNew") : t("master.category.titleWithCode", { code: category!.code });
 
   return (
     <div className="doc-page">
       <div className="doc-page__breadcrumb">
         <BackButton to="/categories" aria-label={t("master.category.backToListAria")} />
-        <Breadcrumb items={breadcrumbItems} />
+        {!isNew && category ? (
+          <div className="ml-1 flex flex-wrap gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="h-7 shrink-0 px-2.5 text-xs"
+              onClick={() =>
+                navigate(`/items?categoryId=${encodeURIComponent(category.id)}`)
+              }
+            >
+              {t("master.related.openAllItems")}
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="h-7 shrink-0 px-2.5 text-xs"
+              onClick={openStockBalancesForCategory}
+            >
+              {t("master.category.openAllStockBalances")}
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="h-7 shrink-0 px-2.5 text-xs"
+              onClick={openStockMovementsForCategory}
+            >
+              {t("master.category.openAllStockMovements")}
+            </Button>
+          </div>
+        ) : null}
       </div>
       <div className="doc-page__header">
         <div className="doc-header">
@@ -175,39 +200,6 @@ export function CategoryPage() {
           </div>
         </div>
       </div>
-      {!isNew && category ? (
-        <div className="flex flex-wrap gap-2">
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            className="h-7 shrink-0 px-2.5 text-xs"
-            onClick={() =>
-              navigate(`/items?categoryId=${encodeURIComponent(category.id)}`)
-            }
-          >
-            {t("master.related.openAllItems")}
-          </Button>
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            className="h-7 shrink-0 px-2.5 text-xs"
-            onClick={openStockBalancesForCategory}
-          >
-            {t("master.category.openAllStockBalances")}
-          </Button>
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            className="h-7 shrink-0 px-2.5 text-xs"
-            onClick={openStockMovementsForCategory}
-          >
-            {t("master.category.openAllStockMovements")}
-          </Button>
-        </div>
-      ) : null}
       <Card className="mt-4 max-w-2xl border-0 shadow-none">
         <CardHeader className="p-2 pb-0.5">
           <CardTitle className="text-[0.9rem] font-semibold">{t("master.common.detailsTitle")}</CardTitle>

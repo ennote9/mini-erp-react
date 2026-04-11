@@ -2,7 +2,6 @@ import { useParams, useNavigate } from "react-router-dom";
 import { useMemo, useState, useEffect } from "react";
 import { supplierRepository } from "../repository";
 import { saveSupplier } from "../service";
-import { Breadcrumb } from "../../../shared/ui/object/Breadcrumb";
 import { BackButton } from "../../../shared/ui/list/BackButton";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -171,19 +170,27 @@ export function SupplierPage() {
     );
   }
 
-  const breadcrumbItems = [
-    { label: t("master.breadcrumb.masterData"), to: "/suppliers" },
-    { label: t("master.supplier.listBreadcrumb"), to: "/suppliers" },
-    { label: isNew ? t("master.common.newLabel") : supplier!.code },
-  ];
-
   const displayTitle = isNew ? t("master.supplier.titleNew") : t("master.supplier.titleWithCode", { code: supplier!.code });
 
   return (
     <div className="doc-page">
       <div className="doc-page__breadcrumb">
         <BackButton to="/suppliers" aria-label={t("master.supplier.backToListAria")} />
-        <Breadcrumb items={breadcrumbItems} />
+        {!isNew && supplier ? (
+          <div className="ml-1 flex flex-wrap gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="h-7 shrink-0 px-2.5 text-xs"
+              onClick={() =>
+                navigate(`/purchase-orders?supplierId=${encodeURIComponent(supplier.id)}`)
+              }
+            >
+              {t("master.supplier.openAllPurchaseOrders")}
+            </Button>
+          </div>
+        ) : null}
       </div>
       <div className="doc-page__header">
         <div className="doc-header">
@@ -207,21 +214,6 @@ export function SupplierPage() {
           </div>
         </div>
       </div>
-      {!isNew && supplier ? (
-        <div className="flex flex-wrap gap-2">
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            className="h-7 shrink-0 px-2.5 text-xs"
-            onClick={() =>
-              navigate(`/purchase-orders?supplierId=${encodeURIComponent(supplier.id)}`)
-            }
-          >
-            {t("master.supplier.openAllPurchaseOrders")}
-          </Button>
-        </div>
-      ) : null}
       <Card className="mt-4 max-w-2xl border-0 shadow-none">
         <CardHeader className="p-2 pb-0.5">
           <CardTitle className="text-[0.9rem] font-semibold">{t("master.common.detailsTitle")}</CardTitle>
