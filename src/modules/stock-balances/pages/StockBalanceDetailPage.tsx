@@ -1,7 +1,8 @@
-import { useMemo } from "react";
-import { useParams } from "react-router-dom";
-import { Badge } from "@/components/ui/badge";
+import { useMemo, useState } from "react";
+import { useNavigate, useParams } from "react-router-dom";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { Tabs } from "radix-ui";
 import { itemRepository } from "../../items/repository";
 import { warehouseRepository } from "../../warehouses/repository";
 import { stockBalanceRepository } from "../repository";
@@ -9,25 +10,19 @@ import {
   buildIncomingRemainingByWarehouseItem,
   buildOutgoingRemainingByWarehouseItem,
   computeOperationalFieldsForBalance,
-  type StockBalanceCoverageStatus,
 } from "../../../shared/stockBalancesOperationalMetrics";
 import { useTranslation } from "@/shared/i18n/context";
 import {
   StockBalanceDetailContent,
+  type StockBalanceDetailTab,
   type StockBalanceDrillDownSnapshot,
 } from "../components/StockBalanceDetailContent";
 
-function coverageBadgeVariant(
-  s: StockBalanceCoverageStatus,
-): "destructive" | "secondary" | "outline" {
-  if (s === "short") return "destructive";
-  if (s === "at_risk") return "secondary";
-  return "outline";
-}
-
 export function StockBalanceDetailPage() {
   const { t } = useTranslation();
+  const navigate = useNavigate();
   const { id } = useParams<{ id: string }>();
+  const [activeTab, setActiveTab] = useState<StockBalanceDetailTab>("operational");
 
   const row = useMemo((): StockBalanceDrillDownSnapshot | null => {
     if (!id) return null;
@@ -67,63 +62,108 @@ export function StockBalanceDetailPage() {
     );
   }
 
-  const coverageLabel = t(`ops.stock.coverage.${row.coverageStatus}`);
   const styleLabel = t(`ops.stock.styles.${row.style}`);
+  const actions = [
+    {
+      key: "item",
+      label: t("ops.stock.drilldown.openItemCard"),
+      onClick: () => navigate(`/items/${row.itemId}`),
+    },
+    {
+      key: "so",
+      label: t("ops.stock.drilldown.openRelatedSo"),
+      onClick: () => navigate(`/sales-orders?warehouseId=${encodeURIComponent(row.warehouseId)}&itemId=${encodeURIComponent(row.itemId)}`),
+    },
+    {
+      key: "po",
+      label: t("ops.stock.drilldown.openRelatedPo"),
+      onClick: () => navigate(`/purchase-orders?warehouseId=${encodeURIComponent(row.warehouseId)}&itemId=${encodeURIComponent(row.itemId)}`),
+    },
+    {
+      key: "moves",
+      label: t("ops.stock.drilldown.openRelatedMovements"),
+      onClick: () => navigate(`/stock-movements?warehouseId=${encodeURIComponent(row.warehouseId)}&itemId=${encodeURIComponent(row.itemId)}`),
+    },
+  ];
+
   return (
     <div className="doc-page">
-      <div className="doc-page__header">
-        <div className="doc-header">
-          <div>
-            <p className="text-[0.65rem] font-medium uppercase tracking-widest text-muted-foreground/90">
-              {t("ops.stock.drilldown.headerKicker")}
-            </p>
-            <div className="doc-header__title-row">
-              <h2 className="doc-header__title">
-                <span className="font-mono tracking-tight">{row.itemCode}</span>
-                <span className="mx-1 font-normal text-muted-foreground">—</span>
-                <span>{row.itemName}</span>
-              </h2>
-            </div>
-            <p className="mt-1 text-sm text-muted-foreground">
-              <span className="text-muted-foreground/80">
-                {t("ops.stock.drilldown.warehouseLabel")}
-              </span>{" "}
-              <span className="text-foreground/90">{row.warehouseName}</span>
-              <span className="mx-2 text-muted-foreground/60">•</span>
-              <span className="text-muted-foreground/80">{t("doc.columns.style")}</span>{" "}
-              <span className="text-foreground/90">{styleLabel}</span>
-            </p>
-          </div>
-          <div className="doc-header__right">
-            <Card className="border border-border/70 shadow-none">
-              <CardContent className="flex flex-wrap items-center gap-3 px-3 py-2">
-                <div className="flex items-center gap-1.5">
-                  <span className="text-[0.65rem] uppercase tracking-wide text-muted-foreground">
-                    {t("doc.columns.coverage")}
-                  </span>
-                  <Badge
-                    variant={coverageBadgeVariant(row.coverageStatus)}
-                    className="h-5 px-1.5 text-[0.62rem]"
-                  >
-                    {coverageLabel}
-                  </Badge>
-                </div>
-                <div className="flex items-baseline gap-1">
-                  <span className="text-[0.65rem] uppercase tracking-wide text-muted-foreground">
-                    {t("doc.columns.netShortage")}
-                  </span>
-                  <span className="text-sm font-semibold text-foreground tabular-nums">
-                    {row.netShortageQty}
-                  </span>
-                </div>
-              </CardContent>
-            </Card>
+      <div className="max-w-[1120px] min-w-0 space-y-4">
+        <div className="doc-page__breadcrumb">
+          <div className="ml-1 flex flex-wrap gap-2">
+            {actions.map((action) => (
+              <Button
+                key={action.key}
+                type="button"
+                variant="outline"
+                size="sm"
+                className="h-7 shrink-0 px-2.5 text-xs"
+                onClick={action.onClick}
+              >
+                {action.label}
+              </Button>
+            ))}
           </div>
         </div>
-      </div>
 
-      <div className="mt-4 max-w-5xl">
-        <StockBalanceDetailContent row={row} />
+        <div className="space-y-4 min-w-0">
+          <Card className="border border-border/70 shadow-none">
+            <CardContent className="p-4">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div className="min-w-0 flex-1">
+                  <p className="text-[0.65rem] font-medium uppercase tracking-widest text-muted-foreground/90">
+                    {t("ops.stock.drilldown.headerKicker")}
+                  </p>
+                  <h2 className="mt-1 text-lg font-semibold leading-tight text-foreground">
+                    <span className="font-mono tracking-tight">{row.itemCode}</span>
+                    <span className="mx-1 font-normal text-muted-foreground">—</span>
+                    <span>{row.itemName}</span>
+                  </h2>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    <span className="text-muted-foreground/80">{t("ops.stock.drilldown.warehouseLabel")}</span>{" "}
+                    <span className="text-foreground/90">{row.warehouseName}</span>
+                    <span className="mx-2 text-muted-foreground/60">•</span>
+                    <span className="text-muted-foreground/80">{t("doc.columns.style")}</span>{" "}
+                    <span className="text-foreground/90">{styleLabel}</span>
+                  </p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Tabs.Root value={activeTab} onValueChange={(v) => setActiveTab(v as StockBalanceDetailTab)}>
+            <Tabs.List className="inline-flex h-9 items-center justify-start rounded-lg border border-border/70 bg-muted/40 p-1 text-muted-foreground">
+              <Tabs.Trigger
+                value="operational"
+                className="inline-flex items-center justify-center rounded-md px-2.5 py-1 text-xs font-medium transition-all data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-sm"
+              >
+                {t("ops.stock.drilldown.tabOperational")}
+              </Tabs.Trigger>
+              <Tabs.Trigger
+                value="outgoing"
+                className="inline-flex items-center justify-center rounded-md px-2.5 py-1 text-xs font-medium transition-all data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-sm"
+              >
+                {t("ops.stock.drilldown.tabOutgoing")}
+              </Tabs.Trigger>
+              <Tabs.Trigger
+                value="incoming"
+                className="inline-flex items-center justify-center rounded-md px-2.5 py-1 text-xs font-medium transition-all data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-sm"
+              >
+                {t("ops.stock.drilldown.tabIncoming")}
+              </Tabs.Trigger>
+              <Tabs.Trigger
+                value="reservations"
+                className="inline-flex items-center justify-center rounded-md px-2.5 py-1 text-xs font-medium transition-all data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-sm"
+              >
+                {t("ops.stock.drilldown.tabReservations")}
+              </Tabs.Trigger>
+            </Tabs.List>
+
+            <Tabs.Content value={activeTab} className="mt-3 outline-none">
+              <StockBalanceDetailContent row={row} activeTab={activeTab} />
+            </Tabs.Content>
+          </Tabs.Root>
+        </div>
       </div>
     </div>
   );

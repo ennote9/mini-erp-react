@@ -2,7 +2,7 @@
  * Stock Balances list — AG Grid migration (same pattern as Stock Movements).
  * Repository-backed data, search, empty states, dark theme. Plain text columns only.
  */
-import { useMemo, useState, useRef, useCallback, useEffect } from "react";
+import { useMemo, useState, useRef, useCallback } from "react";
 import type { RowClassParams, RowClickedEvent } from "ag-grid-community";
 import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { AgGridReact } from "ag-grid-react";
@@ -23,13 +23,14 @@ import {
   agGridRowNumberColDef,
   agGridSelectionColumnDef,
   decorateAgGridColumnDefsWithFilters,
+  useAgGridColumnFilterBridge,
+  useAgGridNoRowsOverlayLifecycle,
   hasMeaningfulTextSelection,
   useAgGridBackNavigationLayoutFix,
   getAgGridNoRowsOverlayContent,
   buildAgGridNoRowsOverlayTemplate,
   type AgGridColumnFilterConfig,
 } from "../../../shared/ui/ag-grid";
-import { BackButton } from "../../../shared/ui/list/BackButton";
 import { ListPageSearch } from "../../../shared/ui/list/ListPageSearch";
 import { useListPageSearchHotkey } from "../../../shared/hotkeys";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -493,16 +494,7 @@ export function StockBalancesListPage() {
     [rowsWithNames.length, displayRows.length, searchActive, filtersActive, t, locale],
   );
 
-  useEffect(() => {
-    const api = gridRef.current?.api;
-    if (!api) return;
-    api.setGridOption("overlayNoRowsTemplate", noRowsOverlayTemplate ?? "");
-    if (displayRows.length === 0) {
-      api.showNoRowsOverlay();
-      return;
-    }
-    api.hideOverlay();
-  }, [displayRows.length, noRowsOverlayTemplate]);
+  useAgGridNoRowsOverlayLifecycle(gridRef, noRowsOverlayTemplate, displayRows.length);
 
   const qtyCol = (
     field: keyof RowData,
@@ -540,6 +532,11 @@ export function StockBalancesListPage() {
       replaceUrlAgGridColumnFilters(searchParams, setSearchParams, nextModel);
     },
     [columnFilterModel, searchParams, setSearchParams],
+  );
+  const columnFilterBridge = useAgGridColumnFilterBridge(
+    columnFilterModel,
+    handleApplyColumnFilter,
+    handleResetColumnFilter,
   );
 
   const baseColumnDefs = useMemo<ColDef<RowData>[]>(() => {
@@ -604,16 +601,12 @@ export function StockBalancesListPage() {
       decorateAgGridColumnDefsWithFilters(
         baseColumnDefs,
         stockBalanceColumnFilterConfigs,
-        columnFilterModel,
-        handleApplyColumnFilter,
-        handleResetColumnFilter,
+        columnFilterBridge,
       ),
     [
       baseColumnDefs,
       stockBalanceColumnFilterConfigs,
-      columnFilterModel,
-      handleApplyColumnFilter,
-      handleResetColumnFilter,
+      columnFilterBridge,
     ],
   );
 
@@ -622,12 +615,12 @@ export function StockBalancesListPage() {
       header={null}
       controls={
         <>
-          <BackButton to="/" aria-label={t("doc.list.backToDashboard")} />
           <ListPageSearch
             inputRef={listSearchInputRef}
             placeholder={t("ops.stockBalances.searchPlaceholder")}
             value={searchQuery}
             onChange={(value) => setQueryValue("q", value)}
+            debounceMs={220}
             aria-label={t("ops.stockBalances.searchAria")}
             resultCount={displayRows.length}
           />
@@ -841,12 +834,6 @@ export function StockBalancesListPage() {
           overlayNoRowsTemplate={noRowsOverlayTemplate}
           onGridReady={(event) => {
             applyUrlGridSort(event.api, initialSortModel);
-            event.api.setGridOption("overlayNoRowsTemplate", noRowsOverlayTemplate ?? "");
-            if (displayRows.length === 0) {
-              event.api.showNoRowsOverlay();
-              return;
-            }
-            event.api.hideOverlay();
           }}
           onSortChanged={handleSortChanged}
           rowSelection={{ mode: "multiRow", checkboxes: true, headerCheckbox: true, enableClickSelection: true }}

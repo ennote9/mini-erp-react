@@ -1,8 +1,6 @@
 import { useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import {
   listIncomingContributorsForWarehouseItem,
@@ -11,6 +9,7 @@ import {
 } from "../../../shared/stockBalancesDrillDownContributors";
 import { type StockBalanceCoverageStatus } from "../../../shared/stockBalancesOperationalMetrics";
 import { useTranslation } from "@/shared/i18n/context";
+import { useAppDisplayFormatters } from "@/shared/formatting";
 import type { StockStyle } from "@/shared/inventoryStyle";
 
 export type StockBalanceDrillDownSnapshot = {
@@ -30,8 +29,15 @@ export type StockBalanceDrillDownSnapshot = {
   coverageStatus: StockBalanceCoverageStatus;
 };
 
+export type StockBalanceDetailTab =
+  | "operational"
+  | "outgoing"
+  | "incoming"
+  | "reservations";
+
 type Props = {
   row: StockBalanceDrillDownSnapshot;
+  activeTab: StockBalanceDetailTab;
 };
 
 const th =
@@ -43,14 +49,6 @@ const tfootValue = "py-1.5 pl-2 text-[0.6875rem] font-semibold tabular-nums text
 const linkBtn =
   "h-auto min-h-0 cursor-pointer border-0 bg-transparent p-0 text-left text-[0.6875rem] font-medium text-foreground underline-offset-2 hover:underline";
 
-function sumReservations(rows: { qty: number }[]) {
-  return rows.reduce((a, r) => a + r.qty, 0);
-}
-
-function sumRemaining(rows: { remainingCounted: number }[]) {
-  return rows.reduce((a, r) => a + r.remainingCounted, 0);
-}
-
 function coverageBadgeVariant(
   s: StockBalanceCoverageStatus,
 ): "destructive" | "secondary" | "outline" {
@@ -59,31 +57,30 @@ function coverageBadgeVariant(
   return "outline";
 }
 
-function StatTile({ label, value }: { label: string; value: string | number }) {
-  return (
-    <div className="min-w-0 rounded border border-border/60 bg-background px-2 py-1.5">
-      <div className="text-[0.58rem] font-medium uppercase leading-none tracking-wide text-muted-foreground">
-        {label}
-      </div>
-      <div className="mt-0.5 text-xs font-semibold leading-tight text-foreground tabular-nums">
-        {value}
-      </div>
-    </div>
-  );
+function sumRemaining(rows: { remainingCounted: number }[]) {
+  return rows.reduce((a, r) => a + r.remainingCounted, 0);
 }
 
-export function StockBalanceDetailContent({ row }: Props) {
+function sumOutgoingImpact(rows: { impactShortage: number }[]) {
+  return rows.reduce((a, r) => a + r.impactShortage, 0);
+}
+
+function sumIncomingCoverage(rows: { coverageImpact: number }[]) {
+  return rows.reduce((a, r) => a + r.coverageImpact, 0);
+}
+
+function sumReservations(rows: { qty: number }[]) {
+  return rows.reduce((a, r) => a + r.qty, 0);
+}
+
+export function StockBalanceDetailContent({ row, activeTab }: Props) {
   const { t } = useTranslation();
   const navigate = useNavigate();
-
-  const coverageLabel = (s: StockBalanceCoverageStatus) => t(`ops.stock.coverage.${s}`);
+  const { formatDateTime, formatNumber } = useAppDisplayFormatters();
   const isOperationalStyle = row.style === "GOOD";
-  const nonOperationalStyleHint =
-    row.style === "MARKDOWN"
-      ? t("ops.stock.drilldown.markdownStyleHint")
-      : row.style === "DEFECT"
-        ? t("ops.stock.drilldown.defectStyleHint")
-        : t("ops.stock.drilldown.nonGoodStyleHint");
+
+  const formatQty = (value: number) =>
+    formatNumber(value, { minFractionDigits: 0, maxFractionDigits: 0 });
 
   const reservations = useMemo(
     () =>
@@ -107,135 +104,78 @@ export function StockBalanceDetailContent({ row }: Props) {
     [isOperationalStyle, row.warehouseId, row.itemId],
   );
 
-  const sumRes = sumReservations(reservations);
-  const sumOut = sumRemaining(outgoing);
-  const sumInc = sumRemaining(incoming);
+  const outgoingRows = useMemo(
+    () =>
+      outgoing.map((record) => ({
+        ...record,
+        impactShortage: Math.max(0, record.remainingCounted - record.lineReservedQty),
+      })),
+    [outgoing],
+  );
+  const incomingRows = useMemo(() => {
+    let restToCover = row.netShortageQty;
+    return incoming.map((record) => {
+      const coverageImpact = Math.min(record.remainingCounted, Math.max(0, restToCover));
+      restToCover = Math.max(0, restToCover - coverageImpact);
+      return {
+        ...record,
+        coverageImpact,
+      };
+    });
+  }, [incoming, row.netShortageQty]);
 
-  const hasSalesSideContext = reservations.length > 0 || outgoing.length > 0;
-  const hasPurchaseSideContext = incoming.length > 0;
-
-  const navigateToRelatedSalesOrders = () => {
-    const params = new URLSearchParams();
-    params.set("warehouseId", row.warehouseId);
-    params.set("itemId", row.itemId);
-    navigate(`/sales-orders?${params.toString()}`);
-  };
-
-  const navigateToRelatedPurchaseOrders = () => {
-    const params = new URLSearchParams();
-    params.set("warehouseId", row.warehouseId);
-    params.set("itemId", row.itemId);
-    navigate(`/purchase-orders?${params.toString()}`);
-  };
-
-  return (
-    <div className="space-y-3">
-      <Card className="border border-border/70 shadow-none">
-        <CardHeader className="pb-2">
-          <CardTitle className="text-sm">{t("ops.stock.drilldown.summarySection")}</CardTitle>
-        </CardHeader>
-        <CardContent className="pt-0">
-          <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-4">
-            <StatTile label={t("doc.columns.style")} value={t(`ops.stock.styles.${row.style}`)} />
-            <StatTile label={t("doc.columns.totalQuantity")} value={row.qtyOnHand} />
-            <StatTile label={t("doc.columns.reserved")} value={row.reservedQty} />
-            <StatTile label={t("doc.columns.available")} value={row.availableQty} />
-            <StatTile label={t("doc.columns.outgoing")} value={row.outgoingQty} />
-            <StatTile label={t("doc.columns.incoming")} value={row.incomingQty} />
-            <StatTile label={t("doc.columns.deficit")} value={row.deficitQty} />
-            <StatTile label={t("doc.columns.netShortage")} value={row.netShortageQty} />
-            <StatTile label={t("doc.columns.coverage")} value={coverageLabel(row.coverageStatus)} />
-          </div>
-          {!isOperationalStyle ? (
-            <p className="mt-2 text-[0.6875rem] leading-snug text-muted-foreground">
-              {nonOperationalStyleHint}
-            </p>
-          ) : null}
-        </CardContent>
-      </Card>
-
-      <section className="rounded-md border border-border/70 bg-background px-3 py-2" aria-labelledby="sb-src-res">
-        <h3
-          id="sb-src-res"
-          className="mb-1.5 border-b border-border/50 pb-1 text-[0.62rem] font-semibold uppercase tracking-wider text-foreground/90"
-        >
-          {t("ops.stock.drilldown.reservationsTitle")}
-        </h3>
-        {reservations.length === 0 ? (
-          <p className="text-[0.6875rem] leading-snug text-muted-foreground">
-            {t("ops.stock.drilldown.reservationsEmpty")}
-          </p>
-        ) : (
-          <>
-            <div className="-mx-1 overflow-x-auto">
-              <table className="w-full min-w-[480px]">
-                <thead>
-                  <tr className="bg-background">
-                    <th className={th}>{t("doc.columns.salesOrder")}</th>
-                    <th className={th}>{t("doc.columns.status")}</th>
-                    <th className={th}>{t("doc.columns.line")}</th>
-                    <th className={cn(th, "text-right")}>{t("doc.columns.reserved")}</th>
-                    <th className={th}>{t("doc.columns.updated")}</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {reservations.map((r) => (
-                    <tr key={r.reservationId} className="hover:bg-background">
-                      <td className={td}>
-                        <button
-                          type="button"
-                          className={linkBtn}
-                          onClick={() => navigate(`/sales-orders/${r.salesOrderId}`)}
-                        >
-                          {r.salesOrderNumber}
-                        </button>
-                      </td>
-                      <td className={td}>{r.salesOrderStatus}</td>
-                      <td className={cn(td, "font-mono text-[0.65rem] text-muted-foreground")}>
-                        {r.salesOrderLineId}
-                      </td>
-                      <td className={cn(td, "text-right")}>{r.qty}</td>
-                      <td className={cn(td, "text-[0.65rem] text-muted-foreground")}>
-                        {r.updatedAt.slice(0, 19)}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-                <tfoot>
-                  <tr className="bg-background">
-                    <td colSpan={3} className={tfootLabel}>
-                      {t("doc.columns.total")}
-                    </td>
-                    <td className={cn(tfootValue, "text-right")}>{sumRes}</td>
-                    <td />
-                  </tr>
-                </tfoot>
-              </table>
+  if (activeTab === "operational") {
+    return (
+      <div className="space-y-3">
+        <section className="rounded-md border border-border/70 bg-background p-3">
+          <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3">
+            <div className="rounded border border-border/60 bg-background px-2.5 py-2">
+              <div className="text-[0.62rem] uppercase tracking-wide text-muted-foreground">{t("doc.columns.available")}</div>
+              <div className="mt-1 text-sm font-semibold tabular-nums">{formatQty(row.availableQty)}</div>
             </div>
-            {sumRes !== row.reservedQty ? (
-              <p className="mt-1.5 text-[0.6rem] leading-snug text-muted-foreground/85">
-                {t("ops.stock.drilldown.mismatchReserved", { sum: sumRes, grid: row.reservedQty })}
-              </p>
-            ) : null}
-          </>
-        )}
-      </section>
+            <div className="rounded border border-border/60 bg-background px-2.5 py-2">
+              <div className="text-[0.62rem] uppercase tracking-wide text-muted-foreground">{t("doc.columns.reserved")}</div>
+              <div className="mt-1 text-sm font-semibold tabular-nums">{formatQty(row.reservedQty)}</div>
+            </div>
+            <div className="rounded border border-border/60 bg-background px-2.5 py-2">
+              <div className="text-[0.62rem] uppercase tracking-wide text-muted-foreground">{t("doc.columns.outgoing")}</div>
+              <div className="mt-1 text-sm font-semibold tabular-nums">{formatQty(row.outgoingQty)}</div>
+            </div>
+            <div className="rounded border border-border/60 bg-background px-2.5 py-2">
+              <div className="text-[0.62rem] uppercase tracking-wide text-muted-foreground">{t("doc.columns.incoming")}</div>
+              <div className="mt-1 text-sm font-semibold tabular-nums">{formatQty(row.incomingQty)}</div>
+            </div>
+            <div className="rounded border border-border/60 bg-background px-2.5 py-2">
+              <div className="text-[0.62rem] uppercase tracking-wide text-muted-foreground">{t("doc.columns.netShortage")}</div>
+              <div className="mt-1 text-sm font-semibold tabular-nums">{formatQty(row.netShortageQty)}</div>
+            </div>
+            <div className="rounded border border-border/60 bg-background px-2.5 py-2">
+              <div className="text-[0.62rem] uppercase tracking-wide text-muted-foreground">{t("doc.columns.coverage")}</div>
+              <div className="mt-1">
+                <Badge variant={coverageBadgeVariant(row.coverageStatus)} className="h-5 px-2 text-[0.68rem]">
+                  {t(`ops.stock.coverage.${row.coverageStatus}`)}
+                </Badge>
+              </div>
+            </div>
+          </div>
+        </section>
+      </div>
+    );
+  }
 
-      <section className="rounded-md border border-border/70 bg-background px-3 py-2" aria-labelledby="sb-src-out">
-        <h3
-          id="sb-src-out"
-          className="mb-1.5 border-b border-border/50 pb-1 text-[0.62rem] font-semibold uppercase tracking-wider text-foreground/90"
-        >
-          {t("ops.stock.drilldown.outgoingTitle")}
-        </h3>
-        {outgoing.length === 0 ? (
+  if (activeTab === "outgoing") {
+    const sumOut = sumRemaining(outgoingRows);
+    const sumOutImpact = sumOutgoingImpact(outgoingRows);
+    return (
+      <section className="rounded-md border border-border/70 bg-background px-3 py-2">
+        {outgoingRows.length === 0 ? (
           <p className="text-[0.6875rem] leading-snug text-muted-foreground">
             {t("ops.stock.drilldown.outgoingEmpty")}
           </p>
         ) : (
           <>
             <div className="-mx-1 overflow-x-auto">
-              <table className="w-full min-w-[560px]">
+              <table className="w-full min-w-[700px]">
                 <thead>
                   <tr className="bg-background">
                     <th className={th}>{t("doc.columns.salesOrder")}</th>
@@ -245,28 +185,30 @@ export function StockBalanceDetailContent({ row }: Props) {
                     <th className={cn(th, "text-right")}>{t("doc.columns.shipped")}</th>
                     <th className={cn(th, "text-right")}>{t("doc.columns.remaining")}</th>
                     <th className={cn(th, "text-right")}>{t("doc.columns.reserved")}</th>
+                    <th className={cn(th, "text-right")}>{t("ops.stock.drilldown.shortageImpact")}</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {outgoing.map((r) => (
-                    <tr key={`${r.salesOrderId}-${r.lineId}`} className="hover:bg-background">
+                  {outgoingRows.map((record) => (
+                    <tr key={`${record.salesOrderId}-${record.lineId}`} className="hover:bg-background">
                       <td className={td}>
                         <button
                           type="button"
                           className={linkBtn}
-                          onClick={() => navigate(`/sales-orders/${r.salesOrderId}`)}
+                          onClick={() => navigate(`/sales-orders/${record.salesOrderId}`)}
                         >
-                          {r.salesOrderNumber}
+                          {record.salesOrderNumber}
                         </button>
                       </td>
-                      <td className={td}>{r.salesOrderStatus}</td>
+                      <td className={td}>{record.salesOrderStatus}</td>
                       <td className={cn(td, "font-mono text-[0.65rem] text-muted-foreground")}>
-                        {r.lineId}
+                        {record.lineId}
                       </td>
-                      <td className={cn(td, "text-right")}>{r.orderedQty}</td>
-                      <td className={cn(td, "text-right")}>{r.shippedQty}</td>
-                      <td className={cn(td, "text-right font-medium")}>{r.remainingCounted}</td>
-                      <td className={cn(td, "text-right")}>{r.lineReservedQty}</td>
+                      <td className={cn(td, "text-right")}>{formatQty(record.orderedQty)}</td>
+                      <td className={cn(td, "text-right")}>{formatQty(record.shippedQty)}</td>
+                      <td className={cn(td, "text-right font-medium")}>{formatQty(record.remainingCounted)}</td>
+                      <td className={cn(td, "text-right")}>{formatQty(record.lineReservedQty)}</td>
+                      <td className={cn(td, "text-right font-medium")}>{formatQty(record.impactShortage)}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -275,36 +217,37 @@ export function StockBalanceDetailContent({ row }: Props) {
                     <td colSpan={5} className={tfootLabel}>
                       {t("doc.columns.totalRemaining")}
                     </td>
-                    <td className={cn(tfootValue, "text-right")}>{sumOut}</td>
+                    <td className={cn(tfootValue, "text-right")}>{formatQty(sumOut)}</td>
                     <td />
+                    <td className={cn(tfootValue, "text-right")}>{formatQty(sumOutImpact)}</td>
                   </tr>
                 </tfoot>
               </table>
             </div>
             {sumOut !== row.outgoingQty ? (
               <p className="mt-1.5 text-[0.6rem] leading-snug text-muted-foreground/85">
-                {t("ops.stock.drilldown.mismatchOutgoing", { sum: sumOut, grid: row.outgoingQty })}
+                {t("ops.stock.drilldown.mismatchOutgoing", { sum: formatQty(sumOut), grid: formatQty(row.outgoingQty) })}
               </p>
             ) : null}
           </>
         )}
       </section>
+    );
+  }
 
-      <section className="rounded-md border border-border/70 bg-background px-3 py-2" aria-labelledby="sb-src-in">
-        <h3
-          id="sb-src-in"
-          className="mb-1.5 border-b border-border/50 pb-1 text-[0.62rem] font-semibold uppercase tracking-wider text-foreground/90"
-        >
-          {t("ops.stock.drilldown.incomingTitle")}
-        </h3>
-        {incoming.length === 0 ? (
+  if (activeTab === "incoming") {
+    const sumInc = sumRemaining(incomingRows);
+    const sumIncCoverage = sumIncomingCoverage(incomingRows);
+    return (
+      <section className="rounded-md border border-border/70 bg-background px-3 py-2">
+        {incomingRows.length === 0 ? (
           <p className="text-[0.6875rem] leading-snug text-muted-foreground">
             {t("ops.stock.drilldown.incomingEmpty")}
           </p>
         ) : (
           <>
             <div className="-mx-1 overflow-x-auto">
-              <table className="w-full min-w-[480px]">
+              <table className="w-full min-w-[650px]">
                 <thead>
                   <tr className="bg-background">
                     <th className={th}>{t("doc.columns.purchaseOrder")}</th>
@@ -313,27 +256,29 @@ export function StockBalanceDetailContent({ row }: Props) {
                     <th className={cn(th, "text-right")}>{t("doc.columns.ordered")}</th>
                     <th className={cn(th, "text-right")}>{t("doc.columns.received")}</th>
                     <th className={cn(th, "text-right")}>{t("doc.columns.remaining")}</th>
+                    <th className={cn(th, "text-right")}>{t("ops.stock.drilldown.coverageImpact")}</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {incoming.map((r) => (
-                    <tr key={`${r.purchaseOrderId}-${r.lineId}`} className="hover:bg-background">
+                  {incomingRows.map((record) => (
+                    <tr key={`${record.purchaseOrderId}-${record.lineId}`} className="hover:bg-background">
                       <td className={td}>
                         <button
                           type="button"
                           className={linkBtn}
-                          onClick={() => navigate(`/purchase-orders/${r.purchaseOrderId}`)}
+                          onClick={() => navigate(`/purchase-orders/${record.purchaseOrderId}`)}
                         >
-                          {r.purchaseOrderNumber}
+                          {record.purchaseOrderNumber}
                         </button>
                       </td>
-                      <td className={td}>{r.purchaseOrderStatus}</td>
+                      <td className={td}>{record.purchaseOrderStatus}</td>
                       <td className={cn(td, "font-mono text-[0.65rem] text-muted-foreground")}>
-                        {r.lineId}
+                        {record.lineId}
                       </td>
-                      <td className={cn(td, "text-right")}>{r.orderedQty}</td>
-                      <td className={cn(td, "text-right")}>{r.receivedQty}</td>
-                      <td className={cn(td, "text-right font-medium")}>{r.remainingCounted}</td>
+                      <td className={cn(td, "text-right")}>{formatQty(record.orderedQty)}</td>
+                      <td className={cn(td, "text-right")}>{formatQty(record.receivedQty)}</td>
+                      <td className={cn(td, "text-right font-medium")}>{formatQty(record.remainingCounted)}</td>
+                      <td className={cn(td, "text-right font-medium")}>{formatQty(record.coverageImpact)}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -342,37 +287,82 @@ export function StockBalanceDetailContent({ row }: Props) {
                     <td colSpan={5} className={tfootLabel}>
                       {t("doc.columns.totalRemaining")}
                     </td>
-                    <td className={cn(tfootValue, "text-right")}>{sumInc}</td>
+                    <td className={cn(tfootValue, "text-right")}>{formatQty(sumInc)}</td>
+                    <td className={cn(tfootValue, "text-right")}>{formatQty(sumIncCoverage)}</td>
                   </tr>
                 </tfoot>
               </table>
             </div>
             {sumInc !== row.incomingQty ? (
               <p className="mt-1.5 text-[0.6rem] leading-snug text-muted-foreground/85">
-                {t("ops.stock.drilldown.mismatchIncoming", { sum: sumInc, grid: row.incomingQty })}
+                {t("ops.stock.drilldown.mismatchIncoming", { sum: formatQty(sumInc), grid: formatQty(row.incomingQty) })}
               </p>
             ) : null}
           </>
         )}
       </section>
+    );
+  }
 
-      {hasSalesSideContext || hasPurchaseSideContext ? (
-        <div className="flex flex-wrap gap-2">
-          {hasSalesSideContext ? (
-            <Button type="button" variant="outline" size="sm" onClick={navigateToRelatedSalesOrders}>
-              {t("ops.stock.drilldown.openRelatedSo")}
-            </Button>
-          ) : null}
-          {hasPurchaseSideContext ? (
-            <Button type="button" variant="outline" size="sm" onClick={navigateToRelatedPurchaseOrders}>
-              {t("ops.stock.drilldown.openRelatedPo")}
-            </Button>
-          ) : null}
-          <Badge variant={coverageBadgeVariant(row.coverageStatus)} className="h-8 px-2 text-xs">
-            {coverageLabel(row.coverageStatus)}
-          </Badge>
+  const sumRes = sumReservations(reservations);
+  return (
+    <section className="rounded-md border border-border/60 bg-background/40 px-3 py-2">
+      {reservations.length === 0 ? (
+        <p className="text-[0.6875rem] leading-snug text-muted-foreground/90">
+          {t("ops.stock.drilldown.reservationsEmptyLight")}
+        </p>
+      ) : (
+        <div className="-mx-1 overflow-x-auto">
+          <table className="w-full min-w-[560px]">
+            <thead>
+              <tr className="bg-background">
+                <th className={th}>{t("doc.columns.salesOrder")}</th>
+                <th className={th}>{t("doc.columns.status")}</th>
+                <th className={th}>{t("doc.columns.line")}</th>
+                <th className={cn(th, "text-right")}>{t("doc.columns.reserved")}</th>
+                <th className={th}>{t("doc.columns.updated")}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {reservations.map((record) => (
+                <tr key={record.reservationId} className="hover:bg-background">
+                  <td className={td}>
+                    <button
+                      type="button"
+                      className={linkBtn}
+                      onClick={() => navigate(`/sales-orders/${record.salesOrderId}`)}
+                    >
+                      {record.salesOrderNumber}
+                    </button>
+                  </td>
+                  <td className={td}>{record.salesOrderStatus}</td>
+                  <td className={cn(td, "font-mono text-[0.65rem] text-muted-foreground")}>
+                    {record.salesOrderLineId}
+                  </td>
+                  <td className={cn(td, "text-right")}>{formatQty(record.qty)}</td>
+                  <td className={cn(td, "text-[0.65rem] text-muted-foreground")}>
+                    {formatDateTime(record.updatedAt, { empty: "—" })}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+            <tfoot>
+              <tr className="bg-background">
+                <td colSpan={3} className={tfootLabel}>
+                  {t("doc.columns.total")}
+                </td>
+                <td className={cn(tfootValue, "text-right")}>{formatQty(sumRes)}</td>
+                <td />
+              </tr>
+            </tfoot>
+          </table>
         </div>
+      )}
+      {reservations.length > 0 && sumRes !== row.reservedQty ? (
+        <p className="mt-1.5 text-[0.6rem] leading-snug text-muted-foreground/85">
+          {t("ops.stock.drilldown.mismatchReserved", { sum: formatQty(sumRes), grid: formatQty(row.reservedQty) })}
+        </p>
       ) : null}
-    </div>
+    </section>
   );
 }

@@ -1,5 +1,6 @@
 export { AgGridContainer } from "./AgGridContainer";
 export { useAgGridBackNavigationLayoutFix } from "./useAgGridBackNavigationLayoutFix";
+export { useAgGridNoRowsOverlayLifecycle } from "./useAgGridNoRowsOverlayLifecycle";
 export {
   getAgGridNoRowsOverlayContent,
   buildAgGridNoRowsOverlayTemplate,
@@ -27,7 +28,17 @@ export {
 export {
   applyAgGridColumnFilters,
   decorateAgGridColumnDefsWithFilters,
+  useAgGridColumnFilterBridge,
   defaultOperatorsForKind,
+  type AgGridColumnFilterBridge,
   type AgGridColumnFilterConfig,
   type AgGridColumnFilterOption,
 } from "./AgGridColumnFilters";
+export { AgGridColumnSettingsModal } from "./AgGridColumnSettingsModal";
+export { useAgGridColumnSettings, type AgGridColumnSettingsItem } from "./columnSettings";
+export {
+  getVisibleAgGridExportColumns,
+  collectFilteredSortedRowNodes,
+  buildExportMatrixFromRowNodes,
+  type AgGridExportColumn,
+} from "./exportProjection";

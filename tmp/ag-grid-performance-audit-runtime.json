@@ -1,0 +1,135 @@
+{
+  "generatedAt": "2026-04-11T14:58:02.253Z",
+  "pages": [
+    {
+      "route": "/items",
+      "baseline": {
+        "rows": 25,
+        "headers": 12,
+        "viewportWidth": 1291,
+        "containerWidth": 1291,
+        "deadGap": 0,
+        "colWidth": 136
+      },
+      "afterSearch": {
+        "rows": 0,
+        "headers": 12,
+        "viewportWidth": 1291,
+        "containerWidth": 1291,
+        "deadGap": 0,
+        "colWidth": 136
+      },
+      "afterFilter": {
+        "rows": 0,
+        "headers": 12,
+        "viewportWidth": 1291,
+        "containerWidth": 1291,
+        "deadGap": 0,
+        "colWidth": 136
+      },
+      "afterResize": {
+        "rows": 0,
+        "headers": 12,
+        "viewportWidth": 1371,
+        "containerWidth": 1371,
+        "deadGap": 0,
+        "colWidth": 144
+      },
+      "interaction": {
+        "searchMutation": {
+          "count": 76,
+          "attrs": 26
+        },
+        "clearSearchMs": 761,
+        "filterNavigationMs": 2026
+      }
+    },
+    {
+      "route": "/sales-orders",
+      "baseline": {
+        "rows": 1,
+        "headers": 10,
+        "viewportWidth": 1371,
+        "containerWidth": 1371,
+        "deadGap": 0,
+        "colWidth": 138
+      },
+      "afterSearch": {
+        "rows": 0,
+        "headers": 10,
+        "viewportWidth": 1371,
+        "containerWidth": 1371,
+        "deadGap": 0,
+        "colWidth": 138
+      },
+      "afterFilter": {
+        "rows": 0,
+        "headers": 10,
+        "viewportWidth": 1371,
+        "containerWidth": 1371,
+        "deadGap": 0,
+        "colWidth": 138
+      },
+      "afterResize": {
+        "rows": 0,
+        "headers": 10,
+        "viewportWidth": 1371,
+        "containerWidth": 1371,
+        "deadGap": 0,
+        "colWidth": 138
+      },
+      "interaction": {
+        "searchMutation": {
+          "count": 6,
+          "attrs": 4
+        },
+        "clearSearchMs": 420,
+        "filterNavigationMs": 1731
+      }
+    },
+    {
+      "route": "/stock-balances",
+      "baseline": {
+        "rows": 1,
+        "headers": 14,
+        "viewportWidth": 1371,
+        "containerWidth": 1371,
+        "deadGap": 0,
+        "colWidth": 110
+      },
+      "afterSearch": {
+        "rows": 0,
+        "headers": 14,
+        "viewportWidth": 1371,
+        "containerWidth": 1371,
+        "deadGap": 0,
+        "colWidth": 110
+      },
+      "afterFilter": {
+        "rows": 0,
+        "headers": 14,
+        "viewportWidth": 1371,
+        "containerWidth": 1371,
+        "deadGap": 0,
+        "colWidth": 110
+      },
+      "afterResize": {
+        "rows": 0,
+        "headers": 14,
+        "viewportWidth": 1371,
+        "containerWidth": 1371,
+        "deadGap": 0,
+        "colWidth": 110
+      },
+      "interaction": {
+        "searchMutation": {
+          "count": 6,
+          "attrs": 4
+        },
+        "clearSearchMs": 404,
+        "filterNavigationMs": 1967
+      }
+    }
+  ],
+  "consoleErrors": []
+}

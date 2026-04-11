@@ -1,4 +1,4 @@
-import { useMemo, useState, useRef, useCallback, useEffect } from "react";
+import { useMemo, useState, useRef, useCallback } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { AgGridReact } from "ag-grid-react";
 import type { ColDef, SelectionChangedEvent } from "ag-grid-community";
@@ -16,12 +16,13 @@ import {
   getAgGridRowNumberColDef,
   agGridSelectionColumnDef,
   decorateAgGridColumnDefsWithFilters,
+  useAgGridColumnFilterBridge,
+  useAgGridNoRowsOverlayLifecycle,
   hasMeaningfulTextSelection,
   getAgGridNoRowsOverlayContent,
   buildAgGridNoRowsOverlayTemplate,
   type AgGridColumnFilterConfig,
 } from "../../../shared/ui/ag-grid";
-import { BackButton } from "../../../shared/ui/list/BackButton";
 import { ListPageSearch } from "../../../shared/ui/list/ListPageSearch";
 import { useListPageSearchHotkey } from "../../../shared/hotkeys";
 import { Button } from "@/components/ui/button";
@@ -260,16 +261,7 @@ export function ReceiptsListPage() {
     [rowsWithNames.length, displayRows.length, searchActive, filtersActive, t, locale],
   );
 
-  useEffect(() => {
-    const api = gridRef.current?.api;
-    if (!api) return;
-    api.setGridOption("overlayNoRowsTemplate", noRowsOverlayTemplate ?? "");
-    if (displayRows.length === 0) {
-      api.showNoRowsOverlay();
-      return;
-    }
-    api.hideOverlay();
-  }, [displayRows.length, noRowsOverlayTemplate]);
+  useAgGridNoRowsOverlayLifecycle(gridRef, noRowsOverlayTemplate, displayRows.length);
 
   const handleApplyColumnFilter = useCallback(
     (colId: string, clause: AgGridColumnFilterClause) => {
@@ -288,6 +280,11 @@ export function ReceiptsListPage() {
       replaceUrlAgGridColumnFilters(searchParams, setSearchParams, nextModel);
     },
     [columnFilterModel, searchParams, setSearchParams],
+  );
+  const columnFilterBridge = useAgGridColumnFilterBridge(
+    columnFilterModel,
+    handleApplyColumnFilter,
+    handleResetColumnFilter,
   );
 
   const baseColumnDefs = useMemo<ColDef<RowData>[]>(
@@ -329,16 +326,12 @@ export function ReceiptsListPage() {
       decorateAgGridColumnDefsWithFilters(
         baseColumnDefs,
         receiptColumnFilterConfigs,
-        columnFilterModel,
-        handleApplyColumnFilter,
-        handleResetColumnFilter,
+        columnFilterBridge,
       ),
     [
       baseColumnDefs,
       receiptColumnFilterConfigs,
-      columnFilterModel,
-      handleApplyColumnFilter,
-      handleResetColumnFilter,
+      columnFilterBridge,
     ],
   );
 
@@ -347,7 +340,6 @@ export function ReceiptsListPage() {
       header={null}
       controls={
         <>
-          <BackButton to="/" aria-label={t("doc.list.backToDashboard")} />
           <ListPageSearch
             inputRef={listSearchInputRef}
             placeholder={t("ops.list.receipts.searchPlaceholder")}
@@ -484,14 +476,6 @@ export function ReceiptsListPage() {
           columnDefs={columnDefs}
             defaultColDef={agGridDefaultColDef}
             overlayNoRowsTemplate={noRowsOverlayTemplate}
-            onGridReady={(event) => {
-              event.api.setGridOption("overlayNoRowsTemplate", noRowsOverlayTemplate ?? "");
-              if (displayRows.length === 0) {
-                event.api.showNoRowsOverlay();
-                return;
-              }
-              event.api.hideOverlay();
-            }}
             rowSelection={{ mode: "multiRow", checkboxes: true, headerCheckbox: true, enableClickSelection: true }}
             selectionColumnDef={agGridSelectionColumnDef}
             getRowId={(params) => params.data.id}

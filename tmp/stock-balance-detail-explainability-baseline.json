@@ -1,0 +1,37 @@
+{
+  "listRowCount": 1,
+  "deficitRow": null,
+  "nonDeficitRow": {
+    "index": 0,
+    "id": "1",
+    "itemCode": "ITEM-001",
+    "coverage": "Covered",
+    "netShortageText": "0",
+    "netShortage": 0
+  },
+  "deficitDetail": null,
+  "nonDeficitDetail": {
+    "url": "http://127.0.0.1:1420/stock-balances/1?returnTo=%2Fstock-balances",
+    "header": "ITEM-001—Widget A",
+    "explainLine": "Warehouse Main Warehouse•Style Good",
+    "hasKpiStrip": false,
+    "hasExplainability": true,
+    "sectionTitles": [
+      "Outgoing demand",
+      "Incoming supply",
+      "Why the status looks like this",
+      "Active reservations",
+      "Recent stock movements"
+    ],
+    "actionButtons": [
+      "Open item card",
+      "Open related sales orders",
+      "Open related purchase orders",
+      "Open stock movements"
+    ],
+    "hasMovementsTable": true
+  },
+  "injected": null,
+  "actionNavigationCheck": null,
+  "consoleErrors": []
+}

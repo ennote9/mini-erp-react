@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useRef, useState, useEffect } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import { AgGridReact } from "ag-grid-react";
 import type { ColDef, ICellRendererParams, RowClickedEvent, SelectionChangedEvent } from "ag-grid-community";
 import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
@@ -22,12 +22,13 @@ import {
   agGridRowNumberColDef,
   agGridSelectionColumnDef,
   decorateAgGridColumnDefsWithFilters,
+  useAgGridColumnFilterBridge,
+  useAgGridNoRowsOverlayLifecycle,
   hasMeaningfulTextSelection,
   getAgGridNoRowsOverlayContent,
   buildAgGridNoRowsOverlayTemplate,
   type AgGridColumnFilterConfig,
 } from "@/shared/ui/ag-grid";
-import { BackButton } from "@/shared/ui/list/BackButton";
 import { ListPageLayout } from "@/shared/ui/list/ListPageLayout";
 import { ListPageSearch } from "@/shared/ui/list/ListPageSearch";
 import { useListPageSearchHotkey } from "@/shared/hotkeys";
@@ -209,16 +210,7 @@ export function BarcodeRegistryPage() {
     [rows.length, displayRows.length, searchQuery, columnFilterModel, t, locale],
   );
 
-  useEffect(() => {
-    const api = gridRef.current?.api;
-    if (!api) return;
-    api.setGridOption("overlayNoRowsTemplate", noRowsOverlayTemplate ?? "");
-    if (displayRows.length === 0) {
-      api.showNoRowsOverlay();
-      return;
-    }
-    api.hideOverlay();
-  }, [displayRows.length, noRowsOverlayTemplate]);
+  useAgGridNoRowsOverlayLifecycle(gridRef, noRowsOverlayTemplate, displayRows.length);
 
   const buildExportRows = useCallback(
     (inputRows: BarcodeRegistryRow[]): BarcodeRegistryExportRow[] =>
@@ -414,22 +406,23 @@ export function BarcodeRegistryPage() {
     },
     [searchParams, setSearchParams, columnFilterModel],
   );
+  const columnFilterBridge = useAgGridColumnFilterBridge(
+    columnFilterModel,
+    handleApplyColumnFilter,
+    handleResetColumnFilter,
+  );
 
   const columnDefs = useMemo(
     () =>
       decorateAgGridColumnDefsWithFilters(
         baseColumnDefs,
         barcodeColumnFilterConfigs,
-        columnFilterModel,
-        handleApplyColumnFilter,
-        handleResetColumnFilter,
+        columnFilterBridge,
       ),
     [
       baseColumnDefs,
       barcodeColumnFilterConfigs,
-      columnFilterModel,
-      handleApplyColumnFilter,
-      handleResetColumnFilter,
+      columnFilterBridge,
     ],
   );
 
@@ -439,12 +432,12 @@ export function BarcodeRegistryPage() {
       controls={
         <div className="list-page__controls-stack flex w-full min-w-0 flex-col gap-2">
           <div className="flex flex-wrap items-center gap-2">
-            <BackButton to="/" aria-label={t("doc.list.backToDashboard")} />
             <ListPageSearch
               inputRef={listSearchInputRef}
               placeholder={t("ops.list.barcodeRegistry.searchPlaceholder")}
               value={searchQuery}
               onChange={(value) => replaceQueryParam(searchParams, setSearchParams, "q", value, "")}
+              debounceMs={220}
               aria-label={t("ops.list.barcodeRegistry.searchAria")}
               resultCount={displayRows.length}
             />
@@ -558,12 +551,6 @@ export function BarcodeRegistryPage() {
             overlayNoRowsTemplate={noRowsOverlayTemplate}
             onGridReady={(event) => {
               applyUrlGridSort(event.api, initialSortModel);
-              event.api.setGridOption("overlayNoRowsTemplate", noRowsOverlayTemplate ?? "");
-              if (displayRows.length === 0) {
-                event.api.showNoRowsOverlay();
-                return;
-              }
-              event.api.hideOverlay();
             }}
             onSortChanged={handleSortChanged}
             rowSelection={{ mode: "multiRow", checkboxes: true, headerCheckbox: true, enableClickSelection: true }}

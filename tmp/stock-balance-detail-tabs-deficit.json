@@ -1,0 +1,57 @@
+{
+  "injectedDeficit": true,
+  "firstRow": {
+    "index": 0,
+    "itemCode": "ITEM-001",
+    "netShortageText": "5",
+    "coverage": "Short",
+    "netShortage": 5
+  },
+  "snapshot": {
+    "header": "ITEM-001—Widget A",
+    "utilityButtons": [
+      "Open item card",
+      "Open related sales orders",
+      "Open related purchase orders",
+      "Open stock movements"
+    ],
+    "tabTriggers": [
+      "Operational Summary",
+      "Outbound Demand",
+      "Inbound Supply",
+      "Active Reservations"
+    ],
+    "activeTab": "Operational Summary",
+    "hasRightRail": false,
+    "hasMovementsSection": false,
+    "bounds": {
+      "viewportWidth": 1720,
+      "wrapper": {
+        "x": 273,
+        "width": 1120
+      },
+      "utilityRow": {
+        "x": 273,
+        "width": 1120
+      },
+      "headerCard": null,
+      "tabs": {
+        "x": 273,
+        "width": 524
+      },
+      "tabContent": {
+        "x": 273,
+        "width": 1120
+      }
+    }
+  },
+  "tabsSwitchCheck": {
+    "outboundVisible": true,
+    "inboundVisible": true,
+    "reservationsVisible": true
+  },
+  "actionNavigation": "http://127.0.0.1:1420/stock-movements?warehouseId=1&itemId=1",
+  "consoleErrors": [
+    "[stockBalanceRepository] persist failed: TypeError: Cannot read properties of undefined (reading 'invoke')\n    at invoke (http://127.0.0.1:1420/node_modules/.vite/deps/chunk-G7S6KQDI.js?v=b08e49f2:109:37)\n    at mkdir (http://127.0.0.1:1420/node_modules/.vite/deps/@tauri-apps_plugin-fs.js?v=b08e49f2:246:9)\n    at writeInventoryPayload (http://127.0.0.1:1420/src/shared/inventoryPersistence.ts:32:18)\n    at http://127.0.0.1:1420/src/modules/stock-balances/repository.ts:75:13"
+  ]
+}

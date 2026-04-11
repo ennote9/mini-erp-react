@@ -1,0 +1,23 @@
+{
+  "ok": true,
+  "report": {
+    "items": {
+      "baseCodeWidth": 136,
+      "afterFilterCodeWidth": 136,
+      "afterSearchCodeWidth": 136,
+      "gapAfterResize": {
+        "ok": true,
+        "viewport": 1371,
+        "container": 1371,
+        "deadGap": 0
+      },
+      "manualWidth": 254,
+      "afterManualSearchWidth": 254
+    },
+    "salesOrders": {
+      "baseNumberWidth": 138,
+      "afterSearchWidth": 138
+    },
+    "consoleErrors": []
+  }
+}

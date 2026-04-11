@@ -1,4 +1,4 @@
-import { useMemo, useState, useRef, useCallback, useEffect } from "react";
+import { useMemo, useState, useRef, useCallback } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { AgGridReact } from "ag-grid-react";
 import type { ColDef, SelectionChangedEvent } from "ag-grid-community";
@@ -14,12 +14,13 @@ import {
   agGridRowNumberColDef,
   agGridSelectionColumnDef,
   decorateAgGridColumnDefsWithFilters,
+  useAgGridColumnFilterBridge,
+  useAgGridNoRowsOverlayLifecycle,
   hasMeaningfulTextSelection,
   getAgGridNoRowsOverlayContent,
   buildAgGridNoRowsOverlayTemplate,
   type AgGridColumnFilterConfig,
 } from "../../../shared/ui/ag-grid";
-import { BackButton } from "../../../shared/ui/list/BackButton";
 import { ListPageSearch } from "../../../shared/ui/list/ListPageSearch";
 import { useListPageSearchHotkey } from "../../../shared/hotkeys";
 import { Button } from "@/components/ui/button";
@@ -192,16 +193,7 @@ export function WarehousesListPage() {
     [displayRows.length, searchActive, filtersActive, t, locale],
   );
 
-  useEffect(() => {
-    const api = gridRef.current?.api;
-    if (!api) return;
-    api.setGridOption("overlayNoRowsTemplate", noRowsOverlayTemplate ?? "");
-    if (displayRows.length === 0) {
-      api.showNoRowsOverlay();
-      return;
-    }
-    api.hideOverlay();
-  }, [displayRows.length, noRowsOverlayTemplate]);
+  useAgGridNoRowsOverlayLifecycle(gridRef, noRowsOverlayTemplate, displayRows.length);
 
   const handleApplyColumnFilter = useCallback(
     (colId: string, clause: AgGridColumnFilterClause) => {
@@ -220,6 +212,11 @@ export function WarehousesListPage() {
       replaceUrlAgGridColumnFilters(searchParams, setSearchParams, nextModel);
     },
     [columnFilterModel, searchParams, setSearchParams],
+  );
+  const columnFilterBridge = useAgGridColumnFilterBridge(
+    columnFilterModel,
+    handleApplyColumnFilter,
+    handleResetColumnFilter,
   );
 
   const baseColumnDefs = useMemo<ColDef<Warehouse>[]>(
@@ -271,16 +268,12 @@ export function WarehousesListPage() {
       decorateAgGridColumnDefsWithFilters(
         baseColumnDefs,
         warehouseColumnFilterConfigs,
-        columnFilterModel,
-        handleApplyColumnFilter,
-        handleResetColumnFilter,
+        columnFilterBridge,
       ),
     [
       baseColumnDefs,
       warehouseColumnFilterConfigs,
-      columnFilterModel,
-      handleApplyColumnFilter,
-      handleResetColumnFilter,
+      columnFilterBridge,
     ],
   );
 
@@ -289,7 +282,6 @@ export function WarehousesListPage() {
       header={null}
       controls={
         <>
-          <BackButton to="/" aria-label={t("doc.list.backToDashboard")} />
           <ListPageSearch
             inputRef={listSearchInputRef}
             placeholder={t("ops.list.warehouses.searchPlaceholder")}
@@ -411,14 +403,6 @@ export function WarehousesListPage() {
           columnDefs={columnDefs}
             defaultColDef={agGridDefaultColDef}
             overlayNoRowsTemplate={noRowsOverlayTemplate}
-            onGridReady={(event) => {
-              event.api.setGridOption("overlayNoRowsTemplate", noRowsOverlayTemplate ?? "");
-              if (displayRows.length === 0) {
-                event.api.showNoRowsOverlay();
-                return;
-              }
-              event.api.hideOverlay();
-            }}
             rowSelection={{ mode: "multiRow", checkboxes: true, headerCheckbox: true, enableClickSelection: true }}
             selectionColumnDef={agGridSelectionColumnDef}
             getRowId={(params) => params.data.id}

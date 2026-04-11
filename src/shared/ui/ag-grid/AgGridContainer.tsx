@@ -31,6 +31,8 @@ export const AgGridContainer = forwardRef<HTMLDivElement, AgGridContainerProps>(
       sizeColumnsToFit?: () => void;
       addEventListener?: (eventType: string, listener: (event: any) => void) => void;
       removeEventListener?: (eventType: string, listener: (event: any) => void) => void;
+      getColumnState?: () => Array<{ colId: string; width?: number }>;
+      applyColumnState?: (params: { state: Array<{ colId: string; width?: number }>; applyOrder?: boolean }) => boolean;
     };
 
     /**
@@ -49,16 +51,51 @@ export const AgGridContainer = forwardRef<HTMLDivElement, AgGridContainerProps>(
       let cancelled = false;
       let attachedApi: AnyGridApi | null = null;
       let lastFittedWidth = -1;
-      let lastFittedHeight = -1;
       const autoFitEnabledRef = { current: true };
+      const MEANINGFUL_WIDTH_DELTA = 20;
+      const lastKnownColumnWidthsRef = { current: [] as Array<{ colId: string; width: number }> };
+      const restoringColumnStateRef = { current: false };
 
       const onColumnResized = (event: any) => {
+        const api = getApi();
         const source = typeof event?.source === "string" ? event.source.toLowerCase() : "";
         const finished = event?.finished !== false;
         if (!finished) return;
+        if (api?.getColumnState) {
+          const widths = api
+            .getColumnState()
+            .map((col) => ({ colId: col.colId, width: typeof col.width === "number" ? col.width : 0 }))
+            .filter((col) => col.width > 0);
+          if (widths.length > 0) {
+            lastKnownColumnWidthsRef.current = widths;
+          }
+        }
         if (source.startsWith("ui")) {
           autoFitEnabledRef.current = false;
         }
+      };
+
+      const restoreColumnWidthsSnapshot = () => {
+        const api = getApi();
+        if (!api?.applyColumnState) return;
+        const widths = lastKnownColumnWidthsRef.current;
+        if (widths.length === 0) return;
+        if (restoringColumnStateRef.current) return;
+        restoringColumnStateRef.current = true;
+        api.applyColumnState({ state: widths, applyOrder: false });
+        api.doLayout?.();
+        api.refreshHeader?.();
+        requestAnimationFrame(() => {
+          restoringColumnStateRef.current = false;
+        });
+      };
+
+      const onNewColumnsLoaded = () => {
+        restoreColumnWidthsSnapshot();
+      };
+
+      const onGridColumnsChanged = () => {
+        restoreColumnWidthsSnapshot();
       };
 
       const getApi = (): AnyGridApi | null => {
@@ -70,11 +107,30 @@ export const AgGridContainer = forwardRef<HTMLDivElement, AgGridContainerProps>(
         const api = getApi();
         if (!api || api === attachedApi) return;
         attachedApi?.removeEventListener?.("columnResized", onColumnResized);
+        attachedApi?.removeEventListener?.("newColumnsLoaded", onNewColumnsLoaded);
+        attachedApi?.removeEventListener?.("gridColumnsChanged", onGridColumnsChanged);
+        attachedApi?.removeEventListener?.("columnEverythingChanged", onGridColumnsChanged);
+        attachedApi?.removeEventListener?.("displayedColumnsChanged", onGridColumnsChanged);
         attachedApi = api;
         attachedApi.addEventListener?.("columnResized", onColumnResized);
+        attachedApi.addEventListener?.("newColumnsLoaded", onNewColumnsLoaded);
+        attachedApi.addEventListener?.("gridColumnsChanged", onGridColumnsChanged);
+        attachedApi.addEventListener?.("columnEverythingChanged", onGridColumnsChanged);
+        attachedApi.addEventListener?.("displayedColumnsChanged", onGridColumnsChanged);
       };
 
-      const runFillWidth = (width: number, height: number) => {
+      const hasStaleRightDeadArea = (): boolean => {
+        const root = localRef.current;
+        if (!root) return false;
+        const viewport = root.querySelector<HTMLElement>(".ag-center-cols-viewport");
+        const containerEl = root.querySelector<HTMLElement>(".ag-center-cols-container");
+        if (!viewport || !containerEl) return false;
+        const vw = Math.round(viewport.getBoundingClientRect().width);
+        const cw = Math.round(containerEl.getBoundingClientRect().width);
+        return vw - cw > 24;
+      };
+
+      const runFillWidth = (width: number, allowStaleRecovery: boolean) => {
         const api = getApi();
         if (!api) return;
         attachColumnResizeListener();
@@ -83,15 +139,25 @@ export const AgGridContainer = forwardRef<HTMLDivElement, AgGridContainerProps>(
         api.refreshHeader?.();
 
         if (!autoFitEnabledRef.current) return;
-        if (Math.abs(width - lastFittedWidth) < 2 && Math.abs(height - lastFittedHeight) < 2) {
+        const widthChanged = Math.abs(width - lastFittedWidth) >= MEANINGFUL_WIDTH_DELTA;
+        const staleDeadArea = allowStaleRecovery ? hasStaleRightDeadArea() : false;
+        if (!widthChanged && !staleDeadArea) {
           return;
         }
         lastFittedWidth = width;
-        lastFittedHeight = height;
         api.sizeColumnsToFit?.();
+        if (api.getColumnState) {
+          const widths = api
+            .getColumnState()
+            .map((col) => ({ colId: col.colId, width: typeof col.width === "number" ? col.width : 0 }))
+            .filter((col) => col.width > 0);
+          if (widths.length > 0) {
+            lastKnownColumnWidthsRef.current = widths;
+          }
+        }
       };
 
-      const scheduleWhenStable = () => {
+      const scheduleWhenStable = (reason: "init" | "observer" | "pageshow" | "popstate" | "visibility") => {
         cancelAnimationFrame(rafId);
         let attempts = 0;
         let stableFrames = 0;
@@ -124,7 +190,8 @@ export const AgGridContainer = forwardRef<HTMLDivElement, AgGridContainerProps>(
           prevHeight = height;
 
           if (stableFrames >= 1 || attempts >= 16) {
-            runFillWidth(width, height);
+            const allowStaleRecovery = reason !== "observer";
+            runFillWidth(width, allowStaleRecovery);
             return;
           }
           rafId = requestAnimationFrame(tick);
@@ -133,11 +200,11 @@ export const AgGridContainer = forwardRef<HTMLDivElement, AgGridContainerProps>(
         rafId = requestAnimationFrame(tick);
       };
 
-      const onPageShow = () => scheduleWhenStable();
-      const onPopState = () => scheduleWhenStable();
+      const onPageShow = () => scheduleWhenStable("pageshow");
+      const onPopState = () => scheduleWhenStable("popstate");
       const onVisibility = () => {
         if (document.visibilityState === "visible") {
-          scheduleWhenStable();
+          scheduleWhenStable("visibility");
         }
       };
 
@@ -146,17 +213,21 @@ export const AgGridContainer = forwardRef<HTMLDivElement, AgGridContainerProps>(
       document.addEventListener("visibilitychange", onVisibility);
 
       if (typeof ResizeObserver !== "undefined") {
-        observer = new ResizeObserver(() => scheduleWhenStable());
+        observer = new ResizeObserver(() => scheduleWhenStable("observer"));
         observer.observe(container);
       }
 
-      scheduleWhenStable();
+      scheduleWhenStable("init");
 
       return () => {
         cancelled = true;
         cancelAnimationFrame(rafId);
         observer?.disconnect();
         attachedApi?.removeEventListener?.("columnResized", onColumnResized);
+        attachedApi?.removeEventListener?.("newColumnsLoaded", onNewColumnsLoaded);
+        attachedApi?.removeEventListener?.("gridColumnsChanged", onGridColumnsChanged);
+        attachedApi?.removeEventListener?.("columnEverythingChanged", onGridColumnsChanged);
+        attachedApi?.removeEventListener?.("displayedColumnsChanged", onGridColumnsChanged);
         window.removeEventListener("pageshow", onPageShow);
         window.removeEventListener("popstate", onPopState);
         document.removeEventListener("visibilitychange", onVisibility);

@@ -1,0 +1,58 @@
+{
+  "ok": true,
+  "report": [
+    {
+      "route": "/items",
+      "backButtons": 0,
+      "expected": "none"
+    },
+    {
+      "route": "/sales-orders",
+      "backButtons": 0,
+      "expected": "none"
+    },
+    {
+      "route": "/purchase-orders",
+      "backButtons": 0,
+      "expected": "none"
+    },
+    {
+      "route": "/brands",
+      "backButtons": 0,
+      "expected": "none"
+    },
+    {
+      "route": "/items/1",
+      "backButtons": 1,
+      "expected": "present"
+    },
+    {
+      "route": "/purchase-orders/1, /sales-orders/1, /receipts/1, /shipments/1, /stock-balances/1",
+      "expected": "document-detail back button present",
+      "note": "not found on tried routes",
+      "tried": [
+        {
+          "route": "/purchase-orders/1",
+          "backButtons": 0
+        },
+        {
+          "route": "/sales-orders/1",
+          "backButtons": 0
+        },
+        {
+          "route": "/receipts/1",
+          "backButtons": 0
+        },
+        {
+          "route": "/shipments/1",
+          "backButtons": 0
+        },
+        {
+          "route": "/stock-balances/1",
+          "backButtons": 0
+        }
+      ]
+    }
+  ],
+  "consoleErrors": []
+}

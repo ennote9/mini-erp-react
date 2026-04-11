@@ -2,7 +2,7 @@
  * Items list — AG Grid migration. Uses shared AgGridContainer and defaultColDef.
  * Preserves search, New button, row navigation, empty state.
  */
-import { useMemo, useState, useRef, useCallback, useEffect } from "react";
+import { useMemo, useState, useRef, useCallback } from "react";
 import { useLocation, useNavigate, useSearchParams, Link } from "react-router-dom";
 import { AgGridReact } from "ag-grid-react";
 import type { ColDef, ICellRendererParams, SelectionChangedEvent } from "ag-grid-community";
@@ -20,24 +20,30 @@ import {
   agGridRowNumberColDef,
   agGridSelectionColumnDef,
   decorateAgGridColumnDefsWithFilters,
+  useAgGridColumnFilterBridge,
+  useAgGridNoRowsOverlayLifecycle,
+  useAgGridColumnSettings,
+  AgGridColumnSettingsModal,
+  getVisibleAgGridExportColumns,
+  collectFilteredSortedRowNodes,
+  buildExportMatrixFromRowNodes,
   hasMeaningfulTextSelection,
   getAgGridNoRowsOverlayContent,
   buildAgGridNoRowsOverlayTemplate,
   type AgGridColumnFilterConfig,
 } from "../../../shared/ui/ag-grid";
-import { BackButton } from "../../../shared/ui/list/BackButton";
 import { ListPageSearch } from "../../../shared/ui/list/ListPageSearch";
 import { useListPageSearchHotkey } from "../../../shared/hotkeys";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { ChevronDown, FileSpreadsheet, File, FolderOpen, X } from "lucide-react";
-import { buildItemsListXlsxBuffer, type ItemsExportRow } from "../itemsListExport";
 import { save } from "@tauri-apps/plugin-dialog";
 import { invoke } from "@tauri-apps/api/core";
 import { revealItemInDir } from "@tauri-apps/plugin-opener";
 import { useTranslation } from "@/shared/i18n/context";
 import { buildReadableUniqueFilename, ensureUniqueExportPath } from "@/shared/export/filenameBuilder";
 import { itemsListExcelLabels } from "@/shared/i18n/excelListExportLabels";
+import { buildListViewXlsxBuffer } from "@/shared/export/listViewXlsx";
 import { useAppReadModelRevision } from "@/shared/inventoryMasterPageBlocks/useAppReadModelRevision";
 import { useAppDisplayFormatters } from "@/shared/formatting";
 import {
@@ -51,6 +57,7 @@ import {
   hasActiveAgGridColumnFilters,
   readUrlAgGridColumnFilters,
   replaceUrlAgGridColumnFilters,
+  withUrlAgGridColumnFilters,
 } from "@/shared/navigation/agGridColumnFilters";
 
 function applyBrandIdFilter(items: Item[], brandId: string | null): Item[] {
@@ -70,32 +77,6 @@ function ImagesCountCellRenderer(params: ICellRendererParams<Item, number>) {
     return <span className="text-muted-foreground tabular-nums">—</span>;
   }
   return <span className="tabular-nums text-foreground/90">{n}</span>;
-}
-
-function buildExportRowsFromItems(items: Item[], activeYes: string, activeNo: string): ItemsExportRow[] {
-  return items.map((item, idx) => {
-    const brand = item.brandId ? brandRepository.getById(item.brandId)?.name ?? "" : "";
-    const category = item.categoryId ? categoryRepository.getById(item.categoryId)?.name ?? "" : "";
-    const purchasePrice =
-      item.purchasePrice != null && typeof item.purchasePrice === "number" && !Number.isNaN(item.purchasePrice)
-        ? item.purchasePrice
-        : "";
-    const salePrice =
-      item.salePrice != null && typeof item.salePrice === "number" && !Number.isNaN(item.salePrice)
-        ? item.salePrice
-        : "";
-    return {
-      no: idx + 1,
-      code: item.code ?? "",
-      name: item.name ?? "",
-      brand,
-      category,
-      uom: item.uom ?? "",
-      purchasePrice,
-      salePrice,
-      active: item.isActive ? activeYes : activeNo,
-    };
-  });
 }
 
 export function ItemsListPage() {
@@ -257,23 +238,22 @@ export function ItemsListPage() {
     setSearchParams(next, { replace: true });
   }, [searchParams, setSearchParams]);
 
-  const getExportRowsCurrentView = useCallback((): ItemsExportRow[] => {
-    const api = gridRef.current?.api;
-    const y = t("ops.master.exportActiveYes");
-    const n = t("ops.master.exportActiveNo");
-    if (!api) return buildExportRowsFromItems(filteredItems, y, n);
-    const rows: Item[] = [];
-    api.forEachNodeAfterFilterAndSort((rowNode) => {
-      if (rowNode.data) rows.push(rowNode.data);
-    });
-    return buildExportRowsFromItems(rows, y, n);
-  }, [filteredItems, t]);
-
-  const getExportRowsSelected = useCallback((): ItemsExportRow[] => {
-    const api = gridRef.current?.api;
-    const rows: Item[] = api ? (api.getSelectedRows() as Item[]) : [];
-    return buildExportRowsFromItems(rows, t("ops.master.exportActiveYes"), t("ops.master.exportActiveNo"));
-  }, [t]);
+  const buildExportPayload = useCallback(
+    (mode: "current" | "selected"): { headers: string[]; rows: Array<Array<string | number>> } => {
+      const api = gridRef.current?.api;
+      if (!api) return { headers: [], rows: [] };
+      const columns = getVisibleAgGridExportColumns(api);
+      const rowNodes =
+        mode === "selected"
+          ? api.getSelectedNodes()
+          : collectFilteredSortedRowNodes(api);
+      return {
+        headers: columns.map((x) => x.headerName),
+        rows: buildExportMatrixFromRowNodes(api, columns, rowNodes),
+      };
+    },
+    [],
+  );
 
   const runExportWithSaveAs = useCallback(
     async (defaultFilename: string, buildBuffer: () => Promise<ArrayBuffer>) => {
@@ -317,15 +297,29 @@ export function ItemsListPage() {
   const listExcelLabels = useMemo(() => itemsListExcelLabels(t), [t, locale]);
 
   const handleExportCurrentView = useCallback(() => {
-    const rows = getExportRowsCurrentView();
-    runExportWithSaveAs("items.xlsx", () => buildItemsListXlsxBuffer(rows, listExcelLabels));
-  }, [getExportRowsCurrentView, listExcelLabels, runExportWithSaveAs]);
+    const payload = buildExportPayload("current");
+    runExportWithSaveAs("items.xlsx", () =>
+      buildListViewXlsxBuffer({
+        sheetName: listExcelLabels.sheetName,
+        headers: payload.headers,
+        rows: payload.rows,
+        tableNameBase: "ItemsListView",
+      }),
+    );
+  }, [buildExportPayload, listExcelLabels, runExportWithSaveAs]);
 
   const handleExportSelected = useCallback(() => {
-    const rows = getExportRowsSelected();
-    if (rows.length === 0) return;
-    runExportWithSaveAs("items-selected.xlsx", () => buildItemsListXlsxBuffer(rows, listExcelLabels));
-  }, [getExportRowsSelected, listExcelLabels, runExportWithSaveAs]);
+    const payload = buildExportPayload("selected");
+    if (payload.rows.length === 0) return;
+    runExportWithSaveAs("items-selected.xlsx", () =>
+      buildListViewXlsxBuffer({
+        sheetName: listExcelLabels.sheetName,
+        headers: payload.headers,
+        rows: payload.rows,
+        tableNameBase: "ItemsListViewSelected",
+      }),
+    );
+  }, [buildExportPayload, listExcelLabels, runExportWithSaveAs]);
 
   const exportSelectedDisabled = selectedCount === 0;
 
@@ -345,16 +339,7 @@ export function ItemsListPage() {
     [displayItems.length, searchActive, filtersActive, t, locale],
   );
 
-  useEffect(() => {
-    const api = gridRef.current?.api;
-    if (!api) return;
-    api.setGridOption("overlayNoRowsTemplate", noRowsOverlayTemplate ?? "");
-    if (displayItems.length === 0) {
-      api.showNoRowsOverlay();
-      return;
-    }
-    api.hideOverlay();
-  }, [displayItems.length, noRowsOverlayTemplate]);
+  useAgGridNoRowsOverlayLifecycle(gridRef, noRowsOverlayTemplate, displayItems.length);
 
   const baseColumnDefs = useMemo<ColDef<Item>[]>(
     () => [
@@ -443,6 +428,20 @@ export function ItemsListPage() {
     [t, locale, formatMoney],
   );
 
+  const {
+    columnDefs: settingsAwareBaseColumnDefs,
+    draftItems: columnSettingsDraftItems,
+    settingsOpen: columnSettingsOpen,
+    openSettings: openColumnSettings,
+    setDraftItems: setColumnSettingsDraftItems,
+    applyDraft: applyColumnSettingsDraft,
+    resetDraftToDefaults: resetColumnSettingsDraftToDefaults,
+    cancelDraft: cancelColumnSettingsDraft,
+  } = useAgGridColumnSettings<Item>({
+    pageKey: "items",
+    baseColumnDefs,
+  });
+
   const handleApplyColumnFilter = useCallback(
     (colId: string, clause: { operator: any; value?: string; valueTo?: string; values?: string[] }) => {
       replaceUrlAgGridColumnFilters(searchParams, setSearchParams, {
@@ -461,36 +460,76 @@ export function ItemsListPage() {
     },
     [searchParams, setSearchParams, columnFilterModel],
   );
+  const columnFilterBridge = useAgGridColumnFilterBridge(
+    columnFilterModel,
+    handleApplyColumnFilter,
+    handleResetColumnFilter,
+  );
 
   const columnDefs = useMemo(
     () =>
       decorateAgGridColumnDefsWithFilters(
-        baseColumnDefs,
+        settingsAwareBaseColumnDefs,
         itemColumnFilterConfigs,
-        columnFilterModel,
-        handleApplyColumnFilter,
-        handleResetColumnFilter,
+        columnFilterBridge,
       ),
     [
-      baseColumnDefs,
+      settingsAwareBaseColumnDefs,
       itemColumnFilterConfigs,
-      columnFilterModel,
-      handleApplyColumnFilter,
-      handleResetColumnFilter,
+      columnFilterBridge,
     ],
   );
+
+  const handleApplyColumnSettings = useCallback(() => {
+    const api = gridRef.current?.api;
+    const { hiddenIds, nextItems } = applyColumnSettingsDraft();
+    if (api) {
+      api.applyColumnState({
+        state: nextItems.map((item) => ({
+          colId: item.id,
+          hide: item.visible ? false : true,
+        })),
+        applyOrder: true,
+      });
+    }
+    if (hiddenIds.length === 0) return;
+
+    const nextColumnFilterModel = { ...columnFilterModel };
+    for (const colId of hiddenIds) {
+      delete nextColumnFilterModel[colId];
+    }
+
+    const currentSortModel = readUrlGridSort(searchParams);
+    const nextSortModel = currentSortModel.filter((entry) => !hiddenIds.includes(entry.colId));
+    const nextParams = withUrlAgGridColumnFilters(searchParams, nextColumnFilterModel);
+    const nextSortSerialized = serializeUrlGridSort(nextSortModel);
+    if (nextSortSerialized === "") {
+      nextParams.delete("sort");
+    } else {
+      nextParams.set("sort", nextSortSerialized);
+    }
+    setSearchParams(nextParams, { replace: true });
+    if (api) {
+      applyUrlGridSort(api, nextSortModel);
+    }
+  }, [
+    applyColumnSettingsDraft,
+    columnFilterModel,
+    searchParams,
+    setSearchParams,
+  ]);
 
   return (
     <ListPageLayout
       header={null}
       controls={
         <>
-          <BackButton to="/" aria-label={t("doc.list.backToDashboard")} />
           <ListPageSearch
             inputRef={listSearchInputRef}
             placeholder={t("ops.list.items.searchPlaceholder")}
             value={searchQuery}
             onChange={handleSearchQueryChange}
+            debounceMs={220}
             aria-label={t("ops.list.items.searchAria")}
             resultCount={displayItems.length}
           />
@@ -632,6 +671,15 @@ export function ItemsListPage() {
                 </PopoverContent>
               </Popover>
             </div>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="h-[1.625rem] shrink-0"
+              onClick={openColumnSettings}
+            >
+              {t("doc.list.columnSettings")}
+            </Button>
           </div>
           <Button
             type="button"
@@ -686,12 +734,6 @@ export function ItemsListPage() {
             overlayNoRowsTemplate={noRowsOverlayTemplate}
             onGridReady={(event) => {
               applyUrlGridSort(event.api, initialSortModel);
-              event.api.setGridOption("overlayNoRowsTemplate", noRowsOverlayTemplate ?? "");
-              if (displayItems.length === 0) {
-                event.api.showNoRowsOverlay();
-                return;
-              }
-              event.api.hideOverlay();
             }}
             onSortChanged={syncSortToUrl}
             rowSelection={{ mode: "multiRow", checkboxes: true, headerCheckbox: true, enableClickSelection: true }}
@@ -704,6 +746,21 @@ export function ItemsListPage() {
             onSelectionChanged={onSelectionChanged}
           />
         </AgGridContainer>
+        <AgGridColumnSettingsModal
+          open={columnSettingsOpen}
+          onOpenChange={(nextOpen) => {
+            if (nextOpen) {
+              openColumnSettings();
+              return;
+            }
+            cancelColumnSettingsDraft();
+          }}
+          items={columnSettingsDraftItems}
+          onItemsChange={(nextItems) => setColumnSettingsDraftItems(() => nextItems)}
+          onApply={handleApplyColumnSettings}
+          onCancel={cancelColumnSettingsDraft}
+          onReset={resetColumnSettingsDraftToDefaults}
+        />
       </>
     </ListPageLayout>
   );

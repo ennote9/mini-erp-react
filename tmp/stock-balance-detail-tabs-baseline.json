@@ -1,0 +1,55 @@
+{
+  "injectedDeficit": false,
+  "firstRow": {
+    "index": 0,
+    "itemCode": "ITEM-001",
+    "netShortageText": "0",
+    "coverage": "Covered",
+    "netShortage": 0
+  },
+  "snapshot": {
+    "header": "ITEM-001—Widget A",
+    "utilityButtons": [
+      "Open item card",
+      "Open related sales orders",
+      "Open related purchase orders",
+      "Open stock movements"
+    ],
+    "tabTriggers": [
+      "Operational Summary",
+      "Outbound Demand",
+      "Inbound Supply",
+      "Active Reservations"
+    ],
+    "activeTab": "Operational Summary",
+    "hasRightRail": false,
+    "hasMovementsSection": false,
+    "bounds": {
+      "viewportWidth": 1720,
+      "wrapper": {
+        "x": 273,
+        "width": 1120
+      },
+      "utilityRow": {
+        "x": 273,
+        "width": 1120
+      },
+      "headerCard": null,
+      "tabs": {
+        "x": 273,
+        "width": 524
+      },
+      "tabContent": {
+        "x": 273,
+        "width": 1120
+      }
+    }
+  },
+  "tabsSwitchCheck": {
+    "outboundVisible": true,
+    "inboundVisible": true,
+    "reservationsVisible": true
+  },
+  "actionNavigation": "http://127.0.0.1:1420/stock-movements?warehouseId=1&itemId=1",
+  "consoleErrors": []
+}

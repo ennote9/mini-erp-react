@@ -1,4 +1,4 @@
-import { useState, type Ref } from "react";
+import { useEffect, useRef, useState, type Ref } from "react";
 import { Search, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useTranslation } from "@/shared/i18n/context";
@@ -7,6 +7,8 @@ type Props = {
   placeholder: string;
   value: string;
   onChange: (value: string) => void;
+  /** Debounce delay for external state/URL sync while typing. */
+  debounceMs?: number;
   "aria-label": string;
   /** Show "X results" on the right only when value is non-empty */
   resultCount?: number;
@@ -26,6 +28,7 @@ export function ListPageSearch({
   placeholder,
   value,
   onChange,
+  debounceMs,
   "aria-label": ariaLabel,
   resultCount,
   id,
@@ -33,10 +36,49 @@ export function ListPageSearch({
   inputRef,
 }: Props) {
   const { t } = useTranslation();
+  const [inputValue, setInputValue] = useState(value);
   const [focused, setFocused] = useState(false);
-  const showLeftOverlay = value === "" && !focused;
-  const showClearButton = value !== "";
-  const showResultCount = value.trim() !== "" && resultCount != null;
+  const timerRef = useRef<number | null>(null);
+  const shouldDebounce = typeof debounceMs === "number" && debounceMs > 0;
+  const showLeftOverlay = inputValue === "" && !focused;
+  const showClearButton = inputValue !== "";
+  const showResultCount = inputValue.trim() !== "" && resultCount != null;
+
+  useEffect(() => {
+    setInputValue(value);
+  }, [value]);
+
+  useEffect(() => {
+    if (!shouldDebounce) return;
+    if (inputValue === value) return;
+    if (timerRef.current != null) {
+      window.clearTimeout(timerRef.current);
+      timerRef.current = null;
+    }
+    if (inputValue === "") {
+      onChange("");
+      return;
+    }
+    timerRef.current = window.setTimeout(() => {
+      timerRef.current = null;
+      onChange(inputValue);
+    }, debounceMs);
+    return () => {
+      if (timerRef.current != null) {
+        window.clearTimeout(timerRef.current);
+        timerRef.current = null;
+      }
+    };
+  }, [inputValue, value, onChange, debounceMs, shouldDebounce]);
+
+  const flushInput = () => {
+    if (!shouldDebounce) return;
+    if (timerRef.current != null) {
+      window.clearTimeout(timerRef.current);
+      timerRef.current = null;
+    }
+    if (inputValue !== value) onChange(inputValue);
+  };
 
   return (
     <div
@@ -56,7 +98,10 @@ export function ListPageSearch({
         <button
           type="button"
           className="list-page-search__clear"
-          onClick={() => onChange("")}
+          onClick={() => {
+            setInputValue("");
+            if (!shouldDebounce) onChange("");
+          }}
           aria-label={t("doc.list.clearSearchAria")}
         >
           <X className="list-page-search__clear-icon" />
@@ -68,10 +113,20 @@ export function ListPageSearch({
         id={id}
         name={name}
         className="list-page-search__input"
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
+        value={inputValue}
+        onChange={(e) => {
+          const next = e.target.value;
+          setInputValue(next);
+          if (!shouldDebounce) onChange(next);
+        }}
         onFocus={() => setFocused(true)}
-        onBlur={() => setFocused(false)}
+        onBlur={() => {
+          setFocused(false);
+          flushInput();
+        }}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") flushInput();
+        }}
         aria-label={ariaLabel}
         placeholder=""
       />

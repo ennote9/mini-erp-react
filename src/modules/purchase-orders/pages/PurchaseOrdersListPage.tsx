@@ -1,4 +1,4 @@
-import { useMemo, useState, useRef, useCallback, useEffect } from "react";
+import { useMemo, useState, useRef, useCallback } from "react";
 import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { AgGridReact } from "ag-grid-react";
 import type { ColDef, SelectionChangedEvent } from "ag-grid-community";
@@ -18,18 +18,23 @@ import {
   getAgGridRowNumberColDef,
   agGridSelectionColumnDef,
   decorateAgGridColumnDefsWithFilters,
+  useAgGridColumnFilterBridge,
+  useAgGridNoRowsOverlayLifecycle,
+  useAgGridColumnSettings,
+  AgGridColumnSettingsModal,
+  getVisibleAgGridExportColumns,
+  collectFilteredSortedRowNodes,
+  buildExportMatrixFromRowNodes,
   hasMeaningfulTextSelection,
   getAgGridNoRowsOverlayContent,
   buildAgGridNoRowsOverlayTemplate,
   type AgGridColumnFilterConfig,
 } from "../../../shared/ui/ag-grid";
-import { BackButton } from "../../../shared/ui/list/BackButton";
 import { ListPageSearch } from "../../../shared/ui/list/ListPageSearch";
 import { useListPageSearchHotkey } from "../../../shared/hotkeys";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { ChevronDown, FileSpreadsheet, File, FolderOpen, X } from "lucide-react";
-import { buildPurchaseOrdersListXlsxBuffer, type PurchaseOrdersExportRow } from "../purchaseOrdersListExport";
 import { save } from "@tauri-apps/plugin-dialog";
 import { invoke } from "@tauri-apps/api/core";
 import { revealItemInDir } from "@tauri-apps/plugin-opener";
@@ -37,6 +42,7 @@ import { useTranslation } from "@/shared/i18n/context";
 import { useAppDisplayFormatters } from "@/shared/formatting";
 import { buildReadableUniqueFilename, ensureUniqueExportPath } from "@/shared/export/filenameBuilder";
 import { purchaseOrdersListExcelLabels } from "@/shared/i18n/excelListExportLabels";
+import { buildListViewXlsxBuffer } from "@/shared/export/listViewXlsx";
 import { toGeneratedCodeSearchTokens } from "@/shared/generatedVisibleCodes";
 import { applyUrlGridSort, getCurrentGridSort, readUrlGridSort, serializeUrlGridSort } from "@/shared/navigation/agGridSort";
 import { appendReturnTo, buildNavigationStateKey, buildReturnToValue, replaceQueryParam } from "@/shared/navigation/returnTo";
@@ -45,6 +51,7 @@ import {
   hasActiveAgGridColumnFilters,
   readUrlAgGridColumnFilters,
   replaceUrlAgGridColumnFilters,
+  withUrlAgGridColumnFilters,
 } from "@/shared/navigation/agGridColumnFilters";
 
 type RowData = PurchaseOrder & {
@@ -85,17 +92,6 @@ function parseQueryId(searchParams: URLSearchParams, key: string): string | null
   if (raw == null) return null;
   const t = raw.trim();
   return t === "" ? null : t;
-}
-
-function buildExportRowsFromPO(rows: RowData[]): PurchaseOrdersExportRow[] {
-  return rows.map((r, idx) => ({
-    no: idx + 1,
-    number: r.number ?? "",
-    date: normalizeDateForPO(r.date),
-    supplier: r.supplierName ?? "",
-    warehouse: r.warehouseName ?? "",
-    status: r.status ?? "",
-  }));
 }
 
 export function PurchaseOrdersListPage() {
@@ -275,21 +271,22 @@ export function PurchaseOrdersListPage() {
     return itemFilterId;
   }, [itemFilterId, emDash]);
 
-  const getExportRowsCurrentView = useCallback((): PurchaseOrdersExportRow[] => {
-    const api = gridRef.current?.api;
-    if (!api) return buildExportRowsFromPO(filteredRows);
-    const rows: RowData[] = [];
-    api.forEachNodeAfterFilterAndSort((rowNode) => {
-      if (rowNode.data) rows.push(rowNode.data);
-    });
-    return buildExportRowsFromPO(rows);
-  }, [filteredRows]);
-
-  const getExportRowsSelected = useCallback((): PurchaseOrdersExportRow[] => {
-    const api = gridRef.current?.api;
-    const rows: RowData[] = api ? (api.getSelectedRows() as RowData[]) : [];
-    return buildExportRowsFromPO(rows);
-  }, []);
+  const buildExportPayload = useCallback(
+    (mode: "current" | "selected"): { headers: string[]; rows: Array<Array<string | number>> } => {
+      const api = gridRef.current?.api;
+      if (!api) return { headers: [], rows: [] };
+      const columns = getVisibleAgGridExportColumns(api);
+      const rowNodes =
+        mode === "selected"
+          ? api.getSelectedNodes()
+          : collectFilteredSortedRowNodes(api);
+      return {
+        headers: columns.map((x) => x.headerName),
+        rows: buildExportMatrixFromRowNodes(api, columns, rowNodes),
+      };
+    },
+    [],
+  );
 
   const runExportWithSaveAs = useCallback(
     async (defaultFilename: string, buildBuffer: () => Promise<ArrayBuffer>) => {
@@ -333,15 +330,29 @@ export function PurchaseOrdersListPage() {
   const listExcelLabels = useMemo(() => purchaseOrdersListExcelLabels(t), [t, locale]);
 
   const handleExportCurrentView = useCallback(() => {
-    const rows = getExportRowsCurrentView();
-    runExportWithSaveAs("purchase-orders.xlsx", () => buildPurchaseOrdersListXlsxBuffer(rows, listExcelLabels));
-  }, [getExportRowsCurrentView, listExcelLabels, runExportWithSaveAs]);
+    const payload = buildExportPayload("current");
+    runExportWithSaveAs("purchase-orders.xlsx", () =>
+      buildListViewXlsxBuffer({
+        sheetName: listExcelLabels.sheetName,
+        headers: payload.headers,
+        rows: payload.rows,
+        tableNameBase: "PurchaseOrdersListView",
+      }),
+    );
+  }, [buildExportPayload, listExcelLabels, runExportWithSaveAs]);
 
   const handleExportSelected = useCallback(() => {
-    const rows = getExportRowsSelected();
-    if (rows.length === 0) return;
-    runExportWithSaveAs("purchase-orders-selected.xlsx", () => buildPurchaseOrdersListXlsxBuffer(rows, listExcelLabels));
-  }, [getExportRowsSelected, listExcelLabels, runExportWithSaveAs]);
+    const payload = buildExportPayload("selected");
+    if (payload.rows.length === 0) return;
+    runExportWithSaveAs("purchase-orders-selected.xlsx", () =>
+      buildListViewXlsxBuffer({
+        sheetName: listExcelLabels.sheetName,
+        headers: payload.headers,
+        rows: payload.rows,
+        tableNameBase: "PurchaseOrdersListViewSelected",
+      }),
+    );
+  }, [buildExportPayload, listExcelLabels, runExportWithSaveAs]);
 
   const exportSelectedDisabled = selectedCount === 0;
 
@@ -361,16 +372,7 @@ export function PurchaseOrdersListPage() {
     [rowsWithNames.length, displayRows.length, searchActive, filtersActive, t, locale],
   );
 
-  useEffect(() => {
-    const api = gridRef.current?.api;
-    if (!api) return;
-    api.setGridOption("overlayNoRowsTemplate", noRowsOverlayTemplate ?? "");
-    if (displayRows.length === 0) {
-      api.showNoRowsOverlay();
-      return;
-    }
-    api.hideOverlay();
-  }, [displayRows.length, noRowsOverlayTemplate]);
+  useAgGridNoRowsOverlayLifecycle(gridRef, noRowsOverlayTemplate, displayRows.length);
 
   const baseColumnDefs = useMemo<ColDef<RowData>[]>(
     () => [
@@ -406,6 +408,20 @@ export function PurchaseOrdersListPage() {
     [t, locale, formatDate],
   );
 
+  const {
+    columnDefs: settingsAwareBaseColumnDefs,
+    draftItems: columnSettingsDraftItems,
+    settingsOpen: columnSettingsOpen,
+    openSettings: openColumnSettings,
+    setDraftItems: setColumnSettingsDraftItems,
+    applyDraft: applyColumnSettingsDraft,
+    resetDraftToDefaults: resetColumnSettingsDraftToDefaults,
+    cancelDraft: cancelColumnSettingsDraft,
+  } = useAgGridColumnSettings<RowData>({
+    pageKey: "purchase-orders",
+    baseColumnDefs,
+  });
+
   const handleApplyColumnFilter = useCallback(
     (colId: string, clause: { operator: any; value?: string; valueTo?: string; values?: string[] }) => {
       replaceUrlAgGridColumnFilters(searchParams, setSearchParams, {
@@ -424,36 +440,75 @@ export function PurchaseOrdersListPage() {
     },
     [searchParams, setSearchParams, columnFilterModel],
   );
+  const columnFilterBridge = useAgGridColumnFilterBridge(
+    columnFilterModel,
+    handleApplyColumnFilter,
+    handleResetColumnFilter,
+  );
 
   const columnDefs = useMemo(
     () =>
       decorateAgGridColumnDefsWithFilters(
-        baseColumnDefs,
+        settingsAwareBaseColumnDefs,
         purchaseOrderColumnFilterConfigs,
-        columnFilterModel,
-        handleApplyColumnFilter,
-        handleResetColumnFilter,
+        columnFilterBridge,
       ),
     [
-      baseColumnDefs,
+      settingsAwareBaseColumnDefs,
       purchaseOrderColumnFilterConfigs,
-      columnFilterModel,
-      handleApplyColumnFilter,
-      handleResetColumnFilter,
+      columnFilterBridge,
     ],
   );
+
+  const handleApplyColumnSettings = useCallback(() => {
+    const api = gridRef.current?.api;
+    const { hiddenIds, nextItems } = applyColumnSettingsDraft();
+    if (api) {
+      api.applyColumnState({
+        state: nextItems.map((item) => ({
+          colId: item.id,
+          hide: item.visible ? false : true,
+        })),
+        applyOrder: true,
+      });
+    }
+    if (hiddenIds.length === 0) return;
+
+    const nextColumnFilterModel = { ...columnFilterModel };
+    for (const colId of hiddenIds) {
+      delete nextColumnFilterModel[colId];
+    }
+    const currentSortModel = readUrlGridSort(searchParams);
+    const nextSortModel = currentSortModel.filter((entry) => !hiddenIds.includes(entry.colId));
+    const nextParams = withUrlAgGridColumnFilters(searchParams, nextColumnFilterModel);
+    const nextSortSerialized = serializeUrlGridSort(nextSortModel);
+    if (nextSortSerialized === "") {
+      nextParams.delete("sort");
+    } else {
+      nextParams.set("sort", nextSortSerialized);
+    }
+    setSearchParams(nextParams, { replace: true });
+    if (api) {
+      applyUrlGridSort(api, nextSortModel);
+    }
+  }, [
+    applyColumnSettingsDraft,
+    columnFilterModel,
+    searchParams,
+    setSearchParams,
+  ]);
 
   return (
     <ListPageLayout
       header={null}
       controls={
         <>
-          <BackButton to="/" aria-label={t("doc.list.backToDashboard")} />
           <ListPageSearch
             inputRef={listSearchInputRef}
             placeholder={t("ops.list.purchaseOrders.searchPlaceholder")}
             value={searchQuery}
             onChange={(value) => setQueryValue("q", value)}
+            debounceMs={220}
             aria-label={t("ops.list.purchaseOrders.searchAria")}
             resultCount={displayRows.length}
           />
@@ -621,6 +676,15 @@ export function PurchaseOrdersListPage() {
                 </PopoverContent>
               </Popover>
             </div>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="h-[1.625rem] shrink-0"
+              onClick={openColumnSettings}
+            >
+              {t("doc.list.columnSettings")}
+            </Button>
           </div>
           <Button
             type="button"
@@ -644,12 +708,6 @@ export function PurchaseOrdersListPage() {
             overlayNoRowsTemplate={noRowsOverlayTemplate}
             onGridReady={(event) => {
               applyUrlGridSort(event.api, initialSortModel);
-              event.api.setGridOption("overlayNoRowsTemplate", noRowsOverlayTemplate ?? "");
-              if (displayRows.length === 0) {
-                event.api.showNoRowsOverlay();
-                return;
-              }
-              event.api.hideOverlay();
             }}
             onSortChanged={handleSortChanged}
             rowSelection={{ mode: "multiRow", checkboxes: true, headerCheckbox: true, enableClickSelection: true }}
@@ -662,6 +720,21 @@ export function PurchaseOrdersListPage() {
             onSelectionChanged={onSelectionChanged}
           />
       </AgGridContainer>
+      <AgGridColumnSettingsModal
+        open={columnSettingsOpen}
+        onOpenChange={(nextOpen) => {
+          if (nextOpen) {
+            openColumnSettings();
+            return;
+          }
+          cancelColumnSettingsDraft();
+        }}
+        items={columnSettingsDraftItems}
+        onItemsChange={(nextItems) => setColumnSettingsDraftItems(() => nextItems)}
+        onApply={handleApplyColumnSettings}
+        onCancel={cancelColumnSettingsDraft}
+        onReset={resetColumnSettingsDraftToDefaults}
+      />
     </ListPageLayout>
   );
 }

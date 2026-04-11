@@ -23,6 +23,8 @@ import {
   agGridDefaultGridOptions,
   agGridRowNumberColDef,
   decorateAgGridColumnDefsWithFilters,
+  useAgGridColumnFilterBridge,
+  useAgGridNoRowsOverlayLifecycle,
   hasMeaningfulTextSelection,
   getAgGridNoRowsOverlayContent,
   buildAgGridNoRowsOverlayTemplate,
@@ -345,16 +347,7 @@ export function MarkdownJournalPage() {
     [baseRowsCount, activeRows.length, searchActive, filtersActive, t],
   );
 
-  useEffect(() => {
-    const api = gridRef.current?.api;
-    if (!api) return;
-    api.setGridOption("overlayNoRowsTemplate", noRowsOverlayTemplate ?? "");
-    if (activeRows.length === 0) {
-      api.showNoRowsOverlay();
-      return;
-    }
-    api.hideOverlay();
-  }, [activeRows.length, noRowsOverlayTemplate]);
+  useAgGridNoRowsOverlayLifecycle(gridRef, noRowsOverlayTemplate, activeRows.length);
 
   const handleApplyColumnFilter = useCallback(
     (colId: string, clause: AgGridColumnFilterClause) => {
@@ -373,6 +366,11 @@ export function MarkdownJournalPage() {
       replaceUrlAgGridColumnFilters(searchParams, setSearchParams, nextModel);
     },
     [columnFilterModel, searchParams, setSearchParams],
+  );
+  const columnFilterBridge = useAgGridColumnFilterBridge(
+    columnFilterModel,
+    handleApplyColumnFilter,
+    handleResetColumnFilter,
   );
 
   const baseJournalColumnDefs = useMemo<ColDef<JournalRow>[]>(
@@ -505,16 +503,12 @@ export function MarkdownJournalPage() {
       decorateAgGridColumnDefsWithFilters(
         baseJournalColumnDefs,
         journalColumnFilterConfigs,
-        columnFilterModel,
-        handleApplyColumnFilter,
-        handleResetColumnFilter,
+        columnFilterBridge,
       ),
     [
       baseJournalColumnDefs,
       journalColumnFilterConfigs,
-      columnFilterModel,
-      handleApplyColumnFilter,
-      handleResetColumnFilter,
+      columnFilterBridge,
     ],
   );
 
@@ -523,16 +517,12 @@ export function MarkdownJournalPage() {
       decorateAgGridColumnDefsWithFilters(
         baseCodeColumnDefs,
         codeColumnFilterConfigs,
-        columnFilterModel,
-        handleApplyColumnFilter,
-        handleResetColumnFilter,
+        columnFilterBridge,
       ),
     [
       baseCodeColumnDefs,
       codeColumnFilterConfigs,
-      columnFilterModel,
-      handleApplyColumnFilter,
-      handleResetColumnFilter,
+      columnFilterBridge,
     ],
   );
 
@@ -573,6 +563,7 @@ export function MarkdownJournalPage() {
               }
               value={search}
               onChange={(value) => setQueryValue("q", value)}
+              debounceMs={220}
               aria-label={
                 view === "journals"
                   ? t("markdown.journal.searchJournals")
@@ -618,12 +609,6 @@ export function MarkdownJournalPage() {
           overlayNoRowsTemplate={noRowsOverlayTemplate}
           onGridReady={(event) => {
             applyUrlGridSort(event.api, initialSortModel);
-            event.api.setGridOption("overlayNoRowsTemplate", noRowsOverlayTemplate ?? "");
-            if (activeRows.length === 0) {
-              event.api.showNoRowsOverlay();
-              return;
-            }
-            event.api.hideOverlay();
           }}
           onSortChanged={handleSortChanged}
           getRowId={(params) => params.data.id}

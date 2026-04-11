@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import type { ColDef, IHeaderParams } from "ag-grid-community";
 import { ArrowDown, ArrowUp, ArrowUpDown, Check, ChevronDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -37,10 +37,74 @@ type DraftState = {
 
 type HeaderParams = IHeaderParams & {
   filterConfig?: AgGridColumnFilterConfig<unknown>;
-  filterClause?: AgGridColumnFilterClause | null;
-  onApplyColumnFilter?: (colId: string, clause: AgGridColumnFilterClause) => void;
-  onResetColumnFilter?: (colId: string) => void;
+  filterBridge?: AgGridColumnFilterBridge;
 };
+
+type FilterBridgeListener = () => void;
+
+export type AgGridColumnFilterBridge = {
+  getClause: (colId: string) => AgGridColumnFilterClause | null;
+  apply: (colId: string, clause: AgGridColumnFilterClause) => void;
+  reset: (colId: string) => void;
+  subscribe: (listener: FilterBridgeListener) => () => void;
+  getSnapshot: () => number;
+  update: (
+    model: AgGridColumnFilterModel,
+    onApply: (colId: string, clause: AgGridColumnFilterClause) => void,
+    onReset: (colId: string) => void,
+  ) => void;
+};
+
+function createAgGridColumnFilterBridge(
+  model: AgGridColumnFilterModel,
+  onApply: (colId: string, clause: AgGridColumnFilterClause) => void,
+  onReset: (colId: string) => void,
+): AgGridColumnFilterBridge {
+  let currentModel = model;
+  let currentApply = onApply;
+  let currentReset = onReset;
+  let version = 0;
+  const listeners = new Set<FilterBridgeListener>();
+
+  const emit = () => {
+    version += 1;
+    for (const listener of listeners) listener();
+  };
+
+  return {
+    getClause: (colId) => currentModel[colId] ?? null,
+    apply: (colId, clause) => currentApply(colId, clause),
+    reset: (colId) => currentReset(colId),
+    subscribe: (listener) => {
+      listeners.add(listener);
+      return () => listeners.delete(listener);
+    },
+    getSnapshot: () => version,
+    update: (nextModel, nextApply, nextReset) => {
+      currentModel = nextModel;
+      currentApply = nextApply;
+      currentReset = nextReset;
+      emit();
+    },
+  };
+}
+
+export function useAgGridColumnFilterBridge(
+  model: AgGridColumnFilterModel,
+  onApply: (colId: string, clause: AgGridColumnFilterClause) => void,
+  onReset: (colId: string) => void,
+): AgGridColumnFilterBridge {
+  const bridgeRef = useRef<AgGridColumnFilterBridge | null>(null);
+  if (bridgeRef.current == null) {
+    bridgeRef.current = createAgGridColumnFilterBridge(model, onApply, onReset);
+  }
+
+  useEffect(() => {
+    bridgeRef.current?.update(model, onApply, onReset);
+  }, [model, onApply, onReset]);
+
+  return bridgeRef.current;
+}
 
 const FILTERABLE_KINDS = new Set<AgGridFilterKind>(["text", "enum", "number", "date", "datetime", "boolean"]);
 
@@ -420,8 +484,14 @@ function parseMultiValueInput(raw: string): string[] {
 function AgGridColumnFilterHeader(props: HeaderParams) {
   const { t } = useTranslation();
   const config = props.filterConfig;
-  const filterClause = props.filterClause ?? null;
   const filterColId = props.column.getColId();
+  const bridge = props.filterBridge;
+  useSyncExternalStore(
+    bridge?.subscribe ?? (() => () => undefined),
+    bridge?.getSnapshot ?? (() => 0),
+    bridge?.getSnapshot ?? (() => 0),
+  );
+  const filterClause = bridge?.getClause(filterColId) ?? null;
   const [open, setOpen] = useState(false);
   const [draft, setDraft] = useState<DraftState>(() =>
     draftFromClause(config ?? { kind: "text" }, filterClause),
@@ -460,13 +530,13 @@ function AgGridColumnFilterHeader(props: HeaderParams) {
   const sortActive = sortDirection !== null;
 
   const applyDraft = () => {
-    if (!props.onApplyColumnFilter || !isDraftComplete(draft)) return;
-    props.onApplyColumnFilter(filterColId, clauseFromDraft(draft));
+    if (!bridge || !isDraftComplete(draft)) return;
+    bridge.apply(filterColId, clauseFromDraft(draft));
     setOpen(false);
   };
 
   const resetDraft = () => {
-    props.onResetColumnFilter?.(filterColId);
+    bridge?.reset(filterColId);
     setOpen(false);
   };
 
@@ -721,9 +791,7 @@ function AgGridColumnFilterHeader(props: HeaderParams) {
 export function decorateAgGridColumnDefsWithFilters<T>(
   columnDefs: ColDef<T>[],
   filterConfigs: Record<string, AgGridColumnFilterConfig<T>>,
-  filterModel: AgGridColumnFilterModel,
-  onApplyColumnFilter: (colId: string, clause: AgGridColumnFilterClause) => void,
-  onResetColumnFilter: (colId: string) => void,
+  filterBridge: AgGridColumnFilterBridge,
 ): ColDef<T>[] {
   return columnDefs.map((columnDef) => {
     const colId = getFilterColId(columnDef);
@@ -735,9 +803,7 @@ export function decorateAgGridColumnDefsWithFilters<T>(
       headerComponent: AgGridColumnFilterHeader,
       headerComponentParams: {
         filterConfig,
-        filterClause: filterModel[colId] ?? null,
-        onApplyColumnFilter,
-        onResetColumnFilter,
+        filterBridge,
       },
     };
   });

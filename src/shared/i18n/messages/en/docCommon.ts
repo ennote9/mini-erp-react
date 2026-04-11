@@ -417,5 +417,9 @@ export const docCommonEn = {
     exportSelectionEditModeOnly: "Selection is available in edit mode only.",
     clearSearchAria: "Clear search",
     searchResultsCount: "{{count}} results",
+    columnSettings: "Columns",
+    columnSettingsTitle: "Column settings",
+    columnSettingsDescription: "Choose which columns are visible and set their order for this list.",
+    columnSettingsReset: "Reset to default",
   },
 } as const;
