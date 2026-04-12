@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
 import * as Dialog from "@radix-ui/react-dialog";
+import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 import { DndContext, PointerSensor, closestCenter, useSensor, useSensors, type DragEndEvent } from "@dnd-kit/core";
 import { SortableContext, arrayMove, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { ChevronDown, ChevronUp, GripVertical, Lock, Plus, Trash2 } from "lucide-react";
+import { ChevronDown, ChevronUp, GripVertical, Lock, MoreHorizontal, Plus, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
@@ -49,15 +50,12 @@ type ConfiguratorTab = "fields" | "filtering" | "sorting";
 
 type RowProps = {
   item: AgGridColumnSettingsItem;
-  index: number;
-  total: number;
   selected: boolean;
   onToggleVisible: (id: string, checked: boolean) => void;
-  onMove: (id: string, direction: -1 | 1) => void;
-  onSelect: (id: string) => void;
+  onSelect: (id: string, ctrlToggle: boolean) => void;
 };
 
-function SortableColumnRow({ item, index, total, selected, onToggleVisible, onMove, onSelect }: RowProps) {
+function SortableColumnRow({ item, selected, onToggleVisible, onSelect }: RowProps) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: item.id,
     disabled: item.lockedOrder,
@@ -75,7 +73,7 @@ function SortableColumnRow({ item, index, total, selected, onToggleVisible, onMo
       className={`flex items-center gap-2 rounded-md border px-2 py-1.5 ${
         selected ? "border-primary/60 bg-primary/10" : "border-input bg-background"
       } ${isDragging ? "opacity-75" : ""}`.trim()}
-      onClick={() => onSelect(item.id)}
+      onClick={(event) => onSelect(item.id, event.ctrlKey || event.metaKey)}
     >
       <button
         type="button"
@@ -104,38 +102,6 @@ function SortableColumnRow({ item, index, total, selected, onToggleVisible, onMo
           Fixed
         </span>
       )}
-      {!item.lockedOrder && (
-        <div className="ml-1 inline-flex items-center gap-0.5">
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon"
-            className="h-6 w-6 text-muted-foreground hover:text-foreground"
-            onClick={(event) => {
-              event.stopPropagation();
-              onMove(item.id, -1);
-            }}
-            disabled={index <= 0}
-            aria-label="Move up"
-          >
-            <ChevronUp className="h-3.5 w-3.5" />
-          </Button>
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon"
-            className="h-6 w-6 text-muted-foreground hover:text-foreground"
-            onClick={(event) => {
-              event.stopPropagation();
-              onMove(item.id, 1);
-            }}
-            disabled={index >= total - 1}
-            aria-label="Move down"
-          >
-            <ChevronDown className="h-3.5 w-3.5" />
-          </Button>
-        </div>
-      )}
     </div>
   );
 }
@@ -148,7 +114,7 @@ type SortableSortRuleRowProps = {
   sortableFields: ListViewFieldRegistryEntry[];
   usedSortFields: Set<string>;
   tx: (key: string, fallback: string) => string;
-  onSelect: () => void;
+  onSelect: (ctrlToggle: boolean) => void;
   onChange: (patch: Partial<ListViewDeepSortRule>) => void;
 };
 
@@ -172,6 +138,25 @@ function SortableSortRuleRow({
     transition,
   };
 
+  const handleEditControlPointerDown = (
+    event: { preventDefault: () => void; stopPropagation: () => void },
+    ctrlToggle: boolean,
+  ) => {
+    if (ctrlToggle) {
+      event.preventDefault();
+      event.stopPropagation();
+      onSelect(true);
+      return;
+    }
+    if (!selected) {
+      event.preventDefault();
+      event.stopPropagation();
+      onSelect(false);
+      return;
+    }
+    event.stopPropagation();
+  };
+
   return (
     <div
       ref={setNodeRef}
@@ -181,13 +166,13 @@ function SortableSortRuleRow({
           ? "border-primary/60 bg-primary/10"
           : "border-input bg-background hover:border-border/90"
       } ${isDragging ? "opacity-75" : ""}`.trim()}
-      onClick={onSelect}
+      onClick={(event) => onSelect(event.ctrlKey || event.metaKey)}
       role="button"
       tabIndex={0}
       onKeyDown={(event) => {
         if (event.key === "Enter" || event.key === " ") {
           event.preventDefault();
-          onSelect();
+          onSelect(false);
         }
       }}
       aria-pressed={selected}
@@ -197,7 +182,10 @@ function SortableSortRuleRow({
         {...attributes}
         {...listeners}
         className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-foreground"
-        onClick={onSelect}
+        onClick={(event) => {
+          event.stopPropagation();
+          onSelect(false);
+        }}
         aria-label={tx("doc.list.viewSortDragHandle", "Drag to reorder")}
       >
         <GripVertical className="h-4 w-4" />
@@ -207,10 +195,10 @@ function SortableSortRuleRow({
         aria-label={`${tx("doc.list.viewRuleEnabled", "Enabled")} #${index + 1}`}
         onClick={(event) => {
           event.stopPropagation();
-          onSelect();
+          onSelect(false);
         }}
         onCheckedChange={(checked) => {
-          onSelect();
+          onSelect(false);
           onChange({ enabled: checked === true });
         }}
       />
@@ -220,12 +208,9 @@ function SortableSortRuleRow({
       <select
         className="h-8 min-w-[10rem] flex-[1_1_15rem] rounded-md border border-input bg-background px-2 text-xs text-foreground"
         value={rule.fieldKey}
-        onClick={(event) => {
-          event.stopPropagation();
-          onSelect();
-        }}
+        onPointerDown={(event) => handleEditControlPointerDown(event, event.ctrlKey || event.metaKey)}
+        onClick={(event) => event.stopPropagation()}
         onChange={(event) => {
-          onSelect();
           onChange({ fieldKey: event.target.value });
         }}
       >
@@ -242,12 +227,9 @@ function SortableSortRuleRow({
       <select
         className="h-8 w-[9rem] shrink-0 rounded-md border border-input bg-background px-2 text-xs text-foreground"
         value={rule.direction}
-        onClick={(event) => {
-          event.stopPropagation();
-          onSelect();
-        }}
+        onPointerDown={(event) => handleEditControlPointerDown(event, event.ctrlKey || event.metaKey)}
+        onClick={(event) => event.stopPropagation()}
         onChange={(event) => {
-          onSelect();
           onChange({ direction: event.target.value as "asc" | "desc" });
         }}
       >
@@ -371,14 +353,59 @@ export function AgGridColumnSettingsModal({
   );
   const [pendingSwitchViewId, setPendingSwitchViewId] = useState<string | null>(null);
   const [confirmingSaveChanges, setConfirmingSaveChanges] = useState(false);
-  const [confirmingDeleteView, setConfirmingDeleteView] = useState(false);
-  const [selectedFieldId, setSelectedFieldId] = useState<string | null>(null);
-  const [selectedFilterIndex, setSelectedFilterIndex] = useState<number | null>(null);
-  const [selectedSortFieldKey, setSelectedSortFieldKey] = useState<string | null>(null);
+  const [createViewDialogOpen, setCreateViewDialogOpen] = useState(false);
+  const [renameViewDialogOpen, setRenameViewDialogOpen] = useState(false);
+  const [deleteViewDialogOpen, setDeleteViewDialogOpen] = useState(false);
+  const [createViewName, setCreateViewName] = useState("");
+  const [renameViewName, setRenameViewName] = useState("");
+  const [selectedFieldIds, setSelectedFieldIds] = useState<string[]>([]);
+  const [selectedFilterIndexes, setSelectedFilterIndexes] = useState<number[]>([]);
+  const [selectedSortFieldKeys, setSelectedSortFieldKeys] = useState<string[]>([]);
 
   const tx = (key: string, fallback: string): string => {
     const translated = t(key);
     return translated === key ? fallback : translated;
+  };
+
+  const toggleSelection = <T,>(current: T[], value: T, ctrlToggle: boolean): T[] => {
+    if (!ctrlToggle) return [value];
+    return current.includes(value) ? current.filter((item) => item !== value) : [...current, value];
+  };
+
+  const moveSelectionByOne = <T,>(
+    list: T[],
+    selectedIndices: number[],
+    direction: -1 | 1,
+    canSwap?: (fromIndex: number, toIndex: number, snapshot: T[]) => boolean,
+  ) => {
+    const next = [...list];
+    const selectedFlags = list.map((_, index) => selectedIndices.includes(index));
+    let moved = false;
+
+    if (direction === -1) {
+      for (let index = 1; index < next.length; index += 1) {
+        if (!selectedFlags[index] || selectedFlags[index - 1]) continue;
+        if (canSwap && !canSwap(index, index - 1, next)) continue;
+        [next[index - 1], next[index]] = [next[index], next[index - 1]];
+        [selectedFlags[index - 1], selectedFlags[index]] = [selectedFlags[index], selectedFlags[index - 1]];
+        moved = true;
+      }
+    } else {
+      for (let index = next.length - 2; index >= 0; index -= 1) {
+        if (!selectedFlags[index] || selectedFlags[index + 1]) continue;
+        if (canSwap && !canSwap(index, index + 1, next)) continue;
+        [next[index], next[index + 1]] = [next[index + 1], next[index]];
+        [selectedFlags[index], selectedFlags[index + 1]] = [selectedFlags[index + 1], selectedFlags[index]];
+        moved = true;
+      }
+    }
+
+    const nextSelectedIndices = selectedFlags.reduce<number[]>((acc, selected, index) => {
+      if (selected) acc.push(index);
+      return acc;
+    }, []);
+
+    return { next, nextSelectedIndices, moved };
   };
 
   const summary = useMemo(() => {
@@ -389,31 +416,41 @@ export function AgGridColumnSettingsModal({
   }, [items, filterRules, sortRules]);
 
   const handleCreateView = () => {
-    const name = window.prompt(
-      tx("doc.list.viewActionSaveAsPrompt", "Enter a name for the new view"),
-      "",
-    );
-    if (name == null) return;
-    const trimmed = name.trim();
+    const trimmed = createViewName.trim();
     if (trimmed === "") return;
     onCreateView(trimmed);
+    setCreateViewDialogOpen(false);
+    setCreateViewName("");
   };
 
   const handleRenameView = () => {
     if (!activeView) return;
-    const name = window.prompt(
-      tx("doc.list.viewActionRenamePrompt", "Enter a new name"),
-      activeView.name,
-    );
-    if (name == null) return;
-    const trimmed = name.trim();
-    if (trimmed === "") return;
+    const trimmed = renameViewName.trim();
+    if (trimmed === "" || trimmed === activeView.name.trim()) return;
     onRenameActiveView(trimmed);
+    setRenameViewDialogOpen(false);
   };
 
   const handleDeleteView = () => {
     if (!activeView) return;
-    setConfirmingDeleteView(true);
+    onDeleteActiveView();
+    setDeleteViewDialogOpen(false);
+  };
+
+  const openCreateViewDialog = () => {
+    setCreateViewName("");
+    setCreateViewDialogOpen(true);
+  };
+
+  const openRenameViewDialog = () => {
+    if (!activeView) return;
+    setRenameViewName(activeView.name);
+    setRenameViewDialogOpen(true);
+  };
+
+  const openDeleteViewDialog = () => {
+    if (!activeView) return;
+    setDeleteViewDialogOpen(true);
   };
 
   const handleViewSelectChange = (nextViewId: string | null) => {
@@ -456,22 +493,12 @@ export function AgGridColumnSettingsModal({
     onItemsChange(items.map((x) => (x.id === id ? { ...x, visible: x.lockedVisible ? true : checked } : x)));
   };
 
-  const handleMove = (id: string, direction: -1 | 1) => {
-    const index = items.findIndex((x) => x.id === id);
-    if (index < 0) return;
-    const targetIndex = index + direction;
-    if (targetIndex < 0 || targetIndex >= items.length) return;
-    const target = items[targetIndex];
-    if (target.lockedOrder) return;
-    onItemsChange(arrayMove(items, index, targetIndex));
-  };
-
   const handleAddFilterRule = () => {
     const field = filterableFields[0];
     if (!field) return;
     const operator = firstOperatorForField(field);
     if (!operator) return;
-    onFilterRulesChange([
+    const nextRules = [
       ...filterRules,
       {
         fieldKey: field.fieldKey,
@@ -479,7 +506,9 @@ export function AgGridColumnSettingsModal({
         enabled: false,
         priority: filterRules.length,
       },
-    ]);
+    ];
+    onFilterRulesChange(nextRules);
+    setSelectedFilterIndexes([nextRules.length - 1]);
   };
 
   const handleChangeFilterRule = (index: number, patch: Partial<ListViewDeepFilterRule>) => {
@@ -496,28 +525,31 @@ export function AgGridColumnSettingsModal({
     );
   };
 
-  const handleRemoveFilterRule = (index: number) => {
-    const next = filterRules.filter((_, currentIndex) => currentIndex !== index).map((rule, currentIndex) => ({
+  const handleRemoveFilterRules = (indexesToRemove: number[]) => {
+    if (indexesToRemove.length === 0) return;
+    const removeSet = new Set(indexesToRemove);
+    const next = filterRules.filter((_, currentIndex) => !removeSet.has(currentIndex)).map((rule, currentIndex) => ({
       ...rule,
       priority: currentIndex,
     }));
     onFilterRulesChange(next);
     if (next.length === 0) {
-      setSelectedFilterIndex(null);
+      setSelectedFilterIndexes([]);
       return;
     }
-    setSelectedFilterIndex(Math.min(index, next.length - 1));
+    const anchor = Math.min(...indexesToRemove);
+    setSelectedFilterIndexes([Math.min(anchor, next.length - 1)]);
   };
 
-  const handleMoveFilterRule = (index: number, direction: -1 | 1) => {
-    const targetIndex = index + direction;
-    if (targetIndex < 0 || targetIndex >= filterRules.length) return;
-    const moved = arrayMove(filterRules, index, targetIndex).map((rule, nextIndex) => ({
+  const handleMoveFilterRules = (selectedIndices: number[], direction: -1 | 1) => {
+    const { next, nextSelectedIndices, moved } = moveSelectionByOne(filterRules, selectedIndices, direction);
+    if (!moved) return;
+    const normalized = next.map((rule, nextIndex) => ({
       ...rule,
       priority: nextIndex,
     }));
-    onFilterRulesChange(moved);
-    setSelectedFilterIndex(targetIndex);
+    onFilterRulesChange(normalized);
+    setSelectedFilterIndexes(nextSelectedIndices);
   };
 
   const handleAddSortRule = () => {
@@ -533,7 +565,7 @@ export function AgGridColumnSettingsModal({
       },
     ];
     onSortRulesChange(next);
-    setSelectedSortFieldKey(field.fieldKey);
+    setSelectedSortFieldKeys([field.fieldKey]);
   };
 
   const handleChangeSortRule = (index: number, patch: Partial<ListViewDeepSortRule>) => {
@@ -550,8 +582,12 @@ export function AgGridColumnSettingsModal({
           : { ...rule, priority: currentIndex },
       ),
     );
-    if (selectedSortFieldKey && currentFieldKey && selectedSortFieldKey === currentFieldKey && nextSelectedFieldKey) {
-      setSelectedSortFieldKey(nextSelectedFieldKey);
+    if (currentFieldKey && nextSelectedFieldKey) {
+      setSelectedSortFieldKeys((currentSelection) =>
+        currentSelection.includes(currentFieldKey)
+          ? currentSelection.map((key) => (key === currentFieldKey ? nextSelectedFieldKey : key))
+          : currentSelection,
+      );
     }
   };
 
@@ -566,86 +602,101 @@ export function AgGridColumnSettingsModal({
       priority: nextIndex,
     }));
     onSortRulesChange(moved);
+    setSelectedSortFieldKeys([String(active.id)]);
   };
 
-  const handleMoveSortRule = (index: number, direction: -1 | 1) => {
-    const targetIndex = index + direction;
-    if (targetIndex < 0 || targetIndex >= sortRules.length) return;
-    const movedRule = sortRules[index];
-    const moved = arrayMove(sortRules, index, targetIndex).map((rule, nextIndex) => ({
+  const handleMoveSortRules = (selectedIndices: number[], direction: -1 | 1) => {
+    const { next, nextSelectedIndices, moved } = moveSelectionByOne(sortRules, selectedIndices, direction);
+    if (!moved) return;
+    const normalized = next.map((rule, nextIndex) => ({
       ...rule,
       priority: nextIndex,
     }));
-    onSortRulesChange(moved);
-    setSelectedSortFieldKey(movedRule?.fieldKey ?? null);
+    onSortRulesChange(normalized);
+    setSelectedSortFieldKeys(nextSelectedIndices.map((index) => normalized[index]?.fieldKey).filter(Boolean));
   };
 
-  const handleRemoveSortRule = (index: number) => {
-    const nextRules = sortRules.filter((_, currentIndex) => currentIndex !== index).map((rule, currentIndex) => ({
+  const handleRemoveSortRules = (indexesToRemove: number[]) => {
+    if (indexesToRemove.length === 0) return;
+    const removeSet = new Set(indexesToRemove);
+    const nextRules = sortRules.filter((_, currentIndex) => !removeSet.has(currentIndex)).map((rule, currentIndex) => ({
       ...rule,
       priority: currentIndex,
     }));
     onSortRulesChange(nextRules);
 
     if (nextRules.length === 0) {
-      setSelectedSortFieldKey(null);
+      setSelectedSortFieldKeys([]);
       return;
     }
 
-    const nextSelection = nextRules[index] ?? nextRules[index - 1] ?? null;
-    setSelectedSortFieldKey(nextSelection?.fieldKey ?? null);
+    const anchor = Math.min(...indexesToRemove);
+    const nextSelection = nextRules[Math.min(anchor, nextRules.length - 1)] ?? null;
+    setSelectedSortFieldKeys(nextSelection?.fieldKey ? [nextSelection.fieldKey] : []);
   };
 
-  const selectedSortIndex = useMemo(() => {
-    if (!selectedSortFieldKey) return -1;
-    return sortRules.findIndex((rule) => rule.fieldKey === selectedSortFieldKey);
-  }, [sortRules, selectedSortFieldKey]);
+  const selectedFieldIdSet = useMemo(() => new Set(selectedFieldIds), [selectedFieldIds]);
+  const selectedFieldIndices = useMemo(
+    () => items.map((item, index) => (selectedFieldIdSet.has(item.id) ? index : -1)).filter((index) => index >= 0),
+    [items, selectedFieldIdSet],
+  );
+  const selectedFieldIndexSet = useMemo(() => new Set(selectedFieldIndices), [selectedFieldIndices]);
 
-  const selectedFieldIndex = useMemo(() => {
-    if (!selectedFieldId) return -1;
-    return items.findIndex((item) => item.id === selectedFieldId);
-  }, [items, selectedFieldId]);
+  const selectedFilterIndices = useMemo(
+    () =>
+      [...new Set(selectedFilterIndexes)]
+        .filter((index) => index >= 0 && index < filterRules.length)
+        .sort((left, right) => left - right),
+    [selectedFilterIndexes, filterRules.length],
+  );
+  const selectedFilterIndexSet = useMemo(() => new Set(selectedFilterIndices), [selectedFilterIndices]);
 
-  const selectedFilterIndexSafe = useMemo(() => {
-    if (selectedFilterIndex == null) return -1;
-    if (selectedFilterIndex < 0 || selectedFilterIndex >= filterRules.length) return -1;
-    return selectedFilterIndex;
-  }, [selectedFilterIndex, filterRules.length]);
-
-  useEffect(() => {
-    if (!selectedSortFieldKey) return;
-    if (!sortRules.some((rule) => rule.fieldKey === selectedSortFieldKey)) {
-      setSelectedSortFieldKey(null);
-    }
-  }, [sortRules, selectedSortFieldKey]);
-
-  useEffect(() => {
-    if (!selectedFieldId) return;
-    if (!items.some((item) => item.id === selectedFieldId)) {
-      setSelectedFieldId(null);
-    }
-  }, [items, selectedFieldId]);
+  const selectedSortFieldKeySet = useMemo(() => new Set(selectedSortFieldKeys), [selectedSortFieldKeys]);
+  const selectedSortIndices = useMemo(
+    () => sortRules.map((rule, index) => (selectedSortFieldKeySet.has(rule.fieldKey) ? index : -1)).filter((index) => index >= 0),
+    [sortRules, selectedSortFieldKeySet],
+  );
+  const selectedSortIndexSet = useMemo(() => new Set(selectedSortIndices), [selectedSortIndices]);
 
   useEffect(() => {
-    if (selectedFilterIndex == null) return;
-    if (selectedFilterIndex < 0 || selectedFilterIndex >= filterRules.length) {
-      setSelectedFilterIndex(null);
-    }
-  }, [filterRules.length, selectedFilterIndex]);
+    setSelectedFieldIds((current) => current.filter((id) => items.some((item) => item.id === id)));
+  }, [items]);
+
+  useEffect(() => {
+    setSelectedFilterIndexes((current) =>
+      [...new Set(current)].filter((index) => index >= 0 && index < filterRules.length).sort((left, right) => left - right),
+    );
+  }, [filterRules.length]);
+
+  useEffect(() => {
+    setSelectedSortFieldKeys((current) => current.filter((key) => sortRules.some((rule) => rule.fieldKey === key)));
+  }, [sortRules]);
 
   const canMoveUp =
     activeTab === "fields"
-      ? selectedFieldIndex > 0
+      ? selectedFieldIndices.some(
+          (index) =>
+            index > 0 &&
+            !selectedFieldIndexSet.has(index - 1) &&
+            !items[index]?.lockedOrder &&
+            !items[index - 1]?.lockedOrder,
+        )
       : activeTab === "filtering"
-        ? selectedFilterIndexSafe > 0
-        : selectedSortIndex > 0;
+        ? selectedFilterIndices.some((index) => index > 0 && !selectedFilterIndexSet.has(index - 1))
+        : selectedSortIndices.some((index) => index > 0 && !selectedSortIndexSet.has(index - 1));
 
   const canMoveDown =
     activeTab === "fields"
-      ? selectedFieldIndex >= 0 && selectedFieldIndex < items.length - 1
+      ? selectedFieldIndices.some(
+          (index) =>
+            index < items.length - 1 &&
+            !selectedFieldIndexSet.has(index + 1) &&
+            !items[index]?.lockedOrder &&
+            !items[index + 1]?.lockedOrder,
+        )
       : activeTab === "filtering"
-        ? selectedFilterIndexSafe >= 0 && selectedFilterIndexSafe < filterRules.length - 1
-        : selectedSortIndex >= 0 && selectedSortIndex < sortRules.length - 1;
+        ? selectedFilterIndices.some((index) => index < filterRules.length - 1 && !selectedFilterIndexSet.has(index + 1))
+        : selectedSortIndices.some((index) => index < sortRules.length - 1 && !selectedSortIndexSet.has(index + 1));
 
   const canAdd =
     activeTab === "fields"
@@ -658,8 +709,8 @@ export function AgGridColumnSettingsModal({
     activeTab === "fields"
       ? false
       : activeTab === "filtering"
-        ? selectedFilterIndexSafe >= 0
-        : selectedSortIndex >= 0;
+        ? selectedFilterIndices.length > 0
+        : selectedSortIndices.length > 0;
 
   const handleContextAdd = () => {
     if (activeTab === "filtering") {
@@ -672,40 +723,50 @@ export function AgGridColumnSettingsModal({
   };
 
   const handleContextMove = (direction: -1 | 1) => {
-    if (activeTab === "fields" && selectedFieldIndex >= 0) {
-      const selected = items[selectedFieldIndex];
-      if (!selected) return;
-      handleMove(selected.id, direction);
+    if (activeTab === "fields" && selectedFieldIndices.length > 0) {
+      const { next, nextSelectedIndices, moved } = moveSelectionByOne(
+        items,
+        selectedFieldIndices,
+        direction,
+        (fromIndex, toIndex, snapshot) => !snapshot[fromIndex]?.lockedOrder && !snapshot[toIndex]?.lockedOrder,
+      );
+      if (!moved) return;
+      onItemsChange(next);
+      setSelectedFieldIds(nextSelectedIndices.map((index) => next[index]?.id).filter(Boolean));
       return;
     }
-    if (activeTab === "filtering" && selectedFilterIndexSafe >= 0) {
-      handleMoveFilterRule(selectedFilterIndexSafe, direction);
+    if (activeTab === "filtering" && selectedFilterIndices.length > 0) {
+      handleMoveFilterRules(selectedFilterIndices, direction);
       return;
     }
-    if (activeTab === "sorting" && selectedSortIndex >= 0) {
-      handleMoveSortRule(selectedSortIndex, direction);
+    if (activeTab === "sorting" && selectedSortIndices.length > 0) {
+      handleMoveSortRules(selectedSortIndices, direction);
     }
   };
 
   const handleContextDelete = () => {
-    if (activeTab === "fields" && selectedFieldIndex >= 0) {
-      const next = items.filter((_, index) => index !== selectedFieldIndex);
-      onItemsChange(next);
-      if (next.length === 0) {
-        setSelectedFieldId(null);
-      } else {
-        const nextSelection = next[Math.min(selectedFieldIndex, next.length - 1)];
-        setSelectedFieldId(nextSelection?.id ?? null);
-      }
+    if (activeTab === "fields") {
       return;
     }
-    if (activeTab === "filtering" && selectedFilterIndexSafe >= 0) {
-      handleRemoveFilterRule(selectedFilterIndexSafe);
+    if (activeTab === "filtering" && selectedFilterIndices.length > 0) {
+      handleRemoveFilterRules(selectedFilterIndices);
       return;
     }
-    if (activeTab === "sorting" && selectedSortIndex >= 0) {
-      handleRemoveSortRule(selectedSortIndex);
+    if (activeTab === "sorting" && selectedSortIndices.length > 0) {
+      handleRemoveSortRules(selectedSortIndices);
     }
+  };
+
+  const handleFieldRowSelect = (fieldId: string, ctrlToggle: boolean) => {
+    setSelectedFieldIds((current) => toggleSelection(current, fieldId, ctrlToggle));
+  };
+
+  const handleFilterRowSelect = (index: number, ctrlToggle: boolean) => {
+    setSelectedFilterIndexes((current) => toggleSelection(current, index, ctrlToggle));
+  };
+
+  const handleSortRowSelect = (fieldKey: string, ctrlToggle: boolean) => {
+    setSelectedSortFieldKeys((current) => toggleSelection(current, fieldKey, ctrlToggle));
   };
 
   return (
@@ -716,13 +777,13 @@ export function AgGridColumnSettingsModal({
           <Dialog.Title className="text-base font-semibold">{t("doc.list.viewSettingsTitle")}</Dialog.Title>
 
           <div className="mt-3 shrink-0 rounded-md border border-input bg-muted/15 p-2.5">
-            <div className="flex flex-wrap items-center gap-2">
-              <div className="min-w-[14rem] flex-1">
-                <div className="mb-1 text-[11px] uppercase tracking-wide text-muted-foreground">
-                  {tx("doc.list.viewCurrentLabel", "Current view")}
-                </div>
+            <div>
+              <div className="mb-1 text-[11px] uppercase tracking-wide text-muted-foreground">
+                {tx("doc.list.viewCurrentLabel", "Current view")}
+              </div>
+              <div className="flex items-center gap-2">
                 <select
-                  className="h-8 w-full rounded-md border border-input bg-background px-2 text-xs text-foreground"
+                  className="h-8 min-w-[14rem] flex-1 rounded-md border border-input bg-background px-2 text-xs text-foreground"
                   value={activeViewId ?? ""}
                   onChange={(event) => handleViewSelectChange(event.target.value || null)}
                 >
@@ -733,51 +794,69 @@ export function AgGridColumnSettingsModal({
                     </option>
                   ))}
                 </select>
-              </div>
-              <div className="flex flex-wrap items-center gap-1">
-                <Button type="button" variant="outline" size="sm" className="h-8 text-xs" onClick={handleCreateView}>
-                  {tx("doc.list.viewActionSaveAs", "Save as new")}
-                </Button>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  className="h-8 text-xs"
-                  onClick={() => setConfirmingSaveChanges(true)}
-                  disabled={!activeView || !hasUnsavedChanges}
-                >
-                  {tx("doc.list.viewActionSaveChanges", "Save changes")}
-                </Button>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  className="h-8 text-xs"
-                  onClick={handleRenameView}
-                  disabled={!activeView}
-                >
-                  {tx("doc.list.viewActionRename", "Rename")}
-                </Button>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  className="h-8 text-xs border-destructive/40 text-destructive hover:bg-destructive/10 hover:text-destructive"
-                  onClick={handleDeleteView}
-                  disabled={!activeView}
-                >
-                  {tx("doc.list.viewActionDelete", "Delete")}
-                </Button>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  className="h-8 text-xs"
-                  onClick={onSetActiveAsDefault}
-                  disabled={!activeView || activeView.isDefault}
-                >
-                  {tx("doc.list.viewActionSetDefault", "Set default")}
-                </Button>
+                <DropdownMenu.Root>
+                  <DropdownMenu.Trigger asChild>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="icon"
+                      className="h-8 w-8 text-muted-foreground hover:text-foreground"
+                      aria-label={tx("doc.list.viewActions", "View actions")}
+                    >
+                      <MoreHorizontal className="h-4 w-4" />
+                    </Button>
+                  </DropdownMenu.Trigger>
+                  <DropdownMenu.Portal>
+                    <DropdownMenu.Content
+                      align="end"
+                      sideOffset={6}
+                      className="z-[120] min-w-[14rem] rounded-md border border-input bg-popover p-1 shadow-md"
+                    >
+                      <DropdownMenu.Item
+                        className="cursor-pointer rounded-sm px-2 py-1.5 text-xs text-popover-foreground outline-none hover:bg-accent hover:text-accent-foreground"
+                        onSelect={openCreateViewDialog}
+                      >
+                        {tx("doc.list.viewActionSaveAs", "Save as new")}
+                      </DropdownMenu.Item>
+                      <DropdownMenu.Item
+                        className="cursor-pointer rounded-sm px-2 py-1.5 text-xs text-popover-foreground outline-none hover:bg-accent hover:text-accent-foreground data-[disabled]:pointer-events-none data-[disabled]:opacity-45"
+                        disabled={!activeView || !hasUnsavedChanges}
+                        onSelect={(event) => {
+                          event.preventDefault();
+                          setConfirmingSaveChanges(true);
+                        }}
+                      >
+                        {tx("doc.list.viewActionSaveChanges", "Save changes")}
+                      </DropdownMenu.Item>
+                      <DropdownMenu.Separator className="my-1 h-px bg-border" />
+                      <DropdownMenu.Item
+                        className="cursor-pointer rounded-sm px-2 py-1.5 text-xs text-popover-foreground outline-none hover:bg-accent hover:text-accent-foreground data-[disabled]:pointer-events-none data-[disabled]:opacity-45"
+                        disabled={!activeView}
+                        onSelect={openRenameViewDialog}
+                      >
+                        {tx("doc.list.viewActionRename", "Rename")}
+                      </DropdownMenu.Item>
+                      <DropdownMenu.Item
+                        className="cursor-pointer rounded-sm px-2 py-1.5 text-xs text-popover-foreground outline-none hover:bg-accent hover:text-accent-foreground data-[disabled]:pointer-events-none data-[disabled]:opacity-45"
+                        disabled={!activeView || activeView.isDefault}
+                        onSelect={(event) => {
+                          event.preventDefault();
+                          onSetActiveAsDefault();
+                        }}
+                      >
+                        {tx("doc.list.viewActionSetDefault", "Set default")}
+                      </DropdownMenu.Item>
+                      <DropdownMenu.Separator className="my-1 h-px bg-border" />
+                      <DropdownMenu.Item
+                        className="cursor-pointer rounded-sm px-2 py-1.5 text-xs text-destructive outline-none hover:bg-destructive/10 data-[disabled]:pointer-events-none data-[disabled]:opacity-45"
+                        disabled={!activeView}
+                        onSelect={openDeleteViewDialog}
+                      >
+                        {tx("doc.list.viewActionDelete", "Delete")}
+                      </DropdownMenu.Item>
+                    </DropdownMenu.Content>
+                  </DropdownMenu.Portal>
+                </DropdownMenu.Root>
               </div>
             </div>
             <div className="mt-1 text-xs text-muted-foreground">
@@ -834,35 +913,6 @@ export function AgGridColumnSettingsModal({
                     size="sm"
                     className="h-7 text-xs"
                     onClick={() => setConfirmingSaveChanges(false)}
-                  >
-                    {tx("common.cancel", "Cancel")}
-                  </Button>
-                </div>
-              </div>
-            ) : null}
-            {confirmingDeleteView ? (
-              <div className="mt-2 rounded-md border border-destructive/40 bg-destructive/10 px-2 py-2 text-xs">
-                <div className="text-destructive/90">
-                  {tx("doc.list.viewActionDeleteConfirm", "Delete current personal view?")}
-                </div>
-                <div className="mt-2 flex items-center gap-1.5">
-                  <Button
-                    type="button"
-                    size="sm"
-                    className="h-7 text-xs"
-                    onClick={() => {
-                      onDeleteActiveView();
-                      setConfirmingDeleteView(false);
-                    }}
-                  >
-                    {tx("doc.list.viewActionDelete", "Delete")}
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    className="h-7 text-xs"
-                    onClick={() => setConfirmingDeleteView(false)}
                   >
                     {tx("common.cancel", "Cancel")}
                   </Button>
@@ -950,16 +1000,13 @@ export function AgGridColumnSettingsModal({
               <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
                 <SortableContext items={orderedIds} strategy={verticalListSortingStrategy}>
                   <div className="space-y-2">
-                    {items.map((item, index) => (
+                    {items.map((item) => (
                       <SortableColumnRow
                         key={item.id}
                         item={item}
-                        index={index}
-                        total={items.length}
-                        selected={selectedFieldId === item.id}
+                        selected={selectedFieldIdSet.has(item.id)}
                         onToggleVisible={handleToggleVisible}
-                        onMove={handleMove}
-                        onSelect={setSelectedFieldId}
+                        onSelect={handleFieldRowSelect}
                       />
                     ))}
                   </div>
@@ -975,10 +1022,29 @@ export function AgGridColumnSettingsModal({
                   </div>
                 ) : (
                   filterRules.map((rule, index) => {
+                    const isSelected = selectedFilterIndexSet.has(index);
                     const field = registryByFieldKey.get(rule.fieldKey);
                     const operators = field ? getSupportedOperatorsByFieldType(field.dataType) : [];
                     const selectedOperator = operators.includes(rule.operator) ? rule.operator : operators[0];
                     const options = filterConfigs?.[rule.fieldKey]?.options ?? [];
+                    const handleEditControlPointerDown = (
+                      event: { preventDefault: () => void; stopPropagation: () => void },
+                      ctrlToggle: boolean,
+                    ) => {
+                      if (ctrlToggle) {
+                        event.preventDefault();
+                        event.stopPropagation();
+                        handleFilterRowSelect(index, true);
+                        return;
+                      }
+                      if (!isSelected) {
+                        event.preventDefault();
+                        event.stopPropagation();
+                        handleFilterRowSelect(index, false);
+                        return;
+                      }
+                      event.stopPropagation();
+                    };
                     const renderValueInput = () => {
                       if (!field || !selectedOperator || isNoValueOperator(selectedOperator)) {
                         return <div className="h-8" aria-hidden />;
@@ -988,6 +1054,8 @@ export function AgGridColumnSettingsModal({
                           <select
                             className="h-8 w-full rounded-md border border-input bg-background px-2 text-xs text-foreground"
                             value={rule.value ?? ""}
+                            onPointerDown={(event) => handleEditControlPointerDown(event, event.ctrlKey || event.metaKey)}
+                            onClick={(event) => event.stopPropagation()}
                             onChange={(event) =>
                               handleChangeFilterRule(index, { value: event.target.value, valueTo: undefined, values: undefined })
                             }
@@ -1011,6 +1079,8 @@ export function AgGridColumnSettingsModal({
                               className="h-8 min-w-0 flex-1 text-xs"
                               placeholder={tx("doc.list.viewFilterValueFrom", "From")}
                               value={rule.value ?? ""}
+                              onPointerDown={(event) => handleEditControlPointerDown(event, event.ctrlKey || event.metaKey)}
+                              onClick={(event) => event.stopPropagation()}
                               onChange={(event) =>
                                 handleChangeFilterRule(index, { value: event.target.value, values: undefined })
                               }
@@ -1020,6 +1090,8 @@ export function AgGridColumnSettingsModal({
                               className="h-8 min-w-0 flex-1 text-xs"
                               placeholder={tx("doc.list.viewFilterValueTo", "To")}
                               value={rule.valueTo ?? ""}
+                              onPointerDown={(event) => handleEditControlPointerDown(event, event.ctrlKey || event.metaKey)}
+                              onClick={(event) => event.stopPropagation()}
                               onChange={(event) =>
                                 handleChangeFilterRule(index, { valueTo: event.target.value, values: undefined })
                               }
@@ -1035,6 +1107,8 @@ export function AgGridColumnSettingsModal({
                             className="h-8 text-xs"
                             placeholder={tx("doc.list.viewFilterValues", "Values separated by commas")}
                             value={Array.isArray(rule.values) ? rule.values.join(", ") : ""}
+                            onPointerDown={(event) => handleEditControlPointerDown(event, event.ctrlKey || event.metaKey)}
+                            onClick={(event) => event.stopPropagation()}
                             onChange={(event) =>
                               handleChangeFilterRule(index, {
                                 values: event.target.value
@@ -1055,6 +1129,8 @@ export function AgGridColumnSettingsModal({
                           className="h-8 text-xs"
                           placeholder={tx("doc.list.viewFilterValue", "Value")}
                           value={rule.value ?? ""}
+                          onPointerDown={(event) => handleEditControlPointerDown(event, event.ctrlKey || event.metaKey)}
+                          onClick={(event) => event.stopPropagation()}
                           onChange={(event) =>
                             handleChangeFilterRule(index, {
                               value: event.target.value,
@@ -1070,9 +1146,9 @@ export function AgGridColumnSettingsModal({
                       <div
                         key={`${rule.fieldKey}-${index}`}
                         className={`flex items-center gap-2 rounded-md border px-2 py-1.5 ${
-                          selectedFilterIndexSafe === index ? "border-primary/60 bg-primary/10" : "border-input bg-background"
+                          isSelected ? "border-primary/60 bg-primary/10" : "border-input bg-background"
                         }`}
-                        onClick={() => setSelectedFilterIndex(index)}
+                        onClick={(event) => handleFilterRowSelect(index, event.ctrlKey || event.metaKey)}
                       >
                         <Switch
                           checked={rule.enabled}
@@ -1083,6 +1159,7 @@ export function AgGridColumnSettingsModal({
                         <select
                           className="h-8 min-w-[9.5rem] max-w-[13rem] rounded-md border border-input bg-background px-2 text-xs text-foreground"
                           value={rule.fieldKey}
+                          onPointerDown={(event) => handleEditControlPointerDown(event, event.ctrlKey || event.metaKey)}
                           onClick={(event) => event.stopPropagation()}
                           onChange={(event) => {
                             const nextField = registryByFieldKey.get(event.target.value);
@@ -1105,6 +1182,7 @@ export function AgGridColumnSettingsModal({
                         <select
                           className="h-8 w-[9.5rem] shrink-0 rounded-md border border-input bg-background px-2 text-xs text-foreground"
                           value={selectedOperator}
+                          onPointerDown={(event) => handleEditControlPointerDown(event, event.ctrlKey || event.metaKey)}
                           onClick={(event) => event.stopPropagation()}
                           onChange={(event) =>
                             handleChangeFilterRule(index, {
@@ -1145,11 +1223,11 @@ export function AgGridColumnSettingsModal({
                             dndId={rule.fieldKey}
                             rule={rule}
                             index={index}
-                            selected={selectedSortFieldKey === rule.fieldKey}
+                            selected={selectedSortFieldKeySet.has(rule.fieldKey)}
                             sortableFields={sortableFields}
                             usedSortFields={usedSortFields}
                             tx={tx}
-                            onSelect={() => setSelectedSortFieldKey(rule.fieldKey)}
+                            onSelect={(ctrlToggle) => handleSortRowSelect(rule.fieldKey, ctrlToggle)}
                             onChange={(patch) => handleChangeSortRule(index, patch)}
                           />
                         ))}
@@ -1176,6 +1254,103 @@ export function AgGridColumnSettingsModal({
           </div>
         </Dialog.Content>
       </Dialog.Portal>
+
+      <Dialog.Root open={createViewDialogOpen} onOpenChange={setCreateViewDialogOpen}>
+        <Dialog.Portal>
+          <Dialog.Overlay className="fixed inset-0 z-[130] bg-black/65" />
+          <Dialog.Content className="fixed left-1/2 top-1/2 z-[131] w-[min(26rem,92vw)] -translate-x-1/2 -translate-y-1/2 rounded-lg border border-input bg-background p-4 shadow-xl">
+            <Dialog.Title className="text-sm font-semibold">
+              {tx("doc.list.viewActionSaveAsDialogTitle", "Сохранить как новый вид")}
+            </Dialog.Title>
+            <form
+              className="mt-3 space-y-3"
+              onSubmit={(event) => {
+                event.preventDefault();
+                handleCreateView();
+              }}
+            >
+              <Input
+                autoFocus
+                className="h-9 text-sm"
+                value={createViewName}
+                onChange={(event) => setCreateViewName(event.target.value)}
+                placeholder={tx("doc.list.viewNamePlaceholder", "Введите название вида")}
+              />
+              <div className="flex items-center justify-end gap-2">
+                <Button type="button" variant="outline" onClick={() => setCreateViewDialogOpen(false)}>
+                  {tx("common.cancel", "Cancel")}
+                </Button>
+                <Button type="submit" disabled={createViewName.trim() === ""}>
+                  {tx("doc.list.viewActionSaveAs", "Save as new")}
+                </Button>
+              </div>
+            </form>
+          </Dialog.Content>
+        </Dialog.Portal>
+      </Dialog.Root>
+
+      <Dialog.Root open={renameViewDialogOpen} onOpenChange={setRenameViewDialogOpen}>
+        <Dialog.Portal>
+          <Dialog.Overlay className="fixed inset-0 z-[130] bg-black/65" />
+          <Dialog.Content className="fixed left-1/2 top-1/2 z-[131] w-[min(26rem,92vw)] -translate-x-1/2 -translate-y-1/2 rounded-lg border border-input bg-background p-4 shadow-xl">
+            <Dialog.Title className="text-sm font-semibold">
+              {tx("doc.list.viewActionRenameDialogTitle", "Переименовать вид")}
+            </Dialog.Title>
+            <form
+              className="mt-3 space-y-3"
+              onSubmit={(event) => {
+                event.preventDefault();
+                handleRenameView();
+              }}
+            >
+              <Input
+                autoFocus
+                className="h-9 text-sm"
+                value={renameViewName}
+                onChange={(event) => setRenameViewName(event.target.value)}
+                placeholder={tx("doc.list.viewNamePlaceholder", "Введите название вида")}
+              />
+              <div className="flex items-center justify-end gap-2">
+                <Button type="button" variant="outline" onClick={() => setRenameViewDialogOpen(false)}>
+                  {tx("common.cancel", "Cancel")}
+                </Button>
+                <Button
+                  type="submit"
+                  disabled={
+                    !activeView ||
+                    renameViewName.trim() === "" ||
+                    renameViewName.trim() === activeView.name.trim()
+                  }
+                >
+                  {tx("doc.list.viewActionRename", "Rename")}
+                </Button>
+              </div>
+            </form>
+          </Dialog.Content>
+        </Dialog.Portal>
+      </Dialog.Root>
+
+      <Dialog.Root open={deleteViewDialogOpen} onOpenChange={setDeleteViewDialogOpen}>
+        <Dialog.Portal>
+          <Dialog.Overlay className="fixed inset-0 z-[130] bg-black/65" />
+          <Dialog.Content className="fixed left-1/2 top-1/2 z-[131] w-[min(24rem,92vw)] -translate-x-1/2 -translate-y-1/2 rounded-lg border border-destructive/40 bg-background p-4 shadow-xl">
+            <Dialog.Title className="text-sm font-semibold text-foreground">
+              {tx("doc.list.viewActionDeleteConfirmTitle", "Удалить вид?")}
+            </Dialog.Title>
+            <p className="mt-2 text-sm text-muted-foreground">
+              {tx("doc.list.viewActionDeleteConfirm", "Delete current personal view?")}
+            </p>
+            <div className="mt-4 flex items-center justify-end gap-2">
+              <Button type="button" variant="outline" onClick={() => setDeleteViewDialogOpen(false)}>
+                {tx("common.cancel", "Cancel")}
+              </Button>
+              <Button type="button" variant="destructive" onClick={handleDeleteView}>
+                {tx("doc.list.viewActionDelete", "Delete")}
+              </Button>
+            </div>
+          </Dialog.Content>
+        </Dialog.Portal>
+      </Dialog.Root>
     </Dialog.Root>
   );
 }
