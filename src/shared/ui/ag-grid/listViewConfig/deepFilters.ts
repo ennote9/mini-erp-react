@@ -68,13 +68,6 @@ export function normalizeDeepFilterRules(input: {
         enabled: rule.enabled !== false,
         priority: Number.isFinite(rule.priority) ? Math.trunc(rule.priority) : index,
       };
-      if (!nextRule.enabled) {
-        return {
-          ...nextRule,
-          priority: index,
-        };
-      }
-      if (!isRuleValueValid(nextRule)) return null;
       return {
         ...nextRule,
         priority: index,
@@ -89,6 +82,7 @@ export function buildAgGridModelFromDeepFilterRules(rules: ListViewDeepFilterRul
   const model: AgGridColumnFilterModel = {};
   const sorted = [...rules].filter((rule) => rule.enabled).sort((a, b) => a.priority - b.priority);
   for (const rule of sorted) {
+    if (!isRuleValueValid(rule)) continue;
     const clause: AgGridColumnFilterClause = { operator: rule.operator };
     if (rule.value !== undefined) clause.value = rule.value;
     if (rule.valueTo !== undefined) clause.valueTo = rule.valueTo;

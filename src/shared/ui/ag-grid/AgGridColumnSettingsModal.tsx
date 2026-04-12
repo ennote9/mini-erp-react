@@ -400,7 +400,11 @@ export function AgGridColumnSettingsModal({
   const handleMoveSortRule = (index: number, direction: -1 | 1) => {
     const targetIndex = index + direction;
     if (targetIndex < 0 || targetIndex >= sortRules.length) return;
-    onSortRulesChange(arrayMove(sortRules, index, targetIndex));
+    const moved = arrayMove(sortRules, index, targetIndex).map((rule, nextIndex) => ({
+      ...rule,
+      priority: nextIndex,
+    }));
+    onSortRulesChange(moved);
   };
 
   const handleRemoveSortRule = (index: number) => {
@@ -633,7 +637,9 @@ export function AgGridColumnSettingsModal({
                     const selectedOperator = operators.includes(rule.operator) ? rule.operator : operators[0];
                     const options = filterConfigs?.[rule.fieldKey]?.options ?? [];
                     const renderValueInput = () => {
-                      if (!field || !selectedOperator || isNoValueOperator(selectedOperator)) return null;
+                      if (!field || !selectedOperator || isNoValueOperator(selectedOperator)) {
+                        return <div className="h-8" aria-hidden />;
+                      }
                       if (field.dataType === "enum" && !isMultiValueOperator(selectedOperator) && options.length > 0) {
                         return (
                           <select
@@ -656,10 +662,10 @@ export function AgGridColumnSettingsModal({
                       if (isRangeOperator(selectedOperator)) {
                         const inputType = mapFieldDataTypeToInputType(field.dataType);
                         return (
-                          <div className="grid grid-cols-2 gap-2">
+                          <div className="flex min-w-0 items-center gap-2">
                             <Input
                               type={inputType}
-                              className="h-8 text-xs"
+                              className="h-8 min-w-0 flex-1 text-xs"
                               placeholder={tx("doc.list.viewFilterValueFrom", "From")}
                               value={rule.value ?? ""}
                               onChange={(event) =>
@@ -668,7 +674,7 @@ export function AgGridColumnSettingsModal({
                             />
                             <Input
                               type={inputType}
-                              className="h-8 text-xs"
+                              className="h-8 min-w-0 flex-1 text-xs"
                               placeholder={tx("doc.list.viewFilterValueTo", "To")}
                               value={rule.valueTo ?? ""}
                               onChange={(event) =>
@@ -718,72 +724,65 @@ export function AgGridColumnSettingsModal({
                     };
 
                     return (
-                      <div key={`${rule.fieldKey}-${index}`} className="rounded-md border border-input bg-background px-2 py-2">
-                        <div className="mb-2 flex items-center justify-between gap-2">
-                          <div className="text-xs text-muted-foreground">
-                            {tx("doc.list.viewRuleNumber", "Rule")} #{index + 1}
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <label className="inline-flex items-center gap-1 text-xs text-muted-foreground">
-                              <Checkbox
-                                checked={rule.enabled}
-                                onCheckedChange={(checked) => handleChangeFilterRule(index, { enabled: checked === true })}
-                              />
-                              {tx("doc.list.viewRuleEnabled", "Enabled")}
-                            </label>
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="icon"
-                              className="h-7 w-7 text-muted-foreground hover:text-foreground"
-                              onClick={() => handleRemoveFilterRule(index)}
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          </div>
-                        </div>
-                        <div className="grid grid-cols-1 gap-2 md:grid-cols-[1.25fr,1fr]">
-                          <select
-                            className="h-8 rounded-md border border-input bg-background px-2 text-xs text-foreground"
-                            value={rule.fieldKey}
-                            onChange={(event) => {
-                              const nextField = registryByFieldKey.get(event.target.value);
-                              const nextOperator = nextField ? firstOperatorForField(nextField) : null;
-                              handleChangeFilterRule(index, {
-                                fieldKey: event.target.value,
-                                operator: nextOperator ?? rule.operator,
-                                value: undefined,
-                                valueTo: undefined,
-                                values: undefined,
-                              });
-                            }}
-                          >
-                            {filterableFields.map((entry) => (
-                              <option key={entry.fieldKey} value={entry.fieldKey}>
-                                {entry.label}
-                              </option>
-                            ))}
-                          </select>
-                          <select
-                            className="h-8 rounded-md border border-input bg-background px-2 text-xs text-foreground"
-                            value={selectedOperator}
-                            onChange={(event) =>
-                              handleChangeFilterRule(index, {
-                                operator: event.target.value as AgGridFilterOperator,
-                                value: undefined,
-                                valueTo: undefined,
-                                values: undefined,
-                              })
-                            }
-                          >
-                            {operators.map((operator) => (
-                              <option key={operator} value={operator}>
-                                {operatorLabel(t, operator)}
-                              </option>
-                            ))}
-                          </select>
-                        </div>
-                        <div className="mt-2">{renderValueInput()}</div>
+                      <div
+                        key={`${rule.fieldKey}-${index}`}
+                        className="flex items-center gap-2 rounded-md border border-input bg-background px-2 py-1.5"
+                      >
+                        <Checkbox
+                          checked={rule.enabled}
+                          aria-label={`${tx("doc.list.viewRuleEnabled", "Enabled")} #${index + 1}`}
+                          onCheckedChange={(checked) => handleChangeFilterRule(index, { enabled: checked === true })}
+                        />
+                        <select
+                          className="h-8 min-w-[9.5rem] max-w-[13rem] rounded-md border border-input bg-background px-2 text-xs text-foreground"
+                          value={rule.fieldKey}
+                          onChange={(event) => {
+                            const nextField = registryByFieldKey.get(event.target.value);
+                            const nextOperator = nextField ? firstOperatorForField(nextField) : null;
+                            handleChangeFilterRule(index, {
+                              fieldKey: event.target.value,
+                              operator: nextOperator ?? rule.operator,
+                              value: undefined,
+                              valueTo: undefined,
+                              values: undefined,
+                            });
+                          }}
+                        >
+                          {filterableFields.map((entry) => (
+                            <option key={entry.fieldKey} value={entry.fieldKey}>
+                              {entry.label}
+                            </option>
+                          ))}
+                        </select>
+                        <select
+                          className="h-8 w-[9.5rem] shrink-0 rounded-md border border-input bg-background px-2 text-xs text-foreground"
+                          value={selectedOperator}
+                          onChange={(event) =>
+                            handleChangeFilterRule(index, {
+                              operator: event.target.value as AgGridFilterOperator,
+                              value: undefined,
+                              valueTo: undefined,
+                              values: undefined,
+                            })
+                          }
+                        >
+                          {operators.map((operator) => (
+                            <option key={operator} value={operator}>
+                              {operatorLabel(t, operator)}
+                            </option>
+                          ))}
+                        </select>
+                        <div className="min-w-0 flex-1">{renderValueInput()}</div>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 shrink-0 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+                          onClick={() => handleRemoveFilterRule(index)}
+                          aria-label={`${tx("doc.list.viewActionDelete", "Delete")} #${index + 1}`}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
                       </div>
                     );
                   })
@@ -809,77 +808,75 @@ export function AgGridColumnSettingsModal({
                   </div>
                 ) : (
                   sortRules.map((rule, index) => (
-                    <div key={`${rule.fieldKey}-${index}`} className="rounded-md border border-input bg-background px-2 py-2">
-                      <div className="mb-2 flex items-center justify-between gap-2">
-                        <div className="text-xs text-muted-foreground">
-                          {tx("doc.list.viewSortPriority", "Priority")} #{index + 1}
-                        </div>
-                        <div className="flex items-center gap-1">
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="icon"
-                            className="h-7 w-7 text-muted-foreground hover:text-foreground"
-                            onClick={() => handleMoveSortRule(index, -1)}
-                            disabled={index <= 0}
-                          >
-                            <ChevronUp className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="icon"
-                            className="h-7 w-7 text-muted-foreground hover:text-foreground"
-                            onClick={() => handleMoveSortRule(index, 1)}
-                            disabled={index >= sortRules.length - 1}
-                          >
-                            <ChevronDown className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="icon"
-                            className="h-7 w-7 text-muted-foreground hover:text-foreground"
-                            onClick={() => handleRemoveSortRule(index)}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      </div>
-                      <div className="grid grid-cols-1 gap-2 md:grid-cols-[1.4fr,0.9fr,0.7fr]">
-                        <select
-                          className="h-8 rounded-md border border-input bg-background px-2 text-xs text-foreground"
-                          value={rule.fieldKey}
-                          onChange={(event) => handleChangeSortRule(index, { fieldKey: event.target.value })}
+                    <div
+                      key={`${rule.fieldKey}-${index}`}
+                      className="flex items-center gap-2 rounded-md border border-input bg-background px-2 py-1.5"
+                    >
+                      <div className="inline-flex h-8 shrink-0 items-center gap-0.5 rounded-md border border-input bg-muted/20 px-1">
+                        <span className="px-1 text-[11px] font-medium text-muted-foreground">#{index + 1}</span>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          className="h-6 w-6 text-muted-foreground hover:text-foreground"
+                          onClick={() => handleMoveSortRule(index, -1)}
+                          disabled={index <= 0}
+                          aria-label={`${tx("common.moveUp", "Move up")} #${index + 1}`}
                         >
-                          {sortableFields.map((entry) => (
-                            <option
-                              key={entry.fieldKey}
-                              value={entry.fieldKey}
-                              disabled={entry.fieldKey !== rule.fieldKey && usedSortFields.has(entry.fieldKey)}
-                            >
-                              {entry.label}
-                            </option>
-                          ))}
-                        </select>
-                        <select
-                          className="h-8 rounded-md border border-input bg-background px-2 text-xs text-foreground"
-                          value={rule.direction}
-                          onChange={(event) =>
-                            handleChangeSortRule(index, { direction: event.target.value as "asc" | "desc" })
-                          }
+                          <ChevronUp className="h-3.5 w-3.5" />
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          className="h-6 w-6 text-muted-foreground hover:text-foreground"
+                          onClick={() => handleMoveSortRule(index, 1)}
+                          disabled={index >= sortRules.length - 1}
+                          aria-label={`${tx("common.moveDown", "Move down")} #${index + 1}`}
                         >
-                          <option value="asc">{tx("doc.list.viewSortAsc", "Ascending")}</option>
-                          <option value="desc">{tx("doc.list.viewSortDesc", "Descending")}</option>
-                        </select>
-                        <label className="inline-flex items-center gap-1 text-xs text-muted-foreground">
-                          <Checkbox
-                            checked={rule.enabled}
-                            onCheckedChange={(checked) => handleChangeSortRule(index, { enabled: checked === true })}
-                          />
-                          {tx("doc.list.viewRuleEnabled", "Enabled")}
-                        </label>
+                          <ChevronDown className="h-3.5 w-3.5" />
+                        </Button>
                       </div>
+                      <select
+                        className="h-8 min-w-[10rem] flex-[1_1_15rem] rounded-md border border-input bg-background px-2 text-xs text-foreground"
+                        value={rule.fieldKey}
+                        onChange={(event) => handleChangeSortRule(index, { fieldKey: event.target.value })}
+                      >
+                        {sortableFields.map((entry) => (
+                          <option
+                            key={entry.fieldKey}
+                            value={entry.fieldKey}
+                            disabled={entry.fieldKey !== rule.fieldKey && usedSortFields.has(entry.fieldKey)}
+                          >
+                            {entry.label}
+                          </option>
+                        ))}
+                      </select>
+                      <select
+                        className="h-8 w-[9rem] shrink-0 rounded-md border border-input bg-background px-2 text-xs text-foreground"
+                        value={rule.direction}
+                        onChange={(event) =>
+                          handleChangeSortRule(index, { direction: event.target.value as "asc" | "desc" })
+                        }
+                      >
+                        <option value="asc">{tx("doc.list.viewSortAsc", "Ascending")}</option>
+                        <option value="desc">{tx("doc.list.viewSortDesc", "Descending")}</option>
+                      </select>
+                      <Checkbox
+                        checked={rule.enabled}
+                        aria-label={`${tx("doc.list.viewRuleEnabled", "Enabled")} #${index + 1}`}
+                        onCheckedChange={(checked) => handleChangeSortRule(index, { enabled: checked === true })}
+                      />
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 shrink-0 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+                        onClick={() => handleRemoveSortRule(index)}
+                        aria-label={`${tx("doc.list.viewActionDelete", "Delete")} #${index + 1}`}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
                     </div>
                   ))
                 )}
