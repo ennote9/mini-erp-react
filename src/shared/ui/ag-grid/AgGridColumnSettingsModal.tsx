@@ -5,8 +5,8 @@ import { SortableContext, arrayMove, useSortable, verticalListSortingStrategy } 
 import { CSS } from "@dnd-kit/utilities";
 import { ChevronDown, ChevronUp, GripVertical, Lock, Plus, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
+import { Switch } from "@/components/ui/switch";
 import { useTranslation } from "@/shared/i18n/context";
 import type { AgGridFilterOperator } from "@/shared/navigation/agGridColumnFilters";
 import type { AgGridColumnFilterConfig } from "./AgGridColumnFilters";
@@ -87,15 +87,13 @@ function SortableColumnRow({ item, index, total, selected, onToggleVisible, onMo
       >
         <GripVertical className="h-4 w-4" />
       </button>
-      <Checkbox
-        id={`grid-col-visible-${item.id}`}
+      <Switch
         checked={item.visible}
         disabled={item.lockedVisible}
         onClick={(event) => event.stopPropagation()}
         onCheckedChange={(checked) => onToggleVisible(item.id, checked === true)}
       />
       <label
-        htmlFor={`grid-col-visible-${item.id}`}
         className={`min-w-0 flex-1 truncate text-sm ${item.lockedVisible ? "text-muted-foreground" : "text-foreground"}`.trim()}
       >
         {item.label}
@@ -204,6 +202,18 @@ function SortableSortRuleRow({
       >
         <GripVertical className="h-4 w-4" />
       </button>
+      <Switch
+        checked={rule.enabled}
+        aria-label={`${tx("doc.list.viewRuleEnabled", "Enabled")} #${index + 1}`}
+        onClick={(event) => {
+          event.stopPropagation();
+          onSelect();
+        }}
+        onCheckedChange={(checked) => {
+          onSelect();
+          onChange({ enabled: checked === true });
+        }}
+      />
       <span className="inline-flex h-8 w-9 shrink-0 items-center justify-center rounded-md border border-input bg-muted/20 text-[11px] font-medium text-muted-foreground">
         #{index + 1}
       </span>
@@ -244,18 +254,6 @@ function SortableSortRuleRow({
         <option value="asc">{tx("doc.list.viewSortAsc", "Ascending")}</option>
         <option value="desc">{tx("doc.list.viewSortDesc", "Descending")}</option>
       </select>
-      <Checkbox
-        checked={rule.enabled}
-        aria-label={`${tx("doc.list.viewRuleEnabled", "Enabled")} #${index + 1}`}
-        onClick={(event) => {
-          event.stopPropagation();
-          onSelect();
-        }}
-        onCheckedChange={(checked) => {
-          onSelect();
-          onChange({ enabled: checked === true });
-        }}
-      />
     </div>
   );
 }
@@ -649,12 +647,29 @@ export function AgGridColumnSettingsModal({
         ? selectedFilterIndexSafe >= 0 && selectedFilterIndexSafe < filterRules.length - 1
         : selectedSortIndex >= 0 && selectedSortIndex < sortRules.length - 1;
 
+  const canAdd =
+    activeTab === "fields"
+      ? false
+      : activeTab === "filtering"
+        ? filterableFields.length > 0
+        : sortableFields.length > 0 && usedSortFields.size < sortableFields.length;
+
   const canDelete =
     activeTab === "fields"
-      ? selectedFieldIndex >= 0
+      ? false
       : activeTab === "filtering"
         ? selectedFilterIndexSafe >= 0
         : selectedSortIndex >= 0;
+
+  const handleContextAdd = () => {
+    if (activeTab === "filtering") {
+      handleAddFilterRule();
+      return;
+    }
+    if (activeTab === "sorting") {
+      handleAddSortRule();
+    }
+  };
 
   const handleContextMove = (direction: -1 | 1) => {
     if (activeTab === "fields" && selectedFieldIndex >= 0) {
@@ -892,6 +907,16 @@ export function AgGridColumnSettingsModal({
                 variant="outline"
                 size="icon"
                 className="h-7 w-7 text-muted-foreground hover:text-foreground"
+                disabled={!canAdd}
+                onClick={handleContextAdd}
+              >
+                <Plus className="h-3.5 w-3.5" />
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                size="icon"
+                className="h-7 w-7 text-muted-foreground hover:text-foreground"
                 disabled={!canMoveUp}
                 onClick={() => handleContextMove(-1)}
               >
@@ -1049,7 +1074,7 @@ export function AgGridColumnSettingsModal({
                         }`}
                         onClick={() => setSelectedFilterIndex(index)}
                       >
-                        <Checkbox
+                        <Switch
                           checked={rule.enabled}
                           aria-label={`${tx("doc.list.viewRuleEnabled", "Enabled")} #${index + 1}`}
                           onClick={(event) => event.stopPropagation()}
@@ -1097,33 +1122,10 @@ export function AgGridColumnSettingsModal({
                           ))}
                         </select>
                         <div className="min-w-0 flex-1">{renderValueInput()}</div>
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="icon"
-                          className="h-8 w-8 shrink-0 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
-                          onClick={(event) => {
-                            event.stopPropagation();
-                            handleRemoveFilterRule(index);
-                          }}
-                          aria-label={`${tx("doc.list.viewActionDelete", "Delete")} #${index + 1}`}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
                       </div>
                     );
                   })
                 )}
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={handleAddFilterRule}
-                  disabled={filterableFields.length === 0}
-                >
-                  <Plus className="mr-1 h-3.5 w-3.5" />
-                  {tx("doc.list.viewAddFilterRule", "Add filter rule")}
-                </Button>
               </div>
             ) : null}
 
@@ -1155,16 +1157,6 @@ export function AgGridColumnSettingsModal({
                     </SortableContext>
                   </DndContext>
                 )}
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={handleAddSortRule}
-                  disabled={sortableFields.length === 0 || usedSortFields.size >= sortableFields.length}
-                >
-                  <Plus className="mr-1 h-3.5 w-3.5" />
-                  {tx("doc.list.viewAddSortRule", "Add sort rule")}
-                </Button>
               </div>
             ) : null}
           </div>
