@@ -9,7 +9,14 @@ export type ListViewEntityType =
   | "stock-balances"
   | "stock-movements"
   | "customers"
-  | "suppliers";
+  | "suppliers"
+  | "warehouses"
+  | "carriers"
+  | "brands"
+  | "categories"
+  | "barcodes"
+  | "markdown-journal-journals"
+  | "markdown-journal-codes";
 
 export type ListViewFieldDataType =
   | "string"

@@ -411,13 +411,10 @@ export function AgGridColumnSettingsModal({
     <Dialog.Root open={open} onOpenChange={onOpenChange}>
       <Dialog.Portal>
         <Dialog.Overlay className="fixed inset-0 z-[100] bg-black/60" />
-        <Dialog.Content className="fixed left-1/2 top-1/2 z-[101] w-[min(52rem,94vw)] max-h-[90vh] -translate-x-1/2 -translate-y-1/2 rounded-lg border border-input bg-background p-4 shadow-lg">
+        <Dialog.Content className="fixed left-1/2 top-1/2 z-[101] flex h-[min(90vh,46rem)] w-[min(52rem,94vw)] -translate-x-1/2 -translate-y-1/2 flex-col rounded-lg border border-input bg-background p-4 shadow-lg">
           <Dialog.Title className="text-base font-semibold">{t("doc.list.viewSettingsTitle")}</Dialog.Title>
-          <Dialog.Description className="mt-1 text-sm text-muted-foreground">
-            {t("doc.list.viewSettingsDescription")}
-          </Dialog.Description>
 
-          <div className="mt-3 rounded-md border border-input bg-muted/15 p-2.5">
+          <div className="mt-3 shrink-0 rounded-md border border-input bg-muted/15 p-2.5">
             <div className="flex flex-wrap items-center gap-2">
               <div className="min-w-[14rem] flex-1">
                 <div className="mb-1 text-[11px] uppercase tracking-wide text-muted-foreground">
@@ -452,7 +449,7 @@ export function AgGridColumnSettingsModal({
                 </Button>
                 <Button
                   type="button"
-                  variant="ghost"
+                  variant="outline"
                   size="sm"
                   className="h-8 text-xs"
                   onClick={handleRenameView}
@@ -462,9 +459,9 @@ export function AgGridColumnSettingsModal({
                 </Button>
                 <Button
                   type="button"
-                  variant="ghost"
+                  variant="outline"
                   size="sm"
-                  className="h-8 text-xs text-destructive hover:text-destructive"
+                  className="h-8 text-xs border-destructive/40 text-destructive hover:bg-destructive/10 hover:text-destructive"
                   onClick={handleDeleteView}
                   disabled={!activeView}
                 >
@@ -472,7 +469,7 @@ export function AgGridColumnSettingsModal({
                 </Button>
                 <Button
                   type="button"
-                  variant="ghost"
+                  variant="outline"
                   size="sm"
                   className="h-8 text-xs"
                   onClick={onSetActiveAsDefault}
@@ -488,13 +485,8 @@ export function AgGridColumnSettingsModal({
             <div className="mt-1 text-xs text-muted-foreground">
               {activeView
                 ? `${tx("doc.list.viewCurrentSaved", "Active saved view")}: ${activeViewName ?? activeView.name}${activeView.isDefault ? ` · ${tx("doc.list.viewDefaultBadge", "Default")}` : ""}`
-                : tx("doc.list.viewUsingSystemBaseline", "You are using the system/working baseline.")}
+                : null}
             </div>
-            {personalViews.length === 0 ? (
-              <div className="mt-1 text-xs text-muted-foreground">
-                {tx("doc.list.viewEmptyHint", "No saved views yet. Save current configuration as a new view.")}
-              </div>
-            ) : null}
             {activeView && hasUnsavedChanges ? (
               <div className="mt-1.5 text-xs text-amber-300">
                 {tx("doc.list.viewUnsavedChanges", "Current working state differs from the saved active view.")}
@@ -578,7 +570,7 @@ export function AgGridColumnSettingsModal({
             ) : null}
           </div>
 
-          <div className="mt-3 inline-flex rounded-md border border-input bg-muted/20 p-0.5">
+          <div className="mt-3 shrink-0 inline-flex rounded-md border border-input bg-muted/20 p-0.5">
             <button
               type="button"
               className={`rounded px-2.5 py-1 text-xs transition-colors ${
@@ -608,27 +600,28 @@ export function AgGridColumnSettingsModal({
             </button>
           </div>
 
-          <div className="mt-3 max-h-[62vh] space-y-2 overflow-y-auto pr-1">
+          <div className="list-view-configurator__scroll mt-3 min-h-0 flex-1 overflow-y-auto pr-1">
             {activeTab === "fields" ? (
               <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
                 <SortableContext items={orderedIds} strategy={verticalListSortingStrategy}>
-                  {items.map((item, index) => (
-                    <SortableColumnRow
-                      key={item.id}
-                      item={item}
-                      index={index}
-                      total={items.length}
-                      onToggleVisible={handleToggleVisible}
-                      onMove={handleMove}
-                    />
-                  ))}
+                  <div className="space-y-2">
+                    {items.map((item, index) => (
+                      <SortableColumnRow
+                        key={item.id}
+                        item={item}
+                        index={index}
+                        total={items.length}
+                        onToggleVisible={handleToggleVisible}
+                        onMove={handleMove}
+                      />
+                    ))}
+                  </div>
                 </SortableContext>
               </DndContext>
             ) : null}
 
             {activeTab === "filtering" ? (
               <div className="space-y-2">
-                <div className="text-xs text-muted-foreground">{tx("doc.list.viewFilteringHint", "Rules are applied with AND logic.")}</div>
                 {filterRules.length === 0 ? (
                   <div className="rounded-md border border-dashed border-input px-3 py-4 text-sm text-muted-foreground">
                     {tx("doc.list.viewNoFilterRules", "No filter rules")}
@@ -904,18 +897,10 @@ export function AgGridColumnSettingsModal({
             ) : null}
           </div>
 
-          <div className="mt-4 flex items-center justify-between gap-2">
-            <div className="space-y-0.5">
-              <Button type="button" variant="ghost" size="sm" onClick={onReset}>
-                {t("doc.list.columnSettingsReset")}
-              </Button>
-              <div className="text-[11px] text-muted-foreground">
-                {tx(
-                  "doc.list.viewResetHint",
-                  "Reset returns to active view baseline, or system baseline when no saved view is active.",
-                )}
-              </div>
-            </div>
+          <div className="mt-4 shrink-0 flex items-center justify-between gap-2">
+            <Button type="button" variant="ghost" size="sm" onClick={onReset}>
+              {t("doc.list.columnSettingsReset")}
+            </Button>
             <div className="flex items-center gap-2">
               <Button type="button" variant="outline" size="sm" onClick={onCancel}>
                 {t("common.cancel")}

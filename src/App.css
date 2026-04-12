@@ -575,6 +575,39 @@ summary,
   background: var(--app-surface);
 }
 
+/* List View Configurator modal content scrollbar — scoped dark treatment */
+.list-view-configurator__scroll {
+  scrollbar-width: thin;
+  scrollbar-color: var(--app-line-strong) var(--app-shell-bg);
+}
+
+.list-view-configurator__scroll:hover {
+  scrollbar-color: var(--app-text-muted) var(--app-shell-bg);
+}
+
+.list-view-configurator__scroll::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.list-view-configurator__scroll::-webkit-scrollbar-track {
+  background: var(--app-shell-bg);
+  border-radius: 4px;
+}
+
+.list-view-configurator__scroll::-webkit-scrollbar-thumb {
+  background: var(--app-line-strong);
+  border-radius: 4px;
+}
+
+.list-view-configurator__scroll::-webkit-scrollbar-thumb:hover {
+  background: var(--app-text-muted);
+}
+
+.list-view-configurator__scroll::-webkit-scrollbar-corner {
+  background: var(--app-shell-bg);
+}
+
 /* AG Grid — premium dark data grid (aligned with reference: shell, header, rows, lines) */
 .list-page__content > .erp-ag-grid {
   --ag-background-color: var(--app-grid-row);

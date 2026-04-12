@@ -1,10 +1,10 @@
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AgGridReact } from "ag-grid-react";
 import type { ColDef, ICellRendererParams, RowClickedEvent, SelectionChangedEvent } from "ag-grid-community";
 import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { ChevronDown, File, FileSpreadsheet, FolderOpen, ScanBarcode, TicketPercent, X } from "lucide-react";
+import { ChevronDown, File, FileSpreadsheet, FolderOpen, ScanBarcode, SlidersHorizontal, TicketPercent, X } from "lucide-react";
 import { save } from "@tauri-apps/plugin-dialog";
 import { invoke } from "@tauri-apps/api/core";
 import { revealItemInDir } from "@tauri-apps/plugin-opener";
@@ -14,29 +14,32 @@ import { barcodeRegistryListExcelLabels } from "@/shared/i18n/excelListExportLab
 import { useAppReadModelRevision } from "@/shared/inventoryMasterPageBlocks/useAppReadModelRevision";
 import {
   AgGridActiveBooleanCellRenderer,
+  AgGridColumnSettingsModal,
   AgGridContainer,
   GridOutlinePillBadge,
   applyAgGridColumnFilters,
+  applyDeepSortModel,
   agGridDefaultColDef,
   agGridDefaultGridOptions,
-  agGridRowNumberColDef,
+  getAgGridRowNumberColDef,
   agGridSelectionColumnDef,
-  decorateAgGridColumnDefsWithFilters,
-  useAgGridColumnFilterBridge,
-  useAgGridNoRowsOverlayLifecycle,
-  hasMeaningfulTextSelection,
-  getAgGridNoRowsOverlayContent,
+  buildExportMatrixFromRowNodes,
   buildAgGridNoRowsOverlayTemplate,
+  collectFilteredSortedRowNodes,
+  decorateAgGridColumnDefsWithFilters,
+  getAgGridNoRowsOverlayContent,
+  getVisibleAgGridExportColumns,
+  hasMeaningfulTextSelection,
   type AgGridColumnFilterConfig,
+  useAgGridColumnFilterBridge,
+  useAgGridColumnSettings,
+  useAgGridNoRowsOverlayLifecycle,
 } from "@/shared/ui/ag-grid";
 import { ListPageLayout } from "@/shared/ui/list/ListPageLayout";
 import { ListPageSearch } from "@/shared/ui/list/ListPageSearch";
 import { useListPageSearchHotkey } from "@/shared/hotkeys";
 import { buildReadableUniqueFilename, ensureUniqueExportPath } from "@/shared/export/filenameBuilder";
-import {
-  buildBarcodeRegistryListXlsxBuffer,
-  type BarcodeRegistryExportRow,
-} from "../barcodeRegistryListExport";
+import { buildListViewXlsxBuffer } from "@/shared/export/listViewXlsx";
 import {
   listBarcodeRegistryRows,
   type BarcodeRegistryEntryType,
@@ -50,6 +53,8 @@ import {
   hasActiveAgGridColumnFilters,
   readUrlAgGridColumnFilters,
   replaceUrlAgGridColumnFilters,
+  type AgGridColumnFilterClause,
+  withUrlAgGridColumnFilters,
 } from "@/shared/navigation/agGridColumnFilters";
 
 function EntryTypeCellRenderer(params: ICellRendererParams<BarcodeRegistryRow, BarcodeRegistryEntryType>) {
@@ -91,6 +96,7 @@ export function BarcodeRegistryPage() {
   const searchQuery = searchParams.get("q") ?? "";
   const [selectedCount, setSelectedCount] = useState(0);
   const [exportOpen, setExportOpen] = useState(false);
+  const [runtimeSortSerialized, setRuntimeSortSerialized] = useState("");
   const [exportSuccess, setExportSuccess] = useState<{ path: string; filename: string } | null>(null);
   const listStateKey = useMemo(
     () => buildNavigationStateKey(location.pathname, searchParams),
@@ -101,8 +107,18 @@ export function BarcodeRegistryPage() {
     () => buildReturnToValue(location.pathname, location.search),
     [location.pathname, location.search],
   );
-  const initialSortModel = useMemo(() => readUrlGridSort(searchParams), [searchParams]);
-  const columnFilterModel = useMemo(() => readUrlAgGridColumnFilters(searchParams), [searchParams]);
+  const initialSortModel = useMemo(
+    () => readUrlGridSort(new URLSearchParams(location.search)),
+    [location.search],
+  );
+  const columnFilterModel = useMemo(
+    () => readUrlAgGridColumnFilters(new URLSearchParams(location.search)),
+    [location.search],
+  );
+
+  useEffect(() => {
+    setRuntimeSortSerialized(serializeUrlGridSort(initialSortModel));
+  }, [initialSortModel]);
 
   const entryTypeLabel = useCallback(
     (value: BarcodeRegistryEntryType) =>
@@ -182,7 +198,7 @@ export function BarcodeRegistryPage() {
     [entryTypeLabel, markdownStatusLabel, rows, sourceOptions, symbologyLabel],
   );
 
-  const displayRows = useMemo(
+  const displayRowsWithQueryFilters = useMemo(
     () => applyAgGridColumnFilters(filteredRows, columnFilterModel, barcodeColumnFilterConfigs),
     [filteredRows, columnFilterModel, barcodeColumnFilterConfigs],
   );
@@ -190,133 +206,14 @@ export function BarcodeRegistryPage() {
   const handleSortChanged = useCallback(() => {
     const api = gridRef.current?.api;
     if (!api) return;
-    const serialized = serializeUrlGridSort(getCurrentGridSort(api, ["selection", "rowNumber"]));
+    const serialized = serializeUrlGridSort(getCurrentGridSort(api, ["selection", "lineNo"]));
+    setRuntimeSortSerialized(serialized);
     replaceQueryParam(searchParams, setSearchParams, "sort", serialized);
   }, [searchParams, setSearchParams]);
 
-  const noRowsOverlayTemplate = useMemo(
-    () =>
-      buildAgGridNoRowsOverlayTemplate(
-        getAgGridNoRowsOverlayContent(
-          {
-            baseRowCount: rows.length,
-            visibleRowCount: displayRows.length,
-            searchActive: searchQuery.trim() !== "",
-            filtersActive: hasActiveAgGridColumnFilters(columnFilterModel),
-          },
-          t,
-        ),
-      ),
-    [rows.length, displayRows.length, searchQuery, columnFilterModel, t, locale],
-  );
-
-  useAgGridNoRowsOverlayLifecycle(gridRef, noRowsOverlayTemplate, displayRows.length);
-
-  const buildExportRows = useCallback(
-    (inputRows: BarcodeRegistryRow[]): BarcodeRegistryExportRow[] =>
-      inputRows.map((row, idx) => ({
-        no: idx + 1,
-        code: row.code,
-        entryType: entryTypeLabel(row.entryType),
-        itemCode: row.itemCode,
-        itemName: row.itemName,
-        active: row.isActive ? t("ops.master.exportActiveYes") : t("ops.master.exportActiveNo"),
-        source: sourceLabel(row.source),
-        created: row.createdAt ?? "",
-        symbology: row.symbology ? symbologyLabel(row.symbology) : "",
-        markdownJournal: row.markdownJournalNumber ?? "",
-        status: row.markdownStatus ? markdownStatusLabel(row.markdownStatus) : "",
-      })),
-    [entryTypeLabel, markdownStatusLabel, sourceLabel, symbologyLabel, t],
-  );
-
-  const getExportRowsCurrentView = useCallback((): BarcodeRegistryExportRow[] => {
-    const api = gridRef.current?.api;
-    if (!api) return buildExportRows(filteredRows);
-    const exportRows: BarcodeRegistryRow[] = [];
-    api.forEachNodeAfterFilterAndSort((rowNode) => {
-      if (rowNode.data) exportRows.push(rowNode.data);
-    });
-    return buildExportRows(exportRows);
-  }, [buildExportRows, filteredRows]);
-
-  const getExportRowsSelected = useCallback((): BarcodeRegistryExportRow[] => {
-    const api = gridRef.current?.api;
-    const selectedRows = api ? (api.getSelectedRows() as BarcodeRegistryRow[]) : [];
-    return buildExportRows(selectedRows);
-  }, [buildExportRows]);
-
-  const runExportWithSaveAs = useCallback(
-    async (defaultFilename: string, buildBuffer: () => Promise<ArrayBuffer>) => {
-      try {
-        const base = defaultFilename.replace(/\.[^.]+$/, "");
-        const generatedFilename = buildReadableUniqueFilename({ base, extension: "xlsx" });
-        const path = await save({
-          defaultPath: generatedFilename,
-          filters: [{ name: t("ops.importModal.excelFileFilterName"), extensions: ["xlsx"] }],
-        });
-        if (path == null) return;
-        const safePath = await ensureUniqueExportPath(path);
-
-        const buffer = await buildBuffer();
-        const bytes = new Uint8Array(buffer);
-        let binary = "";
-        for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
-        const contentsBase64 = btoa(binary);
-
-        await invoke("write_export_file", { path: safePath, contentsBase64 });
-        const filename = safePath.replace(/^.*[/\\]/, "") || generatedFilename;
-        setExportSuccess({ path: safePath, filename });
-      } catch (err) {
-        console.error("Export failed", err);
-        const buffer = await buildBuffer();
-        const blob = new Blob([buffer], {
-          type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement("a");
-        a.href = url;
-        a.download = defaultFilename;
-        a.click();
-        URL.revokeObjectURL(url);
-      }
-    },
-    [t],
-  );
-
-  const listExcelLabels = useMemo(() => barcodeRegistryListExcelLabels(t), [t, locale]);
-
-  const handleExportCurrentView = useCallback(() => {
-    const exportRows = getExportRowsCurrentView();
-    runExportWithSaveAs("barcode-registry.xlsx", () =>
-      buildBarcodeRegistryListXlsxBuffer(exportRows, listExcelLabels),
-    );
-  }, [getExportRowsCurrentView, listExcelLabels, runExportWithSaveAs]);
-
-  const handleExportSelected = useCallback(() => {
-    const exportRows = getExportRowsSelected();
-    if (exportRows.length === 0) return;
-    runExportWithSaveAs("barcode-registry-selected.xlsx", () =>
-      buildBarcodeRegistryListXlsxBuffer(exportRows, listExcelLabels),
-    );
-  }, [getExportRowsSelected, listExcelLabels, runExportWithSaveAs]);
-
-  const onSelectionChanged = useCallback((event: SelectionChangedEvent<BarcodeRegistryRow>) => {
-    setSelectedCount(event.api.getSelectedRows().length);
-  }, []);
-
-  const onRowClicked = useCallback(
-    (event: RowClickedEvent<BarcodeRegistryRow>) => {
-      if (hasMeaningfulTextSelection()) return;
-      if (!event.data) return;
-      navigate(appendReturnTo(event.data.nativePath, currentReturnTo));
-    },
-    [navigate, currentReturnTo],
-  );
-
   const baseColumnDefs = useMemo<ColDef<BarcodeRegistryRow>[]>(
     () => [
-      agGridRowNumberColDef,
+      getAgGridRowNumberColDef(t),
       {
         field: "code",
         headerName: t("exportExcel.list.colCode"),
@@ -388,8 +285,184 @@ export function BarcodeRegistryPage() {
     [markdownStatusLabel, sourceLabel, symbologyLabel, t],
   );
 
+  const {
+    columnDefs: settingsAwareBaseColumnDefs,
+    draftItems: columnSettingsDraftItems,
+    draftDeepFilters: columnSettingsDraftDeepFilters,
+    draftDeepSorts: columnSettingsDraftDeepSorts,
+    settingsOpen: columnSettingsOpen,
+    openSettings: openColumnSettings,
+    setDraftItems: setColumnSettingsDraftItems,
+    setDraftDeepFilters: setColumnSettingsDraftDeepFilters,
+    setDraftDeepSorts: setColumnSettingsDraftDeepSorts,
+    applyDraft: applyColumnSettingsDraft,
+    resetDraftToDefaults: resetColumnSettingsDraftToDefaults,
+    cancelDraft: cancelColumnSettingsDraft,
+    deepFilterModel,
+    deepSortModel,
+    registry: columnSettingsRegistry,
+    personalViews: columnSettingsPersonalViews,
+    activeViewId: columnSettingsActiveViewId,
+    activeViewName: columnSettingsActiveViewName,
+    hasUnsavedChanges: columnSettingsHasUnsavedChanges,
+    activatePersonalView: activateColumnSettingsPersonalView,
+    createPersonalViewFromCurrent: createColumnSettingsPersonalViewFromCurrent,
+    saveActivePersonalViewFromCurrent: saveColumnSettingsActivePersonalViewFromCurrent,
+    renameActivePersonalView: renameColumnSettingsActivePersonalView,
+    deleteActivePersonalView: deleteColumnSettingsActivePersonalView,
+    setActivePersonalViewAsDefault: setColumnSettingsActivePersonalViewAsDefault,
+  } = useAgGridColumnSettings<BarcodeRegistryRow>({
+    pageKey: "barcodes",
+    entityType: "barcodes",
+    baseColumnDefs,
+  });
+
+  const effectiveSortModel = useMemo(() => {
+    const params = new URLSearchParams();
+    if (runtimeSortSerialized !== "") params.set("sort", runtimeSortSerialized);
+    const runtime = readUrlGridSort(params);
+    return runtime.length > 0 ? runtime : deepSortModel;
+  }, [runtimeSortSerialized, deepSortModel]);
+
+  const resolveDeepSortValue = useCallback(
+    (row: BarcodeRegistryRow, fieldKey: string): unknown => {
+      const config = barcodeColumnFilterConfigs[fieldKey];
+      if (config?.getValue) return config.getValue(row);
+      return (row as unknown as Record<string, unknown>)[fieldKey];
+    },
+    [barcodeColumnFilterConfigs],
+  );
+
+  const displayRowsWithDeepFilters = useMemo(
+    () => applyAgGridColumnFilters(displayRowsWithQueryFilters, deepFilterModel, barcodeColumnFilterConfigs),
+    [displayRowsWithQueryFilters, deepFilterModel, barcodeColumnFilterConfigs],
+  );
+
+  const displayRows = useMemo(
+    () =>
+      applyDeepSortModel({
+        rows: displayRowsWithDeepFilters,
+        sortModel: effectiveSortModel,
+        getFieldValue: resolveDeepSortValue,
+      }),
+    [displayRowsWithDeepFilters, effectiveSortModel, resolveDeepSortValue],
+  );
+
+  const noRowsOverlayTemplate = useMemo(
+    () =>
+      buildAgGridNoRowsOverlayTemplate(
+        getAgGridNoRowsOverlayContent(
+          {
+            baseRowCount: rows.length,
+            visibleRowCount: displayRows.length,
+            searchActive: searchQuery.trim() !== "",
+            filtersActive: hasActiveAgGridColumnFilters(columnFilterModel),
+          },
+          t,
+        ),
+      ),
+    [rows.length, displayRows.length, searchQuery, columnFilterModel, t, locale],
+  );
+
+  useAgGridNoRowsOverlayLifecycle(gridRef, noRowsOverlayTemplate, displayRows.length);
+
+  const buildExportPayload = useCallback(
+    (mode: "current" | "selected"): { headers: string[]; rows: Array<Array<string | number>> } => {
+      const api = gridRef.current?.api;
+      if (!api) return { headers: [], rows: [] };
+      const columns = getVisibleAgGridExportColumns(api, { entityType: "barcodes" });
+      const rowNodes =
+        mode === "selected"
+          ? api.getSelectedNodes()
+          : collectFilteredSortedRowNodes(api);
+      return {
+        headers: columns.map((x) => x.headerName),
+        rows: buildExportMatrixFromRowNodes(api, columns, rowNodes),
+      };
+    },
+    [],
+  );
+
+  const runExportWithSaveAs = useCallback(
+    async (defaultFilename: string, buildBuffer: () => Promise<ArrayBuffer>) => {
+      try {
+        const base = defaultFilename.replace(/\.[^.]+$/, "");
+        const generatedFilename = buildReadableUniqueFilename({ base, extension: "xlsx" });
+        const path = await save({
+          defaultPath: generatedFilename,
+          filters: [{ name: t("ops.importModal.excelFileFilterName"), extensions: ["xlsx"] }],
+        });
+        if (path == null) return;
+        const safePath = await ensureUniqueExportPath(path);
+
+        const buffer = await buildBuffer();
+        const bytes = new Uint8Array(buffer);
+        let binary = "";
+        for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
+        const contentsBase64 = btoa(binary);
+
+        await invoke("write_export_file", { path: safePath, contentsBase64 });
+        const filename = safePath.replace(/^.*[/\\]/, "") || generatedFilename;
+        setExportSuccess({ path: safePath, filename });
+      } catch (err) {
+        void err;
+        const buffer = await buildBuffer();
+        const blob = new Blob([buffer], {
+          type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = defaultFilename;
+        a.click();
+        URL.revokeObjectURL(url);
+      }
+    },
+    [t],
+  );
+
+  const listExcelLabels = useMemo(() => barcodeRegistryListExcelLabels(t), [t, locale]);
+
+  const handleExportCurrentView = useCallback(() => {
+    const payload = buildExportPayload("current");
+    runExportWithSaveAs("barcode-registry.xlsx", () =>
+      buildListViewXlsxBuffer({
+        sheetName: listExcelLabels.sheetName,
+        headers: payload.headers,
+        rows: payload.rows,
+        tableNameBase: "BarcodeRegistryListView",
+      }),
+    );
+  }, [buildExportPayload, listExcelLabels, runExportWithSaveAs]);
+
+  const handleExportSelected = useCallback(() => {
+    const payload = buildExportPayload("selected");
+    if (payload.rows.length === 0) return;
+    runExportWithSaveAs("barcode-registry-selected.xlsx", () =>
+      buildListViewXlsxBuffer({
+        sheetName: listExcelLabels.sheetName,
+        headers: payload.headers,
+        rows: payload.rows,
+        tableNameBase: "BarcodeRegistryListViewSelected",
+      }),
+    );
+  }, [buildExportPayload, listExcelLabels, runExportWithSaveAs]);
+
+  const onSelectionChanged = useCallback((event: SelectionChangedEvent<BarcodeRegistryRow>) => {
+    setSelectedCount(event.api.getSelectedRows().length);
+  }, []);
+
+  const onRowClicked = useCallback(
+    (event: RowClickedEvent<BarcodeRegistryRow>) => {
+      if (hasMeaningfulTextSelection()) return;
+      if (!event.data) return;
+      navigate(appendReturnTo(event.data.nativePath, currentReturnTo));
+    },
+    [navigate, currentReturnTo],
+  );
+
   const handleApplyColumnFilter = useCallback(
-    (colId: string, clause: { operator: any; value?: string; valueTo?: string; values?: string[] }) => {
+    (colId: string, clause: AgGridColumnFilterClause) => {
       replaceUrlAgGridColumnFilters(searchParams, setSearchParams, {
         ...columnFilterModel,
         [colId]: clause,
@@ -415,16 +488,54 @@ export function BarcodeRegistryPage() {
   const columnDefs = useMemo(
     () =>
       decorateAgGridColumnDefsWithFilters(
-        baseColumnDefs,
+        settingsAwareBaseColumnDefs,
         barcodeColumnFilterConfigs,
         columnFilterBridge,
       ),
     [
-      baseColumnDefs,
+      settingsAwareBaseColumnDefs,
       barcodeColumnFilterConfigs,
       columnFilterBridge,
     ],
   );
+
+  useEffect(() => {
+    const api = gridRef.current?.api;
+    if (!api) return;
+    applyUrlGridSort(api, effectiveSortModel);
+  }, [columnDefs, effectiveSortModel]);
+
+  const handleApplyColumnSettings = useCallback(() => {
+    const api = gridRef.current?.api;
+    const { hiddenIds, nextItems } = applyColumnSettingsDraft();
+    if (api) {
+      api.applyColumnState({
+        state: nextItems.map((item) => ({
+          colId: item.id,
+          hide: item.visible ? false : true,
+        })),
+        applyOrder: true,
+      });
+    }
+    if (hiddenIds.length === 0) return;
+
+    const nextColumnFilterModel = { ...columnFilterModel };
+    for (const colId of hiddenIds) delete nextColumnFilterModel[colId];
+    const nextSortModel = effectiveSortModel.filter((entry) => !hiddenIds.includes(entry.colId));
+    const nextParams = withUrlAgGridColumnFilters(searchParams, nextColumnFilterModel);
+    const nextSortSerialized = serializeUrlGridSort(nextSortModel);
+    if (nextSortSerialized === "") nextParams.delete("sort");
+    else nextParams.set("sort", nextSortSerialized);
+    setSearchParams(nextParams, { replace: true });
+    setRuntimeSortSerialized(nextSortSerialized);
+    if (api) applyUrlGridSort(api, nextSortModel);
+  }, [
+    applyColumnSettingsDraft,
+    columnFilterModel,
+    effectiveSortModel,
+    searchParams,
+    setSearchParams,
+  ]);
 
   return (
     <ListPageLayout
@@ -535,6 +646,16 @@ export function BarcodeRegistryPage() {
                   </PopoverContent>
                 </Popover>
               </div>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="h-[1.625rem] shrink-0 !px-1 !py-0 !gap-0.5"
+                onClick={openColumnSettings}
+              >
+                <SlidersHorizontal className="h-4 w-4 shrink-0" />
+                {t("doc.list.viewSettings")}
+              </Button>
             </div>
           </div>
         </div>
@@ -547,19 +668,50 @@ export function BarcodeRegistryPage() {
           ref={gridRef}
           rowData={displayRows}
           columnDefs={columnDefs}
-            defaultColDef={agGridDefaultColDef}
-            overlayNoRowsTemplate={noRowsOverlayTemplate}
-            onGridReady={(event) => {
-              applyUrlGridSort(event.api, initialSortModel);
-            }}
-            onSortChanged={handleSortChanged}
-            rowSelection={{ mode: "multiRow", checkboxes: true, headerCheckbox: true, enableClickSelection: true }}
-            selectionColumnDef={agGridSelectionColumnDef}
-            getRowId={(params) => params.data.id}
-            onSelectionChanged={onSelectionChanged}
-            onRowClicked={onRowClicked}
-          />
+          defaultColDef={agGridDefaultColDef}
+          overlayNoRowsTemplate={noRowsOverlayTemplate}
+          onGridReady={(event) => {
+            applyUrlGridSort(event.api, effectiveSortModel);
+          }}
+          onSortChanged={handleSortChanged}
+          rowSelection={{ mode: "multiRow", checkboxes: true, headerCheckbox: true, enableClickSelection: true }}
+          selectionColumnDef={agGridSelectionColumnDef}
+          getRowId={(params) => params.data.id}
+          onSelectionChanged={onSelectionChanged}
+          onRowClicked={onRowClicked}
+        />
       </AgGridContainer>
+      <AgGridColumnSettingsModal
+        open={columnSettingsOpen}
+        onOpenChange={(nextOpen) => {
+          if (nextOpen) {
+            openColumnSettings();
+            return;
+          }
+          cancelColumnSettingsDraft();
+        }}
+        items={columnSettingsDraftItems}
+        onItemsChange={(nextItems) => setColumnSettingsDraftItems(() => nextItems)}
+        filterRules={columnSettingsDraftDeepFilters}
+        onFilterRulesChange={(nextRules) => setColumnSettingsDraftDeepFilters(() => nextRules)}
+        sortRules={columnSettingsDraftDeepSorts}
+        onSortRulesChange={(nextRules) => setColumnSettingsDraftDeepSorts(() => nextRules)}
+        registry={columnSettingsRegistry}
+        filterConfigs={barcodeColumnFilterConfigs as Record<string, AgGridColumnFilterConfig<unknown>>}
+        personalViews={columnSettingsPersonalViews}
+        activeViewId={columnSettingsActiveViewId}
+        activeViewName={columnSettingsActiveViewName}
+        hasUnsavedChanges={columnSettingsHasUnsavedChanges}
+        onActivateView={activateColumnSettingsPersonalView}
+        onCreateView={createColumnSettingsPersonalViewFromCurrent}
+        onSaveChangesToActiveView={saveColumnSettingsActivePersonalViewFromCurrent}
+        onRenameActiveView={renameColumnSettingsActivePersonalView}
+        onDeleteActiveView={deleteColumnSettingsActivePersonalView}
+        onSetActiveAsDefault={setColumnSettingsActivePersonalViewAsDefault}
+        onApply={handleApplyColumnSettings}
+        onCancel={cancelColumnSettingsDraft}
+        onReset={resetColumnSettingsDraftToDefaults}
+      />
     </ListPageLayout>
   );
 }
