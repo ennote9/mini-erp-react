@@ -1,5 +1,5 @@
-import { useMemo, useState, useRef, useCallback } from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { useMemo, useState, useRef, useCallback, useEffect } from "react";
+import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { AgGridReact } from "ag-grid-react";
 import type { ColDef, ICellRendererParams, SelectionChangedEvent } from "ag-grid-community";
 import { shipmentRepository } from "../repository";
@@ -16,6 +16,7 @@ import {
   AgGridContainer,
   AgGridFactualStatusCellRenderer,
   applyAgGridColumnFilters,
+  applyDeepSortModel,
   agGridDefaultColDef,
   agGridDefaultGridOptions,
   getAgGridRowNumberColDef,
@@ -23,6 +24,11 @@ import {
   decorateAgGridColumnDefsWithFilters,
   useAgGridColumnFilterBridge,
   useAgGridNoRowsOverlayLifecycle,
+  useAgGridColumnSettings,
+  AgGridColumnSettingsModal,
+  getVisibleAgGridExportColumns,
+  collectFilteredSortedRowNodes,
+  buildExportMatrixFromRowNodes,
   hasMeaningfulTextSelection,
   getAgGridNoRowsOverlayContent,
   buildAgGridNoRowsOverlayTemplate,
@@ -33,7 +39,6 @@ import { useListPageSearchHotkey } from "../../../shared/hotkeys";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { ChevronDown, FileSpreadsheet, File, FolderOpen, X } from "lucide-react";
-import { buildShipmentsListXlsxBuffer, type ShipmentsExportRow } from "../shipmentsListExport";
 import { save } from "@tauri-apps/plugin-dialog";
 import { invoke } from "@tauri-apps/api/core";
 import { revealItemInDir } from "@tauri-apps/plugin-opener";
@@ -41,11 +46,15 @@ import { useTranslation } from "@/shared/i18n/context";
 import { useAppDisplayFormatters } from "@/shared/formatting";
 import { buildReadableUniqueFilename, ensureUniqueExportPath } from "@/shared/export/filenameBuilder";
 import { shipmentsListExcelLabels } from "@/shared/i18n/excelListExportLabels";
+import { buildListViewXlsxBuffer } from "@/shared/export/listViewXlsx";
 import { toGeneratedCodeSearchTokens } from "@/shared/generatedVisibleCodes";
+import { applyUrlGridSort, getCurrentGridSort, readUrlGridSort, serializeUrlGridSort } from "@/shared/navigation/agGridSort";
+import { replaceQueryParam } from "@/shared/navigation/returnTo";
 import {
   hasActiveAgGridColumnFilters,
   readUrlAgGridColumnFilters,
   replaceUrlAgGridColumnFilters,
+  withUrlAgGridColumnFilters,
   type AgGridColumnFilterClause,
 } from "@/shared/navigation/agGridColumnFilters";
 
@@ -83,23 +92,6 @@ function filterByCarrierId(rows: RowData[], carrierId: string | null): RowData[]
   return rows.filter((r) => (r.carrierId?.trim() ?? "") === carrierId);
 }
 
-function buildExportRowsFromShipments(rows: RowData[]): ShipmentsExportRow[] {
-  return rows.map((r, idx) => ({
-    no: idx + 1,
-    number: r.number ?? "",
-    date: r.date ?? "",
-    salesOrder: r.salesOrderNumber ?? "",
-    warehouse: r.warehouseName ?? "",
-    carrier: r.carrierExport ?? "",
-    trackingNumber: r.trackingExport ?? "",
-    recipient: r.recipientExport ?? "",
-    recipientPhone: r.recipientPhoneExport ?? "",
-    deliveryAddress: r.deliveryAddressExport ?? "",
-    deliveryComment: r.deliveryCommentExport ?? "",
-    status: r.status ?? "",
-  }));
-}
-
 function TrackingListCellRenderer(params: ICellRendererParams<RowData>) {
   const { t } = useTranslation();
   const data = params.data;
@@ -126,6 +118,7 @@ function TrackingListCellRenderer(params: ICellRendererParams<RowData>) {
 }
 
 export function ShipmentsListPage() {
+  const location = useLocation();
   const navigate = useNavigate();
   const { t, locale } = useTranslation();
   const { formatDate } = useAppDisplayFormatters();
@@ -145,7 +138,15 @@ export function ShipmentsListPage() {
   }, [searchParams]);
 
   const [searchQuery, setSearchQuery] = useState("");
-  const columnFilterModel = useMemo(() => readUrlAgGridColumnFilters(searchParams), [searchParams]);
+  const initialSortModel = useMemo(
+    () => readUrlGridSort(new URLSearchParams(location.search)),
+    [location.search],
+  );
+  const columnFilterModel = useMemo(
+    () => readUrlAgGridColumnFilters(new URLSearchParams(location.search)),
+    [location.search],
+  );
+  const [runtimeSortSerialized, setRuntimeSortSerialized] = useState(() => serializeUrlGridSort(initialSortModel));
   const [exportSuccess, setExportSuccess] = useState<{ path: string; filename: string } | null>(null);
   const [exportOpen, setExportOpen] = useState(false);
   const [selectedCount, setSelectedCount] = useState(0);
@@ -156,6 +157,14 @@ export function ShipmentsListPage() {
   const onSelectionChanged = useCallback((e: SelectionChangedEvent<RowData>) => {
     setSelectedCount(e.api.getSelectedRows().length);
   }, []);
+  const handleSortChanged = useCallback(() => {
+    const api = gridRef.current?.api;
+    if (!api) return;
+    const nextSortModel = getCurrentGridSort(api, ["selection", "lineNo"]);
+    const serialized = serializeUrlGridSort(nextSortModel);
+    setRuntimeSortSerialized(serialized);
+    replaceQueryParam(searchParams, setSearchParams, "sort", serialized);
+  }, [searchParams, setSearchParams]);
 
   const rowsWithNames = useMemo(() => {
     const list = shipmentRepository.list();
@@ -215,7 +224,7 @@ export function ShipmentsListPage() {
     [rowsWithNames, factualStatusOptions],
   );
 
-  const displayRows = useMemo(
+  const displayRowsWithQueryFilters = useMemo(
     () => applyAgGridColumnFilters(filteredRows, columnFilterModel, shipmentColumnFilterConfigs),
     [filteredRows, columnFilterModel, shipmentColumnFilterConfigs],
   );
@@ -252,21 +261,22 @@ export function ShipmentsListPage() {
     setSearchParams(next, { replace: true });
   }, [searchParams, setSearchParams]);
 
-  const getExportRowsCurrentView = useCallback((): ShipmentsExportRow[] => {
-    const api = gridRef.current?.api;
-    if (!api) return buildExportRowsFromShipments(displayRows);
-    const rows: RowData[] = [];
-    api.forEachNodeAfterFilterAndSort((rowNode) => {
-      if (rowNode.data) rows.push(rowNode.data);
-    });
-    return buildExportRowsFromShipments(rows);
-  }, [displayRows]);
-
-  const getExportRowsSelected = useCallback((): ShipmentsExportRow[] => {
-    const api = gridRef.current?.api;
-    const rows: RowData[] = api ? (api.getSelectedRows() as RowData[]) : [];
-    return buildExportRowsFromShipments(rows);
-  }, []);
+  const buildExportPayload = useCallback(
+    (mode: "current" | "selected"): { headers: string[]; rows: Array<Array<string | number>> } => {
+      const api = gridRef.current?.api;
+      if (!api) return { headers: [], rows: [] };
+      const columns = getVisibleAgGridExportColumns(api, { entityType: "shipments" });
+      const rowNodes =
+        mode === "selected"
+          ? api.getSelectedNodes()
+          : collectFilteredSortedRowNodes(api);
+      return {
+        headers: columns.map((x) => x.headerName),
+        rows: buildExportMatrixFromRowNodes(api, columns, rowNodes),
+      };
+    },
+    [],
+  );
 
   const runExportWithSaveAs = useCallback(
     async (defaultFilename: string, buildBuffer: () => Promise<ArrayBuffer>) => {
@@ -310,35 +320,31 @@ export function ShipmentsListPage() {
   const listExcelLabels = useMemo(() => shipmentsListExcelLabels(t), [t, locale]);
 
   const handleExportCurrentView = useCallback(() => {
-    const rows = getExportRowsCurrentView();
-    runExportWithSaveAs("shipments.xlsx", () => buildShipmentsListXlsxBuffer(rows, listExcelLabels));
-  }, [getExportRowsCurrentView, listExcelLabels, runExportWithSaveAs]);
+    const payload = buildExportPayload("current");
+    runExportWithSaveAs("shipments.xlsx", () =>
+      buildListViewXlsxBuffer({
+        sheetName: listExcelLabels.sheetName,
+        headers: payload.headers,
+        rows: payload.rows,
+        tableNameBase: "ShipmentsListView",
+      }),
+    );
+  }, [buildExportPayload, listExcelLabels, runExportWithSaveAs]);
 
   const handleExportSelected = useCallback(() => {
-    const rows = getExportRowsSelected();
-    if (rows.length === 0) return;
-    runExportWithSaveAs("shipments-selected.xlsx", () => buildShipmentsListXlsxBuffer(rows, listExcelLabels));
-  }, [getExportRowsSelected, listExcelLabels, runExportWithSaveAs]);
+    const payload = buildExportPayload("selected");
+    if (payload.rows.length === 0) return;
+    runExportWithSaveAs("shipments-selected.xlsx", () =>
+      buildListViewXlsxBuffer({
+        sheetName: listExcelLabels.sheetName,
+        headers: payload.headers,
+        rows: payload.rows,
+        tableNameBase: "ShipmentsListViewSelected",
+      }),
+    );
+  }, [buildExportPayload, listExcelLabels, runExportWithSaveAs]);
 
   const exportSelectedDisabled = selectedCount === 0;
-
-  const noRowsOverlayTemplate = useMemo(
-    () =>
-      buildAgGridNoRowsOverlayTemplate(
-        getAgGridNoRowsOverlayContent(
-          {
-            baseRowCount: rowsWithNames.length,
-            visibleRowCount: displayRows.length,
-            searchActive,
-            filtersActive,
-          },
-          t,
-        ),
-      ),
-    [rowsWithNames.length, displayRows.length, searchActive, filtersActive, t, locale],
-  );
-
-  useAgGridNoRowsOverlayLifecycle(gridRef, noRowsOverlayTemplate, displayRows.length);
 
   const handleApplyColumnFilter = useCallback(
     (colId: string, clause: AgGridColumnFilterClause) => {
@@ -437,19 +443,145 @@ export function ShipmentsListPage() {
     [t, locale, formatDate],
   );
 
+  const {
+    columnDefs: settingsAwareBaseColumnDefs,
+    draftItems: columnSettingsDraftItems,
+    draftDeepFilters: columnSettingsDraftDeepFilters,
+    draftDeepSorts: columnSettingsDraftDeepSorts,
+    settingsOpen: columnSettingsOpen,
+    openSettings: openColumnSettings,
+    setDraftItems: setColumnSettingsDraftItems,
+    setDraftDeepFilters: setColumnSettingsDraftDeepFilters,
+    setDraftDeepSorts: setColumnSettingsDraftDeepSorts,
+    applyDraft: applyColumnSettingsDraft,
+    resetDraftToDefaults: resetColumnSettingsDraftToDefaults,
+    cancelDraft: cancelColumnSettingsDraft,
+    deepFilterModel,
+    deepSortModel,
+    registry: columnSettingsRegistry,
+    personalViews: columnSettingsPersonalViews,
+    activeViewId: columnSettingsActiveViewId,
+    activeViewName: columnSettingsActiveViewName,
+    hasUnsavedChanges: columnSettingsHasUnsavedChanges,
+    activatePersonalView: activateColumnSettingsPersonalView,
+    createPersonalViewFromCurrent: createColumnSettingsPersonalViewFromCurrent,
+    saveActivePersonalViewFromCurrent: saveColumnSettingsActivePersonalViewFromCurrent,
+    renameActivePersonalView: renameColumnSettingsActivePersonalView,
+    deleteActivePersonalView: deleteColumnSettingsActivePersonalView,
+    setActivePersonalViewAsDefault: setColumnSettingsActivePersonalViewAsDefault,
+  } = useAgGridColumnSettings<RowData>({
+    pageKey: "shipments",
+    entityType: "shipments",
+    baseColumnDefs,
+  });
+  const effectiveSortModel = useMemo(
+    () => {
+      const params = new URLSearchParams();
+      if (runtimeSortSerialized !== "") params.set("sort", runtimeSortSerialized);
+      const runtime = readUrlGridSort(params);
+      return runtime.length > 0 ? runtime : deepSortModel;
+    },
+    [runtimeSortSerialized, deepSortModel],
+  );
+  const resolveDeepSortValue = useCallback(
+    (row: RowData, fieldKey: string): unknown => {
+      const config = shipmentColumnFilterConfigs[fieldKey];
+      if (config?.getValue) return config.getValue(row);
+      return (row as unknown as Record<string, unknown>)[fieldKey];
+    },
+    [shipmentColumnFilterConfigs],
+  );
+
+  const displayRowsWithDeepFilters = useMemo(
+    () => applyAgGridColumnFilters(displayRowsWithQueryFilters, deepFilterModel, shipmentColumnFilterConfigs),
+    [displayRowsWithQueryFilters, deepFilterModel, shipmentColumnFilterConfigs],
+  );
+  const displayRows = useMemo(
+    () =>
+      applyDeepSortModel({
+        rows: displayRowsWithDeepFilters,
+        sortModel: effectiveSortModel,
+        getFieldValue: resolveDeepSortValue,
+      }),
+    [displayRowsWithDeepFilters, effectiveSortModel, resolveDeepSortValue],
+  );
+
+  const noRowsOverlayTemplate = useMemo(
+    () =>
+      buildAgGridNoRowsOverlayTemplate(
+        getAgGridNoRowsOverlayContent(
+          {
+            baseRowCount: rowsWithNames.length,
+            visibleRowCount: displayRows.length,
+            searchActive,
+            filtersActive,
+          },
+          t,
+        ),
+      ),
+    [rowsWithNames.length, displayRows.length, searchActive, filtersActive, t, locale],
+  );
+
+  useAgGridNoRowsOverlayLifecycle(gridRef, noRowsOverlayTemplate, displayRows.length);
+
   const columnDefs = useMemo(
     () =>
       decorateAgGridColumnDefsWithFilters(
-        baseColumnDefs,
+        settingsAwareBaseColumnDefs,
         shipmentColumnFilterConfigs,
         columnFilterBridge,
       ),
     [
-      baseColumnDefs,
+      settingsAwareBaseColumnDefs,
       shipmentColumnFilterConfigs,
       columnFilterBridge,
     ],
   );
+  useEffect(() => {
+    const api = gridRef.current?.api;
+    if (!api) return;
+    applyUrlGridSort(api, effectiveSortModel);
+  }, [columnDefs, effectiveSortModel]);
+
+  const handleApplyColumnSettings = useCallback(() => {
+    const api = gridRef.current?.api;
+    const { hiddenIds, nextItems } = applyColumnSettingsDraft();
+    if (api) {
+      api.applyColumnState({
+        state: nextItems.map((item) => ({
+          colId: item.id,
+          hide: item.visible ? false : true,
+        })),
+        applyOrder: true,
+      });
+    }
+    if (hiddenIds.length === 0) return;
+
+    const nextColumnFilterModel = { ...columnFilterModel };
+    for (const colId of hiddenIds) {
+      delete nextColumnFilterModel[colId];
+    }
+    const currentSortModel = effectiveSortModel;
+    const nextSortModel = currentSortModel.filter((entry) => !hiddenIds.includes(entry.colId));
+    const nextParams = withUrlAgGridColumnFilters(searchParams, nextColumnFilterModel);
+    const nextSortSerialized = serializeUrlGridSort(nextSortModel);
+    if (nextSortSerialized === "") {
+      nextParams.delete("sort");
+    } else {
+      nextParams.set("sort", nextSortSerialized);
+    }
+    setSearchParams(nextParams, { replace: true });
+    setRuntimeSortSerialized(nextSortSerialized);
+    if (api) {
+      applyUrlGridSort(api, nextSortModel);
+    }
+  }, [
+    applyColumnSettingsDraft,
+    columnFilterModel,
+    effectiveSortModel,
+    searchParams,
+    setSearchParams,
+  ]);
 
   return (
     <ListPageLayout
@@ -604,6 +736,15 @@ export function ShipmentsListPage() {
                 </PopoverContent>
               </Popover>
             </div>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="h-[1.625rem] shrink-0"
+              onClick={openColumnSettings}
+            >
+              {t("doc.list.viewSettings")}
+            </Button>
           </div>
         </>
       }
@@ -614,18 +755,53 @@ export function ShipmentsListPage() {
           ref={gridRef}
           rowData={displayRows}
           columnDefs={columnDefs}
-            defaultColDef={agGridDefaultColDef}
-            overlayNoRowsTemplate={noRowsOverlayTemplate}
-            rowSelection={{ mode: "multiRow", checkboxes: true, headerCheckbox: true, enableClickSelection: true }}
-            selectionColumnDef={agGridSelectionColumnDef}
-            getRowId={(params) => params.data.id}
-            onRowClicked={(e) => {
-              if (hasMeaningfulTextSelection()) return;
-              if (e.data) navigate(`/shipments/${e.data.id}`);
-            }}
-            onSelectionChanged={onSelectionChanged}
-          />
+          defaultColDef={agGridDefaultColDef}
+          overlayNoRowsTemplate={noRowsOverlayTemplate}
+          onGridReady={(event) => {
+            applyUrlGridSort(event.api, effectiveSortModel);
+          }}
+          onSortChanged={handleSortChanged}
+          rowSelection={{ mode: "multiRow", checkboxes: true, headerCheckbox: true, enableClickSelection: true }}
+          selectionColumnDef={agGridSelectionColumnDef}
+          getRowId={(params) => params.data.id}
+          onRowClicked={(e) => {
+            if (hasMeaningfulTextSelection()) return;
+            if (e.data) navigate(`/shipments/${e.data.id}`);
+          }}
+          onSelectionChanged={onSelectionChanged}
+        />
       </AgGridContainer>
+      <AgGridColumnSettingsModal
+        open={columnSettingsOpen}
+        onOpenChange={(nextOpen) => {
+          if (nextOpen) {
+            openColumnSettings();
+            return;
+          }
+          cancelColumnSettingsDraft();
+        }}
+        items={columnSettingsDraftItems}
+        onItemsChange={(nextItems) => setColumnSettingsDraftItems(() => nextItems)}
+        filterRules={columnSettingsDraftDeepFilters}
+        onFilterRulesChange={(nextRules) => setColumnSettingsDraftDeepFilters(() => nextRules)}
+        sortRules={columnSettingsDraftDeepSorts}
+        onSortRulesChange={(nextRules) => setColumnSettingsDraftDeepSorts(() => nextRules)}
+        registry={columnSettingsRegistry}
+        filterConfigs={shipmentColumnFilterConfigs as Record<string, AgGridColumnFilterConfig<unknown>>}
+        personalViews={columnSettingsPersonalViews}
+        activeViewId={columnSettingsActiveViewId}
+        activeViewName={columnSettingsActiveViewName}
+        hasUnsavedChanges={columnSettingsHasUnsavedChanges}
+        onActivateView={activateColumnSettingsPersonalView}
+        onCreateView={createColumnSettingsPersonalViewFromCurrent}
+        onSaveChangesToActiveView={saveColumnSettingsActivePersonalViewFromCurrent}
+        onRenameActiveView={renameColumnSettingsActivePersonalView}
+        onDeleteActiveView={deleteColumnSettingsActivePersonalView}
+        onSetActiveAsDefault={setColumnSettingsActivePersonalViewAsDefault}
+        onApply={handleApplyColumnSettings}
+        onCancel={cancelColumnSettingsDraft}
+        onReset={resetColumnSettingsDraftToDefaults}
+      />
     </ListPageLayout>
   );
 }

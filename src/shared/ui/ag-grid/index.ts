@@ -42,3 +42,12 @@ export {
   buildExportMatrixFromRowNodes,
   type AgGridExportColumn,
 } from "./exportProjection";
+export type {
+  ListViewDefinition,
+  ListViewEntityType,
+  ListViewFieldRegistryEntry,
+  ListViewColumnState,
+  ListViewDeepFilterRule,
+  ListViewDeepSortRule,
+} from "./listViewConfig";
+export { getListViewFieldRegistry, applyDeepSortModel } from "./listViewConfig";

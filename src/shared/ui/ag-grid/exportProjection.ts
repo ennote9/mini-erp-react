@@ -1,4 +1,5 @@
 import type { GridApi, IRowNode } from "ag-grid-community";
+import { getListViewFieldRegistry, type ListViewEntityType } from "./listViewConfig";
 
 export type AgGridExportColumn = {
   colId: string;
@@ -6,11 +7,19 @@ export type AgGridExportColumn = {
 };
 
 function isExportableColumnId(colId: string): boolean {
-  return colId !== "selection";
+  if (colId === "selection") return false;
+  if (colId === "ag-Grid-SelectionColumn") return false;
+  return true;
 }
 
-export function getVisibleAgGridExportColumns(api: GridApi): AgGridExportColumn[] {
+export function getVisibleAgGridExportColumns(
+  api: GridApi,
+  options?: { entityType?: ListViewEntityType },
+): AgGridExportColumn[] {
   const cols = api.getAllDisplayedColumns();
+  const exportableByField = options?.entityType
+    ? new Map(getListViewFieldRegistry(options.entityType).map((field) => [field.fieldKey, field.exportable]))
+    : null;
   return cols
     .map((col) => {
       const colId = col.getColId();
@@ -18,7 +27,12 @@ export function getVisibleAgGridExportColumns(api: GridApi): AgGridExportColumn[
       const headerName = typeof def.headerName === "string" && def.headerName.trim() !== "" ? def.headerName : colId;
       return { colId, headerName };
     })
-    .filter((col) => isExportableColumnId(col.colId));
+    .filter((col) => {
+      if (!isExportableColumnId(col.colId)) return false;
+      if (!exportableByField) return true;
+      const exportable = exportableByField.get(col.colId);
+      return exportable !== false;
+    });
 }
 
 function normalizeCellValue(value: unknown): string | number {

@@ -1,5 +1,5 @@
-import { useMemo, useState, useRef, useCallback } from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { useMemo, useState, useRef, useCallback, useEffect } from "react";
+import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { AgGridReact } from "ag-grid-react";
 import type { ColDef, SelectionChangedEvent } from "ag-grid-community";
 import { customerRepository } from "../repository";
@@ -10,13 +10,19 @@ import {
   AgGridContainer,
   AgGridActiveBooleanCellRenderer,
   applyAgGridColumnFilters,
+  applyDeepSortModel,
   agGridDefaultColDef,
   agGridDefaultGridOptions,
-  agGridRowNumberColDef,
+  getAgGridRowNumberColDef,
   agGridSelectionColumnDef,
   decorateAgGridColumnDefsWithFilters,
   useAgGridColumnFilterBridge,
   useAgGridNoRowsOverlayLifecycle,
+  useAgGridColumnSettings,
+  AgGridColumnSettingsModal,
+  getVisibleAgGridExportColumns,
+  collectFilteredSortedRowNodes,
+  buildExportMatrixFromRowNodes,
   hasMeaningfulTextSelection,
   getAgGridNoRowsOverlayContent,
   buildAgGridNoRowsOverlayTemplate,
@@ -27,19 +33,24 @@ import { useListPageSearchHotkey } from "../../../shared/hotkeys";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { ChevronDown, FileSpreadsheet, File, FolderOpen, X } from "lucide-react";
-import { buildCustomersListXlsxBuffer, type CustomersExportRow } from "../customersListExport";
 import { save } from "@tauri-apps/plugin-dialog";
 import { invoke } from "@tauri-apps/api/core";
 import { revealItemInDir } from "@tauri-apps/plugin-opener";
 import { useTranslation } from "@/shared/i18n/context";
 import { buildReadableUniqueFilename, ensureUniqueExportPath } from "@/shared/export/filenameBuilder";
 import { customersListExcelLabels } from "@/shared/i18n/excelListExportLabels";
+import { buildListViewXlsxBuffer } from "@/shared/export/listViewXlsx";
+import { applyUrlGridSort, getCurrentGridSort, readUrlGridSort, serializeUrlGridSort } from "@/shared/navigation/agGridSort";
+import { replaceQueryParam } from "@/shared/navigation/returnTo";
 import {
   hasActiveAgGridColumnFilters,
   readUrlAgGridColumnFilters,
   replaceUrlAgGridColumnFilters,
+  withUrlAgGridColumnFilters,
   type AgGridColumnFilterClause,
 } from "@/shared/navigation/agGridColumnFilters";
+
+type RowData = Customer;
 
 function parseQueryId(searchParams: URLSearchParams, key: string): string | null {
   const raw = searchParams.get(key);
@@ -61,22 +72,8 @@ function filterCustomersBySearch(list: Customer[], query: string): Customer[] {
   );
 }
 
-function buildExportRowsFromCustomers(
-  customers: Customer[],
-  activeYes: string,
-  activeNo: string,
-): CustomersExportRow[] {
-  return customers.map((c, idx) => ({
-    no: idx + 1,
-    code: c.code ?? "",
-    name: c.name ?? "",
-    phone: c.phone ?? "",
-    email: c.email ?? "",
-    active: c.isActive ? activeYes : activeNo,
-  }));
-}
-
 export function CustomersListPage() {
+  const location = useLocation();
   const { t, locale } = useTranslation();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -85,16 +82,34 @@ export function CustomersListPage() {
     [searchParams],
   );
   const [searchQuery, setSearchQuery] = useState("");
+  const initialSortModel = useMemo(
+    () => readUrlGridSort(new URLSearchParams(location.search)),
+    [location.search],
+  );
+  const columnFilterModel = useMemo(
+    () => readUrlAgGridColumnFilters(new URLSearchParams(location.search)),
+    [location.search],
+  );
+  const [runtimeSortSerialized, setRuntimeSortSerialized] = useState(() => serializeUrlGridSort(initialSortModel));
   const [exportSuccess, setExportSuccess] = useState<{ path: string; filename: string } | null>(null);
   const [exportOpen, setExportOpen] = useState(false);
   const [selectedCount, setSelectedCount] = useState(0);
-  const gridRef = useRef<AgGridReact<Customer> | null>(null);
+  const gridRef = useRef<AgGridReact<RowData> | null>(null);
   const listSearchInputRef = useRef<HTMLInputElement>(null);
   useListPageSearchHotkey(listSearchInputRef);
 
-  const onSelectionChanged = useCallback((e: SelectionChangedEvent<Customer>) => {
+  const onSelectionChanged = useCallback((e: SelectionChangedEvent<RowData>) => {
     setSelectedCount(e.api.getSelectedRows().length);
   }, []);
+
+  const handleSortChanged = useCallback(() => {
+    const api = gridRef.current?.api;
+    if (!api) return;
+    const nextSortModel = getCurrentGridSort(api, ["selection", "lineNo"]);
+    const serialized = serializeUrlGridSort(nextSortModel);
+    setRuntimeSortSerialized(serialized);
+    replaceQueryParam(searchParams, setSearchParams, "sort", serialized);
+  }, [searchParams, setSearchParams]);
 
   const filteredRows = useMemo(() => {
     let next = customerRepository.list();
@@ -102,8 +117,8 @@ export function CustomersListPage() {
     next = filterCustomersBySearch(next, searchQuery);
     return next;
   }, [searchQuery, preferredCarrierFilterId]);
-  const columnFilterModel = useMemo(() => readUrlAgGridColumnFilters(searchParams), [searchParams]);
-  const customerColumnFilterConfigs = useMemo<Record<string, AgGridColumnFilterConfig<Customer>>>(
+
+  const customerColumnFilterConfigs = useMemo<Record<string, AgGridColumnFilterConfig<RowData>>>(
     () => ({
       code: { kind: "text" },
       name: { kind: "text" },
@@ -116,7 +131,7 @@ export function CustomersListPage() {
     }),
     [],
   );
-  const displayRows = useMemo(
+  const displayRowsWithQueryFilters = useMemo(
     () => applyAgGridColumnFilters(filteredRows, columnFilterModel, customerColumnFilterConfigs),
     [filteredRows, columnFilterModel, customerColumnFilterConfigs],
   );
@@ -139,23 +154,22 @@ export function CustomersListPage() {
     setSearchParams(next, { replace: true });
   }, [searchParams, setSearchParams]);
 
-  const getExportRowsCurrentView = useCallback((): CustomersExportRow[] => {
-    const api = gridRef.current?.api;
-    const y = t("ops.master.exportActiveYes");
-    const n = t("ops.master.exportActiveNo");
-    if (!api) return buildExportRowsFromCustomers(filteredRows, y, n);
-    const rows: Customer[] = [];
-    api.forEachNodeAfterFilterAndSort((rowNode) => {
-      if (rowNode.data) rows.push(rowNode.data);
-    });
-    return buildExportRowsFromCustomers(rows, y, n);
-  }, [filteredRows, t]);
-
-  const getExportRowsSelected = useCallback((): CustomersExportRow[] => {
-    const api = gridRef.current?.api;
-    const rows: Customer[] = api ? (api.getSelectedRows() as Customer[]) : [];
-    return buildExportRowsFromCustomers(rows, t("ops.master.exportActiveYes"), t("ops.master.exportActiveNo"));
-  }, [t]);
+  const buildExportPayload = useCallback(
+    (mode: "current" | "selected"): { headers: string[]; rows: Array<Array<string | number>> } => {
+      const api = gridRef.current?.api;
+      if (!api) return { headers: [], rows: [] };
+      const columns = getVisibleAgGridExportColumns(api, { entityType: "customers" });
+      const rowNodes =
+        mode === "selected"
+          ? api.getSelectedNodes()
+          : collectFilteredSortedRowNodes(api);
+      return {
+        headers: columns.map((x) => x.headerName),
+        rows: buildExportMatrixFromRowNodes(api, columns, rowNodes),
+      };
+    },
+    [],
+  );
 
   const runExportWithSaveAs = useCallback(
     async (defaultFilename: string, buildBuffer: () => Promise<ArrayBuffer>) => {
@@ -180,7 +194,7 @@ export function CustomersListPage() {
         const filename = safePath.replace(/^.*[/\\]/, "") || generatedFilename;
         setExportSuccess({ path: safePath, filename });
       } catch (err) {
-        console.error("Export failed", err);
+        void err;
         const buffer = await buildBuffer();
         const blob = new Blob([buffer], {
           type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
@@ -199,35 +213,31 @@ export function CustomersListPage() {
   const listExcelLabels = useMemo(() => customersListExcelLabels(t), [t, locale]);
 
   const handleExportCurrentView = useCallback(() => {
-    const rows = getExportRowsCurrentView();
-    runExportWithSaveAs("customers.xlsx", () => buildCustomersListXlsxBuffer(rows, listExcelLabels));
-  }, [getExportRowsCurrentView, listExcelLabels, runExportWithSaveAs]);
+    const payload = buildExportPayload("current");
+    runExportWithSaveAs("customers.xlsx", () =>
+      buildListViewXlsxBuffer({
+        sheetName: listExcelLabels.sheetName,
+        headers: payload.headers,
+        rows: payload.rows,
+        tableNameBase: "CustomersListView",
+      }),
+    );
+  }, [buildExportPayload, listExcelLabels, runExportWithSaveAs]);
 
   const handleExportSelected = useCallback(() => {
-    const rows = getExportRowsSelected();
-    if (rows.length === 0) return;
-    runExportWithSaveAs("customers-selected.xlsx", () => buildCustomersListXlsxBuffer(rows, listExcelLabels));
-  }, [getExportRowsSelected, listExcelLabels, runExportWithSaveAs]);
+    const payload = buildExportPayload("selected");
+    if (payload.rows.length === 0) return;
+    runExportWithSaveAs("customers-selected.xlsx", () =>
+      buildListViewXlsxBuffer({
+        sheetName: listExcelLabels.sheetName,
+        headers: payload.headers,
+        rows: payload.rows,
+        tableNameBase: "CustomersListViewSelected",
+      }),
+    );
+  }, [buildExportPayload, listExcelLabels, runExportWithSaveAs]);
 
   const exportSelectedDisabled = selectedCount === 0;
-
-  const noRowsOverlayTemplate = useMemo(
-    () =>
-      buildAgGridNoRowsOverlayTemplate(
-        getAgGridNoRowsOverlayContent(
-          {
-            baseRowCount: customerRepository.list().length,
-            visibleRowCount: displayRows.length,
-            searchActive,
-            filtersActive,
-          },
-          t,
-        ),
-      ),
-    [displayRows.length, searchActive, filtersActive, t, locale],
-  );
-
-  useAgGridNoRowsOverlayLifecycle(gridRef, noRowsOverlayTemplate, displayRows.length);
 
   const emDash = t("domain.audit.summary.emDash");
 
@@ -255,9 +265,9 @@ export function CustomersListPage() {
     handleResetColumnFilter,
   );
 
-  const baseColumnDefs = useMemo<ColDef<Customer>[]>(
+  const baseColumnDefs = useMemo<ColDef<RowData>[]>(
     () => [
-      agGridRowNumberColDef,
+      getAgGridRowNumberColDef(t),
       {
         field: "code",
         headerName: t("doc.columns.code"),
@@ -312,19 +322,146 @@ export function CustomersListPage() {
     [t, locale, emDash],
   );
 
+  const {
+    columnDefs: settingsAwareBaseColumnDefs,
+    draftItems: columnSettingsDraftItems,
+    draftDeepFilters: columnSettingsDraftDeepFilters,
+    draftDeepSorts: columnSettingsDraftDeepSorts,
+    settingsOpen: columnSettingsOpen,
+    openSettings: openColumnSettings,
+    setDraftItems: setColumnSettingsDraftItems,
+    setDraftDeepFilters: setColumnSettingsDraftDeepFilters,
+    setDraftDeepSorts: setColumnSettingsDraftDeepSorts,
+    applyDraft: applyColumnSettingsDraft,
+    resetDraftToDefaults: resetColumnSettingsDraftToDefaults,
+    cancelDraft: cancelColumnSettingsDraft,
+    deepFilterModel,
+    deepSortModel,
+    registry: columnSettingsRegistry,
+    personalViews: columnSettingsPersonalViews,
+    activeViewId: columnSettingsActiveViewId,
+    activeViewName: columnSettingsActiveViewName,
+    hasUnsavedChanges: columnSettingsHasUnsavedChanges,
+    activatePersonalView: activateColumnSettingsPersonalView,
+    createPersonalViewFromCurrent: createColumnSettingsPersonalViewFromCurrent,
+    saveActivePersonalViewFromCurrent: saveColumnSettingsActivePersonalViewFromCurrent,
+    renameActivePersonalView: renameColumnSettingsActivePersonalView,
+    deleteActivePersonalView: deleteColumnSettingsActivePersonalView,
+    setActivePersonalViewAsDefault: setColumnSettingsActivePersonalViewAsDefault,
+  } = useAgGridColumnSettings<RowData>({
+    pageKey: "customers",
+    entityType: "customers",
+    baseColumnDefs,
+  });
+
+  const effectiveSortModel = useMemo(
+    () => {
+      const params = new URLSearchParams();
+      if (runtimeSortSerialized !== "") params.set("sort", runtimeSortSerialized);
+      const runtime = readUrlGridSort(params);
+      return runtime.length > 0 ? runtime : deepSortModel;
+    },
+    [runtimeSortSerialized, deepSortModel],
+  );
+  const resolveDeepSortValue = useCallback(
+    (row: RowData, fieldKey: string): unknown => {
+      const config = customerColumnFilterConfigs[fieldKey];
+      if (config?.getValue) return config.getValue(row);
+      return (row as unknown as Record<string, unknown>)[fieldKey];
+    },
+    [customerColumnFilterConfigs],
+  );
+
+  const displayRowsWithDeepFilters = useMemo(
+    () => applyAgGridColumnFilters(displayRowsWithQueryFilters, deepFilterModel, customerColumnFilterConfigs),
+    [displayRowsWithQueryFilters, deepFilterModel, customerColumnFilterConfigs],
+  );
+  const displayRows = useMemo(
+    () =>
+      applyDeepSortModel({
+        rows: displayRowsWithDeepFilters,
+        sortModel: effectiveSortModel,
+        getFieldValue: resolveDeepSortValue,
+      }),
+    [displayRowsWithDeepFilters, effectiveSortModel, resolveDeepSortValue],
+  );
+
+  const noRowsOverlayTemplate = useMemo(
+    () =>
+      buildAgGridNoRowsOverlayTemplate(
+        getAgGridNoRowsOverlayContent(
+          {
+            baseRowCount: customerRepository.list().length,
+            visibleRowCount: displayRows.length,
+            searchActive,
+            filtersActive,
+          },
+          t,
+        ),
+      ),
+    [displayRows.length, searchActive, filtersActive, t, locale],
+  );
+  useAgGridNoRowsOverlayLifecycle(gridRef, noRowsOverlayTemplate, displayRows.length);
+
   const columnDefs = useMemo(
     () =>
       decorateAgGridColumnDefsWithFilters(
-        baseColumnDefs,
+        settingsAwareBaseColumnDefs,
         customerColumnFilterConfigs,
         columnFilterBridge,
       ),
     [
-      baseColumnDefs,
+      settingsAwareBaseColumnDefs,
       customerColumnFilterConfigs,
       columnFilterBridge,
     ],
   );
+
+  useEffect(() => {
+    const api = gridRef.current?.api;
+    if (!api) return;
+    applyUrlGridSort(api, effectiveSortModel);
+  }, [columnDefs, effectiveSortModel]);
+
+  const handleApplyColumnSettings = useCallback(() => {
+    const api = gridRef.current?.api;
+    const { hiddenIds, nextItems } = applyColumnSettingsDraft();
+    if (api) {
+      api.applyColumnState({
+        state: nextItems.map((item) => ({
+          colId: item.id,
+          hide: item.visible ? false : true,
+        })),
+        applyOrder: true,
+      });
+    }
+    if (hiddenIds.length === 0) return;
+
+    const nextColumnFilterModel = { ...columnFilterModel };
+    for (const colId of hiddenIds) {
+      delete nextColumnFilterModel[colId];
+    }
+    const currentSortModel = effectiveSortModel;
+    const nextSortModel = currentSortModel.filter((entry) => !hiddenIds.includes(entry.colId));
+    const nextParams = withUrlAgGridColumnFilters(searchParams, nextColumnFilterModel);
+    const nextSortSerialized = serializeUrlGridSort(nextSortModel);
+    if (nextSortSerialized === "") {
+      nextParams.delete("sort");
+    } else {
+      nextParams.set("sort", nextSortSerialized);
+    }
+    setSearchParams(nextParams, { replace: true });
+    setRuntimeSortSerialized(nextSortSerialized);
+    if (api) {
+      applyUrlGridSort(api, nextSortModel);
+    }
+  }, [
+    applyColumnSettingsDraft,
+    columnFilterModel,
+    effectiveSortModel,
+    searchParams,
+    setSearchParams,
+  ]);
 
   return (
     <ListPageLayout
@@ -457,6 +594,15 @@ export function CustomersListPage() {
                 </PopoverContent>
               </Popover>
             </div>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="h-[1.625rem] shrink-0"
+              onClick={openColumnSettings}
+            >
+              {t("doc.list.viewSettings")}
+            </Button>
           </div>
           <Button
             type="button"
@@ -471,23 +617,58 @@ export function CustomersListPage() {
       }
     >
       <AgGridContainer themeClass="customers-grid" gridRef={gridRef}>
-        <AgGridReact<Customer>
+        <AgGridReact<RowData>
           {...agGridDefaultGridOptions}
           ref={gridRef}
           rowData={displayRows}
           columnDefs={columnDefs}
-            defaultColDef={agGridDefaultColDef}
-            overlayNoRowsTemplate={noRowsOverlayTemplate}
-            rowSelection={{ mode: "multiRow", checkboxes: true, headerCheckbox: true, enableClickSelection: true }}
-            selectionColumnDef={agGridSelectionColumnDef}
-            getRowId={(params) => params.data.id}
-            onRowClicked={(e) => {
-              if (hasMeaningfulTextSelection()) return;
-              if (e.data) navigate(`/customers/${e.data.id}`);
-            }}
-            onSelectionChanged={onSelectionChanged}
-          />
+          defaultColDef={agGridDefaultColDef}
+          overlayNoRowsTemplate={noRowsOverlayTemplate}
+          onGridReady={(event) => {
+            applyUrlGridSort(event.api, effectiveSortModel);
+          }}
+          onSortChanged={handleSortChanged}
+          rowSelection={{ mode: "multiRow", checkboxes: true, headerCheckbox: true, enableClickSelection: true }}
+          selectionColumnDef={agGridSelectionColumnDef}
+          getRowId={(params) => params.data.id}
+          onRowClicked={(e) => {
+            if (hasMeaningfulTextSelection()) return;
+            if (e.data) navigate(`/customers/${e.data.id}`);
+          }}
+          onSelectionChanged={onSelectionChanged}
+        />
       </AgGridContainer>
+      <AgGridColumnSettingsModal
+        open={columnSettingsOpen}
+        onOpenChange={(nextOpen) => {
+          if (nextOpen) {
+            openColumnSettings();
+            return;
+          }
+          cancelColumnSettingsDraft();
+        }}
+        items={columnSettingsDraftItems}
+        onItemsChange={(nextItems) => setColumnSettingsDraftItems(() => nextItems)}
+        filterRules={columnSettingsDraftDeepFilters}
+        onFilterRulesChange={(nextRules) => setColumnSettingsDraftDeepFilters(() => nextRules)}
+        sortRules={columnSettingsDraftDeepSorts}
+        onSortRulesChange={(nextRules) => setColumnSettingsDraftDeepSorts(() => nextRules)}
+        registry={columnSettingsRegistry}
+        filterConfigs={customerColumnFilterConfigs as Record<string, AgGridColumnFilterConfig<unknown>>}
+        personalViews={columnSettingsPersonalViews}
+        activeViewId={columnSettingsActiveViewId}
+        activeViewName={columnSettingsActiveViewName}
+        hasUnsavedChanges={columnSettingsHasUnsavedChanges}
+        onActivateView={activateColumnSettingsPersonalView}
+        onCreateView={createColumnSettingsPersonalViewFromCurrent}
+        onSaveChangesToActiveView={saveColumnSettingsActivePersonalViewFromCurrent}
+        onRenameActiveView={renameColumnSettingsActivePersonalView}
+        onDeleteActiveView={deleteColumnSettingsActivePersonalView}
+        onSetActiveAsDefault={setColumnSettingsActivePersonalViewAsDefault}
+        onApply={handleApplyColumnSettings}
+        onCancel={cancelColumnSettingsDraft}
+        onReset={resetColumnSettingsDraftToDefaults}
+      />
     </ListPageLayout>
   );
 }

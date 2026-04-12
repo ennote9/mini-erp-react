@@ -2,7 +2,7 @@
  * Stock Balances list — AG Grid migration (same pattern as Stock Movements).
  * Repository-backed data, search, empty states, dark theme. Plain text columns only.
  */
-import { useMemo, useState, useRef, useCallback } from "react";
+import { useMemo, useState, useRef, useCallback, useEffect } from "react";
 import type { RowClassParams, RowClickedEvent } from "ag-grid-community";
 import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { AgGridReact } from "ag-grid-react";
@@ -18,6 +18,7 @@ import {
   AgGridContainer,
   AgGridStockCoverageCellRenderer,
   applyAgGridColumnFilters,
+  applyDeepSortModel,
   agGridDefaultColDef,
   agGridDefaultGridOptions,
   agGridRowNumberColDef,
@@ -25,6 +26,11 @@ import {
   decorateAgGridColumnDefsWithFilters,
   useAgGridColumnFilterBridge,
   useAgGridNoRowsOverlayLifecycle,
+  useAgGridColumnSettings,
+  AgGridColumnSettingsModal,
+  getVisibleAgGridExportColumns,
+  collectFilteredSortedRowNodes,
+  buildExportMatrixFromRowNodes,
   hasMeaningfulTextSelection,
   useAgGridBackNavigationLayoutFix,
   getAgGridNoRowsOverlayContent,
@@ -36,7 +42,6 @@ import { useListPageSearchHotkey } from "../../../shared/hotkeys";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Button } from "@/components/ui/button";
 import { ChevronDown, FileSpreadsheet, File, FolderOpen, X } from "lucide-react";
-import { buildStockBalancesListXlsxBuffer, type StockBalancesExportRow } from "../stockBalancesListExport";
 import {
   buildOutgoingRemainingByWarehouseItem,
   buildIncomingRemainingByWarehouseItem,
@@ -47,6 +52,7 @@ import { useTranslation } from "@/shared/i18n/context";
 import { useAppDisplayFormatters } from "@/shared/formatting";
 import { buildReadableUniqueFilename, ensureUniqueExportPath } from "@/shared/export/filenameBuilder";
 import { stockBalancesListExcelLabels } from "@/shared/i18n/excelListExportLabels";
+import { buildListViewXlsxBuffer } from "@/shared/export/listViewXlsx";
 import { save } from "@tauri-apps/plugin-dialog";
 import { invoke } from "@tauri-apps/api/core";
 import { revealItemInDir } from "@tauri-apps/plugin-opener";
@@ -59,6 +65,7 @@ import {
   hasActiveAgGridColumnFilters,
   readUrlAgGridColumnFilters,
   replaceUrlAgGridColumnFilters,
+  withUrlAgGridColumnFilters,
   type AgGridColumnFilterClause,
 } from "@/shared/navigation/agGridColumnFilters";
 import { appendReturnTo, buildNavigationStateKey, buildReturnToValue, replaceQueryParam } from "@/shared/navigation/returnTo";
@@ -121,28 +128,6 @@ function filterByCategoryId(rows: RowData[], categoryId: string | null): RowData
     const it = itemRepository.getById(r.itemId);
     return normalizeTrim(it?.categoryId ?? "") === want;
   });
-}
-
-function buildExportRowsFromBalances(
-  rows: RowData[],
-  coverageLabel: (s: StockBalanceCoverageStatus) => string,
-  styleLabel: (s: StockStyle) => string,
-): StockBalancesExportRow[] {
-  return rows.map((r, idx) => ({
-    no: idx + 1,
-    itemCode: r.itemCode,
-    itemName: r.itemName,
-    warehouse: r.warehouseName,
-    style: styleLabel(r.style),
-    totalQty: r.qtyOnHand,
-    reservedQty: r.reservedQty,
-    availableQty: r.availableQty,
-    outgoingQty: r.outgoingQty,
-    incomingQty: r.incomingQty,
-    deficitQty: r.deficitQty,
-    netShortageQty: r.netShortageQty,
-    coverage: coverageLabel(r.coverageStatus),
-  }));
 }
 
 export function StockBalancesListPage() {
@@ -209,8 +194,15 @@ export function StockBalancesListPage() {
     () => buildReturnToValue(location.pathname, location.search),
     [location.pathname, location.search],
   );
-  const initialSortModel = useMemo(() => readUrlGridSort(searchParams), [searchParams]);
-  const columnFilterModel = useMemo(() => readUrlAgGridColumnFilters(searchParams), [searchParams]);
+  const initialSortModel = useMemo(
+    () => readUrlGridSort(new URLSearchParams(location.search)),
+    [location.search],
+  );
+  const columnFilterModel = useMemo(
+    () => readUrlAgGridColumnFilters(new URLSearchParams(location.search)),
+    [location.search],
+  );
+  const [runtimeSortSerialized, setRuntimeSortSerialized] = useState(() => serializeUrlGridSort(initialSortModel));
 
   const onSelectionChanged = useCallback((e: SelectionChangedEvent<RowData>) => {
     setSelectedCount(e.api.getSelectedRows().length);
@@ -226,7 +218,8 @@ export function StockBalancesListPage() {
   const handleSortChanged = useCallback(() => {
     const api = gridRef.current?.api;
     if (!api) return;
-    const serialized = serializeUrlGridSort(getCurrentGridSort(api, ["selection", "rowNumber"]));
+    const serialized = serializeUrlGridSort(getCurrentGridSort(api, ["selection", "rowNumber", "lineNo"]));
+    setRuntimeSortSerialized(serialized);
     replaceQueryParam(searchParams, setSearchParams, "sort", serialized);
   }, [searchParams, setSearchParams]);
 
@@ -324,7 +317,7 @@ export function StockBalancesListPage() {
     [rowsWithNames, styleLabel, coverageLabel],
   );
 
-  const displayRows = useMemo(
+  const displayRowsWithQueryFilters = useMemo(
     () => applyAgGridColumnFilters(filteredRows, columnFilterModel, stockBalanceColumnFilterConfigs),
     [filteredRows, columnFilterModel, stockBalanceColumnFilterConfigs],
   );
@@ -406,23 +399,22 @@ export function StockBalancesListPage() {
     setSearchParams(next, { replace: true });
   }, [searchParams, setSearchParams]);
 
-  const getExportRowsCurrentView = useCallback((): StockBalancesExportRow[] => {
-    const api = gridRef.current?.api;
-    if (!api) {
-      return buildExportRowsFromBalances(displayRows, coverageLabel, styleLabel);
-    }
-    const rows: RowData[] = [];
-    api.forEachNodeAfterFilterAndSort((rowNode) => {
-      if (rowNode.data) rows.push(rowNode.data);
-    });
-    return buildExportRowsFromBalances(rows, coverageLabel, styleLabel);
-  }, [displayRows, coverageLabel, styleLabel]);
-
-  const getExportRowsSelected = useCallback((): StockBalancesExportRow[] => {
-    const api = gridRef.current?.api;
-    const rows: RowData[] = api ? (api.getSelectedRows() as RowData[]) : [];
-    return buildExportRowsFromBalances(rows, coverageLabel, styleLabel);
-  }, [coverageLabel, styleLabel]);
+  const buildExportPayload = useCallback(
+    (mode: "current" | "selected"): { headers: string[]; rows: Array<Array<string | number>> } => {
+      const api = gridRef.current?.api;
+      if (!api) return { headers: [], rows: [] };
+      const columns = getVisibleAgGridExportColumns(api, { entityType: "stock-balances" });
+      const rowNodes =
+        mode === "selected"
+          ? api.getSelectedNodes()
+          : collectFilteredSortedRowNodes(api);
+      return {
+        headers: columns.map((x) => x.headerName),
+        rows: buildExportMatrixFromRowNodes(api, columns, rowNodes),
+      };
+    },
+    [],
+  );
 
   const runExportWithSaveAs = useCallback(
     async (defaultFilename: string, buildBuffer: () => Promise<ArrayBuffer>) => {
@@ -466,35 +458,31 @@ export function StockBalancesListPage() {
   const listExcelLabels = useMemo(() => stockBalancesListExcelLabels(t), [t, locale]);
 
   const handleExportCurrentView = useCallback(() => {
-    const rows = getExportRowsCurrentView();
-    runExportWithSaveAs("stock-balances.xlsx", () => buildStockBalancesListXlsxBuffer(rows, listExcelLabels));
-  }, [getExportRowsCurrentView, listExcelLabels, runExportWithSaveAs]);
+    const payload = buildExportPayload("current");
+    runExportWithSaveAs("stock-balances.xlsx", () =>
+      buildListViewXlsxBuffer({
+        sheetName: listExcelLabels.sheetName,
+        headers: payload.headers,
+        rows: payload.rows,
+        tableNameBase: "StockBalancesListView",
+      }),
+    );
+  }, [buildExportPayload, listExcelLabels, runExportWithSaveAs]);
 
   const handleExportSelected = useCallback(() => {
-    const rows = getExportRowsSelected();
-    if (rows.length === 0) return;
-    runExportWithSaveAs("stock-balances-selected.xlsx", () => buildStockBalancesListXlsxBuffer(rows, listExcelLabels));
-  }, [getExportRowsSelected, listExcelLabels, runExportWithSaveAs]);
+    const payload = buildExportPayload("selected");
+    if (payload.rows.length === 0) return;
+    runExportWithSaveAs("stock-balances-selected.xlsx", () =>
+      buildListViewXlsxBuffer({
+        sheetName: listExcelLabels.sheetName,
+        headers: payload.headers,
+        rows: payload.rows,
+        tableNameBase: "StockBalancesListViewSelected",
+      }),
+    );
+  }, [buildExportPayload, listExcelLabels, runExportWithSaveAs]);
 
   const exportSelectedDisabled = selectedCount === 0;
-
-  const noRowsOverlayTemplate = useMemo(
-    () =>
-      buildAgGridNoRowsOverlayTemplate(
-        getAgGridNoRowsOverlayContent(
-          {
-            baseRowCount: rowsWithNames.length,
-            visibleRowCount: displayRows.length,
-            searchActive,
-            filtersActive,
-          },
-          t,
-        ),
-      ),
-    [rowsWithNames.length, displayRows.length, searchActive, filtersActive, t, locale],
-  );
-
-  useAgGridNoRowsOverlayLifecycle(gridRef, noRowsOverlayTemplate, displayRows.length);
 
   const qtyCol = (
     field: keyof RowData,
@@ -596,19 +584,143 @@ export function StockBalancesListPage() {
     ];
   }, [showOperationalGrid, t, locale, coverageLabel, styleLabel, formatNumber]);
 
+  const {
+    columnDefs: settingsAwareBaseColumnDefs,
+    draftItems: columnSettingsDraftItems,
+    draftDeepFilters: columnSettingsDraftDeepFilters,
+    draftDeepSorts: columnSettingsDraftDeepSorts,
+    settingsOpen: columnSettingsOpen,
+    openSettings: openColumnSettings,
+    setDraftItems: setColumnSettingsDraftItems,
+    setDraftDeepFilters: setColumnSettingsDraftDeepFilters,
+    setDraftDeepSorts: setColumnSettingsDraftDeepSorts,
+    applyDraft: applyColumnSettingsDraft,
+    resetDraftToDefaults: resetColumnSettingsDraftToDefaults,
+    cancelDraft: cancelColumnSettingsDraft,
+    deepFilterModel,
+    deepSortModel,
+    registry: columnSettingsRegistry,
+    personalViews: columnSettingsPersonalViews,
+    activeViewId: columnSettingsActiveViewId,
+    activeViewName: columnSettingsActiveViewName,
+    hasUnsavedChanges: columnSettingsHasUnsavedChanges,
+    activatePersonalView: activateColumnSettingsPersonalView,
+    createPersonalViewFromCurrent: createColumnSettingsPersonalViewFromCurrent,
+    saveActivePersonalViewFromCurrent: saveColumnSettingsActivePersonalViewFromCurrent,
+    renameActivePersonalView: renameColumnSettingsActivePersonalView,
+    deleteActivePersonalView: deleteColumnSettingsActivePersonalView,
+    setActivePersonalViewAsDefault: setColumnSettingsActivePersonalViewAsDefault,
+  } = useAgGridColumnSettings<RowData>({
+    pageKey: "stock-balances",
+    entityType: "stock-balances",
+    baseColumnDefs,
+  });
+  const effectiveSortModel = useMemo(
+    () => {
+      const params = new URLSearchParams();
+      if (runtimeSortSerialized !== "") params.set("sort", runtimeSortSerialized);
+      const runtime = readUrlGridSort(params);
+      return runtime.length > 0 ? runtime : deepSortModel;
+    },
+    [runtimeSortSerialized, deepSortModel],
+  );
+  const resolveDeepSortValue = useCallback(
+    (row: RowData, fieldKey: string): unknown => {
+      const config = stockBalanceColumnFilterConfigs[fieldKey];
+      if (config?.getValue) return config.getValue(row);
+      return (row as unknown as Record<string, unknown>)[fieldKey];
+    },
+    [stockBalanceColumnFilterConfigs],
+  );
+  const displayRowsWithDeepFilters = useMemo(
+    () => applyAgGridColumnFilters(displayRowsWithQueryFilters, deepFilterModel, stockBalanceColumnFilterConfigs),
+    [displayRowsWithQueryFilters, deepFilterModel, stockBalanceColumnFilterConfigs],
+  );
+  const displayRows = useMemo(
+    () =>
+      applyDeepSortModel({
+        rows: displayRowsWithDeepFilters,
+        sortModel: effectiveSortModel,
+        getFieldValue: resolveDeepSortValue,
+      }),
+    [displayRowsWithDeepFilters, effectiveSortModel, resolveDeepSortValue],
+  );
+
+  const noRowsOverlayTemplate = useMemo(
+    () =>
+      buildAgGridNoRowsOverlayTemplate(
+        getAgGridNoRowsOverlayContent(
+          {
+            baseRowCount: rowsWithNames.length,
+            visibleRowCount: displayRows.length,
+            searchActive,
+            filtersActive,
+          },
+          t,
+        ),
+      ),
+    [rowsWithNames.length, displayRows.length, searchActive, filtersActive, t, locale],
+  );
+
+  useAgGridNoRowsOverlayLifecycle(gridRef, noRowsOverlayTemplate, displayRows.length);
+
   const columnDefs = useMemo(
     () =>
       decorateAgGridColumnDefsWithFilters(
-        baseColumnDefs,
+        settingsAwareBaseColumnDefs,
         stockBalanceColumnFilterConfigs,
         columnFilterBridge,
       ),
     [
-      baseColumnDefs,
+      settingsAwareBaseColumnDefs,
       stockBalanceColumnFilterConfigs,
       columnFilterBridge,
     ],
   );
+  useEffect(() => {
+    const api = gridRef.current?.api;
+    if (!api) return;
+    applyUrlGridSort(api, effectiveSortModel);
+  }, [columnDefs, effectiveSortModel]);
+
+  const handleApplyColumnSettings = useCallback(() => {
+    const api = gridRef.current?.api;
+    const { hiddenIds, nextItems } = applyColumnSettingsDraft();
+    if (api) {
+      api.applyColumnState({
+        state: nextItems.map((item) => ({
+          colId: item.id,
+          hide: item.visible ? false : true,
+        })),
+        applyOrder: true,
+      });
+    }
+    if (hiddenIds.length === 0) return;
+
+    const nextColumnFilterModel = { ...columnFilterModel };
+    for (const colId of hiddenIds) {
+      delete nextColumnFilterModel[colId];
+    }
+    const nextSortModel = effectiveSortModel.filter((entry) => !hiddenIds.includes(entry.colId));
+    const nextParams = withUrlAgGridColumnFilters(searchParams, nextColumnFilterModel);
+    const nextSortSerialized = serializeUrlGridSort(nextSortModel);
+    if (nextSortSerialized === "") {
+      nextParams.delete("sort");
+    } else {
+      nextParams.set("sort", nextSortSerialized);
+    }
+    setSearchParams(nextParams, { replace: true });
+    setRuntimeSortSerialized(nextSortSerialized);
+    if (api) {
+      applyUrlGridSort(api, nextSortModel);
+    }
+  }, [
+    applyColumnSettingsDraft,
+    columnFilterModel,
+    effectiveSortModel,
+    searchParams,
+    setSearchParams,
+  ]);
 
   return (
     <ListPageLayout
@@ -820,6 +932,15 @@ export function StockBalancesListPage() {
                 </PopoverContent>
               </Popover>
             </div>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="h-[1.625rem] shrink-0"
+              onClick={openColumnSettings}
+            >
+              {t("doc.list.viewSettings")}
+            </Button>
           </div>
         </>
       }
@@ -833,7 +954,7 @@ export function StockBalancesListPage() {
           defaultColDef={agGridDefaultColDef}
           overlayNoRowsTemplate={noRowsOverlayTemplate}
           onGridReady={(event) => {
-            applyUrlGridSort(event.api, initialSortModel);
+            applyUrlGridSort(event.api, effectiveSortModel);
           }}
           onSortChanged={handleSortChanged}
           rowSelection={{ mode: "multiRow", checkboxes: true, headerCheckbox: true, enableClickSelection: true }}
@@ -844,6 +965,37 @@ export function StockBalancesListPage() {
           onRowClicked={onRowClicked}
         />
       </AgGridContainer>
+      <AgGridColumnSettingsModal
+        open={columnSettingsOpen}
+        onOpenChange={(nextOpen) => {
+          if (nextOpen) {
+            openColumnSettings();
+            return;
+          }
+          cancelColumnSettingsDraft();
+        }}
+        items={columnSettingsDraftItems}
+        onItemsChange={(nextItems) => setColumnSettingsDraftItems(() => nextItems)}
+        filterRules={columnSettingsDraftDeepFilters}
+        onFilterRulesChange={(nextRules) => setColumnSettingsDraftDeepFilters(() => nextRules)}
+        sortRules={columnSettingsDraftDeepSorts}
+        onSortRulesChange={(nextRules) => setColumnSettingsDraftDeepSorts(() => nextRules)}
+        registry={columnSettingsRegistry}
+        filterConfigs={stockBalanceColumnFilterConfigs as Record<string, AgGridColumnFilterConfig<unknown>>}
+        personalViews={columnSettingsPersonalViews}
+        activeViewId={columnSettingsActiveViewId}
+        activeViewName={columnSettingsActiveViewName}
+        hasUnsavedChanges={columnSettingsHasUnsavedChanges}
+        onActivateView={activateColumnSettingsPersonalView}
+        onCreateView={createColumnSettingsPersonalViewFromCurrent}
+        onSaveChangesToActiveView={saveColumnSettingsActivePersonalViewFromCurrent}
+        onRenameActiveView={renameColumnSettingsActivePersonalView}
+        onDeleteActiveView={deleteColumnSettingsActivePersonalView}
+        onSetActiveAsDefault={setColumnSettingsActivePersonalViewAsDefault}
+        onApply={handleApplyColumnSettings}
+        onCancel={cancelColumnSettingsDraft}
+        onReset={resetColumnSettingsDraftToDefaults}
+      />
     </ListPageLayout>
   );
 }

@@ -547,6 +547,17 @@ function AgGridColumnFilterHeader(props: HeaderParams) {
       applyOrder: false,
     });
   };
+  const toggleSortCycle = () => {
+    if (sortDirection === null) {
+      applySort("asc");
+      return;
+    }
+    if (sortDirection === "asc") {
+      applySort("desc");
+      return;
+    }
+    applySort(null);
+  };
 
   const valueInputType =
     config.kind === "number"
@@ -680,9 +691,17 @@ function AgGridColumnFilterHeader(props: HeaderParams) {
     >
       <PopoverAnchor asChild>
         <div className="flex h-full w-full items-center justify-between gap-0.5">
-          <span className={`truncate pr-1 text-xs font-medium ${active ? "text-primary" : "text-foreground"}`}>
+          <button
+            type="button"
+            className={`min-w-0 truncate pr-1 text-left text-xs font-medium transition-colors ${
+              active || sortActive ? "text-primary hover:text-primary" : "text-foreground hover:text-foreground/90"
+            }`}
+            onClick={toggleSortCycle}
+            aria-label={uiLabel(t, "gridFilters.toggleSort", "Toggle sort")}
+            title={uiLabel(t, "gridFilters.toggleSortHint", "Click to toggle sort")}
+          >
             {props.displayName}
-          </span>
+          </button>
           <PopoverTrigger asChild>
             <button
               type="button"

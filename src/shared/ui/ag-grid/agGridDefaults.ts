@@ -7,7 +7,8 @@ import type { TFunction } from "@/shared/i18n/resolve";
  */
 export const agGridDefaultGridOptions = {
   enableCellTextSelection: true,
-} as const satisfies Pick<GridOptions, "enableCellTextSelection">;
+  suppressMaintainUnsortedOrder: true,
+} as const satisfies Pick<GridOptions, "enableCellTextSelection" | "suppressMaintainUnsortedOrder">;
 
 /**
  * Shared default column definition for list-page AG Grids.
@@ -20,6 +21,7 @@ export const agGridDefaultColDef: ColDef = {
 
 /** Column with row index (1-based). Always first. */
 export const agGridRowNumberColDef: ColDef = {
+  colId: "lineNo",
   headerName: "№",
   valueGetter: (params) =>
     params.node?.rowIndex != null ? String(params.node.rowIndex + 1) : "",

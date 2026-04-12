@@ -1,4 +1,4 @@
-import { useMemo, useState, useRef, useCallback } from "react";
+import { useMemo, useState, useRef, useCallback, useEffect } from "react";
 import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { AgGridReact } from "ag-grid-react";
 import type { ColDef, SelectionChangedEvent } from "ag-grid-community";
@@ -14,6 +14,7 @@ import {
   AgGridContainer,
   AgGridPlanningStatusCellRenderer,
   applyAgGridColumnFilters,
+  applyDeepSortModel,
   agGridDefaultColDef,
   agGridDefaultGridOptions,
   getAgGridRowNumberColDef,
@@ -156,8 +157,15 @@ export function SalesOrdersListPage() {
     () => buildReturnToValue(location.pathname, location.search),
     [location.pathname, location.search],
   );
-  const initialSortModel = useMemo(() => readUrlGridSort(searchParams), [searchParams]);
-  const columnFilterModel = useMemo(() => readUrlAgGridColumnFilters(searchParams), [searchParams]);
+  const initialSortModel = useMemo(
+    () => readUrlGridSort(new URLSearchParams(location.search)),
+    [location.search],
+  );
+  const columnFilterModel = useMemo(
+    () => readUrlAgGridColumnFilters(new URLSearchParams(location.search)),
+    [location.search],
+  );
+  const [runtimeSortSerialized, setRuntimeSortSerialized] = useState(() => serializeUrlGridSort(initialSortModel));
 
   const onSelectionChanged = useCallback((e: SelectionChangedEvent<RowData>) => {
     setSelectedCount(e.api.getSelectedRows().length);
@@ -173,7 +181,9 @@ export function SalesOrdersListPage() {
   const handleSortChanged = useCallback(() => {
     const api = gridRef.current?.api;
     if (!api) return;
-    const serialized = serializeUrlGridSort(getCurrentGridSort(api, ["selection", "lineNo"]));
+    const nextSortModel = getCurrentGridSort(api, ["selection", "lineNo"]);
+    const serialized = serializeUrlGridSort(nextSortModel);
+    setRuntimeSortSerialized(serialized);
     replaceQueryParam(searchParams, setSearchParams, "sort", serialized);
   }, [searchParams, setSearchParams]);
 
@@ -321,7 +331,7 @@ export function SalesOrdersListPage() {
     (mode: "current" | "selected"): { headers: string[]; rows: Array<Array<string | number>> } => {
       const api = gridRef.current?.api;
       if (!api) return { headers: [], rows: [] };
-      const columns = getVisibleAgGridExportColumns(api);
+      const columns = getVisibleAgGridExportColumns(api, { entityType: "sales-orders" });
       const rowNodes =
         mode === "selected"
           ? api.getSelectedNodes()
@@ -404,28 +414,10 @@ export function SalesOrdersListPage() {
     [rowsWithNames, planningStatusOptions],
   );
 
-  const displayRows = useMemo(
+  const displayRowsWithQueryFilters = useMemo(
     () => applyAgGridColumnFilters(filteredRows, columnFilterModel, salesOrderColumnFilterConfigs),
     [filteredRows, columnFilterModel, salesOrderColumnFilterConfigs],
   );
-
-  const noRowsOverlayTemplate = useMemo(
-    () =>
-      buildAgGridNoRowsOverlayTemplate(
-        getAgGridNoRowsOverlayContent(
-          {
-            baseRowCount: rowsWithNames.length,
-            visibleRowCount: displayRows.length,
-            searchActive,
-            filtersActive,
-          },
-          t,
-        ),
-      ),
-    [rowsWithNames.length, displayRows.length, searchActive, filtersActive, t, locale],
-  );
-
-  useAgGridNoRowsOverlayLifecycle(gridRef, noRowsOverlayTemplate, displayRows.length);
 
   const handleExportCurrentView = useCallback(() => {
     const payload = buildExportPayload("current");
@@ -536,16 +528,83 @@ export function SalesOrdersListPage() {
   const {
     columnDefs: settingsAwareBaseColumnDefs,
     draftItems: columnSettingsDraftItems,
+    draftDeepFilters: columnSettingsDraftDeepFilters,
+    draftDeepSorts: columnSettingsDraftDeepSorts,
     settingsOpen: columnSettingsOpen,
     openSettings: openColumnSettings,
     setDraftItems: setColumnSettingsDraftItems,
+    setDraftDeepFilters: setColumnSettingsDraftDeepFilters,
+    setDraftDeepSorts: setColumnSettingsDraftDeepSorts,
     applyDraft: applyColumnSettingsDraft,
     resetDraftToDefaults: resetColumnSettingsDraftToDefaults,
     cancelDraft: cancelColumnSettingsDraft,
+    deepFilterModel,
+    deepSortModel,
+    registry: columnSettingsRegistry,
+    personalViews: columnSettingsPersonalViews,
+    activeViewId: columnSettingsActiveViewId,
+    activeViewName: columnSettingsActiveViewName,
+    hasUnsavedChanges: columnSettingsHasUnsavedChanges,
+    activatePersonalView: activateColumnSettingsPersonalView,
+    createPersonalViewFromCurrent: createColumnSettingsPersonalViewFromCurrent,
+    saveActivePersonalViewFromCurrent: saveColumnSettingsActivePersonalViewFromCurrent,
+    renameActivePersonalView: renameColumnSettingsActivePersonalView,
+    deleteActivePersonalView: deleteColumnSettingsActivePersonalView,
+    setActivePersonalViewAsDefault: setColumnSettingsActivePersonalViewAsDefault,
   } = useAgGridColumnSettings<RowData>({
     pageKey: "sales-orders",
+    entityType: "sales-orders",
     baseColumnDefs,
   });
+  const effectiveSortModel = useMemo(
+    () => {
+      const params = new URLSearchParams();
+      if (runtimeSortSerialized !== "") params.set("sort", runtimeSortSerialized);
+      const runtime = readUrlGridSort(params);
+      return runtime.length > 0 ? runtime : deepSortModel;
+    },
+    [runtimeSortSerialized, deepSortModel],
+  );
+  const resolveDeepSortValue = useCallback(
+    (row: RowData, fieldKey: string): unknown => {
+      const config = salesOrderColumnFilterConfigs[fieldKey];
+      if (config?.getValue) return config.getValue(row);
+      return (row as unknown as Record<string, unknown>)[fieldKey];
+    },
+    [salesOrderColumnFilterConfigs],
+  );
+
+  const displayRowsWithDeepFilters = useMemo(
+    () => applyAgGridColumnFilters(displayRowsWithQueryFilters, deepFilterModel, salesOrderColumnFilterConfigs),
+    [displayRowsWithQueryFilters, deepFilterModel, salesOrderColumnFilterConfigs],
+  );
+  const displayRows = useMemo(
+    () =>
+      applyDeepSortModel({
+        rows: displayRowsWithDeepFilters,
+        sortModel: effectiveSortModel,
+        getFieldValue: resolveDeepSortValue,
+      }),
+    [displayRowsWithDeepFilters, effectiveSortModel, resolveDeepSortValue],
+  );
+
+  const noRowsOverlayTemplate = useMemo(
+    () =>
+      buildAgGridNoRowsOverlayTemplate(
+        getAgGridNoRowsOverlayContent(
+          {
+            baseRowCount: rowsWithNames.length,
+            visibleRowCount: displayRows.length,
+            searchActive,
+            filtersActive,
+          },
+          t,
+        ),
+      ),
+    [rowsWithNames.length, displayRows.length, searchActive, filtersActive, t, locale],
+  );
+
+  useAgGridNoRowsOverlayLifecycle(gridRef, noRowsOverlayTemplate, displayRows.length);
 
   const columnDefs = useMemo(
     () =>
@@ -560,6 +619,11 @@ export function SalesOrdersListPage() {
       columnFilterBridge,
     ],
   );
+  useEffect(() => {
+    const api = gridRef.current?.api;
+    if (!api) return;
+    applyUrlGridSort(api, effectiveSortModel);
+  }, [columnDefs, effectiveSortModel]);
 
   const handleApplyColumnSettings = useCallback(() => {
     const api = gridRef.current?.api;
@@ -579,7 +643,7 @@ export function SalesOrdersListPage() {
     for (const colId of hiddenIds) {
       delete nextColumnFilterModel[colId];
     }
-    const currentSortModel = readUrlGridSort(searchParams);
+    const currentSortModel = effectiveSortModel;
     const nextSortModel = currentSortModel.filter((entry) => !hiddenIds.includes(entry.colId));
     const nextParams = withUrlAgGridColumnFilters(searchParams, nextColumnFilterModel);
     const nextSortSerialized = serializeUrlGridSort(nextSortModel);
@@ -589,12 +653,14 @@ export function SalesOrdersListPage() {
       nextParams.set("sort", nextSortSerialized);
     }
     setSearchParams(nextParams, { replace: true });
+    setRuntimeSortSerialized(nextSortSerialized);
     if (api) {
       applyUrlGridSort(api, nextSortModel);
     }
   }, [
     applyColumnSettingsDraft,
     columnFilterModel,
+    effectiveSortModel,
     searchParams,
     setSearchParams,
   ]);
@@ -808,7 +874,7 @@ export function SalesOrdersListPage() {
               className="h-[1.625rem] shrink-0"
               onClick={openColumnSettings}
             >
-              {t("doc.list.columnSettings")}
+              {t("doc.list.viewSettings")}
             </Button>
           </div>
           <Button
@@ -832,7 +898,7 @@ export function SalesOrdersListPage() {
             defaultColDef={agGridDefaultColDef}
             overlayNoRowsTemplate={noRowsOverlayTemplate}
             onGridReady={(event) => {
-              applyUrlGridSort(event.api, initialSortModel);
+              applyUrlGridSort(event.api, effectiveSortModel);
             }}
             onSortChanged={handleSortChanged}
             rowSelection={{ mode: "multiRow", checkboxes: true, headerCheckbox: true, enableClickSelection: true }}
@@ -856,6 +922,22 @@ export function SalesOrdersListPage() {
         }}
         items={columnSettingsDraftItems}
         onItemsChange={(nextItems) => setColumnSettingsDraftItems(() => nextItems)}
+        filterRules={columnSettingsDraftDeepFilters}
+        onFilterRulesChange={(nextRules) => setColumnSettingsDraftDeepFilters(() => nextRules)}
+        sortRules={columnSettingsDraftDeepSorts}
+        onSortRulesChange={(nextRules) => setColumnSettingsDraftDeepSorts(() => nextRules)}
+        registry={columnSettingsRegistry}
+        filterConfigs={salesOrderColumnFilterConfigs as Record<string, AgGridColumnFilterConfig<unknown>>}
+        personalViews={columnSettingsPersonalViews}
+        activeViewId={columnSettingsActiveViewId}
+        activeViewName={columnSettingsActiveViewName}
+        hasUnsavedChanges={columnSettingsHasUnsavedChanges}
+        onActivateView={activateColumnSettingsPersonalView}
+        onCreateView={createColumnSettingsPersonalViewFromCurrent}
+        onSaveChangesToActiveView={saveColumnSettingsActivePersonalViewFromCurrent}
+        onRenameActiveView={renameColumnSettingsActivePersonalView}
+        onDeleteActiveView={deleteColumnSettingsActivePersonalView}
+        onSetActiveAsDefault={setColumnSettingsActivePersonalViewAsDefault}
         onApply={handleApplyColumnSettings}
         onCancel={cancelColumnSettingsDraft}
         onReset={resetColumnSettingsDraftToDefaults}
