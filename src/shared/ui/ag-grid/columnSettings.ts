@@ -141,7 +141,13 @@ function buildRegistryForMeta<T>(
   const registryByKey = new Map(getListViewFieldRegistry(entityType).map((field) => [field.fieldKey, field]));
   return meta.map((entry) => {
     const reg = registryByKey.get(entry.id);
-    if (reg) return reg;
+    if (reg) {
+      return {
+        ...reg,
+        // Keep registry behavior but always display the current localized grid header inside View Configuration.
+        label: entry.label,
+      };
+    }
     return {
       fieldKey: entry.id,
       entityType,
@@ -736,4 +742,3 @@ export function useAgGridColumnSettings<T>({
     setActivePersonalViewAsDefault,
   };
 }
-

@@ -56,6 +56,7 @@ type RowProps = {
 };
 
 function SortableColumnRow({ item, selected, onToggleVisible, onSelect }: RowProps) {
+  const { t } = useTranslation();
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: item.id,
     disabled: item.lockedOrder,
@@ -81,7 +82,7 @@ function SortableColumnRow({ item, selected, onToggleVisible, onSelect }: RowPro
         {...listeners}
         className="inline-flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-foreground disabled:cursor-not-allowed disabled:opacity-40"
         disabled={item.lockedOrder}
-        aria-label={item.lockedOrder ? "Locked position" : "Drag to reorder"}
+        aria-label={item.lockedOrder ? t("doc.list.viewFieldLockedPosition") : t("doc.list.viewFieldDragHandle")}
       >
         <GripVertical className="h-4 w-4" />
       </button>
@@ -99,7 +100,7 @@ function SortableColumnRow({ item, selected, onToggleVisible, onSelect }: RowPro
       {item.lockedVisible && (
         <span className="inline-flex items-center gap-1 rounded-md border border-input px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-muted-foreground">
           <Lock className="h-3 w-3" />
-          Fixed
+          {t("doc.list.viewFieldFixed")}
         </span>
       )}
     </div>
@@ -113,7 +114,7 @@ type SortableSortRuleRowProps = {
   selected: boolean;
   sortableFields: ListViewFieldRegistryEntry[];
   usedSortFields: Set<string>;
-  tx: (key: string, fallback: string) => string;
+  tx: (key: string) => string;
   onSelect: (ctrlToggle: boolean) => void;
   onChange: (patch: Partial<ListViewDeepSortRule>) => void;
 };
@@ -186,13 +187,13 @@ function SortableSortRuleRow({
           event.stopPropagation();
           onSelect(false);
         }}
-        aria-label={tx("doc.list.viewSortDragHandle", "Drag to reorder")}
+        aria-label={tx("doc.list.viewSortDragHandle")}
       >
         <GripVertical className="h-4 w-4" />
       </button>
       <Switch
         checked={rule.enabled}
-        aria-label={`${tx("doc.list.viewRuleEnabled", "Enabled")} #${index + 1}`}
+        aria-label={`${tx("doc.list.viewRuleEnabled")} #${index + 1}`}
         onClick={(event) => {
           event.stopPropagation();
           onSelect(false);
@@ -233,8 +234,8 @@ function SortableSortRuleRow({
           onChange({ direction: event.target.value as "asc" | "desc" });
         }}
       >
-        <option value="asc">{tx("doc.list.viewSortAsc", "Ascending")}</option>
-        <option value="desc">{tx("doc.list.viewSortDesc", "Descending")}</option>
+        <option value="asc">{tx("doc.list.viewSortAsc")}</option>
+        <option value="desc">{tx("doc.list.viewSortDesc")}</option>
       </select>
     </div>
   );
@@ -262,35 +263,7 @@ function firstOperatorForField(field: ListViewFieldRegistryEntry): AgGridFilterO
 }
 
 function operatorLabel(t: (key: string) => string, operator: AgGridFilterOperator): string {
-  const fallback: Record<AgGridFilterOperator, string> = {
-    contains: "Contains",
-    not_contains: "Does not contain",
-    equals: "Equals",
-    not_equals: "Does not equal",
-    starts_with: "Starts with",
-    ends_with: "Ends with",
-    in: "In list",
-    not_in: "Not in list",
-    is_empty: "Is empty",
-    is_not_empty: "Is not empty",
-    eq: "=",
-    neq: "!=",
-    gt: ">",
-    gte: ">=",
-    lt: "<",
-    lte: "<=",
-    between: "Between",
-    not_between: "Not between",
-    before: "Before",
-    after: "After",
-    on_or_before: "On or before",
-    on_or_after: "On or after",
-    is_true: "Is true",
-    is_false: "Is false",
-  };
-  const key = `gridFilters.operators.${operator}`;
-  const translated = t(key);
-  return translated === key ? fallback[operator] : translated;
+  return t(`gridFilters.operators.${operator}`);
 }
 
 function mapFieldDataTypeToInputType(dataType: ListViewFieldDataType): "text" | "number" | "date" | "datetime-local" {
@@ -362,10 +335,7 @@ export function AgGridColumnSettingsModal({
   const [selectedFilterIndexes, setSelectedFilterIndexes] = useState<number[]>([]);
   const [selectedSortFieldKeys, setSelectedSortFieldKeys] = useState<string[]>([]);
 
-  const tx = (key: string, fallback: string): string => {
-    const translated = t(key);
-    return translated === key ? fallback : translated;
-  };
+  const tx = (key: string): string => t(key);
 
   const toggleSelection = <T,>(current: T[], value: T, ctrlToggle: boolean): T[] => {
     if (!ctrlToggle) return [value];
@@ -412,7 +382,7 @@ export function AgGridColumnSettingsModal({
     const visibleFields = items.filter((item) => item.visible).length;
     const activeFilters = filterRules.filter((rule) => rule.enabled).length;
     const activeSorts = sortRules.filter((rule) => rule.enabled).length;
-    return `${visibleFields} ${tx("doc.list.viewSummaryFields", "fields")} · ${activeFilters} ${tx("doc.list.viewSummaryFilters", "filters")} · ${activeSorts} ${tx("doc.list.viewSummarySorts", "sorts")}`;
+    return `${visibleFields} ${tx("doc.list.viewSummaryFields")} · ${activeFilters} ${tx("doc.list.viewSummaryFilters")} · ${activeSorts} ${tx("doc.list.viewSummarySorts")}`;
   }, [items, filterRules, sortRules]);
 
   const handleCreateView = () => {
@@ -779,7 +749,7 @@ export function AgGridColumnSettingsModal({
           <div className="mt-3 shrink-0 rounded-md border border-input bg-muted/15 p-2.5">
             <div>
               <div className="mb-1 text-[11px] uppercase tracking-wide text-muted-foreground">
-                {tx("doc.list.viewCurrentLabel", "Current view")}
+                {tx("doc.list.viewCurrentLabel")}
               </div>
               <div className="flex items-center gap-2">
                 <select
@@ -787,10 +757,10 @@ export function AgGridColumnSettingsModal({
                   value={activeViewId ?? ""}
                   onChange={(event) => handleViewSelectChange(event.target.value || null)}
                 >
-                  <option value="">{tx("doc.list.viewWorkingState", "Working state")}</option>
+                  <option value="">{tx("doc.list.viewWorkingState")}</option>
                   {personalViews.map((view) => (
                     <option key={view.viewId} value={view.viewId}>
-                      {view.isDefault ? `${view.name} (${tx("doc.list.viewDefaultBadge", "Default")})` : view.name}
+                      {view.isDefault ? `${view.name} (${tx("doc.list.viewDefaultBadge")})` : view.name}
                     </option>
                   ))}
                 </select>
@@ -801,7 +771,7 @@ export function AgGridColumnSettingsModal({
                       variant="outline"
                       size="icon"
                       className="h-8 w-8 text-muted-foreground hover:text-foreground"
-                      aria-label={tx("doc.list.viewActions", "View actions")}
+                      aria-label={tx("doc.list.viewActions")}
                     >
                       <MoreHorizontal className="h-4 w-4" />
                     </Button>
@@ -816,7 +786,7 @@ export function AgGridColumnSettingsModal({
                         className="cursor-pointer rounded-sm px-2 py-1.5 text-xs text-popover-foreground outline-none hover:bg-accent hover:text-accent-foreground"
                         onSelect={openCreateViewDialog}
                       >
-                        {tx("doc.list.viewActionSaveAs", "Save as new")}
+                        {tx("doc.list.viewActionSaveAs")}
                       </DropdownMenu.Item>
                       <DropdownMenu.Item
                         className="cursor-pointer rounded-sm px-2 py-1.5 text-xs text-popover-foreground outline-none hover:bg-accent hover:text-accent-foreground data-[disabled]:pointer-events-none data-[disabled]:opacity-45"
@@ -826,7 +796,7 @@ export function AgGridColumnSettingsModal({
                           setConfirmingSaveChanges(true);
                         }}
                       >
-                        {tx("doc.list.viewActionSaveChanges", "Save changes")}
+                        {tx("doc.list.viewActionSaveChanges")}
                       </DropdownMenu.Item>
                       <DropdownMenu.Separator className="my-1 h-px bg-border" />
                       <DropdownMenu.Item
@@ -834,7 +804,7 @@ export function AgGridColumnSettingsModal({
                         disabled={!activeView}
                         onSelect={openRenameViewDialog}
                       >
-                        {tx("doc.list.viewActionRename", "Rename")}
+                        {tx("doc.list.viewActionRename")}
                       </DropdownMenu.Item>
                       <DropdownMenu.Item
                         className="cursor-pointer rounded-sm px-2 py-1.5 text-xs text-popover-foreground outline-none hover:bg-accent hover:text-accent-foreground data-[disabled]:pointer-events-none data-[disabled]:opacity-45"
@@ -844,7 +814,7 @@ export function AgGridColumnSettingsModal({
                           onSetActiveAsDefault();
                         }}
                       >
-                        {tx("doc.list.viewActionSetDefault", "Set default")}
+                        {tx("doc.list.viewActionSetDefault")}
                       </DropdownMenu.Item>
                       <DropdownMenu.Separator className="my-1 h-px bg-border" />
                       <DropdownMenu.Item
@@ -852,7 +822,7 @@ export function AgGridColumnSettingsModal({
                         disabled={!activeView}
                         onSelect={openDeleteViewDialog}
                       >
-                        {tx("doc.list.viewActionDelete", "Delete")}
+                        {tx("doc.list.viewActionDelete")}
                       </DropdownMenu.Item>
                     </DropdownMenu.Content>
                   </DropdownMenu.Portal>
@@ -864,28 +834,28 @@ export function AgGridColumnSettingsModal({
             </div>
             <div className="mt-1 text-xs text-muted-foreground">
               {activeView
-                ? `${tx("doc.list.viewCurrentSaved", "Active saved view")}: ${activeViewName ?? activeView.name}${activeView.isDefault ? ` · ${tx("doc.list.viewDefaultBadge", "Default")}` : ""}`
+                ? `${tx("doc.list.viewCurrentSaved")}: ${activeViewName ?? activeView.name}${activeView.isDefault ? ` · ${tx("doc.list.viewDefaultBadge")}` : ""}`
                 : null}
             </div>
             {activeView && hasUnsavedChanges ? (
               <div className="mt-1.5 text-xs text-amber-300">
-                {tx("doc.list.viewUnsavedChanges", "Current working state differs from the saved active view.")}
+                {tx("doc.list.viewUnsavedChanges")}
               </div>
             ) : null}
             {pendingSwitchViewId !== null ? (
               <div className="mt-2 rounded-md border border-amber-500/40 bg-amber-500/10 px-2 py-2 text-xs">
                 <div className="text-amber-200">
-                  {tx("doc.list.viewSwitchUnsavedPrompt", "You have unsaved changes. Save before switching view?")}
+                  {tx("doc.list.viewSwitchUnsavedPrompt")}
                 </div>
                 <div className="mt-2 flex flex-wrap items-center gap-1.5">
                   <Button type="button" size="sm" className="h-7 text-xs" onClick={() => resolvePendingSwitch("save")}>
-                    {tx("doc.list.viewSwitchSaveAndSwitch", "Save and switch")}
+                    {tx("doc.list.viewSwitchSaveAndSwitch")}
                   </Button>
                   <Button type="button" variant="outline" size="sm" className="h-7 text-xs" onClick={() => resolvePendingSwitch("discard")}>
-                    {tx("doc.list.viewSwitchDontSave", "Don't save")}
+                    {tx("doc.list.viewSwitchDontSave")}
                   </Button>
                   <Button type="button" variant="ghost" size="sm" className="h-7 text-xs" onClick={() => resolvePendingSwitch("cancel")}>
-                    {tx("common.cancel", "Cancel")}
+                    {tx("common.cancel")}
                   </Button>
                 </div>
               </div>
@@ -893,7 +863,7 @@ export function AgGridColumnSettingsModal({
             {confirmingSaveChanges ? (
               <div className="mt-2 rounded-md border border-input bg-muted/20 px-2 py-2 text-xs">
                 <div className="text-muted-foreground">
-                  {tx("doc.list.viewSaveChangesConfirm", "Overwrite the active saved view with current working state?")}
+                  {tx("doc.list.viewSaveChangesConfirm")}
                 </div>
                 <div className="mt-2 flex items-center gap-1.5">
                   <Button
@@ -905,7 +875,7 @@ export function AgGridColumnSettingsModal({
                       setConfirmingSaveChanges(false);
                     }}
                   >
-                    {tx("doc.list.viewActionSaveChanges", "Save changes")}
+                    {tx("doc.list.viewActionSaveChanges")}
                   </Button>
                   <Button
                     type="button"
@@ -914,7 +884,7 @@ export function AgGridColumnSettingsModal({
                     className="h-7 text-xs"
                     onClick={() => setConfirmingSaveChanges(false)}
                   >
-                    {tx("common.cancel", "Cancel")}
+                    {tx("common.cancel")}
                   </Button>
                 </div>
               </div>
@@ -1018,7 +988,7 @@ export function AgGridColumnSettingsModal({
               <div className="space-y-2">
                 {filterRules.length === 0 ? (
                   <div className="rounded-md border border-dashed border-input px-3 py-4 text-sm text-muted-foreground">
-                    {tx("doc.list.viewNoFilterRules", "No filter rules")}
+                    {tx("doc.list.viewNoFilterRules")}
                   </div>
                 ) : (
                   filterRules.map((rule, index) => {
@@ -1060,7 +1030,7 @@ export function AgGridColumnSettingsModal({
                               handleChangeFilterRule(index, { value: event.target.value, valueTo: undefined, values: undefined })
                             }
                           >
-                            <option value="">{tx("doc.list.viewSelectValue", "Select value")}</option>
+                            <option value="">{tx("doc.list.viewSelectValue")}</option>
                             {options.map((option) => (
                               <option key={option.value} value={option.value}>
                                 {option.label}
@@ -1077,7 +1047,7 @@ export function AgGridColumnSettingsModal({
                             <Input
                               type={inputType}
                               className="h-8 min-w-0 flex-1 text-xs"
-                              placeholder={tx("doc.list.viewFilterValueFrom", "From")}
+                              placeholder={tx("doc.list.viewFilterValueFrom")}
                               value={rule.value ?? ""}
                               onPointerDown={(event) => handleEditControlPointerDown(event, event.ctrlKey || event.metaKey)}
                               onClick={(event) => event.stopPropagation()}
@@ -1088,7 +1058,7 @@ export function AgGridColumnSettingsModal({
                             <Input
                               type={inputType}
                               className="h-8 min-w-0 flex-1 text-xs"
-                              placeholder={tx("doc.list.viewFilterValueTo", "To")}
+                              placeholder={tx("doc.list.viewFilterValueTo")}
                               value={rule.valueTo ?? ""}
                               onPointerDown={(event) => handleEditControlPointerDown(event, event.ctrlKey || event.metaKey)}
                               onClick={(event) => event.stopPropagation()}
@@ -1105,7 +1075,7 @@ export function AgGridColumnSettingsModal({
                           <Input
                             type="text"
                             className="h-8 text-xs"
-                            placeholder={tx("doc.list.viewFilterValues", "Values separated by commas")}
+                            placeholder={tx("doc.list.viewFilterValues")}
                             value={Array.isArray(rule.values) ? rule.values.join(", ") : ""}
                             onPointerDown={(event) => handleEditControlPointerDown(event, event.ctrlKey || event.metaKey)}
                             onClick={(event) => event.stopPropagation()}
@@ -1127,7 +1097,7 @@ export function AgGridColumnSettingsModal({
                         <Input
                           type={mapFieldDataTypeToInputType(field.dataType)}
                           className="h-8 text-xs"
-                          placeholder={tx("doc.list.viewFilterValue", "Value")}
+                          placeholder={tx("doc.list.viewFilterValue")}
                           value={rule.value ?? ""}
                           onPointerDown={(event) => handleEditControlPointerDown(event, event.ctrlKey || event.metaKey)}
                           onClick={(event) => event.stopPropagation()}
@@ -1152,7 +1122,7 @@ export function AgGridColumnSettingsModal({
                       >
                         <Switch
                           checked={rule.enabled}
-                          aria-label={`${tx("doc.list.viewRuleEnabled", "Enabled")} #${index + 1}`}
+                          aria-label={`${tx("doc.list.viewRuleEnabled")} #${index + 1}`}
                           onClick={(event) => event.stopPropagation()}
                           onCheckedChange={(checked) => handleChangeFilterRule(index, { enabled: checked === true })}
                         />
@@ -1211,7 +1181,7 @@ export function AgGridColumnSettingsModal({
               <div className="space-y-2">
                 {sortRules.length === 0 ? (
                   <div className="rounded-md border border-dashed border-input px-3 py-4 text-sm text-muted-foreground">
-                    {tx("doc.list.viewNoSortRules", "No sort rules")}
+                    {tx("doc.list.viewNoSortRules")}
                   </div>
                 ) : (
                   <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleSortDragEnd}>
@@ -1260,7 +1230,7 @@ export function AgGridColumnSettingsModal({
           <Dialog.Overlay className="fixed inset-0 z-[130] bg-black/65" />
           <Dialog.Content className="fixed left-1/2 top-1/2 z-[131] w-[min(26rem,92vw)] -translate-x-1/2 -translate-y-1/2 rounded-lg border border-input bg-background p-4 shadow-xl">
             <Dialog.Title className="text-sm font-semibold">
-              {tx("doc.list.viewActionSaveAsDialogTitle", "Сохранить как новый вид")}
+              {tx("doc.list.viewActionSaveAsDialogTitle")}
             </Dialog.Title>
             <form
               className="mt-3 space-y-3"
@@ -1274,14 +1244,14 @@ export function AgGridColumnSettingsModal({
                 className="h-9 text-sm"
                 value={createViewName}
                 onChange={(event) => setCreateViewName(event.target.value)}
-                placeholder={tx("doc.list.viewNamePlaceholder", "Введите название вида")}
+                placeholder={tx("doc.list.viewNamePlaceholder")}
               />
               <div className="flex items-center justify-end gap-2">
                 <Button type="button" variant="outline" onClick={() => setCreateViewDialogOpen(false)}>
-                  {tx("common.cancel", "Cancel")}
+                  {tx("common.cancel")}
                 </Button>
                 <Button type="submit" disabled={createViewName.trim() === ""}>
-                  {tx("doc.list.viewActionSaveAs", "Save as new")}
+                  {tx("doc.list.viewActionSaveAs")}
                 </Button>
               </div>
             </form>
@@ -1294,7 +1264,7 @@ export function AgGridColumnSettingsModal({
           <Dialog.Overlay className="fixed inset-0 z-[130] bg-black/65" />
           <Dialog.Content className="fixed left-1/2 top-1/2 z-[131] w-[min(26rem,92vw)] -translate-x-1/2 -translate-y-1/2 rounded-lg border border-input bg-background p-4 shadow-xl">
             <Dialog.Title className="text-sm font-semibold">
-              {tx("doc.list.viewActionRenameDialogTitle", "Переименовать вид")}
+              {tx("doc.list.viewActionRenameDialogTitle")}
             </Dialog.Title>
             <form
               className="mt-3 space-y-3"
@@ -1308,11 +1278,11 @@ export function AgGridColumnSettingsModal({
                 className="h-9 text-sm"
                 value={renameViewName}
                 onChange={(event) => setRenameViewName(event.target.value)}
-                placeholder={tx("doc.list.viewNamePlaceholder", "Введите название вида")}
+                placeholder={tx("doc.list.viewNamePlaceholder")}
               />
               <div className="flex items-center justify-end gap-2">
                 <Button type="button" variant="outline" onClick={() => setRenameViewDialogOpen(false)}>
-                  {tx("common.cancel", "Cancel")}
+                  {tx("common.cancel")}
                 </Button>
                 <Button
                   type="submit"
@@ -1322,7 +1292,7 @@ export function AgGridColumnSettingsModal({
                     renameViewName.trim() === activeView.name.trim()
                   }
                 >
-                  {tx("doc.list.viewActionRename", "Rename")}
+                  {tx("doc.list.viewActionRename")}
                 </Button>
               </div>
             </form>
@@ -1335,17 +1305,17 @@ export function AgGridColumnSettingsModal({
           <Dialog.Overlay className="fixed inset-0 z-[130] bg-black/65" />
           <Dialog.Content className="fixed left-1/2 top-1/2 z-[131] w-[min(24rem,92vw)] -translate-x-1/2 -translate-y-1/2 rounded-lg border border-destructive/40 bg-background p-4 shadow-xl">
             <Dialog.Title className="text-sm font-semibold text-foreground">
-              {tx("doc.list.viewActionDeleteConfirmTitle", "Удалить вид?")}
+              {tx("doc.list.viewActionDeleteConfirmTitle")}
             </Dialog.Title>
             <p className="mt-2 text-sm text-muted-foreground">
-              {tx("doc.list.viewActionDeleteConfirm", "Delete current personal view?")}
+              {tx("doc.list.viewActionDeleteConfirm")}
             </p>
             <div className="mt-4 flex items-center justify-end gap-2">
               <Button type="button" variant="outline" onClick={() => setDeleteViewDialogOpen(false)}>
-                {tx("common.cancel", "Cancel")}
+                {tx("common.cancel")}
               </Button>
               <Button type="button" variant="destructive" onClick={handleDeleteView}>
-                {tx("doc.list.viewActionDelete", "Delete")}
+                {tx("doc.list.viewActionDelete")}
               </Button>
             </div>
           </Dialog.Content>
