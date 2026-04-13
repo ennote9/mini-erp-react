@@ -104,6 +104,7 @@ function normalizeItem(raw: unknown): Item | null {
     ? (imagesRaw.map(normalizeItemImage).filter((x): x is ItemImage => x !== null))
     : [];
   const description = typeof o.description === "string" ? o.description : undefined;
+  const accountingProfile = typeof o.accountingProfile === "string" ? o.accountingProfile : undefined;
   const brandId = typeof o.brandId === "string" ? o.brandId : undefined;
   const categoryId = typeof o.categoryId === "string" ? o.categoryId : undefined;
   const barcode = typeof o.barcode === "string" ? o.barcode : undefined;
@@ -163,6 +164,7 @@ function normalizeItem(raw: unknown): Item | null {
     uom: o.uom,
     isActive: o.isActive,
     description,
+    accountingProfile,
     brandId,
     categoryId,
     barcode: bridgeLegacyBarcodeValueFromCollection(barcodes),

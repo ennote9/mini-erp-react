@@ -5,20 +5,18 @@
 import { useMemo, useState, useRef, useCallback, useEffect } from "react";
 import { useLocation, useNavigate, useSearchParams, Link } from "react-router-dom";
 import { AgGridReact } from "ag-grid-react";
-import type { ColDef, ICellRendererParams, SelectionChangedEvent } from "ag-grid-community";
+import type { SelectionChangedEvent } from "ag-grid-community";
 import { itemRepository } from "../repository";
+import type { Item } from "../model";
 import { brandRepository } from "../../brands/repository";
 import { categoryRepository } from "../../categories/repository";
-import type { Item } from "../model";
 import { ListPageLayout } from "../../../shared/ui/list/ListPageLayout";
 import {
   AgGridContainer,
-  AgGridActiveBooleanCellRenderer,
   applyAgGridColumnFilters,
   applyDeepSortModel,
   agGridDefaultColDef,
   agGridDefaultGridOptions,
-  agGridRowNumberColDef,
   agGridSelectionColumnDef,
   decorateAgGridColumnDefsWithFilters,
   useAgGridColumnFilterBridge,
@@ -51,7 +49,7 @@ import {
   isMarkdownCodeFormat,
   resolveMarkdownRecordByScanInput,
 } from "@/modules/markdown-journal";
-import { applyUrlGridSort, getCurrentGridSort, readUrlGridSort, serializeUrlGridSort } from "@/shared/navigation/agGridSort";
+import { applyUrlGridSort, getCurrentGridSort, readUrlGridSort, serializeUrlGridSort, type UrlGridSort } from "@/shared/navigation/agGridSort";
 import { appendReturnTo, buildNavigationStateKey, buildReturnToValue, replaceQueryParam } from "@/shared/navigation/returnTo";
 import { useSessionScrollRestore } from "@/shared/navigation/useSessionScrollRestore";
 import {
@@ -60,6 +58,11 @@ import {
   replaceUrlAgGridColumnFilters,
   withUrlAgGridColumnFilters,
 } from "@/shared/navigation/agGridColumnFilters";
+import {
+  buildUrlGridSortFromDeepSortRules,
+  pruneDeepSortRulesByHiddenFields,
+} from "@/shared/ui/ag-grid/listViewConfig";
+import { buildItemsListViewCatalog } from "../listViewFieldCatalog";
 
 function applyBrandIdFilter(items: Item[], brandId: string | null): Item[] {
   if (brandId == null || brandId === "") return items;
@@ -69,15 +72,6 @@ function applyBrandIdFilter(items: Item[], brandId: string | null): Item[] {
 function applyCategoryIdFilter(items: Item[], categoryId: string | null): Item[] {
   if (categoryId == null || categoryId === "") return items;
   return items.filter((x) => x.categoryId === categoryId);
-}
-
-/** Image count only — no thumbnails (Items list). */
-function ImagesCountCellRenderer(params: ICellRendererParams<Item, number>) {
-  const n = typeof params.value === "number" ? params.value : 0;
-  if (n === 0) {
-    return <span className="text-muted-foreground tabular-nums">—</span>;
-  }
-  return <span className="tabular-nums text-foreground/90">{n}</span>;
 }
 
 export function ItemsListPage() {
@@ -101,10 +95,13 @@ export function ItemsListPage() {
   }, [searchParams]);
 
   const searchQuery = searchParams.get("q") ?? "";
+  const searchParamsSort = searchParams.get("sort") ?? "";
   const appReadRevision = useAppReadModelRevision();
   const [exportSuccess, setExportSuccess] = useState<{ path: string; filename: string } | null>(null);
   const [exportOpen, setExportOpen] = useState(false);
   const [selectedCount, setSelectedCount] = useState(0);
+  const [pendingSortModel, setPendingSortModel] = useState<UrlGridSort[] | null>(null);
+  const [pendingRowData, setPendingRowData] = useState<Item[] | null>(null);
   const gridRef = useRef<AgGridReact<Item> | null>(null);
   const gridContainerRef = useRef<HTMLDivElement | null>(null);
   const listSearchInputRef = useRef<HTMLInputElement>(null);
@@ -144,6 +141,8 @@ export function ItemsListPage() {
     if (!api) return;
     const nextSortModel = getCurrentGridSort(api, ["selection", "lineNo"]);
     const nextValue = serializeUrlGridSort(nextSortModel);
+    setPendingRowData(null);
+    setPendingSortModel(null);
     setRuntimeSortSerialized(nextValue);
     replaceQueryParam(searchParams, setSearchParams, "sort", nextValue);
   }, [searchParams, setSearchParams]);
@@ -154,49 +153,18 @@ export function ItemsListPage() {
     return applyCategoryIdFilter(brandFiltered, categoryFilterId);
   }, [searchQuery, brandFilterId, categoryFilterId, appReadRevision]);
 
-  const itemColumnFilterConfigs = useMemo<Record<string, AgGridColumnFilterConfig<Item>>>(
-    () => ({
-      code: { kind: "text" },
-      itemKind: {
-        kind: "enum",
-        getValue: (item) => item.itemKind ?? "SELLABLE",
-        options: [
-          { value: "SELLABLE", label: t("master.item.kind.sellable") },
-          { value: "TESTER", label: t("master.item.kind.tester") },
-        ],
-      },
-      name: { kind: "text" },
-      imageCount: {
-        kind: "number",
-        getValue: (item) => (Array.isArray(item.images) ? item.images.length : 0),
-      },
-      brand: {
-        kind: "enum",
-        getValue: (item) => {
-          if (!item.brandId) return "";
-          return brandRepository.getById(item.brandId)?.name ?? "";
-        },
-        options: brandRepository
-          .list()
-          .map((brand) => ({ value: brand.name, label: brand.name })),
-      },
-      category: {
-        kind: "enum",
-        getValue: (item) => {
-          if (!item.categoryId) return "";
-          return categoryRepository.getById(item.categoryId)?.name ?? "";
-        },
-        options: categoryRepository
-          .list()
-          .map((category) => ({ value: category.name, label: category.name })),
-      },
-      uom: { kind: "text" },
-      purchasePrice: { kind: "number" },
-      salePrice: { kind: "number" },
-      isActive: { kind: "boolean" },
-    }),
-    [t, locale, appReadRevision],
+  const itemsListViewCatalog = useMemo(
+    () =>
+      buildItemsListViewCatalog({
+        t,
+        formatMoney,
+      }),
+    [t, locale, formatMoney, appReadRevision],
   );
+
+  const baseColumnDefs = itemsListViewCatalog.columnDefs;
+  const itemFieldRegistry = itemsListViewCatalog.fieldRegistry;
+  const itemColumnFilterConfigs = itemsListViewCatalog.filterConfigs;
 
   const displayItemsWithQueryFilters = useMemo(
     () => applyAgGridColumnFilters(filteredItems, columnFilterModel, itemColumnFilterConfigs),
@@ -333,93 +301,6 @@ export function ItemsListPage() {
 
   const exportSelectedDisabled = selectedCount === 0;
 
-  const baseColumnDefs = useMemo<ColDef<Item>[]>(
-    () => [
-      agGridRowNumberColDef,
-      {
-        field: "code",
-        headerName: t("doc.columns.code"),
-        width: 130,
-      },
-      {
-        colId: "itemKind",
-        headerName: t("master.item.list.kindColumn"),
-        width: 100,
-        maxWidth: 120,
-        valueGetter: (params) => params.data?.itemKind ?? "SELLABLE",
-        valueFormatter: (params) =>
-          params.value === "TESTER" ? t("master.item.kind.tester") : t("master.item.kind.sellable"),
-      },
-      {
-        field: "name",
-        headerName: t("doc.columns.name"),
-        minWidth: 160,
-        flex: 1,
-      },
-      {
-        colId: "imageCount",
-        headerName: t("doc.columns.images"),
-        width: 76,
-        maxWidth: 88,
-        valueGetter: (params) =>
-          Array.isArray(params.data?.images) ? params.data!.images.length : 0,
-        cellRenderer: ImagesCountCellRenderer,
-      },
-      {
-        headerName: t("doc.columns.brand"),
-        colId: "brand",
-        width: 110,
-        valueGetter: (params) => {
-          const id = params.data?.brandId;
-          if (!id) return "";
-          const b = brandRepository.getById(id);
-          return b?.name ?? "";
-        },
-      },
-      {
-        headerName: t("doc.columns.category"),
-        colId: "category",
-        width: 120,
-        valueGetter: (params) => {
-          const id = params.data?.categoryId;
-          if (!id) return "";
-          const c = categoryRepository.getById(id);
-          return c?.name ?? "";
-        },
-      },
-      {
-        field: "uom",
-        headerName: t("doc.columns.uom"),
-        width: 90,
-      },
-      {
-        field: "purchasePrice",
-        headerName: t("doc.columns.purchasePrice"),
-        width: 120,
-        valueFormatter: (params) =>
-          params.value != null && typeof params.value === "number"
-            ? formatMoney(params.value, 2, "")
-            : "",
-      },
-      {
-        field: "salePrice",
-        headerName: t("doc.columns.salePrice"),
-        width: 100,
-        valueFormatter: (params) =>
-          params.value != null && typeof params.value === "number"
-            ? formatMoney(params.value, 2, "")
-            : "",
-      },
-      {
-        field: "isActive",
-        headerName: t("doc.columns.active"),
-        width: 100,
-        cellRenderer: AgGridActiveBooleanCellRenderer,
-      },
-    ],
-    [t, locale, formatMoney],
-  );
-
   const {
     columnDefs: settingsAwareBaseColumnDefs,
     draftItems: columnSettingsDraftItems,
@@ -450,16 +331,23 @@ export function ItemsListPage() {
     pageKey: "items",
     entityType: "items",
     baseColumnDefs,
+    fieldRegistry: itemFieldRegistry,
   });
-  const effectiveSortModel = useMemo(
-    () => {
-      const params = new URLSearchParams();
-      if (runtimeSortSerialized !== "") params.set("sort", runtimeSortSerialized);
-      const runtime = readUrlGridSort(params);
-      return runtime.length > 0 ? runtime : deepSortModel;
-    },
-    [runtimeSortSerialized, deepSortModel],
-  );
+  const effectiveSortModel = useMemo(() => {
+    if (pendingSortModel) return pendingSortModel;
+    const urlSort = readUrlGridSort(new URLSearchParams(searchParamsSort ? `sort=${searchParamsSort}` : ""));
+    const runtimeSort =
+      runtimeSortSerialized === ""
+        ? []
+        : readUrlGridSort(new URLSearchParams(`sort=${runtimeSortSerialized}`));
+
+    if (runtimeSort.length > 0 && runtimeSortSerialized !== searchParamsSort) {
+      return runtimeSort;
+    }
+    if (urlSort.length > 0) return urlSort;
+    if (runtimeSort.length > 0) return runtimeSort;
+    return deepSortModel;
+  }, [pendingSortModel, searchParamsSort, runtimeSortSerialized, deepSortModel]);
   const resolveDeepSortValue = useCallback(
     (item: Item, fieldKey: string): unknown => {
       const config = itemColumnFilterConfigs[fieldKey];
@@ -542,7 +430,37 @@ export function ItemsListPage() {
     const api = gridRef.current?.api;
     if (!api) return;
     applyUrlGridSort(api, effectiveSortModel);
+    api.refreshClientSideRowModel("sort");
   }, [columnDefs, effectiveSortModel]);
+
+  useEffect(() => {
+    if (deepSortModel.length === 0) return;
+    const nextSerialized = serializeUrlGridSort(deepSortModel);
+    const currentSerialized = searchParamsSort;
+    if (nextSerialized === currentSerialized) return;
+
+    const nextParams = new URLSearchParams(searchParams);
+    nextParams.set("sort", nextSerialized);
+    setSearchParams(nextParams, { replace: true });
+    setRuntimeSortSerialized(nextSerialized);
+  }, [deepSortModel, searchParams, searchParamsSort, setSearchParams]);
+
+  useEffect(() => {
+    if (!pendingSortModel) return;
+    const pendingSerialized = serializeUrlGridSort(pendingSortModel);
+    if (pendingSerialized === searchParamsSort) {
+      setPendingSortModel(null);
+    }
+  }, [pendingSortModel, searchParamsSort]);
+
+  useEffect(() => {
+    if (!pendingRowData) return;
+    if (pendingSortModel) return;
+    const effectiveSerialized = serializeUrlGridSort(effectiveSortModel);
+    if (effectiveSerialized === searchParamsSort) {
+      setPendingRowData(null);
+    }
+  }, [pendingRowData, pendingSortModel, effectiveSortModel, searchParamsSort]);
 
   const handleApplyColumnSettings = useCallback(() => {
     const api = gridRef.current?.api;
@@ -556,32 +474,72 @@ export function ItemsListPage() {
         applyOrder: true,
       });
     }
-    if (hiddenIds.length === 0) return;
+    const prunedDraftDeepSorts = pruneDeepSortRulesByHiddenFields(
+      columnSettingsDraftDeepSorts,
+      hiddenIds,
+    );
+    const nextDeepSortModel = buildUrlGridSortFromDeepSortRules(prunedDraftDeepSorts);
+    const nextDeepSortSerialized = serializeUrlGridSort(nextDeepSortModel);
+    const currentDeepSortSerialized = serializeUrlGridSort(deepSortModel);
+    const currentRuntimeSortSerialized = searchParamsSort;
+    const deepSortsChanged = nextDeepSortSerialized !== currentDeepSortSerialized;
+    const shouldSyncToDeepSort = nextDeepSortModel.length > 0 && currentRuntimeSortSerialized !== nextDeepSortSerialized;
+    const runtimeUsesDeepSort =
+      (currentRuntimeSortSerialized === "" && deepSortModel.length > 0) ||
+      currentRuntimeSortSerialized === currentDeepSortSerialized;
+    const shouldUpdateSort = deepSortsChanged || hiddenIds.length > 0 || shouldSyncToDeepSort;
+    if (!shouldUpdateSort) return;
 
-    const nextColumnFilterModel = { ...columnFilterModel };
-    for (const colId of hiddenIds) {
-      delete nextColumnFilterModel[colId];
+    let nextSortModel = effectiveSortModel;
+    if (deepSortsChanged || shouldSyncToDeepSort) {
+      if (nextDeepSortModel.length > 0) {
+        nextSortModel = nextDeepSortModel;
+      } else if (runtimeUsesDeepSort) {
+        nextSortModel = [];
+      }
+    } else if (hiddenIds.length > 0) {
+      nextSortModel = effectiveSortModel.filter((entry) => !hiddenIds.includes(entry.colId));
     }
 
-    const currentSortModel = effectiveSortModel;
-    const nextSortModel = currentSortModel.filter((entry) => !hiddenIds.includes(entry.colId));
-    const nextParams = withUrlAgGridColumnFilters(searchParams, nextColumnFilterModel);
+    let nextParams = new URLSearchParams(searchParams);
+    if (hiddenIds.length > 0) {
+      const nextColumnFilterModel = { ...columnFilterModel };
+      for (const colId of hiddenIds) {
+        delete nextColumnFilterModel[colId];
+      }
+      nextParams = withUrlAgGridColumnFilters(nextParams, nextColumnFilterModel);
+    }
+
     const nextSortSerialized = serializeUrlGridSort(nextSortModel);
     if (nextSortSerialized === "") {
       nextParams.delete("sort");
     } else {
       nextParams.set("sort", nextSortSerialized);
     }
+    setPendingSortModel(nextSortModel);
     setSearchParams(nextParams, { replace: true });
     setRuntimeSortSerialized(nextSortSerialized);
+    const nextRows = applyDeepSortModel({
+      rows: displayItemsWithDeepFilters,
+      sortModel: nextSortModel,
+      getFieldValue: resolveDeepSortValue,
+    });
+    setPendingRowData(nextRows);
     if (api) {
       applyUrlGridSort(api, nextSortModel);
+      api.setRowData(nextRows);
+      api.refreshClientSideRowModel("sort");
     }
   }, [
     applyColumnSettingsDraft,
     columnFilterModel,
+    columnSettingsDraftDeepSorts,
+    deepSortModel,
     effectiveSortModel,
+    displayItemsWithDeepFilters,
+    resolveDeepSortValue,
     searchParams,
+    searchParamsSort,
     setSearchParams,
   ]);
 
@@ -794,7 +752,7 @@ export function ItemsListPage() {
           <AgGridReact<Item>
             {...agGridDefaultGridOptions}
             ref={gridRef}
-            rowData={displayItems}
+            rowData={pendingRowData ?? displayItems}
             columnDefs={columnDefs}
             defaultColDef={agGridDefaultColDef}
             overlayNoRowsTemplate={noRowsOverlayTemplate}

@@ -137,8 +137,10 @@ function buildColumnMeta<T>(defs: ColDef<T>[]): InternalColumnMeta<T>[] {
 function buildRegistryForMeta<T>(
   entityType: ListViewEntityType,
   meta: InternalColumnMeta<T>[],
+  overrideRegistry?: ListViewFieldRegistryEntry[],
 ): ListViewFieldRegistryEntry[] {
-  const registryByKey = new Map(getListViewFieldRegistry(entityType).map((field) => [field.fieldKey, field]));
+  const sourceRegistry = overrideRegistry ?? getListViewFieldRegistry(entityType);
+  const registryByKey = new Map(sourceRegistry.map((field) => [field.fieldKey, field]));
   return meta.map((entry) => {
     const reg = registryByKey.get(entry.id);
     if (reg) {
@@ -351,6 +353,7 @@ type UseAgGridColumnSettingsParams<T> = {
   pageKey: string;
   entityType: ListViewEntityType;
   baseColumnDefs: ColDef<T>[];
+  fieldRegistry?: ListViewFieldRegistryEntry[];
 };
 
 export type UseAgGridColumnSettingsResult<T> = {
@@ -388,10 +391,14 @@ export function useAgGridColumnSettings<T>({
   pageKey,
   entityType,
   baseColumnDefs,
+  fieldRegistry,
 }: UseAgGridColumnSettingsParams<T>): UseAgGridColumnSettingsResult<T> {
   const normalizedBaseDefs = useMemo(() => normalizeColDefsWithStableIds(baseColumnDefs), [baseColumnDefs]);
   const meta = useMemo(() => buildColumnMeta(normalizedBaseDefs), [normalizedBaseDefs]);
-  const registry = useMemo(() => buildRegistryForMeta(entityType, meta), [entityType, meta]);
+  const registry = useMemo(
+    () => buildRegistryForMeta(entityType, meta, fieldRegistry),
+    [entityType, meta, fieldRegistry],
+  );
   const systemDefaultDefinition = useMemo(
     () => buildDefaultListViewDefinition(entityType, registry),
     [entityType, registry],
