@@ -31,6 +31,7 @@ type Props = {
   onSortRulesChange: (next: ListViewDeepSortRule[]) => void;
   registry: ListViewFieldRegistryEntry[];
   filterConfigs?: Record<string, AgGridColumnFilterConfig<unknown>>;
+  includeHiddenInFilterSort?: boolean;
   personalViews: AgGridPersonalView[];
   activeViewId: string | null;
   activeViewName: string | null;
@@ -291,6 +292,7 @@ export function AgGridColumnSettingsModal({
   onSortRulesChange,
   registry,
   filterConfigs,
+  includeHiddenInFilterSort = false,
   personalViews,
   activeViewId,
   activeViewName,
@@ -311,14 +313,18 @@ export function AgGridColumnSettingsModal({
   const orderedIds = useMemo(() => items.map((x) => x.id), [items]);
   const visibleFieldKeys = useMemo(() => new Set(items.filter((item) => item.visible).map((item) => item.id)), [items]);
   const registryByFieldKey = useMemo(() => new Map(registry.map((entry) => [entry.fieldKey, entry])), [registry]);
-  const filterableFields = useMemo(
-    () => registry.filter((entry) => entry.filterable && visibleFieldKeys.has(entry.fieldKey)),
-    [registry, visibleFieldKeys],
-  );
-  const sortableFields = useMemo(
-    () => registry.filter((entry) => entry.sortable && visibleFieldKeys.has(entry.fieldKey)),
-    [registry, visibleFieldKeys],
-  );
+  const filterableFields = useMemo(() => {
+    if (includeHiddenInFilterSort) {
+      return registry.filter((entry) => entry.filterable);
+    }
+    return registry.filter((entry) => entry.filterable && visibleFieldKeys.has(entry.fieldKey));
+  }, [includeHiddenInFilterSort, registry, visibleFieldKeys]);
+  const sortableFields = useMemo(() => {
+    if (includeHiddenInFilterSort) {
+      return registry.filter((entry) => entry.sortable);
+    }
+    return registry.filter((entry) => entry.sortable && visibleFieldKeys.has(entry.fieldKey));
+  }, [includeHiddenInFilterSort, registry, visibleFieldKeys]);
   const usedSortFields = useMemo(() => new Set(sortRules.map((rule) => rule.fieldKey)), [sortRules]);
   const activeView = useMemo(
     () => personalViews.find((view) => view.viewId === activeViewId) ?? null,

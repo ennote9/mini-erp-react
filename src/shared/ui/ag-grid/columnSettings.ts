@@ -354,6 +354,7 @@ type UseAgGridColumnSettingsParams<T> = {
   entityType: ListViewEntityType;
   baseColumnDefs: ColDef<T>[];
   fieldRegistry?: ListViewFieldRegistryEntry[];
+  allowHiddenFilterSort?: boolean;
 };
 
 export type UseAgGridColumnSettingsResult<T> = {
@@ -392,6 +393,7 @@ export function useAgGridColumnSettings<T>({
   entityType,
   baseColumnDefs,
   fieldRegistry,
+  allowHiddenFilterSort = false,
 }: UseAgGridColumnSettingsParams<T>): UseAgGridColumnSettingsResult<T> {
   const normalizedBaseDefs = useMemo(() => normalizeColDefsWithStableIds(baseColumnDefs), [baseColumnDefs]);
   const meta = useMemo(() => buildColumnMeta(normalizedBaseDefs), [normalizedBaseDefs]);
@@ -451,19 +453,19 @@ export function useAgGridColumnSettings<T>({
         return {
           ...prev,
           columns: nextColumns,
-          deepFilters: pruneDeepFilterRulesByHiddenFields(prev.deepFilters, hiddenIds),
-          deepSorts: pruneDeepSortRulesByHiddenFields(prev.deepSorts, hiddenIds),
+          deepFilters: allowHiddenFilterSort ? prev.deepFilters : pruneDeepFilterRulesByHiddenFields(prev.deepFilters, hiddenIds),
+          deepSorts: allowHiddenFilterSort ? prev.deepSorts : pruneDeepSortRulesByHiddenFields(prev.deepSorts, hiddenIds),
         };
       });
     },
-    [meta],
+    [allowHiddenFilterSort, meta],
   );
 
   const setDraftDeepFilters = useCallback(
     (updater: (prev: ListViewDeepFilterRule[]) => ListViewDeepFilterRule[]) => {
       setDraftDefinition((prev) => {
         if (!prev) return prev;
-        const visibleFieldKeys = visibleFieldKeysFromColumns(prev.columns);
+        const visibleFieldKeys = allowHiddenFilterSort ? undefined : visibleFieldKeysFromColumns(prev.columns);
         const nextRules = normalizeDeepFilterRules({
           rules: updater(prev.deepFilters),
           registry,
@@ -475,14 +477,14 @@ export function useAgGridColumnSettings<T>({
         };
       });
     },
-    [registry],
+    [allowHiddenFilterSort, registry],
   );
 
   const setDraftDeepSorts = useCallback(
     (updater: (prev: ListViewDeepSortRule[]) => ListViewDeepSortRule[]) => {
       setDraftDefinition((prev) => {
         if (!prev) return prev;
-        const visibleFieldKeys = visibleFieldKeysFromColumns(prev.columns);
+        const visibleFieldKeys = allowHiddenFilterSort ? undefined : visibleFieldKeysFromColumns(prev.columns);
         const nextRules = normalizeDeepSortRules({
           rules: updater(prev.deepSorts),
           registry,
@@ -494,7 +496,7 @@ export function useAgGridColumnSettings<T>({
         };
       });
     },
-    [registry],
+    [allowHiddenFilterSort, registry],
   );
 
   const openSettings = useCallback(() => {
@@ -529,8 +531,8 @@ export function useAgGridColumnSettings<T>({
     const hiddenIds = Array.from(prevVisible).filter((id) => !nextVisible.has(id));
     const nextDefinition: ListViewDefinition = {
       ...mergedDraft,
-      deepFilters: pruneDeepFilterRulesByHiddenFields(mergedDraft.deepFilters, hiddenIds),
-      deepSorts: pruneDeepSortRulesByHiddenFields(mergedDraft.deepSorts, hiddenIds),
+      deepFilters: allowHiddenFilterSort ? mergedDraft.deepFilters : pruneDeepFilterRulesByHiddenFields(mergedDraft.deepFilters, hiddenIds),
+      deepSorts: allowHiddenFilterSort ? mergedDraft.deepSorts : pruneDeepSortRulesByHiddenFields(mergedDraft.deepSorts, hiddenIds),
     };
 
     setDefinition(nextDefinition);
@@ -538,7 +540,7 @@ export function useAgGridColumnSettings<T>({
     setSettingsOpen(false);
     persistState(currentMeta, nextDefinition);
     return { hiddenIds, nextItems: nextCommitted };
-  }, [committedItems, definition, draftDefinition, entityType, meta, persistState, personalViewsMeta, registry]);
+  }, [allowHiddenFilterSort, committedItems, definition, draftDefinition, entityType, meta, persistState, personalViewsMeta, registry]);
 
   const resetDraftToDefaults = useCallback(() => {
     const currentMeta = personalViewsMeta;

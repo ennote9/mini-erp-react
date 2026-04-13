@@ -5,6 +5,7 @@ import { AgGridActiveBooleanCellRenderer } from "@/shared/ui/ag-grid";
 import { getAgGridRowNumberColDef } from "@/shared/ui/ag-grid/agGridDefaults";
 import { brandRepository } from "@/modules/brands/repository";
 import { categoryRepository } from "@/modules/categories/repository";
+import { itemRepository } from "@/modules/items/repository";
 import type { Item } from "./model";
 
 type ItemFieldCatalogEntry = {
@@ -18,16 +19,65 @@ type BuildItemsFieldCatalogInput = {
   formatMoney: (value: number, fractionDigits?: number, currencyCode?: string) => string;
 };
 
-function ImagesCountCellRenderer(params: ICellRendererParams<Item, number>) {
+function CountCellRenderer(params: ICellRendererParams<Item, number>) {
   const n = typeof params.value === "number" ? params.value : 0;
   if (n === 0) {
-    return <span className="text-muted-foreground tabular-nums">—</span>;
+    return <span className="text-muted-foreground tabular-nums">0</span>;
   }
   return <span className="tabular-nums text-foreground/90">{n}</span>;
 }
 
+function resolveImageCount(item: Item): number {
+  return Array.isArray(item.images) ? item.images.length : 0;
+}
+
+function resolveBarcodeStats(item: Item): {
+  count: number;
+  hasBarcode: boolean;
+  primaryBarcode: string;
+} {
+  const barcodes = Array.isArray(item.barcodes) ? item.barcodes : [];
+  const count = barcodes.length > 0 ? barcodes.length : item.barcode ? 1 : 0;
+  const active = barcodes.filter((barcode) => barcode.isActive !== false);
+  const primary = active.find((barcode) => barcode.isPrimary) ?? active[0] ?? barcodes[0] ?? null;
+  const primaryBarcode = primary?.codeValue ?? item.barcode ?? "";
+  return {
+    count,
+    hasBarcode: count > 0,
+    primaryBarcode,
+  };
+}
+
+type TesterStats = { count: number; firstCode: string; firstName: string };
+
+function buildTesterStats(items: Item[]): Map<string, TesterStats> {
+  const map = new Map<string, TesterStats>();
+  for (const item of items) {
+    if (item.itemKind !== "TESTER" || !item.baseItemId) continue;
+    const key = item.baseItemId;
+    const current = map.get(key) ?? { count: 0, firstCode: "", firstName: "" };
+    map.set(key, {
+      count: current.count + 1,
+      firstCode: current.firstCode || item.code,
+      firstName: current.firstName || item.name,
+    });
+  }
+  return map;
+}
+
 function createItemsFieldCatalog(input: BuildItemsFieldCatalogInput): ItemFieldCatalogEntry[] {
   const { t, formatMoney } = input;
+  const yesLabel = t("common.yes");
+  const noLabel = t("common.no");
+  const testerStatsByBaseId = buildTesterStats(itemRepository.list());
+
+  const resolveTesterStats = (item: Item): TesterStats => {
+    if (item.itemKind !== "SELLABLE") return { count: 0, firstCode: "", firstName: "" };
+    return testerStatsByBaseId.get(item.id) ?? { count: 0, firstCode: "", firstName: "" };
+  };
+
+  const resolveTesterCount = (item: Item): number => resolveTesterStats(item).count;
+  const resolveHasTesters = (item: Item): boolean => resolveTesterCount(item) > 0;
   return [
     {
       registry: {
@@ -154,12 +204,41 @@ function createItemsFieldCatalog(input: BuildItemsFieldCatalogInput): ItemFieldC
         headerName: t("doc.columns.images"),
         width: 76,
         maxWidth: 88,
-        valueGetter: (params) => (Array.isArray(params.data?.images) ? params.data!.images.length : 0),
-        cellRenderer: ImagesCountCellRenderer,
+        valueGetter: (params) => (params.data ? resolveImageCount(params.data) : 0),
+        cellRenderer: CountCellRenderer,
       },
       filterConfig: {
         kind: "number",
-        getValue: (item) => (Array.isArray(item.images) ? item.images.length : 0),
+        getValue: resolveImageCount,
+      },
+    },
+    {
+      registry: {
+        fieldKey: "hasImages",
+        entityType: "items",
+        label: t("doc.columns.hasImages"),
+        dataType: "boolean",
+        sourceType: "derived",
+        defaultVisible: false,
+        lockedVisible: false,
+        sortable: true,
+        filterable: true,
+        exportable: true,
+        selectable: true,
+        rendererType: "boolean-badge",
+        requiresPermission: null,
+        performanceCost: "low",
+      },
+      colDef: {
+        colId: "hasImages",
+        headerName: t("doc.columns.hasImages"),
+        width: 120,
+        valueGetter: (params) => (params.data ? resolveImageCount(params.data) > 0 : false),
+        valueFormatter: (params) => (params.value ? yesLabel : noLabel),
+      },
+      filterConfig: {
+        kind: "boolean",
+        getValue: (item) => resolveImageCount(item) > 0,
       },
     },
     {
@@ -365,7 +444,7 @@ function createItemsFieldCatalog(input: BuildItemsFieldCatalogInput): ItemFieldC
       registry: {
         fieldKey: "barcode",
         entityType: "items",
-        label: t("master.item.barcodes.codeValue"),
+        label: t("doc.columns.primaryBarcode"),
         dataType: "identifier",
         sourceType: "derived",
         defaultVisible: false,
@@ -380,11 +459,75 @@ function createItemsFieldCatalog(input: BuildItemsFieldCatalogInput): ItemFieldC
       },
       colDef: {
         field: "barcode",
-        headerName: t("master.item.barcodes.codeValue"),
+        headerName: t("doc.columns.primaryBarcode"),
         width: 150,
         hide: true,
+        valueGetter: (params) => (params.data ? resolveBarcodeStats(params.data).primaryBarcode : ""),
       },
-      filterConfig: { kind: "text" },
+      filterConfig: {
+        kind: "text",
+        getValue: (item) => resolveBarcodeStats(item).primaryBarcode,
+      },
+    },
+    {
+      registry: {
+        fieldKey: "barcodeCount",
+        entityType: "items",
+        label: t("doc.columns.barcodeCount"),
+        dataType: "number",
+        sourceType: "derived",
+        defaultVisible: false,
+        lockedVisible: false,
+        sortable: true,
+        filterable: true,
+        exportable: true,
+        selectable: true,
+        rendererType: "numeric",
+        requiresPermission: null,
+        performanceCost: "low",
+      },
+      colDef: {
+        colId: "barcodeCount",
+        headerName: t("doc.columns.barcodeCount"),
+        width: 120,
+        valueGetter: (params) => (params.data ? resolveBarcodeStats(params.data).count : 0),
+        cellRenderer: CountCellRenderer,
+        hide: true,
+      },
+      filterConfig: {
+        kind: "number",
+        getValue: (item) => resolveBarcodeStats(item).count,
+      },
+    },
+    {
+      registry: {
+        fieldKey: "hasBarcode",
+        entityType: "items",
+        label: t("doc.columns.hasBarcode"),
+        dataType: "boolean",
+        sourceType: "derived",
+        defaultVisible: false,
+        lockedVisible: false,
+        sortable: true,
+        filterable: true,
+        exportable: true,
+        selectable: true,
+        rendererType: "boolean-badge",
+        requiresPermission: null,
+        performanceCost: "low",
+      },
+      colDef: {
+        colId: "hasBarcode",
+        headerName: t("doc.columns.hasBarcode"),
+        width: 110,
+        valueGetter: (params) => (params.data ? resolveBarcodeStats(params.data).hasBarcode : false),
+        valueFormatter: (params) => (params.value ? yesLabel : noLabel),
+        hide: true,
+      },
+      filterConfig: {
+        kind: "boolean",
+        getValue: (item) => resolveBarcodeStats(item).hasBarcode,
+      },
     },
     {
       registry: {
@@ -411,6 +554,66 @@ function createItemsFieldCatalog(input: BuildItemsFieldCatalogInput): ItemFieldC
       },
       filterConfig: { kind: "text" },
     },
+    {
+      registry: {
+        fieldKey: "testerCount",
+        entityType: "items",
+        label: t("doc.columns.testerCount"),
+        dataType: "number",
+        sourceType: "derived",
+        defaultVisible: false,
+        lockedVisible: false,
+        sortable: true,
+        filterable: true,
+        exportable: true,
+        selectable: true,
+        rendererType: "numeric",
+        requiresPermission: null,
+        performanceCost: "low",
+      },
+      colDef: {
+        colId: "testerCount",
+        headerName: t("doc.columns.testerCount"),
+        width: 120,
+        valueGetter: (params) => (params.data ? resolveTesterCount(params.data) : 0),
+        cellRenderer: CountCellRenderer,
+        hide: true,
+      },
+      filterConfig: {
+        kind: "number",
+        getValue: resolveTesterCount,
+      },
+    },
+    {
+      registry: {
+        fieldKey: "hasTesters",
+        entityType: "items",
+        label: t("doc.columns.hasTesters"),
+        dataType: "boolean",
+        sourceType: "derived",
+        defaultVisible: false,
+        lockedVisible: false,
+        sortable: true,
+        filterable: true,
+        exportable: true,
+        selectable: true,
+        rendererType: "boolean-badge",
+        requiresPermission: null,
+        performanceCost: "low",
+      },
+      colDef: {
+        colId: "hasTesters",
+        headerName: t("doc.columns.hasTesters"),
+        width: 120,
+        valueGetter: (params) => (params.data ? resolveHasTesters(params.data) : false),
+        valueFormatter: (params) => (params.value ? yesLabel : noLabel),
+        hide: true,
+      },
+      filterConfig: {
+        kind: "boolean",
+        getValue: resolveHasTesters,
+      },
+    },
   ];
 }
 
@@ -432,4 +635,3 @@ export function buildItemsListViewCatalog(input: BuildItemsFieldCatalogInput): {
     filterConfigs,
   };
 }
-

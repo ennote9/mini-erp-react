@@ -332,6 +332,7 @@ export function ItemsListPage() {
     entityType: "items",
     baseColumnDefs,
     fieldRegistry: itemFieldRegistry,
+    allowHiddenFilterSort: true,
   });
   const effectiveSortModel = useMemo(() => {
     if (pendingSortModel) return pendingSortModel;
@@ -787,6 +788,7 @@ export function ItemsListPage() {
           onSortRulesChange={(nextRules) => setColumnSettingsDraftDeepSorts(() => nextRules)}
           registry={columnSettingsRegistry}
           filterConfigs={itemColumnFilterConfigs as Record<string, AgGridColumnFilterConfig<unknown>>}
+          includeHiddenInFilterSort
           personalViews={columnSettingsPersonalViews}
           activeViewId={columnSettingsActiveViewId}
           activeViewName={columnSettingsActiveViewName}
