@@ -59,8 +59,6 @@ export const AgGridContainer = forwardRef<HTMLDivElement, AgGridContainerProps>(
       const onColumnResized = (event: any) => {
         const api = getApi();
         const source = typeof event?.source === "string" ? event.source.toLowerCase() : "";
-        const finished = event?.finished !== false;
-        if (!finished) return;
         if (api?.getColumnState) {
           const widths = api
             .getColumnState()
@@ -75,11 +73,33 @@ export const AgGridContainer = forwardRef<HTMLDivElement, AgGridContainerProps>(
         }
       };
 
+      const getCurrentWidthsSnapshot = (api: AnyGridApi | null) => {
+        if (!api?.getColumnState) return [] as Array<{ colId: string; width: number }>;
+        return api
+          .getColumnState()
+          .map((col) => ({ colId: col.colId, width: typeof col.width === "number" ? col.width : 0 }))
+          .filter((col) => col.width > 0);
+      };
+
+      const widthsEqual = (
+        a: Array<{ colId: string; width: number }>,
+        b: Array<{ colId: string; width: number }>,
+      ) => {
+        if (a.length !== b.length) return false;
+        const byId = new Map(a.map((entry) => [entry.colId, entry.width]));
+        for (const entry of b) {
+          if (byId.get(entry.colId) !== entry.width) return false;
+        }
+        return true;
+      };
+
       const restoreColumnWidthsSnapshot = () => {
         const api = getApi();
         if (!api?.applyColumnState) return;
         const widths = lastKnownColumnWidthsRef.current;
         if (widths.length === 0) return;
+        const currentWidths = getCurrentWidthsSnapshot(api);
+        if (widthsEqual(widths, currentWidths)) return;
         if (restoringColumnStateRef.current) return;
         restoringColumnStateRef.current = true;
         api.applyColumnState({ state: widths, applyOrder: false });

@@ -836,18 +836,38 @@ export function decorateAgGridColumnDefsWithFilters<T>(
   filterConfigs: Record<string, AgGridColumnFilterConfig<T>>,
   filterBridge: AgGridColumnFilterBridge,
 ): ColDef<T>[] {
+  const paramsCache = headerParamsCache as Map<
+    string,
+    { config: AgGridColumnFilterConfig<T>; bridge: AgGridColumnFilterBridge; params: HeaderParams }
+  >;
   return columnDefs.map((columnDef) => {
     const colId = getFilterColId(columnDef);
     if (!colId) return columnDef;
     const filterConfig = filterConfigs[colId];
     if (!filterConfig) return columnDef;
+    const existingParams = paramsCache.get(colId);
+    if (existingParams && existingParams.config === filterConfig && existingParams.bridge === filterBridge) {
+      if (columnDef.headerComponent === AgGridColumnFilterHeader && columnDef.headerComponentParams === existingParams.params) {
+        return columnDef;
+      }
+    }
+    const params: HeaderParams = existingParams && existingParams.config === filterConfig && existingParams.bridge === filterBridge
+      ? existingParams.params
+      : { filterConfig, filterBridge };
+    paramsCache.set(colId, { config: filterConfig, bridge: filterBridge, params });
     return {
       ...columnDef,
       headerComponent: AgGridColumnFilterHeader,
-      headerComponentParams: {
-        filterConfig,
-        filterBridge,
-      },
+      headerComponentParams: params,
     };
   });
 }
+
+const headerParamsCache = new Map<
+  string,
+  {
+    config: AgGridColumnFilterConfig<unknown>;
+    bridge: AgGridColumnFilterBridge;
+    params: HeaderParams;
+  }
+>();
