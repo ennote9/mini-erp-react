@@ -55,6 +55,7 @@ import { formatItemsTableValue } from "../itemsTanstackColumns";
 import { ItemsTanstackTable } from "../ItemsTanstackTable";
 
 const COLUMN_SIZING_STORAGE_KEY = "mini-erp:items:tanstack:columnSizing:v1";
+const MAX_REASONABLE_COLUMN_SIZE = 1200;
 
 function applyBrandIdFilter(items: Item[], brandId: string | null): Item[] {
   if (brandId == null || brandId === "") return items;
@@ -86,6 +87,27 @@ function writePersistedColumnSizing(value: ColumnSizingState) {
   } catch {
     // ignore localStorage failures for pilot renderer sizing persistence
   }
+}
+
+function sanitizeColumnSizing(
+  value: ColumnSizingState,
+  schema: ItemsTableColumnSchema[],
+): ColumnSizingState {
+  const schemaById = new Map(schema.map((column) => [column.id, column]));
+  const sanitized: ColumnSizingState = {};
+
+  for (const [columnId, rawSize] of Object.entries(value)) {
+    const column = schemaById.get(columnId);
+    if (!column) continue;
+    if (typeof rawSize !== "number" || !Number.isFinite(rawSize)) continue;
+
+    const min = column.minSize ?? 48;
+    const max = Math.min(column.maxSize ?? MAX_REASONABLE_COLUMN_SIZE, MAX_REASONABLE_COLUMN_SIZE);
+    const nextSize = Math.max(min, Math.min(max, Math.round(rawSize)));
+    sanitized[columnId] = nextSize;
+  }
+
+  return sanitized;
 }
 
 export function ItemsListPage() {
@@ -191,6 +213,21 @@ export function ItemsListPage() {
     () => buildItemsTableSchema({ t }),
     [t, locale, appReadRevision],
   );
+
+  useEffect(() => {
+    setColumnSizing((current) => {
+      const next = sanitizeColumnSizing(current, itemsTableSchema);
+      const currentKeys = Object.keys(current);
+      const nextKeys = Object.keys(next);
+      if (
+        currentKeys.length === nextKeys.length &&
+        currentKeys.every((key) => current[key] === next[key])
+      ) {
+        return current;
+      }
+      return next;
+    });
+  }, [itemsTableSchema]);
 
   const baseColumnDefs = itemsListViewCatalog.columnDefs;
   const itemFieldRegistry = itemsListViewCatalog.fieldRegistry;
@@ -390,6 +427,16 @@ export function ItemsListPage() {
     [tanstackSorting, searchParams, setSearchParams],
   );
 
+  const handleColumnSizingChange = useCallback(
+    (updater: ColumnSizingState | ((old: ColumnSizingState) => ColumnSizingState)) => {
+      setColumnSizing((current) => {
+        const next = sanitizeColumnSizing(functionalUpdate(updater, current), itemsTableSchema);
+        return next;
+      });
+    },
+    [itemsTableSchema],
+  );
+
   const handleApplyColumnSettings = useCallback(() => {
     const { hiddenIds } = applyColumnSettingsDraft();
     const prunedDraftDeepSorts = pruneDeepSortRulesByHiddenFields(
@@ -566,7 +613,7 @@ export function ItemsListPage() {
           columnOrder={tableColumnOrder}
           columnSizing={columnSizing}
           onSortingChange={handleTanstackSortingChange}
-          onColumnSizingChange={setColumnSizing}
+          onColumnSizingChange={handleColumnSizingChange}
           onRowClick={(row) => {
             if (hasMeaningfulTextSelection()) return;
             navigate(appendReturnTo(`/items/${row.id}`, currentReturnTo));

@@ -83,9 +83,14 @@ export function ItemsTanstackTable(props: ItemsTanstackTableProps) {
     >
       <div ref={scrollContainerRef} className="overflow-auto" data-items-table-scroll>
         <table
-          className="w-full border-collapse text-sm"
+          className="w-full border-collapse table-fixed text-sm"
           style={{ width: Math.max(totalWidth, 960) }}
         >
+          <colgroup>
+            {visibleLeafColumns.map((column) => (
+              <col key={column.id} style={{ width: column.getSize() }} />
+            ))}
+          </colgroup>
           <thead className="sticky top-0 z-10 bg-background">
             {table.getHeaderGroups().map((headerGroup) => (
               <tr key={headerGroup.id} className="border-b border-border">
@@ -142,9 +147,19 @@ export function ItemsTanstackTable(props: ItemsTanstackTableProps) {
                       )}
                       {header.column.getCanResize() ? (
                         <div
-                          onDoubleClick={() => header.column.resetSize()}
-                          onMouseDown={header.getResizeHandler()}
-                          onTouchStart={header.getResizeHandler()}
+                          onClick={(event) => event.stopPropagation()}
+                          onDoubleClick={(event) => {
+                            event.stopPropagation();
+                            header.column.resetSize();
+                          }}
+                          onMouseDown={(event) => {
+                            event.stopPropagation();
+                            header.getResizeHandler()(event);
+                          }}
+                          onTouchStart={(event) => {
+                            event.stopPropagation();
+                            header.getResizeHandler()(event);
+                          }}
                           className="absolute right-0 top-0 h-full w-2 cursor-col-resize select-none touch-none opacity-0 transition-opacity group-hover:opacity-100"
                         >
                           <div className="mx-auto h-full w-px bg-border/80" />
@@ -182,7 +197,7 @@ export function ItemsTanstackTable(props: ItemsTanstackTableProps) {
                           "truncate px-3 py-2.5 text-sm text-foreground/95",
                           meta?.align === "right" ? "text-right tabular-nums" : meta?.align === "center" ? "text-center" : "text-left",
                         )}
-                        style={{ width: cell.column.getSize() }}
+                        style={{ width: cell.column.getSize(), minWidth: cell.column.columnDef.minSize }}
                         title={String(cell.getValue() ?? "")}
                       >
                         {flexRender(cell.column.columnDef.cell, cell.getContext())}
