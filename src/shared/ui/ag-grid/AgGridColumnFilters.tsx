@@ -352,6 +352,33 @@ function isValidClause<T>(clause: AgGridColumnFilterClause | null | undefined, c
   return !!clause.value?.trim();
 }
 
+function evaluateClause<T>(
+  row: T,
+  colId: string,
+  clause: AgGridColumnFilterClause,
+  config: AgGridColumnFilterConfig<T>,
+): boolean {
+  const value: FilterPrimitive | FilterPrimitive[] = config.getValue
+    ? config.getValue(row)
+    : ((row as Record<string, unknown>)[colId] as FilterPrimitive | FilterPrimitive[]);
+  switch (config.kind) {
+    case "text":
+      return evaluateText(normalizeCandidates(value), clause);
+    case "enum":
+      return evaluateEnum(normalizeCandidates(value), clause);
+    case "number":
+      return evaluateNumber(Array.isArray(value) ? value[0] : value, clause);
+    case "date":
+      return evaluateDateLike("date", Array.isArray(value) ? value[0] : value, clause);
+    case "datetime":
+      return evaluateDateLike("datetime", Array.isArray(value) ? value[0] : value, clause);
+    case "boolean":
+      return evaluateBoolean(Array.isArray(value) ? value[0] : value, clause);
+    default:
+      return true;
+  }
+}
+
 export function applyAgGridColumnFilters<T>(
   rows: T[],
   model: AgGridColumnFilterModel,
@@ -360,28 +387,25 @@ export function applyAgGridColumnFilters<T>(
   const activeEntries = Object.entries(model).filter(([colId, clause]) => isValidClause(clause, configs[colId]));
   if (activeEntries.length === 0) return rows;
   return rows.filter((row) =>
-    activeEntries.every(([colId, clause]) => {
-      const config = configs[colId];
-      const value: FilterPrimitive | FilterPrimitive[] = config.getValue
-        ? config.getValue(row)
-        : ((row as Record<string, unknown>)[colId] as FilterPrimitive | FilterPrimitive[]);
-      switch (config.kind) {
-        case "text":
-          return evaluateText(normalizeCandidates(value), clause);
-        case "enum":
-          return evaluateEnum(normalizeCandidates(value), clause);
-        case "number":
-          return evaluateNumber(Array.isArray(value) ? value[0] : value, clause);
-        case "date":
-          return evaluateDateLike("date", Array.isArray(value) ? value[0] : value, clause);
-        case "datetime":
-          return evaluateDateLike("datetime", Array.isArray(value) ? value[0] : value, clause);
-        case "boolean":
-          return evaluateBoolean(Array.isArray(value) ? value[0] : value, clause);
-        default:
-          return true;
-      }
-    }),
+    activeEntries.every(([colId, clause]) => evaluateClause(row, colId, clause, configs[colId])),
+  );
+}
+
+export function applyAgGridColumnFiltersCombined<T>(
+  rows: T[],
+  models: AgGridColumnFilterModel[],
+  configs: Record<string, AgGridColumnFilterConfig<T>>,
+): T[] {
+  const activeEntries: Array<{ colId: string; clause: AgGridColumnFilterClause }> = [];
+  for (const model of models) {
+    for (const [colId, clause] of Object.entries(model)) {
+      if (!isValidClause(clause, configs[colId])) continue;
+      activeEntries.push({ colId, clause });
+    }
+  }
+  if (activeEntries.length === 0) return rows;
+  return rows.filter((row) =>
+    activeEntries.every(({ colId, clause }) => evaluateClause(row, colId, clause, configs[colId])),
   );
 }
 

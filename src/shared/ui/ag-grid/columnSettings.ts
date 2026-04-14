@@ -228,6 +228,7 @@ function normalizeDefinitionByRegistry(
   entityType: ListViewEntityType,
   registry: ListViewFieldRegistryEntry[],
   value: unknown,
+  allowHiddenFilterSort?: boolean,
 ): ListViewDefinition | null {
   if (value == null) return null;
   const parsed = parsePersistedListViewDefinition(JSON.stringify(value));
@@ -236,6 +237,7 @@ function normalizeDefinitionByRegistry(
     entityType,
     registry,
     persisted: parsed,
+    allowHiddenFilterSort,
   });
 }
 
@@ -264,8 +266,9 @@ function sanitizePersonalViewsMeta(input: {
   registry: ListViewFieldRegistryEntry[];
   systemDefaultDefinition: ListViewDefinition;
   raw: unknown;
+  allowHiddenFilterSort?: boolean;
 }): { meta: PersonalViewsMeta; workingDefinition: ListViewDefinition } {
-  const { entityType, registry, systemDefaultDefinition, raw } = input;
+  const { entityType, registry, systemDefaultDefinition, raw, allowHiddenFilterSort } = input;
   const emptyMeta: PersonalViewsMeta = {
     personalViews: [],
     activeViewId: null,
@@ -278,7 +281,12 @@ function sanitizePersonalViewsMeta(input: {
 
   const legacyCandidate = raw as LegacyPersistedColumnSettings;
   if ((legacyCandidate as { listViewDefinition?: unknown }).listViewDefinition) {
-    const migrated = normalizeDefinitionByRegistry(entityType, registry, legacyCandidate.listViewDefinition);
+    const migrated = normalizeDefinitionByRegistry(
+      entityType,
+      registry,
+      legacyCandidate.listViewDefinition,
+      allowHiddenFilterSort,
+    );
     return {
       meta: emptyMeta,
       workingDefinition: migrated ?? systemDefaultDefinition,
@@ -296,7 +304,12 @@ function sanitizePersonalViewsMeta(input: {
     if (!entry || typeof entry !== "object") continue;
     const viewId = typeof entry.viewId === "string" ? entry.viewId.trim() : "";
     if (viewId === "" || uniqueIds.has(viewId)) continue;
-    const normalized = normalizeDefinitionByRegistry(entityType, registry, entry.listViewDefinition);
+    const normalized = normalizeDefinitionByRegistry(
+      entityType,
+      registry,
+      entry.listViewDefinition,
+      allowHiddenFilterSort,
+    );
     if (!normalized) continue;
     uniqueIds.add(viewId);
     const name = typeof entry.name === "string" ? entry.name.trim() : "";
@@ -323,7 +336,7 @@ function sanitizePersonalViewsMeta(input: {
   const activeView = activeViewId ? viewById.get(activeViewId) ?? null : null;
   const defaultView = defaultViewId ? viewById.get(defaultViewId) ?? null : null;
   const workingDefinition =
-    normalizeDefinitionByRegistry(entityType, registry, persisted.workingDefinition) ??
+    normalizeDefinitionByRegistry(entityType, registry, persisted.workingDefinition, allowHiddenFilterSort) ??
     activeView?.listViewDefinition ??
     defaultView?.listViewDefinition ??
     systemDefaultDefinition;
@@ -425,6 +438,7 @@ export function useAgGridColumnSettings<T>({
       registry,
       systemDefaultDefinition,
       raw,
+      allowHiddenFilterSort,
     });
     setPersonalViewsMeta(sanitized.meta);
     setDefinition(sanitized.workingDefinition);
@@ -524,6 +538,7 @@ export function useAgGridColumnSettings<T>({
       entityType,
       registry,
       persisted: draftDefinition,
+      allowHiddenFilterSort,
     });
     const nextCommitted = sanitizeSettingsItems(itemsFromDefinition(mergedDraft, meta));
     const prevVisible = visibleFieldKeysFromColumns(currentDefinition.columns);

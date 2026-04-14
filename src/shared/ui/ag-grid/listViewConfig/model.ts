@@ -62,8 +62,9 @@ export function mergeListViewDefinitionWithRegistry(input: {
   entityType: ListViewEntityType;
   registry: ListViewFieldRegistryEntry[];
   persisted: ListViewDefinition | null;
+  allowHiddenFilterSort?: boolean;
 }): ListViewDefinition {
-  const { entityType, registry, persisted } = input;
+  const { entityType, registry, persisted, allowHiddenFilterSort } = input;
   const fallback = buildDefaultListViewDefinition(entityType, registry);
   if (!persisted || persisted.entityType !== entityType) return fallback;
 
@@ -96,9 +97,9 @@ export function mergeListViewDefinitionWithRegistry(input: {
     });
   }
 
-  const visibleFieldKeys = new Set(
-    merged.filter((column) => column.visible).map((column) => column.fieldKey),
-  );
+  const visibleFieldKeys = allowHiddenFilterSort
+    ? undefined
+    : new Set(merged.filter((column) => column.visible).map((column) => column.fieldKey));
   const deepFilters = normalizeDeepFilterRules({
     rules: persisted.deepFilters,
     registry,

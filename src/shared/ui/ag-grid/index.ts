@@ -27,6 +27,7 @@ export {
 } from "./AgGridOutlinePillCellRenderers";
 export {
   applyAgGridColumnFilters,
+  applyAgGridColumnFiltersCombined,
   decorateAgGridColumnDefsWithFilters,
   useAgGridColumnFilterBridge,
   defaultOperatorsForKind,
