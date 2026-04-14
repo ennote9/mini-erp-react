@@ -9,7 +9,7 @@ import {
 } from "@tanstack/react-table";
 import type { RefObject } from "react";
 import { useMemo } from "react";
-import { ChevronDown, ChevronsUpDown, ChevronUp } from "lucide-react";
+import { ChevronDown, ChevronsUpDown, ChevronUp, Funnel } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { TFunction } from "@/shared/i18n";
 import type { ItemListRow } from "./listViewRowModel";
@@ -26,6 +26,8 @@ type ItemsTanstackTableProps = {
   onSortingChange: OnChangeFn<SortingState>;
   onColumnSizingChange: OnChangeFn<ColumnSizingState>;
   onRowClick: (row: ItemListRow) => void;
+  onHeaderFilterClick?: (fieldId: string, anchorRect: { left: number; top: number; height: number }) => void;
+  headerFilterState?: Record<string, boolean>;
   t: TFunction;
   formatMoney: (value: number, fractionDigits?: number, currencyCode?: string) => string;
   className?: string;
@@ -43,6 +45,8 @@ export function ItemsTanstackTable(props: ItemsTanstackTableProps) {
     onSortingChange,
     onColumnSizingChange,
     onRowClick,
+    onHeaderFilterClick,
+    headerFilterState,
     t,
     formatMoney,
     className,
@@ -73,6 +77,10 @@ export function ItemsTanstackTable(props: ItemsTanstackTableProps) {
 
   const visibleLeafColumns = table.getVisibleLeafColumns();
   const totalWidth = table.getTotalSize();
+  const schemaById = useMemo(
+    () => new Map(schema.map((column) => [column.id, column])),
+    [schema],
+  );
 
   return (
     <div
@@ -98,6 +106,9 @@ export function ItemsTanstackTable(props: ItemsTanstackTableProps) {
                   const canSort = header.column.getCanSort();
                   const sortState = header.column.getIsSorted();
                   const meta = header.column.columnDef.meta as { align?: "left" | "right" | "center" } | undefined;
+                  const schemaColumn = schemaById.get(header.column.id);
+                  const canFilter = schemaColumn?.filterable === true;
+                  const hasActiveFilter = headerFilterState?.[header.column.id] === true;
                   return (
                     <th
                       key={header.id}
@@ -143,6 +154,28 @@ export function ItemsTanstackTable(props: ItemsTanstackTableProps) {
                               </span>
                             </div>
                           )}
+                          {canFilter ? (
+                            <button
+                              type="button"
+                              className={cn(
+                                "shrink-0 rounded-sm p-1 transition-colors hover:bg-muted/60",
+                                hasActiveFilter ? "text-primary" : "text-muted-foreground/70",
+                              )}
+                              aria-label={`${t("doc.list.viewTabFiltering")}: ${schemaColumn?.label ?? header.column.id}`}
+                              title={`${t("doc.list.viewTabFiltering")}: ${schemaColumn?.label ?? header.column.id}`}
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                const rect = (event.currentTarget as HTMLButtonElement).getBoundingClientRect();
+                                onHeaderFilterClick?.(header.column.id, {
+                                  left: rect.left,
+                                  top: rect.top,
+                                  height: rect.height,
+                                });
+                              }}
+                            >
+                              <Funnel className={cn("h-3.5 w-3.5", hasActiveFilter && "fill-current")} />
+                            </button>
+                          ) : null}
                         </div>
                       )}
                       {header.column.getCanResize() ? (

@@ -46,6 +46,7 @@ import {
 import {
   buildUrlGridSortFromDeepSortRules,
   pruneDeepSortRulesByHiddenFields,
+  type ListViewDeepFilterRule,
 } from "@/shared/ui/ag-grid/listViewConfig";
 import { buildItemsListViewCatalog } from "../listViewFieldCatalog";
 import { buildItemListRows, type ItemListRow } from "../listViewRowModel";
@@ -53,9 +54,27 @@ import { buildItemsTableSchema, type ItemsTableColumnSchema } from "../itemsTabl
 import { buildItemsTableListViewState } from "../itemsListViewState";
 import { formatItemsTableValue } from "../itemsTanstackColumns";
 import { ItemsTanstackTable } from "../ItemsTanstackTable";
+import { ItemsHeaderFilterPanel } from "../ItemsHeaderFilterPanel";
 
 const COLUMN_SIZING_STORAGE_KEY = "mini-erp:items:tanstack:columnSizing:v1";
 const MAX_REASONABLE_COLUMN_SIZE = 1200;
+
+type HeaderFilterAnchor = {
+  fieldId: string;
+  left: number;
+  top: number;
+  height: number;
+};
+
+type PendingHeaderFilterCommit =
+  | {
+      type: "apply";
+      rule: ListViewDeepFilterRule;
+    }
+  | {
+      type: "reset";
+      fieldKey: string;
+    };
 
 function applyBrandIdFilter(items: Item[], brandId: string | null): Item[] {
   if (brandId == null || brandId === "") return items;
@@ -136,6 +155,8 @@ export function ItemsListPage() {
   const [pendingSortModel, setPendingSortModel] = useState<UrlGridSort[] | null>(null);
   const [columnSizing, setColumnSizing] = useState<ColumnSizingState>(() => readPersistedColumnSizing());
   const [itemsReady, setItemsReady] = useState(() => isItemsRepositoryReady());
+  const [headerFilterAnchor, setHeaderFilterAnchor] = useState<HeaderFilterAnchor | null>(null);
+  const [pendingHeaderFilterCommit, setPendingHeaderFilterCommit] = useState<PendingHeaderFilterCommit | null>(null);
   const [runtimeSortSerialized, setRuntimeSortSerialized] = useState(() =>
     serializeUrlGridSort(readUrlGridSort(new URLSearchParams(location.search))),
   );
@@ -402,6 +423,32 @@ export function ItemsListPage() {
     () => (neutralListViewState.columnOrder.length > 0 ? neutralListViewState.columnOrder : fallbackColumnOrder),
     [neutralListViewState.columnOrder, fallbackColumnOrder],
   );
+  const registryByFieldKey = useMemo(
+    () => new Map(columnSettingsRegistry.map((entry) => [entry.fieldKey, entry])),
+    [columnSettingsRegistry],
+  );
+  const activeDeepFilterFieldState = useMemo(
+    () =>
+      Object.fromEntries(
+        Object.keys(deepFilterModel).map((fieldKey) => [fieldKey, true]),
+      ) as Record<string, boolean>,
+    [deepFilterModel],
+  );
+  const appliedRuleByFieldKey = useMemo(() => {
+    const map = new Map<string, ListViewDeepFilterRule>();
+    for (const rule of columnSettingsDefinition?.deepFilters ?? []) {
+      if (!map.has(rule.fieldKey)) map.set(rule.fieldKey, rule);
+    }
+    return map;
+  }, [columnSettingsDefinition]);
+  const activeHeaderFilterField = headerFilterAnchor?.fieldId ?? null;
+  const activeHeaderFilterRegistryField = activeHeaderFilterField
+    ? registryByFieldKey.get(activeHeaderFilterField) ?? null
+    : null;
+  const activeHeaderFilterConfig =
+    activeHeaderFilterField != null ? itemColumnFilterConfigs[activeHeaderFilterField] : undefined;
+  const activeHeaderFilterRule =
+    activeHeaderFilterField != null ? appliedRuleByFieldKey.get(activeHeaderFilterField) ?? null : null;
 
   const tanstackSorting = useMemo<SortingState>(
     () =>
@@ -489,6 +536,37 @@ export function ItemsListPage() {
     searchParamsSort,
     setSearchParams,
   ]);
+
+  const handleHeaderFilterApply = useCallback(
+    (nextRule: ListViewDeepFilterRule) => {
+      setColumnSettingsDraftDeepFilters((prev) => {
+        const others = prev.filter((rule) => rule.fieldKey !== nextRule.fieldKey);
+        return [
+          ...others,
+          {
+            ...nextRule,
+            priority: others.length,
+          },
+        ];
+      });
+      setHeaderFilterAnchor(null);
+      setPendingHeaderFilterCommit({ type: "apply", rule: nextRule });
+    },
+    [setColumnSettingsDraftDeepFilters],
+  );
+
+  const handleHeaderFilterReset = useCallback(() => {
+    if (!activeHeaderFilterField) return;
+    setColumnSettingsDraftDeepFilters((prev) => prev.filter((rule) => rule.fieldKey !== activeHeaderFilterField));
+    setHeaderFilterAnchor(null);
+    setPendingHeaderFilterCommit({ type: "reset", fieldKey: activeHeaderFilterField });
+  }, [activeHeaderFilterField, setColumnSettingsDraftDeepFilters]);
+
+  useEffect(() => {
+    if (!pendingHeaderFilterCommit) return;
+    handleApplyColumnSettings();
+    setPendingHeaderFilterCommit(null);
+  }, [handleApplyColumnSettings, pendingHeaderFilterCommit]);
 
   const visibleSchemaColumns = useMemo(() => {
     const schemaById = new Map(itemsTableSchema.map((column) => [column.id, column]));
@@ -614,6 +692,8 @@ export function ItemsListPage() {
           columnSizing={columnSizing}
           onSortingChange={handleTanstackSortingChange}
           onColumnSizingChange={handleColumnSizingChange}
+          onHeaderFilterClick={(fieldId, anchorRect) => setHeaderFilterAnchor({ fieldId, ...anchorRect })}
+          headerFilterState={activeDeepFilterFieldState}
           onRowClick={(row) => {
             if (hasMeaningfulTextSelection()) return;
             navigate(appendReturnTo(`/items/${row.id}`, currentReturnTo));
@@ -621,6 +701,18 @@ export function ItemsListPage() {
           t={t}
           formatMoney={formatMoney}
           scrollContainerRef={gridContainerRef}
+        />
+        <ItemsHeaderFilterPanel
+          open={headerFilterAnchor != null}
+          anchorRect={headerFilterAnchor}
+          field={activeHeaderFilterRegistryField}
+          filterConfig={activeHeaderFilterConfig as AgGridColumnFilterConfig<unknown> | undefined}
+          rule={activeHeaderFilterRule}
+          onOpenChange={(open) => {
+            if (!open) setHeaderFilterAnchor(null);
+          }}
+          onApply={handleHeaderFilterApply}
+          onReset={handleHeaderFilterReset}
         />
       </div>
 
