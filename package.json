@@ -17,6 +17,7 @@
     "@fontsource-variable/geist": "^5.2.8",
     "@radix-ui/react-slot": "^1.2.4",
     "@tailwindcss/vite": "^4.2.1",
+    "@tanstack/react-table": "^8.21.3",
     "@tauri-apps/api": "^2.10.1",
     "@tauri-apps/plugin-dialog": "^2.6.0",
     "@tauri-apps/plugin-fs": "^2.4.5",
