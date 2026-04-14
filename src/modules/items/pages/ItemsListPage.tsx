@@ -6,7 +6,7 @@ import { useMemo, useState, useRef, useCallback, useEffect } from "react";
 import { useLocation, useNavigate, useSearchParams, Link } from "react-router-dom";
 import { AgGridReact } from "ag-grid-react";
 import type { SelectionChangedEvent } from "ag-grid-community";
-import { itemRepository } from "../repository";
+import { ensureItemsLoaded, isItemsRepositoryReady, itemRepository } from "../repository";
 import type { Item } from "../model";
 import { brandRepository } from "../../brands/repository";
 import { categoryRepository } from "../../categories/repository";
@@ -63,6 +63,7 @@ import {
   pruneDeepSortRulesByHiddenFields,
 } from "@/shared/ui/ag-grid/listViewConfig";
 import { buildItemsListViewCatalog } from "../listViewFieldCatalog";
+import { buildItemListRows, type ItemListRow } from "../listViewRowModel";
 
 function applyBrandIdFilter(items: Item[], brandId: string | null): Item[] {
   if (brandId == null || brandId === "") return items;
@@ -101,11 +102,24 @@ export function ItemsListPage() {
   const [exportOpen, setExportOpen] = useState(false);
   const [selectedCount, setSelectedCount] = useState(0);
   const [pendingSortModel, setPendingSortModel] = useState<UrlGridSort[] | null>(null);
-  const [pendingRowData, setPendingRowData] = useState<Item[] | null>(null);
-  const gridRef = useRef<AgGridReact<Item> | null>(null);
+  const [pendingRowData, setPendingRowData] = useState<ItemListRow[] | null>(null);
+  const gridRef = useRef<AgGridReact<ItemListRow> | null>(null);
+  const [itemsReady, setItemsReady] = useState(() => isItemsRepositoryReady());
   const gridContainerRef = useRef<HTMLDivElement | null>(null);
   const listSearchInputRef = useRef<HTMLInputElement>(null);
   useListPageSearchHotkey(listSearchInputRef);
+  useEffect(() => {
+    if (itemsReady) return;
+    let cancelled = false;
+    ensureItemsLoaded()
+      .catch(() => null)
+      .finally(() => {
+        if (!cancelled) setItemsReady(true);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [itemsReady]);
   const listStateKey = useMemo(
     () => buildNavigationStateKey(location.pathname, searchParams),
     [location.pathname, searchParams],
@@ -148,10 +162,23 @@ export function ItemsListPage() {
   }, [searchParams, setSearchParams]);
 
   const filteredItems = useMemo(() => {
+    if (!itemsReady) return [];
     const searched = itemRepository.search(searchQuery);
     const brandFiltered = applyBrandIdFilter(searched, brandFilterId);
     return applyCategoryIdFilter(brandFiltered, categoryFilterId);
-  }, [searchQuery, brandFilterId, categoryFilterId, appReadRevision]);
+  }, [itemsReady, searchQuery, brandFilterId, categoryFilterId, appReadRevision]);
+
+  const listRows = useMemo(
+    () =>
+      itemsReady
+        ? buildItemListRows({
+            items: filteredItems,
+            brands: brandRepository.list(),
+            categories: categoryRepository.list(),
+          })
+        : [],
+    [itemsReady, filteredItems, appReadRevision],
+  );
 
   const itemsListViewCatalog = useMemo(
     () =>
@@ -167,8 +194,8 @@ export function ItemsListPage() {
   const itemColumnFilterConfigs = itemsListViewCatalog.filterConfigs;
 
   const displayItemsWithQueryFilters = useMemo(
-    () => applyAgGridColumnFilters(filteredItems, columnFilterModel, itemColumnFilterConfigs),
-    [filteredItems, columnFilterModel, itemColumnFilterConfigs],
+    () => applyAgGridColumnFilters(listRows, columnFilterModel, itemColumnFilterConfigs),
+    [listRows, columnFilterModel, itemColumnFilterConfigs],
   );
 
   const markdownScanMatch = useMemo(() => {
@@ -327,7 +354,7 @@ export function ItemsListPage() {
     renameActivePersonalView: renameColumnSettingsActivePersonalView,
     deleteActivePersonalView: deleteColumnSettingsActivePersonalView,
     setActivePersonalViewAsDefault: setColumnSettingsActivePersonalViewAsDefault,
-  } = useAgGridColumnSettings<Item>({
+  } = useAgGridColumnSettings<ItemListRow>({
     pageKey: "items",
     entityType: "items",
     baseColumnDefs,
@@ -350,7 +377,7 @@ export function ItemsListPage() {
     return deepSortModel;
   }, [pendingSortModel, searchParamsSort, runtimeSortSerialized, deepSortModel]);
   const resolveDeepSortValue = useCallback(
-    (item: Item, fieldKey: string): unknown => {
+    (item: ItemListRow, fieldKey: string): unknown => {
       const config = itemColumnFilterConfigs[fieldKey];
       if (config?.getValue) return config.getValue(item);
       return (item as unknown as Record<string, unknown>)[fieldKey];
@@ -377,7 +404,7 @@ export function ItemsListPage() {
       buildAgGridNoRowsOverlayTemplate(
         getAgGridNoRowsOverlayContent(
           {
-            baseRowCount: itemRepository.list().length,
+            baseRowCount: itemsReady ? itemRepository.list().length : 0,
             visibleRowCount: displayItems.length,
             searchActive,
             filtersActive,
@@ -543,6 +570,97 @@ export function ItemsListPage() {
     searchParamsSort,
     setSearchParams,
   ]);
+
+  const listContent = itemsReady ? (
+    <>
+      {markdownScanMatch ? (
+        <div
+          className="mb-2 flex flex-wrap items-center justify-between gap-2 rounded-md border border-primary/40 bg-primary/5 px-3 py-2 text-sm"
+          role="status"
+        >
+          <span className="text-foreground/90">
+            {t("ops.list.items.markdownScanBanner", { code: markdownScanMatch.markdownCode })}
+          </span>
+          <Link
+            className="list-table__link shrink-0 font-medium"
+            to={`/markdown-journal?view=codes&q=${encodeURIComponent(markdownScanMatch.markdownCode)}`}
+          >
+            {t("common.open")}
+          </Link>
+        </div>
+      ) : markdownCodeNoRecord ? (
+        <div
+          className="mb-2 flex flex-wrap items-center gap-2 rounded-md border border-border/60 bg-muted/30 px-3 py-2 text-sm text-muted-foreground"
+          role="status"
+        >
+          <span>
+            {t("ops.list.items.markdownCodeNotFound", {
+              code: searchQuery.trim().toUpperCase(),
+            })}
+          </span>
+          <Link className="list-table__link shrink-0 font-medium text-foreground/90" to="/markdown-journal">
+            {t("markdown.journal.title")}
+          </Link>
+        </div>
+      ) : null}
+      <AgGridContainer ref={gridContainerRef} themeClass="items-grid" gridRef={gridRef}>
+        <AgGridReact<ItemListRow>
+          {...agGridDefaultGridOptions}
+          ref={gridRef}
+          rowData={pendingRowData ?? displayItems}
+          columnDefs={columnDefs}
+          defaultColDef={agGridDefaultColDef}
+          overlayNoRowsTemplate={noRowsOverlayTemplate}
+          onGridReady={(event) => {
+            applyUrlGridSort(event.api, effectiveSortModel);
+          }}
+          onSortChanged={syncSortToUrl}
+          rowSelection={{ mode: "multiRow", checkboxes: true, headerCheckbox: true, enableClickSelection: true }}
+          selectionColumnDef={agGridSelectionColumnDef}
+          getRowId={(params) => params.data.id}
+          onRowClicked={(e) => {
+            if (hasMeaningfulTextSelection()) return;
+            if (e.data) navigate(appendReturnTo(`/items/${e.data.id}`, currentReturnTo));
+          }}
+          onSelectionChanged={onSelectionChanged}
+        />
+      </AgGridContainer>
+      <AgGridColumnSettingsModal
+        open={columnSettingsOpen}
+        onOpenChange={(nextOpen) => {
+          if (nextOpen) {
+            openColumnSettings();
+            return;
+          }
+          cancelColumnSettingsDraft();
+        }}
+        items={columnSettingsDraftItems}
+        onItemsChange={(nextItems) => setColumnSettingsDraftItems(() => nextItems)}
+        filterRules={columnSettingsDraftDeepFilters}
+        onFilterRulesChange={(nextRules) => setColumnSettingsDraftDeepFilters(() => nextRules)}
+        sortRules={columnSettingsDraftDeepSorts}
+        onSortRulesChange={(nextRules) => setColumnSettingsDraftDeepSorts(() => nextRules)}
+        registry={columnSettingsRegistry}
+        filterConfigs={itemColumnFilterConfigs as Record<string, AgGridColumnFilterConfig<unknown>>}
+        includeHiddenInFilterSort
+        personalViews={columnSettingsPersonalViews}
+        activeViewId={columnSettingsActiveViewId}
+        activeViewName={columnSettingsActiveViewName}
+        hasUnsavedChanges={columnSettingsHasUnsavedChanges}
+        onActivateView={activateColumnSettingsPersonalView}
+        onCreateView={createColumnSettingsPersonalViewFromCurrent}
+        onSaveChangesToActiveView={saveColumnSettingsActivePersonalViewFromCurrent}
+        onRenameActiveView={renameColumnSettingsActivePersonalView}
+        onDeleteActiveView={deleteColumnSettingsActivePersonalView}
+        onSetActiveAsDefault={setColumnSettingsActivePersonalViewAsDefault}
+        onApply={handleApplyColumnSettings}
+        onCancel={cancelColumnSettingsDraft}
+        onReset={resetColumnSettingsDraftToDefaults}
+      />
+    </>
+  ) : (
+    <div className="p-4 text-sm text-muted-foreground">{t("common.loading")}</div>
+  );
 
   return (
     <ListPageLayout
@@ -718,92 +836,7 @@ export function ItemsListPage() {
         </>
       }
     >
-      <>
-        {markdownScanMatch ? (
-          <div
-            className="mb-2 flex flex-wrap items-center justify-between gap-2 rounded-md border border-primary/40 bg-primary/5 px-3 py-2 text-sm"
-            role="status"
-          >
-            <span className="text-foreground/90">
-              {t("ops.list.items.markdownScanBanner", { code: markdownScanMatch.markdownCode })}
-            </span>
-            <Link
-              className="list-table__link shrink-0 font-medium"
-              to={`/markdown-journal?view=codes&q=${encodeURIComponent(markdownScanMatch.markdownCode)}`}
-            >
-              {t("common.open")}
-            </Link>
-          </div>
-        ) : markdownCodeNoRecord ? (
-          <div
-            className="mb-2 flex flex-wrap items-center gap-2 rounded-md border border-border/60 bg-muted/30 px-3 py-2 text-sm text-muted-foreground"
-            role="status"
-          >
-            <span>
-              {t("ops.list.items.markdownCodeNotFound", {
-                code: searchQuery.trim().toUpperCase(),
-              })}
-            </span>
-            <Link className="list-table__link shrink-0 font-medium text-foreground/90" to="/markdown-journal">
-              {t("markdown.journal.title")}
-            </Link>
-          </div>
-        ) : null}
-        <AgGridContainer ref={gridContainerRef} themeClass="items-grid" gridRef={gridRef}>
-          <AgGridReact<Item>
-            {...agGridDefaultGridOptions}
-            ref={gridRef}
-            rowData={pendingRowData ?? displayItems}
-            columnDefs={columnDefs}
-            defaultColDef={agGridDefaultColDef}
-            overlayNoRowsTemplate={noRowsOverlayTemplate}
-            onGridReady={(event) => {
-              applyUrlGridSort(event.api, effectiveSortModel);
-            }}
-            onSortChanged={syncSortToUrl}
-            rowSelection={{ mode: "multiRow", checkboxes: true, headerCheckbox: true, enableClickSelection: true }}
-            selectionColumnDef={agGridSelectionColumnDef}
-            getRowId={(params) => params.data.id}
-            onRowClicked={(e) => {
-              if (hasMeaningfulTextSelection()) return;
-              if (e.data) navigate(appendReturnTo(`/items/${e.data.id}`, currentReturnTo));
-            }}
-            onSelectionChanged={onSelectionChanged}
-          />
-        </AgGridContainer>
-        <AgGridColumnSettingsModal
-          open={columnSettingsOpen}
-          onOpenChange={(nextOpen) => {
-            if (nextOpen) {
-              openColumnSettings();
-              return;
-            }
-            cancelColumnSettingsDraft();
-          }}
-          items={columnSettingsDraftItems}
-          onItemsChange={(nextItems) => setColumnSettingsDraftItems(() => nextItems)}
-          filterRules={columnSettingsDraftDeepFilters}
-          onFilterRulesChange={(nextRules) => setColumnSettingsDraftDeepFilters(() => nextRules)}
-          sortRules={columnSettingsDraftDeepSorts}
-          onSortRulesChange={(nextRules) => setColumnSettingsDraftDeepSorts(() => nextRules)}
-          registry={columnSettingsRegistry}
-          filterConfigs={itemColumnFilterConfigs as Record<string, AgGridColumnFilterConfig<unknown>>}
-          includeHiddenInFilterSort
-          personalViews={columnSettingsPersonalViews}
-          activeViewId={columnSettingsActiveViewId}
-          activeViewName={columnSettingsActiveViewName}
-          hasUnsavedChanges={columnSettingsHasUnsavedChanges}
-          onActivateView={activateColumnSettingsPersonalView}
-          onCreateView={createColumnSettingsPersonalViewFromCurrent}
-          onSaveChangesToActiveView={saveColumnSettingsActivePersonalViewFromCurrent}
-          onRenameActiveView={renameColumnSettingsActivePersonalView}
-          onDeleteActiveView={deleteColumnSettingsActivePersonalView}
-          onSetActiveAsDefault={setColumnSettingsActivePersonalViewAsDefault}
-          onApply={handleApplyColumnSettings}
-          onCancel={cancelColumnSettingsDraft}
-          onReset={resetColumnSettingsDraftToDefaults}
-        />
-      </>
+      {listContent}
     </ListPageLayout>
   );
 }

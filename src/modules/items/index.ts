@@ -12,6 +12,8 @@ export type {
   ItemKind,
 } from "./model";
 export {
+  ensureItemsLoaded,
+  isItemsRepositoryReady,
   itemRepository,
   flushPendingItemsPersist,
   getItemsPersistBusy,

@@ -21,6 +21,8 @@ export type UpdateItemPatch = Partial<Omit<Item, "id">>;
 
 const store: Item[] = [];
 let nextId = 1;
+let itemsReady = false;
+let itemsLoadPromise: Promise<void> | null = null;
 
 /** Serialized disk writes: each scheduled job snapshots the current store and writes once. */
 let persistChain: Promise<void> = Promise.resolve();
@@ -91,9 +93,26 @@ async function bootstrapFromDisk(): Promise<void> {
   const { items, nextId: loadedNext } = await loadItemsPersisted(buildSeedItems);
   store.splice(0, store.length, ...items);
   nextId = loadedNext;
+  itemsReady = true;
 }
 
-await bootstrapFromDisk();
+export function isItemsRepositoryReady(): boolean {
+  return itemsReady;
+}
+
+export function ensureItemsLoaded(): Promise<void> {
+  if (itemsReady) return Promise.resolve();
+  if (!itemsLoadPromise) {
+    itemsLoadPromise = bootstrapFromDisk().catch((e) => {
+      if (import.meta.env.DEV) {
+        console.error("[itemRepository] bootstrap failed:", e);
+      }
+    }).finally(() => {
+      itemsReady = true;
+    });
+  }
+  return itemsLoadPromise;
+}
 registerPersistenceFlush({
   id: "items",
   flush: flushPendingItemsPersist,
@@ -104,14 +123,17 @@ export { getItemsPersistenceDiagnostics };
 
 export const itemRepository = {
   list(): Item[] {
+    void ensureItemsLoaded();
     return [...store];
   },
 
   getById(id: string): Item | undefined {
+    void ensureItemsLoaded();
     return store.find((x) => x.id === id);
   },
 
   create(input: CreateItemInput): Item {
+    void ensureItemsLoaded();
     const item = buildCreatedItem(input);
     store.push(item);
     schedulePersist();
@@ -123,6 +145,7 @@ export const itemRepository = {
     baseItemId: string,
     nextTesterCodeNextSeq: number,
   ): Item | undefined {
+    void ensureItemsLoaded();
     const baseIndex = store.findIndex((x) => x.id === baseItemId);
     if (baseIndex === -1) return undefined;
     const base = store[baseIndex];
@@ -137,6 +160,7 @@ export const itemRepository = {
   },
 
   update(id: string, patch: UpdateItemPatch): Item | undefined {
+    void ensureItemsLoaded();
     const i = store.findIndex((x) => x.id === id);
     if (i === -1) return undefined;
     const merged = { ...store[i], ...patch };
@@ -151,6 +175,7 @@ export const itemRepository = {
   },
 
   search(query: string): Item[] {
+    void ensureItemsLoaded();
     const q = query.trim().toLowerCase();
     if (!q) return [...store];
     return store.filter(

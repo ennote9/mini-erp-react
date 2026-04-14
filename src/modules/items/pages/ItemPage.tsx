@@ -1,6 +1,6 @@
 import { useParams, useNavigate, useSearchParams, Link, useLocation } from "react-router-dom";
 import { useMemo, useState, useEffect, useCallback } from "react";
-import { itemRepository } from "../repository";
+import { ensureItemsLoaded, isItemsRepositoryReady, itemRepository } from "../repository";
 import { brandRepository } from "../../brands/repository";
 import { categoryRepository } from "../../categories/repository";
 import { nextTesterCodeForBaseItem, saveItemAwaitPersist } from "../service";
@@ -73,15 +73,29 @@ export function ItemPage() {
   const [searchParams] = useSearchParams();
   const location = useLocation();
   const navigate = useNavigate();
+  const [itemsReady, setItemsReady] = useState(() => isItemsRepositoryReady());
   const isNew = id === "new";
   const [imagesRevision, setImagesRevision] = useState(0);
   const [barcodesRevision, setBarcodesRevision] = useState(0);
   const requestedKind = (searchParams.get("kind") ?? "").toUpperCase();
   const requestedBaseItemId = searchParams.get("baseItemId") ?? "";
   const createKind: "SELLABLE" | "TESTER" = requestedKind === "TESTER" ? "TESTER" : "SELLABLE";
+  useEffect(() => {
+    if (itemsReady) return;
+    let cancelled = false;
+    ensureItemsLoaded()
+      .catch(() => null)
+      .finally(() => {
+        if (!cancelled) setItemsReady(true);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [itemsReady]);
+
   const item = useMemo(
-    () => (id && !isNew ? itemRepository.getById(id) : undefined),
-    [id, isNew, imagesRevision, barcodesRevision],
+    () => (itemsReady && id && !isNew ? itemRepository.getById(id) : undefined),
+    [itemsReady, id, isNew, imagesRevision, barcodesRevision],
   );
 
   const [form, setForm] = useState<FormState>(defaultForm);
@@ -129,6 +143,10 @@ export function ItemPage() {
     () => combineIssues(health.issues, actionIssues),
     [health.issues, actionIssues],
   );
+
+  if (!itemsReady) {
+    return <div className="p-6 text-sm text-muted-foreground">{t("common.loading")}</div>;
+  }
 
   useEffect(() => {
     if (isNew) {

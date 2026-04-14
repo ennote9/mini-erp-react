@@ -5,13 +5,12 @@ import { AgGridActiveBooleanCellRenderer } from "@/shared/ui/ag-grid";
 import { getAgGridRowNumberColDef } from "@/shared/ui/ag-grid/agGridDefaults";
 import { brandRepository } from "@/modules/brands/repository";
 import { categoryRepository } from "@/modules/categories/repository";
-import { itemRepository } from "@/modules/items/repository";
-import type { Item } from "./model";
+import type { ItemListRow } from "./listViewRowModel";
 
 type ItemFieldCatalogEntry = {
   registry: ListViewFieldRegistryEntry;
-  colDef: ColDef<Item>;
-  filterConfig?: AgGridColumnFilterConfig<Item>;
+  colDef: ColDef<ItemListRow>;
+  filterConfig?: AgGridColumnFilterConfig<ItemListRow>;
 };
 
 type BuildItemsFieldCatalogInput = {
@@ -19,7 +18,7 @@ type BuildItemsFieldCatalogInput = {
   formatMoney: (value: number, fractionDigits?: number, currencyCode?: string) => string;
 };
 
-function CountCellRenderer(params: ICellRendererParams<Item, number>) {
+function CountCellRenderer(params: ICellRendererParams<ItemListRow, number>) {
   const n = typeof params.value === "number" ? params.value : 0;
   if (n === 0) {
     return <span className="text-muted-foreground tabular-nums">0</span>;
@@ -27,57 +26,10 @@ function CountCellRenderer(params: ICellRendererParams<Item, number>) {
   return <span className="tabular-nums text-foreground/90">{n}</span>;
 }
 
-function resolveImageCount(item: Item): number {
-  return Array.isArray(item.images) ? item.images.length : 0;
-}
-
-function resolveBarcodeStats(item: Item): {
-  count: number;
-  hasBarcode: boolean;
-  primaryBarcode: string;
-} {
-  const barcodes = Array.isArray(item.barcodes) ? item.barcodes : [];
-  const count = barcodes.length > 0 ? barcodes.length : item.barcode ? 1 : 0;
-  const active = barcodes.filter((barcode) => barcode.isActive !== false);
-  const primary = active.find((barcode) => barcode.isPrimary) ?? active[0] ?? barcodes[0] ?? null;
-  const primaryBarcode = primary?.codeValue ?? item.barcode ?? "";
-  return {
-    count,
-    hasBarcode: count > 0,
-    primaryBarcode,
-  };
-}
-
-type TesterStats = { count: number; firstCode: string; firstName: string };
-
-function buildTesterStats(items: Item[]): Map<string, TesterStats> {
-  const map = new Map<string, TesterStats>();
-  for (const item of items) {
-    if (item.itemKind !== "TESTER" || !item.baseItemId) continue;
-    const key = item.baseItemId;
-    const current = map.get(key) ?? { count: 0, firstCode: "", firstName: "" };
-    map.set(key, {
-      count: current.count + 1,
-      firstCode: current.firstCode || item.code,
-      firstName: current.firstName || item.name,
-    });
-  }
-  return map;
-}
-
 function createItemsFieldCatalog(input: BuildItemsFieldCatalogInput): ItemFieldCatalogEntry[] {
   const { t, formatMoney } = input;
   const yesLabel = t("common.yes");
   const noLabel = t("common.no");
-  const testerStatsByBaseId = buildTesterStats(itemRepository.list());
-
-  const resolveTesterStats = (item: Item): TesterStats => {
-    if (item.itemKind !== "SELLABLE") return { count: 0, firstCode: "", firstName: "" };
-    return testerStatsByBaseId.get(item.id) ?? { count: 0, firstCode: "", firstName: "" };
-  };
-
-  const resolveTesterCount = (item: Item): number => resolveTesterStats(item).count;
-  const resolveHasTesters = (item: Item): boolean => resolveTesterCount(item) > 0;
   return [
     {
       registry: {
@@ -204,12 +156,11 @@ function createItemsFieldCatalog(input: BuildItemsFieldCatalogInput): ItemFieldC
         headerName: t("doc.columns.images"),
         width: 76,
         maxWidth: 88,
-        valueGetter: (params) => (params.data ? resolveImageCount(params.data) : 0),
+        field: "imageCount",
         cellRenderer: CountCellRenderer,
       },
       filterConfig: {
         kind: "number",
-        getValue: resolveImageCount,
       },
     },
     {
@@ -233,12 +184,11 @@ function createItemsFieldCatalog(input: BuildItemsFieldCatalogInput): ItemFieldC
         colId: "hasImages",
         headerName: t("doc.columns.hasImages"),
         width: 120,
-        valueGetter: (params) => (params.data ? resolveImageCount(params.data) > 0 : false),
+        field: "hasImages",
         valueFormatter: (params) => (params.value ? yesLabel : noLabel),
       },
       filterConfig: {
         kind: "boolean",
-        getValue: (item) => resolveImageCount(item) > 0,
       },
     },
     {
@@ -262,18 +212,11 @@ function createItemsFieldCatalog(input: BuildItemsFieldCatalogInput): ItemFieldC
         colId: "brand",
         headerName: t("doc.columns.brand"),
         width: 110,
-        valueGetter: (params) => {
-          const id = params.data?.brandId;
-          if (!id) return "";
-          return brandRepository.getById(id)?.name ?? "";
-        },
+        field: "brand",
       },
       filterConfig: {
         kind: "enum",
-        getValue: (item) => {
-          if (!item.brandId) return "";
-          return brandRepository.getById(item.brandId)?.name ?? "";
-        },
+        getValue: (item) => item.brandName,
         options: brandRepository.list().map((brand) => ({ value: brand.name, label: brand.name })),
       },
     },
@@ -298,18 +241,11 @@ function createItemsFieldCatalog(input: BuildItemsFieldCatalogInput): ItemFieldC
         colId: "category",
         headerName: t("doc.columns.category"),
         width: 120,
-        valueGetter: (params) => {
-          const id = params.data?.categoryId;
-          if (!id) return "";
-          return categoryRepository.getById(id)?.name ?? "";
-        },
+        field: "category",
       },
       filterConfig: {
         kind: "enum",
-        getValue: (item) => {
-          if (!item.categoryId) return "";
-          return categoryRepository.getById(item.categoryId)?.name ?? "";
-        },
+        getValue: (item) => item.categoryName,
         options: categoryRepository.list().map((category) => ({ value: category.name, label: category.name })),
       },
     },
@@ -462,11 +398,9 @@ function createItemsFieldCatalog(input: BuildItemsFieldCatalogInput): ItemFieldC
         headerName: t("doc.columns.primaryBarcode"),
         width: 150,
         hide: true,
-        valueGetter: (params) => (params.data ? resolveBarcodeStats(params.data).primaryBarcode : ""),
       },
       filterConfig: {
         kind: "text",
-        getValue: (item) => resolveBarcodeStats(item).primaryBarcode,
       },
     },
     {
@@ -490,13 +424,12 @@ function createItemsFieldCatalog(input: BuildItemsFieldCatalogInput): ItemFieldC
         colId: "barcodeCount",
         headerName: t("doc.columns.barcodeCount"),
         width: 120,
-        valueGetter: (params) => (params.data ? resolveBarcodeStats(params.data).count : 0),
+        field: "barcodeCount",
         cellRenderer: CountCellRenderer,
         hide: true,
       },
       filterConfig: {
         kind: "number",
-        getValue: (item) => resolveBarcodeStats(item).count,
       },
     },
     {
@@ -520,13 +453,12 @@ function createItemsFieldCatalog(input: BuildItemsFieldCatalogInput): ItemFieldC
         colId: "hasBarcode",
         headerName: t("doc.columns.hasBarcode"),
         width: 110,
-        valueGetter: (params) => (params.data ? resolveBarcodeStats(params.data).hasBarcode : false),
+        field: "hasBarcode",
         valueFormatter: (params) => (params.value ? yesLabel : noLabel),
         hide: true,
       },
       filterConfig: {
         kind: "boolean",
-        getValue: (item) => resolveBarcodeStats(item).hasBarcode,
       },
     },
     {
@@ -571,19 +503,18 @@ function createItemsFieldCatalog(input: BuildItemsFieldCatalogInput): ItemFieldC
         requiresPermission: null,
         performanceCost: "low",
       },
-      colDef: {
-        colId: "testerCount",
-        headerName: t("doc.columns.testerCount"),
-        width: 120,
-        valueGetter: (params) => (params.data ? resolveTesterCount(params.data) : 0),
-        cellRenderer: CountCellRenderer,
-        hide: true,
-      },
-      filterConfig: {
-        kind: "number",
-        getValue: resolveTesterCount,
-      },
-    },
+            colDef: {
+              colId: "testerCount",
+              headerName: t("doc.columns.testerCount"),
+              width: 120,
+              field: "testerCount",
+              cellRenderer: CountCellRenderer,
+              hide: true,
+            },
+            filterConfig: {
+              kind: "number",
+            },
+          },
     {
       registry: {
         fieldKey: "hasTesters",
@@ -601,29 +532,28 @@ function createItemsFieldCatalog(input: BuildItemsFieldCatalogInput): ItemFieldC
         requiresPermission: null,
         performanceCost: "low",
       },
-      colDef: {
-        colId: "hasTesters",
-        headerName: t("doc.columns.hasTesters"),
-        width: 120,
-        valueGetter: (params) => (params.data ? resolveHasTesters(params.data) : false),
-        valueFormatter: (params) => (params.value ? yesLabel : noLabel),
-        hide: true,
-      },
-      filterConfig: {
-        kind: "boolean",
-        getValue: resolveHasTesters,
-      },
-    },
+            colDef: {
+              colId: "hasTesters",
+              headerName: t("doc.columns.hasTesters"),
+              width: 120,
+              field: "hasTesters",
+              valueFormatter: (params) => (params.value ? yesLabel : noLabel),
+              hide: true,
+            },
+            filterConfig: {
+              kind: "boolean",
+            },
+          },
   ];
 }
 
 export function buildItemsListViewCatalog(input: BuildItemsFieldCatalogInput): {
-  columnDefs: ColDef<Item>[];
+  columnDefs: ColDef<ItemListRow>[];
   fieldRegistry: ListViewFieldRegistryEntry[];
-  filterConfigs: Record<string, AgGridColumnFilterConfig<Item>>;
+  filterConfigs: Record<string, AgGridColumnFilterConfig<ItemListRow>>;
 } {
   const catalog = createItemsFieldCatalog(input);
-  const filterConfigs: Record<string, AgGridColumnFilterConfig<Item>> = {};
+  const filterConfigs: Record<string, AgGridColumnFilterConfig<ItemListRow>> = {};
   for (const entry of catalog) {
     if (entry.filterConfig) {
       filterConfigs[entry.registry.fieldKey] = entry.filterConfig;
