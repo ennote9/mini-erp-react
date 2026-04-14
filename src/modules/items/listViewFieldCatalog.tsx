@@ -1,7 +1,6 @@
-import type { ColDef, ICellRendererParams } from "ag-grid-community";
+import type { ColDef } from "ag-grid-community";
 import type { TFunction } from "@/shared/i18n";
 import type { AgGridColumnFilterConfig, ListViewFieldRegistryEntry } from "@/shared/ui/ag-grid";
-import { AgGridActiveBooleanCellRenderer } from "@/shared/ui/ag-grid";
 import { getAgGridRowNumberColDef } from "@/shared/ui/ag-grid/agGridDefaults";
 import { brandRepository } from "@/modules/brands/repository";
 import { categoryRepository } from "@/modules/categories/repository";
@@ -17,14 +16,6 @@ type BuildItemsFieldCatalogInput = {
   t: TFunction;
   formatMoney: (value: number, fractionDigits?: number, currencyCode?: string) => string;
 };
-
-function CountCellRenderer(params: ICellRendererParams<ItemListRow, number>) {
-  const n = typeof params.value === "number" ? params.value : 0;
-  if (n === 0) {
-    return <span className="text-muted-foreground tabular-nums">0</span>;
-  }
-  return <span className="tabular-nums text-foreground/90">{n}</span>;
-}
 
 function createItemsFieldCatalog(input: BuildItemsFieldCatalogInput): ItemFieldCatalogEntry[] {
   const { t, formatMoney } = input;
@@ -70,7 +61,7 @@ function createItemsFieldCatalog(input: BuildItemsFieldCatalogInput): ItemFieldC
       colDef: {
         field: "code",
         headerName: t("doc.columns.code"),
-        width: 130,
+        initialWidth: 130,
       },
       filterConfig: { kind: "text" },
     },
@@ -92,11 +83,11 @@ function createItemsFieldCatalog(input: BuildItemsFieldCatalogInput): ItemFieldC
         performanceCost: "low",
       },
       colDef: {
+        field: "itemKind",
         colId: "itemKind",
         headerName: t("master.item.list.kindColumn"),
-        width: 100,
+        initialWidth: 100,
         maxWidth: 120,
-        valueGetter: (params) => params.data?.itemKind ?? "SELLABLE",
         valueFormatter: (params) =>
           params.value === "TESTER" ? t("master.item.kind.tester") : t("master.item.kind.sellable"),
       },
@@ -130,7 +121,7 @@ function createItemsFieldCatalog(input: BuildItemsFieldCatalogInput): ItemFieldC
         field: "name",
         headerName: t("doc.columns.name"),
         minWidth: 160,
-        flex: 1,
+        initialFlex: 1,
       },
       filterConfig: { kind: "text" },
     },
@@ -154,10 +145,9 @@ function createItemsFieldCatalog(input: BuildItemsFieldCatalogInput): ItemFieldC
       colDef: {
         colId: "imageCount",
         headerName: t("doc.columns.images"),
-        width: 76,
+        initialWidth: 76,
         maxWidth: 88,
         field: "imageCount",
-        cellRenderer: CountCellRenderer,
       },
       filterConfig: {
         kind: "number",
@@ -183,8 +173,9 @@ function createItemsFieldCatalog(input: BuildItemsFieldCatalogInput): ItemFieldC
       colDef: {
         colId: "hasImages",
         headerName: t("doc.columns.hasImages"),
-        width: 120,
+        initialWidth: 120,
         field: "hasImages",
+        cellDataType: false,
         valueFormatter: (params) => (params.value ? yesLabel : noLabel),
       },
       filterConfig: {
@@ -211,7 +202,7 @@ function createItemsFieldCatalog(input: BuildItemsFieldCatalogInput): ItemFieldC
       colDef: {
         colId: "brand",
         headerName: t("doc.columns.brand"),
-        width: 110,
+        initialWidth: 110,
         field: "brand",
       },
       filterConfig: {
@@ -240,7 +231,7 @@ function createItemsFieldCatalog(input: BuildItemsFieldCatalogInput): ItemFieldC
       colDef: {
         colId: "category",
         headerName: t("doc.columns.category"),
-        width: 120,
+        initialWidth: 120,
         field: "category",
       },
       filterConfig: {
@@ -269,7 +260,7 @@ function createItemsFieldCatalog(input: BuildItemsFieldCatalogInput): ItemFieldC
       colDef: {
         field: "uom",
         headerName: t("doc.columns.uom"),
-        width: 90,
+        initialWidth: 90,
       },
       filterConfig: { kind: "text" },
     },
@@ -293,7 +284,7 @@ function createItemsFieldCatalog(input: BuildItemsFieldCatalogInput): ItemFieldC
       colDef: {
         field: "purchasePrice",
         headerName: t("doc.columns.purchasePrice"),
-        width: 120,
+        initialWidth: 120,
         valueFormatter: (params) =>
           params.value != null && typeof params.value === "number" ? formatMoney(params.value, 2, "") : "",
       },
@@ -319,7 +310,7 @@ function createItemsFieldCatalog(input: BuildItemsFieldCatalogInput): ItemFieldC
       colDef: {
         field: "salePrice",
         headerName: t("doc.columns.salePrice"),
-        width: 100,
+        initialWidth: 100,
         valueFormatter: (params) =>
           params.value != null && typeof params.value === "number" ? formatMoney(params.value, 2, "") : "",
       },
@@ -345,8 +336,9 @@ function createItemsFieldCatalog(input: BuildItemsFieldCatalogInput): ItemFieldC
       colDef: {
         field: "isActive",
         headerName: t("doc.columns.active"),
-        width: 100,
-        cellRenderer: AgGridActiveBooleanCellRenderer,
+        initialWidth: 100,
+        cellDataType: false,
+        valueFormatter: (params) => (params.value ? yesLabel : noLabel),
       },
       filterConfig: { kind: "boolean" },
     },
@@ -371,8 +363,8 @@ function createItemsFieldCatalog(input: BuildItemsFieldCatalogInput): ItemFieldC
         field: "description",
         headerName: t("common.description"),
         minWidth: 180,
-        width: 220,
-        hide: true,
+        initialWidth: 220,
+        initialHide: true,
       },
       filterConfig: { kind: "text" },
     },
@@ -396,8 +388,8 @@ function createItemsFieldCatalog(input: BuildItemsFieldCatalogInput): ItemFieldC
       colDef: {
         field: "barcode",
         headerName: t("doc.columns.primaryBarcode"),
-        width: 150,
-        hide: true,
+        initialWidth: 150,
+        initialHide: true,
       },
       filterConfig: {
         kind: "text",
@@ -423,10 +415,9 @@ function createItemsFieldCatalog(input: BuildItemsFieldCatalogInput): ItemFieldC
       colDef: {
         colId: "barcodeCount",
         headerName: t("doc.columns.barcodeCount"),
-        width: 120,
+        initialWidth: 120,
         field: "barcodeCount",
-        cellRenderer: CountCellRenderer,
-        hide: true,
+        initialHide: true,
       },
       filterConfig: {
         kind: "number",
@@ -452,10 +443,11 @@ function createItemsFieldCatalog(input: BuildItemsFieldCatalogInput): ItemFieldC
       colDef: {
         colId: "hasBarcode",
         headerName: t("doc.columns.hasBarcode"),
-        width: 110,
+        initialWidth: 110,
         field: "hasBarcode",
+        cellDataType: false,
         valueFormatter: (params) => (params.value ? yesLabel : noLabel),
-        hide: true,
+        initialHide: true,
       },
       filterConfig: {
         kind: "boolean",
@@ -481,8 +473,8 @@ function createItemsFieldCatalog(input: BuildItemsFieldCatalogInput): ItemFieldC
       colDef: {
         field: "accountingProfile",
         headerName: t("master.item.accountingProfile"),
-        width: 170,
-        hide: true,
+        initialWidth: 170,
+        initialHide: true,
       },
       filterConfig: { kind: "text" },
     },
@@ -503,18 +495,17 @@ function createItemsFieldCatalog(input: BuildItemsFieldCatalogInput): ItemFieldC
         requiresPermission: null,
         performanceCost: "low",
       },
-            colDef: {
-              colId: "testerCount",
-              headerName: t("doc.columns.testerCount"),
-              width: 120,
-              field: "testerCount",
-              cellRenderer: CountCellRenderer,
-              hide: true,
-            },
-            filterConfig: {
-              kind: "number",
-            },
-          },
+      colDef: {
+        colId: "testerCount",
+        headerName: t("doc.columns.testerCount"),
+        initialWidth: 120,
+        field: "testerCount",
+        initialHide: true,
+      },
+      filterConfig: {
+        kind: "number",
+      },
+    },
     {
       registry: {
         fieldKey: "hasTesters",
@@ -532,18 +523,19 @@ function createItemsFieldCatalog(input: BuildItemsFieldCatalogInput): ItemFieldC
         requiresPermission: null,
         performanceCost: "low",
       },
-            colDef: {
-              colId: "hasTesters",
-              headerName: t("doc.columns.hasTesters"),
-              width: 120,
-              field: "hasTesters",
-              valueFormatter: (params) => (params.value ? yesLabel : noLabel),
-              hide: true,
-            },
-            filterConfig: {
-              kind: "boolean",
-            },
-          },
+      colDef: {
+        colId: "hasTesters",
+        headerName: t("doc.columns.hasTesters"),
+        initialWidth: 120,
+        field: "hasTesters",
+        cellDataType: false,
+        valueFormatter: (params) => (params.value ? yesLabel : noLabel),
+        initialHide: true,
+      },
+      filterConfig: {
+        kind: "boolean",
+      },
+    },
   ];
 }
 

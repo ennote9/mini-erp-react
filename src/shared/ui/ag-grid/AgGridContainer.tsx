@@ -9,8 +9,8 @@ type AgGridContainerProps = {
   children: ReactNode;
   /** Pass list-page gridRef to enable shared fill-width policy with manual-resize protection. */
   gridRef?: RefObject<AgGridReact<any> | null>;
-  /** Disable auto-fit/width-restore policy for diagnostic scenarios. */
-  disableAutoFit?: boolean;
+  /** Width/layout policy for the wrapped grid. */
+  fitWidthMode?: "managed" | "initial-only";
 };
 
 /**
@@ -19,7 +19,7 @@ type AgGridContainerProps = {
  * is applied via themeClass in App.css.
  */
 export const AgGridContainer = forwardRef<HTMLDivElement, AgGridContainerProps>(
-  function AgGridContainer({ themeClass, children, gridRef, disableAutoFit = false }, ref) {
+  function AgGridContainer({ themeClass, children, gridRef, fitWidthMode = "managed" }, ref) {
     const { settings } = useSettings();
     const localRef = useRef<HTMLDivElement | null>(null);
     const isLight =
@@ -44,7 +44,7 @@ export const AgGridContainer = forwardRef<HTMLDivElement, AgGridContainerProps>(
      * 3) stop auto-fit after user manual column resize in this grid instance.
      */
     useEffect(() => {
-      if (!gridRef || disableAutoFit) return;
+      if (!gridRef) return;
       const container = localRef.current;
       if (!container || typeof window === "undefined") return;
 
@@ -53,12 +53,14 @@ export const AgGridContainer = forwardRef<HTMLDivElement, AgGridContainerProps>(
       let cancelled = false;
       let attachedApi: AnyGridApi | null = null;
       let lastFittedWidth = -1;
+      let initialFitComplete = false;
       const autoFitEnabledRef = { current: true };
       const MEANINGFUL_WIDTH_DELTA = 20;
       const lastKnownColumnWidthsRef = { current: [] as Array<{ colId: string; width: number }> };
       const restoringColumnStateRef = { current: false };
 
       const onColumnResized = (event: any) => {
+        if (fitWidthMode === "initial-only") return;
         const api = getApi();
         const source = typeof event?.source === "string" ? event.source.toLowerCase() : "";
         if (api?.getColumnState) {
@@ -96,6 +98,7 @@ export const AgGridContainer = forwardRef<HTMLDivElement, AgGridContainerProps>(
       };
 
       const restoreColumnWidthsSnapshot = () => {
+        if (fitWidthMode === "initial-only") return;
         const api = getApi();
         if (!api?.applyColumnState) return;
         const widths = lastKnownColumnWidthsRef.current;
@@ -126,6 +129,7 @@ export const AgGridContainer = forwardRef<HTMLDivElement, AgGridContainerProps>(
       };
 
       const attachColumnResizeListener = () => {
+        if (fitWidthMode === "initial-only") return;
         const api = getApi();
         if (!api || api === attachedApi) return;
         attachedApi?.removeEventListener?.("columnResized", onColumnResized);
@@ -157,17 +161,25 @@ export const AgGridContainer = forwardRef<HTMLDivElement, AgGridContainerProps>(
         if (!api) return;
         attachColumnResizeListener();
 
-        api.doLayout?.();
-        api.refreshHeader?.();
+        if (fitWidthMode === "managed") {
+          api.doLayout?.();
+          api.refreshHeader?.();
+        }
 
         if (!autoFitEnabledRef.current) return;
+        if (fitWidthMode === "initial-only" && initialFitComplete) return;
         const widthChanged = Math.abs(width - lastFittedWidth) >= MEANINGFUL_WIDTH_DELTA;
-        const staleDeadArea = allowStaleRecovery ? hasStaleRightDeadArea() : false;
+        const staleDeadArea =
+          fitWidthMode === "managed" && allowStaleRecovery ? hasStaleRightDeadArea() : false;
         if (!widthChanged && !staleDeadArea) {
           return;
         }
         lastFittedWidth = width;
         api.sizeColumnsToFit?.();
+        if (fitWidthMode === "initial-only") {
+          initialFitComplete = true;
+          return;
+        }
         if (api.getColumnState) {
           const widths = api
             .getColumnState()
@@ -254,7 +266,7 @@ export const AgGridContainer = forwardRef<HTMLDivElement, AgGridContainerProps>(
         window.removeEventListener("popstate", onPopState);
         document.removeEventListener("visibilitychange", onVisibility);
       };
-    }, [gridRef]);
+    }, [fitWidthMode, gridRef]);
 
     const setRefs = useCallback(
       (node: HTMLDivElement | null) => {

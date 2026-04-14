@@ -862,7 +862,7 @@ export function decorateAgGridColumnDefsWithFilters<T>(
     }
     const params: HeaderParams = existingParams && existingParams.config === filterConfig && existingParams.bridge === filterBridge
       ? existingParams.params
-      : { filterConfig, filterBridge };
+      : ({ filterConfig, filterBridge } as HeaderParams);
     paramsCache.set(colId, { config: filterConfig, bridge: filterBridge, params });
     return {
       ...columnDef,

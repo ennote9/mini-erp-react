@@ -139,7 +139,7 @@ export function ItemsListPage() {
   );
   const [runtimeSortSerialized, setRuntimeSortSerialized] = useState(() => serializeUrlGridSort(initialSortModel));
 
-  const onSelectionChanged = useCallback((e: SelectionChangedEvent<Item>) => {
+  const onSelectionChanged = useCallback((e: SelectionChangedEvent<ItemListRow>) => {
     setSelectedCount(e.api.getSelectedRows().length);
   }, []);
 
@@ -441,45 +441,26 @@ export function ItemsListPage() {
     handleResetColumnFilter,
   );
 
-  const lightweightHeaders = searchParams.get("lightHeaders") === "1";
-  const suppressColumnVirtualisation = searchParams.get("noColVirt") === "1";
-  const disableCellTextSelection = searchParams.get("noCellTextSelection") === "1";
-  const disableGridAutoFit = searchParams.get("noGridAutoFit") === "1";
-  const lightCells = searchParams.get("lightCells") === "1";
   const columnDefs = useMemo(
     () =>
-      lightweightHeaders
-        ? settingsAwareBaseColumnDefs
-        : decorateAgGridColumnDefsWithFilters(
-            settingsAwareBaseColumnDefs,
-            itemColumnFilterConfigs,
-            columnFilterBridge,
-          ),
+      decorateAgGridColumnDefsWithFilters(
+        settingsAwareBaseColumnDefs,
+        itemColumnFilterConfigs,
+        columnFilterBridge,
+      ),
     [
-      lightweightHeaders,
       settingsAwareBaseColumnDefs,
       itemColumnFilterConfigs,
       columnFilterBridge,
     ],
   );
-  const strippedColumnDefs = useMemo(() => {
-    if (!lightCells) return columnDefs;
-    return columnDefs.map((def) => ({
-      ...def,
-      cellRenderer: undefined,
-      cellRendererSelector: undefined,
-      cellRendererParams: undefined,
-      valueFormatter: undefined,
-      valueFormatterParams: undefined,
-    }));
-  }, [columnDefs, lightCells]);
 
   useEffect(() => {
     const api = gridRef.current?.api;
     if (!api) return;
     applyUrlGridSort(api, effectiveSortModel);
     api.refreshClientSideRowModel("sort");
-  }, [strippedColumnDefs, effectiveSortModel]);
+  }, [columnDefs, effectiveSortModel]);
 
   useEffect(() => {
     if (deepSortModel.length === 0) return;
@@ -575,7 +556,6 @@ export function ItemsListPage() {
     setPendingRowData(nextRows);
     if (api) {
       applyUrlGridSort(api, nextSortModel);
-      api.setRowData(nextRows);
       api.refreshClientSideRowModel("sort");
     }
   }, [
@@ -627,16 +607,14 @@ export function ItemsListPage() {
         ref={gridContainerRef}
         themeClass="items-grid"
         gridRef={gridRef}
-        disableAutoFit={disableGridAutoFit}
+        fitWidthMode="initial-only"
       >
         <AgGridReact<ItemListRow>
           {...agGridDefaultGridOptions}
           ref={gridRef}
           rowData={pendingRowData ?? displayItems}
-          columnDefs={strippedColumnDefs}
+          columnDefs={columnDefs}
           defaultColDef={agGridDefaultColDef}
-          suppressColumnVirtualisation={suppressColumnVirtualisation}
-          enableCellTextSelection={!disableCellTextSelection}
           overlayNoRowsTemplate={noRowsOverlayTemplate}
           onGridReady={(event) => {
             applyUrlGridSort(event.api, effectiveSortModel);
