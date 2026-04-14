@@ -538,12 +538,13 @@ function AgGridColumnFilterHeader(props: HeaderParams) {
     }
   }, [open, config, filterClause]);
 
-  const options = useMemo(() => config?.options ?? [], [config]);
+  const options = useMemo(() => (open ? config?.options ?? [] : []), [config, open]);
   const visibleOptions = useMemo(() => {
+    if (!open) return [];
     const q = optionSearch.trim().toLowerCase();
     if (!q) return options;
     return options.filter((option) => option.label.toLowerCase().includes(q));
-  }, [options, optionSearch]);
+  }, [options, optionSearch, open]);
 
   if (!config) {
     return <span className="truncate">{props.displayName}</span>;
@@ -742,91 +743,99 @@ function AgGridColumnFilterHeader(props: HeaderParams) {
           </PopoverTrigger>
         </div>
       </PopoverAnchor>
-      <PopoverContent
-        align="start"
-        side="bottom"
-        sideOffset={2}
-        className="w-[17.5rem] space-y-2 p-2.5"
-        onOpenAutoFocus={(event) => event.preventDefault()}
-      >
-        <div className="space-y-0.5">
-          <div className="text-sm font-semibold leading-none">{props.displayName}</div>
-          <div className="text-[11px] leading-snug text-muted-foreground">
-            {uiLabel(t, "gridFilters.columnMenuDescription", "Sort and filter this column")}
+      {open ? (
+        <PopoverContent
+          align="start"
+          side="bottom"
+          sideOffset={2}
+          className="w-[17.5rem] space-y-2 p-2.5"
+          onOpenAutoFocus={(event) => event.preventDefault()}
+        >
+          <div className="space-y-0.5">
+            <div className="text-sm font-semibold leading-none">{props.displayName}</div>
+            <div className="text-[11px] leading-snug text-muted-foreground">
+              {uiLabel(t, "gridFilters.columnMenuDescription", "Sort and filter this column")}
+            </div>
           </div>
-        </div>
-        <div className="space-y-1.5 border-b border-border pb-2">
-          <div className="text-[11px] font-medium text-muted-foreground">
-            {uiLabel(t, "gridFilters.sortSection", "Sort")}
+          <div className="space-y-1.5 border-b border-border pb-2">
+            <div className="text-[11px] font-medium text-muted-foreground">
+              {uiLabel(t, "gridFilters.sortSection", "Sort")}
+            </div>
+            <div className="grid grid-cols-1 gap-1">
+              <Button
+                type="button"
+                variant={sortDirection === "asc" ? "default" : "outline"}
+                size="sm"
+                className="h-7 justify-start px-2 text-xs"
+                onClick={() => applySort("asc")}
+              >
+                <ArrowUp className="mr-1.5 h-3 w-3" />
+                {sortActionLabel(t, "asc")}
+              </Button>
+              <Button
+                type="button"
+                variant={sortDirection === "desc" ? "default" : "outline"}
+                size="sm"
+                className="h-7 justify-start px-2 text-xs"
+                onClick={() => applySort("desc")}
+              >
+                <ArrowDown className="mr-1.5 h-3 w-3" />
+                {sortActionLabel(t, "desc")}
+              </Button>
+              <Button
+                type="button"
+                variant={sortDirection === null ? "default" : "outline"}
+                size="sm"
+                className="h-7 justify-start px-2 text-xs"
+                onClick={() => applySort(null)}
+              >
+                <ArrowUpDown className="mr-1.5 h-3 w-3" />
+                {sortActionLabel(t, "clear")}
+              </Button>
+            </div>
           </div>
-          <div className="grid grid-cols-1 gap-1">
-            <Button
-              type="button"
-              variant={sortDirection === "asc" ? "default" : "outline"}
-              size="sm"
-              className="h-7 justify-start px-2 text-xs"
-              onClick={() => applySort("asc")}
+          <div className="space-y-1">
+            <div className="text-[11px] font-medium text-muted-foreground">
+              {uiLabel(t, "gridFilters.filterSection", "Filter")}
+            </div>
+            <Label className="text-[11px]">{uiLabel(t, "gridFilters.operatorLabel", "Operator")}</Label>
+            <select
+              className="h-7 w-full rounded-md border border-input bg-background px-2 text-xs text-foreground"
+              value={draft.operator}
+              onChange={(event) =>
+                setDraft({
+                  operator: event.target.value as AgGridFilterOperator,
+                  value: "",
+                  valueTo: "",
+                  values: [],
+                })
+              }
             >
-              <ArrowUp className="mr-1.5 h-3 w-3" />
-              {sortActionLabel(t, "asc")}
+              {operators.map((operator) => (
+                <option key={operator} value={operator}>
+                  {operatorLabel(t, operator)}
+                </option>
+              ))}
+            </select>
+          </div>
+          {renderValueInputs()}
+          <div className="flex items-center justify-end gap-1.5">
+            <Button type="button" variant="outline" size="sm" className="h-7 px-2 text-xs" onClick={resetDraft}>
+              {uiLabel(t, "gridFilters.reset", "Reset")}
             </Button>
             <Button
               type="button"
-              variant={sortDirection === "desc" ? "default" : "outline"}
               size="sm"
-              className="h-7 justify-start px-2 text-xs"
-              onClick={() => applySort("desc")}
+              className="h-7 px-2 text-xs"
+              disabled={!isDraftComplete(draft)}
+              onClick={applyDraft}
             >
-              <ArrowDown className="mr-1.5 h-3 w-3" />
-              {sortActionLabel(t, "desc")}
-            </Button>
-            <Button
-              type="button"
-              variant={sortDirection === null ? "default" : "outline"}
-              size="sm"
-              className="h-7 justify-start px-2 text-xs"
-              onClick={() => applySort(null)}
-            >
-              <ArrowUpDown className="mr-1.5 h-3 w-3" />
-              {sortActionLabel(t, "clear")}
+              <Check className="mr-1 h-3 w-3" />
+              {uiLabel(t, "gridFilters.ok", "OK")}
             </Button>
           </div>
-        </div>
-        <div className="space-y-1">
-          <div className="text-[11px] font-medium text-muted-foreground">
-            {uiLabel(t, "gridFilters.filterSection", "Filter")}
-          </div>
-          <Label className="text-[11px]">{uiLabel(t, "gridFilters.operatorLabel", "Operator")}</Label>
-          <select
-            className="h-7 w-full rounded-md border border-input bg-background px-2 text-xs text-foreground"
-            value={draft.operator}
-            onChange={(event) =>
-              setDraft({
-                operator: event.target.value as AgGridFilterOperator,
-                value: "",
-                valueTo: "",
-                values: [],
-              })
-            }
-          >
-            {operators.map((operator) => (
-              <option key={operator} value={operator}>
-                {operatorLabel(t, operator)}
-              </option>
-            ))}
-          </select>
-        </div>
-        {renderValueInputs()}
-        <div className="flex items-center justify-end gap-1.5">
-          <Button type="button" variant="outline" size="sm" className="h-7 px-2 text-xs" onClick={resetDraft}>
-            {uiLabel(t, "gridFilters.reset", "Reset")}
-          </Button>
-          <Button type="button" size="sm" className="h-7 px-2 text-xs" disabled={!isDraftComplete(draft)} onClick={applyDraft}>
-            <Check className="mr-1 h-3 w-3" />
-            {uiLabel(t, "gridFilters.ok", "OK")}
-          </Button>
-        </div>
-      </PopoverContent>
+        </PopoverContent>
+      ) : null}
     </Popover>
   );
 }
