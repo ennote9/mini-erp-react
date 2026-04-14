@@ -441,25 +441,45 @@ export function ItemsListPage() {
     handleResetColumnFilter,
   );
 
+  const lightweightHeaders = searchParams.get("lightHeaders") === "1";
+  const suppressColumnVirtualisation = searchParams.get("noColVirt") === "1";
+  const disableCellTextSelection = searchParams.get("noCellTextSelection") === "1";
+  const disableGridAutoFit = searchParams.get("noGridAutoFit") === "1";
+  const lightCells = searchParams.get("lightCells") === "1";
   const columnDefs = useMemo(
     () =>
-      decorateAgGridColumnDefsWithFilters(
-        settingsAwareBaseColumnDefs,
-        itemColumnFilterConfigs,
-        columnFilterBridge,
-      ),
+      lightweightHeaders
+        ? settingsAwareBaseColumnDefs
+        : decorateAgGridColumnDefsWithFilters(
+            settingsAwareBaseColumnDefs,
+            itemColumnFilterConfigs,
+            columnFilterBridge,
+          ),
     [
+      lightweightHeaders,
       settingsAwareBaseColumnDefs,
       itemColumnFilterConfigs,
       columnFilterBridge,
     ],
   );
+  const strippedColumnDefs = useMemo(() => {
+    if (!lightCells) return columnDefs;
+    return columnDefs.map((def) => ({
+      ...def,
+      cellRenderer: undefined,
+      cellRendererSelector: undefined,
+      cellRendererParams: undefined,
+      valueFormatter: undefined,
+      valueFormatterParams: undefined,
+    }));
+  }, [columnDefs, lightCells]);
+
   useEffect(() => {
     const api = gridRef.current?.api;
     if (!api) return;
     applyUrlGridSort(api, effectiveSortModel);
     api.refreshClientSideRowModel("sort");
-  }, [columnDefs, effectiveSortModel]);
+  }, [strippedColumnDefs, effectiveSortModel]);
 
   useEffect(() => {
     if (deepSortModel.length === 0) return;
@@ -603,13 +623,20 @@ export function ItemsListPage() {
           </Link>
         </div>
       ) : null}
-      <AgGridContainer ref={gridContainerRef} themeClass="items-grid" gridRef={gridRef}>
+      <AgGridContainer
+        ref={gridContainerRef}
+        themeClass="items-grid"
+        gridRef={gridRef}
+        disableAutoFit={disableGridAutoFit}
+      >
         <AgGridReact<ItemListRow>
           {...agGridDefaultGridOptions}
           ref={gridRef}
           rowData={pendingRowData ?? displayItems}
-          columnDefs={columnDefs}
+          columnDefs={strippedColumnDefs}
           defaultColDef={agGridDefaultColDef}
+          suppressColumnVirtualisation={suppressColumnVirtualisation}
+          enableCellTextSelection={!disableCellTextSelection}
           overlayNoRowsTemplate={noRowsOverlayTemplate}
           onGridReady={(event) => {
             applyUrlGridSort(event.api, effectiveSortModel);

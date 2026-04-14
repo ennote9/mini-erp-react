@@ -9,6 +9,8 @@ type AgGridContainerProps = {
   children: ReactNode;
   /** Pass list-page gridRef to enable shared fill-width policy with manual-resize protection. */
   gridRef?: RefObject<AgGridReact<any> | null>;
+  /** Disable auto-fit/width-restore policy for diagnostic scenarios. */
+  disableAutoFit?: boolean;
 };
 
 /**
@@ -17,7 +19,7 @@ type AgGridContainerProps = {
  * is applied via themeClass in App.css.
  */
 export const AgGridContainer = forwardRef<HTMLDivElement, AgGridContainerProps>(
-  function AgGridContainer({ themeClass, children, gridRef }, ref) {
+  function AgGridContainer({ themeClass, children, gridRef, disableAutoFit = false }, ref) {
     const { settings } = useSettings();
     const localRef = useRef<HTMLDivElement | null>(null);
     const isLight =
@@ -42,7 +44,7 @@ export const AgGridContainer = forwardRef<HTMLDivElement, AgGridContainerProps>(
      * 3) stop auto-fit after user manual column resize in this grid instance.
      */
     useEffect(() => {
-      if (!gridRef) return;
+      if (!gridRef || disableAutoFit) return;
       const container = localRef.current;
       if (!container || typeof window === "undefined") return;
 
