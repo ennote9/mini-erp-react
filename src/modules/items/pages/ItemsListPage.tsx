@@ -29,7 +29,7 @@ import { ListPageSearch } from "../../../shared/ui/list/ListPageSearch";
 import { useListPageSearchHotkey } from "../../../shared/hotkeys";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { ChevronDown, FileSpreadsheet, File, FolderOpen, X } from "lucide-react";
+import { ChevronDown, FileSpreadsheet, File, FolderOpen, SlidersHorizontal, X } from "lucide-react";
 import { save } from "@tauri-apps/plugin-dialog";
 import { invoke } from "@tauri-apps/api/core";
 import { revealItemInDir } from "@tauri-apps/plugin-opener";
@@ -1138,9 +1138,11 @@ export function ItemsListPage() {
               type="button"
               variant="outline"
               size="sm"
-              className="h-[1.625rem] shrink-0"
+              data-icon="inline-start"
+              className="h-[1.625rem] shrink-0 !gap-0.5"
               onClick={openColumnSettings}
             >
+              <SlidersHorizontal className="h-4 w-4 shrink-0" aria-hidden />
               {t("doc.list.viewSettings")}
             </Button>
             <Button
