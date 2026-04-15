@@ -5,6 +5,7 @@ import {
   type ColumnSizingState,
   type OnChangeFn,
   type SortingState,
+  type Table,
   type VisibilityState,
 } from "@tanstack/react-table";
 import type { RefObject } from "react";
@@ -15,6 +16,38 @@ import type { TFunction } from "@/shared/i18n";
 import type { ItemListRow } from "./listViewRowModel";
 import type { ItemsTableColumnSchema } from "./itemsTableSchema";
 import { buildItemsTanstackColumns } from "./itemsTanstackColumns";
+
+/**
+ * Right edge of the resized column in table coordinates, from TanStack's transient
+ * `columnSizingInfo` (updated during drag even when `columnResizeMode` is `onEnd`).
+ */
+function getColumnResizeGuideLeftPx(table: Table<ItemListRow>): number | null {
+  const info = table.getState().columnSizingInfo;
+  const columnId = info.isResizingColumn;
+  if (!columnId || typeof columnId !== "string" || info.columnSizingStart.length === 0) {
+    return null;
+  }
+
+  const headerGroup = table.getHeaderGroups()[0];
+  if (!headerGroup) return null;
+
+  const header = headerGroup.headers.find((h) => h.column.id === columnId);
+  if (!header) return null;
+
+  const startPair = info.columnSizingStart.find(([id]) => id === columnId);
+  if (!startPair) return null;
+
+  const [, startW] = startPair;
+  if (startW <= 0) return null;
+
+  const deltaP = info.deltaPercentage ?? 0;
+  const rawNew = startW + startW * deltaP;
+  const min = header.column.columnDef.minSize ?? 20;
+  const max = header.column.columnDef.maxSize ?? Number.MAX_SAFE_INTEGER;
+  const newW = Math.min(Math.max(Math.round(rawNew * 100) / 100, min), max);
+
+  return header.getStart() + newW;
+}
 
 type ItemsTanstackTableProps = {
   rows: ItemListRow[];
@@ -84,6 +117,8 @@ export function ItemsTanstackTable(props: ItemsTanstackTableProps) {
     [schema],
   );
 
+  const resizeGuideLeftPx = getColumnResizeGuideLeftPx(table);
+
   return (
     <div
       className={cn(
@@ -96,10 +131,18 @@ export function ItemsTanstackTable(props: ItemsTanstackTableProps) {
         className="min-h-0 min-w-0 flex-1 overflow-auto"
         data-items-table-scroll
       >
-        <table
-          className="w-full border-collapse table-fixed text-[12px] leading-tight"
-          style={{ width: Math.max(totalWidth, 960) }}
-        >
+        <div className="relative inline-block align-top" style={{ width: Math.max(totalWidth, 960) }}>
+          {resizeGuideLeftPx != null ? (
+            <div
+              aria-hidden
+              className="pointer-events-none absolute inset-y-0 z-[20] w-px bg-border/80"
+              style={{ left: resizeGuideLeftPx }}
+            />
+          ) : null}
+          <table
+            className="w-full border-collapse table-fixed text-[12px] leading-tight"
+            style={{ width: Math.max(totalWidth, 960) }}
+          >
           <colgroup>
             {visibleLeafColumns.map((column) => (
               <col key={column.id} style={{ width: column.getSize() }} />
@@ -218,10 +261,9 @@ export function ItemsTanstackTable(props: ItemsTanstackTableProps) {
                             event.stopPropagation();
                             header.getResizeHandler()(event);
                           }}
-                          className="absolute right-0 top-0 h-full w-2 cursor-col-resize select-none touch-none opacity-0 transition-opacity group-hover:opacity-100"
-                        >
-                          <div className="mx-auto h-full w-px bg-border/80" />
-                        </div>
+                          className="absolute right-0 top-0 z-[1] h-full w-2 cursor-col-resize select-none touch-none"
+                          aria-hidden
+                        />
                       ) : null}
                     </th>
                   );
@@ -271,7 +313,8 @@ export function ItemsTanstackTable(props: ItemsTanstackTableProps) {
               })
             )}
           </tbody>
-        </table>
+          </table>
+        </div>
       </div>
     </div>
   );
