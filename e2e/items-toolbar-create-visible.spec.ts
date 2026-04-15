@@ -4,6 +4,40 @@ import { test, expect, type Page, type Locator } from "@playwright/test";
 const ITEMS_URL =
   process.env.PLAYWRIGHT_ITEMS_URL ?? "http://localhost:1420/items";
 
+/**
+ * Items table schema defines ~19 logical columns (see `itemsTableSchema.ts`).
+ * "Enable all" in the modal must surface most of them in the header row.
+ */
+const MIN_VISIBLE_HEADER_CELLS = Number(process.env.PLAYWRIGHT_MIN_VISIBLE_COLUMNS ?? "15");
+
+const MIN_TABLE_OVERFLOW_PX = Number(process.env.PLAYWRIGHT_MIN_TABLE_OVERFLOW_PX ?? "40");
+
+type BoxMetrics = {
+  clientWidth: number;
+  scrollWidth: number;
+  clientHeight: number;
+  scrollHeight: number;
+  horizOverflow: boolean;
+  vertOverflow: boolean;
+  rect: { left: number; right: number; top: number; bottom: number; width: number; height: number };
+};
+
+type LayoutSnapshot = {
+  innerWidth: number;
+  innerHeight: number;
+  visibleHeaderCellCount: number;
+  tableHost: (BoxMetrics & { scrollOverflowPx: number }) | null;
+  controls: BoxMetrics | null;
+  actionCluster: BoxMetrics | null;
+  create: BoxMetrics & {
+    outer: BoxMetrics["rect"];
+    fullyInsideActionCluster: boolean;
+    fullyInsideControls: boolean;
+    /** Intersection width of Create rect with action cluster visible rect (screen coords). */
+    intersectClusterWidth: number;
+  } | null;
+};
+
 type CreateButtonAudit = {
   clientWidth: number;
   scrollWidth: number;
@@ -12,7 +46,6 @@ type CreateButtonAudit = {
   horizontalInternalOverflow: boolean;
   verticalInternalOverflow: boolean;
   innerTextTrimmed: string;
-  /** Non-whitespace text ranges inside the button (label + any other text). */
   textFragments: Array<{
     text: string;
     width: number;
@@ -23,12 +56,110 @@ type CreateButtonAudit = {
     bottom: number;
     fullyInsideButton: boolean;
   }>;
-  /** True if there is a readable label fragment (not icon-only / clipped text). */
   hasReadableLabelFragment: boolean;
   outer: { left: number; right: number; top: number; bottom: number; width: number; height: number };
   innerWidth: number;
   outerInViewport: boolean;
 };
+
+async function collectLayoutSnapshot(page: Page): Promise<LayoutSnapshot> {
+  return page.evaluate(() => {
+    function metrics(el: HTMLElement | null): BoxMetrics | null {
+      if (!el) return null;
+      const r = el.getBoundingClientRect();
+      return {
+        clientWidth: el.clientWidth,
+        scrollWidth: el.scrollWidth,
+        clientHeight: el.clientHeight,
+        scrollHeight: el.scrollHeight,
+        horizOverflow: el.scrollWidth > el.clientWidth + 1,
+        vertOverflow: el.scrollHeight > el.clientHeight + 1,
+        rect: {
+          left: r.left,
+          right: r.right,
+          top: r.top,
+          bottom: r.bottom,
+          width: r.width,
+          height: r.height,
+        },
+      };
+    }
+
+    const innerWidth = window.innerWidth;
+    const innerHeight = window.innerHeight;
+
+    const tableHost = document.querySelector("[data-items-table-scroll]") as HTMLElement | null;
+    const headerRow = tableHost?.querySelector("thead tr");
+    const visibleHeaderCellCount = headerRow ? headerRow.querySelectorAll("th").length : 0;
+
+    const thm = metrics(tableHost);
+    const tableHostMetrics = thm
+      ? {
+          ...thm,
+          scrollOverflowPx: thm.scrollWidth - thm.clientWidth,
+        }
+      : null;
+
+    const controls = document.querySelector(".list-page__controls") as HTMLElement | null;
+    const actionCluster = document.querySelector(
+      ".list-page__toolbar-actions-cluster",
+    ) as HTMLElement | null;
+    const createEl = document.querySelector(
+      ".list-page__controls .list-page__create-btn",
+    ) as HTMLElement | null;
+
+    let create: LayoutSnapshot["create"] = null;
+    if (createEl) {
+      const cm = metrics(createEl);
+      if (cm) {
+        const cr = createEl.getBoundingClientRect();
+        const kr = actionCluster?.getBoundingClientRect();
+        const pr = controls?.getBoundingClientRect();
+
+        const intersectWidth = (() => {
+          if (!actionCluster || !kr) return 0;
+          const left = Math.max(cr.left, kr.left);
+          const right = Math.min(cr.right, kr.right);
+          return Math.max(0, right - left);
+        })();
+
+        const fullyInsideActionCluster =
+          !!actionCluster &&
+          !!kr &&
+          cr.left >= kr.left - 2 &&
+          cr.right <= kr.right + 2 &&
+          cr.top >= kr.top - 2 &&
+          cr.bottom <= kr.bottom + 2;
+
+        const fullyInsideControls =
+          !!controls &&
+          !!pr &&
+          cr.left >= pr.left - 2 &&
+          cr.right <= pr.right + 2 &&
+          cr.top >= pr.top - 2 &&
+          cr.bottom <= pr.bottom + 2;
+
+        create = {
+          ...cm,
+          outer: cm.rect,
+          fullyInsideActionCluster,
+          fullyInsideControls,
+          intersectClusterWidth: intersectWidth,
+        };
+      }
+    }
+
+    return {
+      innerWidth,
+      innerHeight,
+      visibleHeaderCellCount,
+      tableHost: tableHostMetrics,
+      controls: metrics(controls),
+      actionCluster: metrics(actionCluster),
+      create,
+    };
+  });
+}
 
 async function enableAllColumnsViaModal(page: Page) {
   await page.waitForLoadState("networkidle").catch(() => {});
@@ -49,7 +180,7 @@ async function enableAllColumnsViaModal(page: Page) {
   const dialog = page.locator('[role="dialog"]').first();
   await expect(dialog, "Column settings dialog").toBeVisible({ timeout: 15_000 });
 
-  /** Field visibility uses Radix `Switch` → `role="switch"`, not `<input type="checkbox">`. */
+  /** Field visibility uses Radix `Switch` → `role="switch"`. */
   const switches = dialog.locator('[role="switch"]');
   const n = await switches.count();
   expect(n, "At least one column visibility switch").toBeGreaterThan(0);
@@ -67,7 +198,7 @@ async function enableAllColumnsViaModal(page: Page) {
   await apply.click();
 
   await expect(dialog).toBeHidden({ timeout: 15_000 });
-  await page.waitForTimeout(500);
+  await page.waitForTimeout(600);
 }
 
 async function auditCreateButton(locator: Locator): Promise<CreateButtonAudit> {
@@ -184,8 +315,54 @@ async function assertCreateButtonUsable(
   ).toBeGreaterThanOrEqual(52);
 }
 
+async function assertLayoutStressAndToolbarHealth(
+  layout: LayoutSnapshot,
+  viewportLabel: string,
+  testInfo: import("@playwright/test").TestInfo,
+) {
+  await testInfo.attach(`${viewportLabel}-layout-snapshot.json`, {
+    body: JSON.stringify(layout, null, 2),
+    contentType: "application/json",
+  });
+
+  expect(
+    layout.visibleHeaderCellCount,
+    `${viewportLabel}: Expected many visible columns after "enable all" (>=${MIN_VISIBLE_HEADER_CELLS}), got ${layout.visibleHeaderCellCount}`,
+  ).toBeGreaterThanOrEqual(MIN_VISIBLE_HEADER_CELLS);
+
+  expect(layout.tableHost, `${viewportLabel}: Table scroll host missing`).toBeTruthy();
+  expect(
+    layout.tableHost!.scrollOverflowPx,
+    `${viewportLabel}: Table must be in horizontal overflow (wide grid stress). scrollWidth-clientWidth=${layout.tableHost!.scrollOverflowPx}`,
+  ).toBeGreaterThanOrEqual(MIN_TABLE_OVERFLOW_PX);
+
+  expect(layout.controls, `${viewportLabel}: .list-page__controls missing`).toBeTruthy();
+  expect(
+    layout.controls!.horizOverflow,
+    `${viewportLabel}: Controls row must not overflow horizontally (scrollWidth ${layout.controls!.scrollWidth} vs clientWidth ${layout.controls!.clientWidth})`,
+  ).toBe(false);
+
+  expect(layout.actionCluster, `${viewportLabel}: Action cluster missing`).toBeTruthy();
+  expect(layout.create, `${viewportLabel}: Create button metrics missing`).toBeTruthy();
+
+  expect(
+    layout.create!.fullyInsideControls,
+    `${viewportLabel}: Create must lie fully inside .list-page__controls`,
+  ).toBe(true);
+
+  expect(
+    layout.create!.fullyInsideActionCluster,
+    `${viewportLabel}: Create must lie fully inside .list-page__toolbar-actions-cluster (not pushed past cluster edge)`,
+  ).toBe(true);
+
+  expect(
+    layout.create!.intersectClusterWidth,
+    `${viewportLabel}: Create should visibly overlap the action cluster (intersection width)`,
+  ).toBeGreaterThanOrEqual(40);
+}
+
 test.describe("Items /items toolbar — Create not clipped", () => {
-  test("Create: viewport + internal layout (no label clip / collapse)", async ({ page }, testInfo) => {
+  test("stress: many columns + wide table + toolbar metrics + Create usability", async ({ page }, testInfo) => {
     await page.setViewportSize({ width: 560, height: 900 });
     const response = await page.goto(ITEMS_URL, {
       waitUntil: "domcontentloaded",
@@ -199,14 +376,35 @@ test.describe("Items /items toolbar — Create not clipped", () => {
     const create = page.locator(".list-page__controls .list-page__create-btn").first();
     await create.waitFor({ state: "visible", timeout: 45_000 });
 
+    const layoutBefore = await collectLayoutSnapshot(page);
+    await testInfo.attach("layout-before-modal.json", {
+      body: JSON.stringify(layoutBefore, null, 2),
+      contentType: "application/json",
+    });
+
     await enableAllColumnsViaModal(page);
 
-    const widths = [480, 420, 380, 340, 300, 280];
+    const layoutAfterApply = await collectLayoutSnapshot(page);
+    await testInfo.attach("layout-after-apply-all-columns.json", {
+      body: JSON.stringify(layoutAfterApply, null, 2),
+      contentType: "application/json",
+    });
+
+    expect(
+      layoutAfterApply.visibleHeaderCellCount,
+      `After apply: visible headers (${layoutAfterApply.visibleHeaderCellCount}) must be >= ${MIN_VISIBLE_HEADER_CELLS} (was ${layoutBefore.visibleHeaderCellCount} before modal)`,
+    ).toBeGreaterThanOrEqual(MIN_VISIBLE_HEADER_CELLS);
+
+    const widths = [
+      520, 500, 480, 460, 440, 420, 400, 380, 360, 340, 320, 300, 280, 260, 240,
+    ];
     for (const width of widths) {
       const label = `w${width}`;
       await page.setViewportSize({ width, height: 900 });
-      await page.waitForTimeout(350);
+      await page.waitForTimeout(320);
 
+      const layout = await collectLayoutSnapshot(page);
+      await assertLayoutStressAndToolbarHealth(layout, label, testInfo);
       await assertCreateButtonUsable(create, label, testInfo);
 
       await page.screenshot({
