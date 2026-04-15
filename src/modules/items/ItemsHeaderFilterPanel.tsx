@@ -147,24 +147,24 @@ export function ItemsHeaderFilterPanel(props: Props) {
           />
         </PopoverAnchor>
       ) : null}
-      <PopoverContent align="end" side="bottom" sideOffset={8} className="w-56 p-3">
-        <PopoverHeader className="mb-1.5 gap-0.5 text-xs">
-          <PopoverTitle className="text-xs font-semibold leading-tight">
+      <PopoverContent align="end" side="bottom" sideOffset={8} className="w-48 p-2">
+        <PopoverHeader className="mb-1 gap-0 text-[11px] leading-tight">
+          <PopoverTitle className="text-[11px] font-semibold leading-tight">
             {field?.label ?? t("doc.list.viewTabFiltering")}
           </PopoverTitle>
-          <PopoverDescription className="text-[11px] leading-snug">
+          <PopoverDescription className="text-[10px] leading-tight text-muted-foreground">
             {t("doc.list.viewTabFiltering")}
           </PopoverDescription>
         </PopoverHeader>
 
         {!field || !draft ? (
-          <div className="text-xs text-muted-foreground">{t("common.noData")}</div>
+          <div className="text-[11px] leading-snug text-muted-foreground">{t("common.noData")}</div>
         ) : (
-          <div className="space-y-2">
-            <div className="space-y-1">
-              <Label className="text-[11px] leading-tight">{t("gridFilters.operatorLabel")}</Label>
+          <div className="space-y-1.5">
+            <div className="space-y-0.5">
+              <Label className="text-[10px] font-medium leading-tight">{t("gridFilters.operatorLabel")}</Label>
               <select
-                className="h-7 w-full rounded-md border border-input bg-background px-2 text-xs text-foreground"
+                className="h-6 w-full rounded-sm border border-input bg-background px-1.5 text-[11px] text-foreground"
                 value={draft.operator}
                 onChange={(event) =>
                   setDraft((current) =>
@@ -189,10 +189,10 @@ export function ItemsHeaderFilterPanel(props: Props) {
             </div>
 
             {isNoValueOperator(draft.operator) ? null : field.dataType === "enum" && !isMultiValueOperator(draft.operator) && options.length > 0 ? (
-              <div className="space-y-1">
-                <Label className="text-[11px] leading-tight">{t("doc.list.viewFilterValue")}</Label>
+              <div className="space-y-0.5">
+                <Label className="text-[10px] font-medium leading-tight">{t("doc.list.viewFilterValue")}</Label>
                 <select
-                  className="h-7 w-full rounded-md border border-input bg-background px-2 text-xs text-foreground"
+                  className="h-6 w-full rounded-sm border border-input bg-background px-1.5 text-[11px] text-foreground"
                   value={draft.value}
                   onChange={(event) => setDraft((current) => (current ? { ...current, value: event.target.value } : current))}
                 >
@@ -205,20 +205,20 @@ export function ItemsHeaderFilterPanel(props: Props) {
                 </select>
               </div>
             ) : isRangeOperator(draft.operator) ? (
-              <div className="grid grid-cols-2 gap-1.5">
-                <div className="space-y-1">
-                  <Label className="text-[11px] leading-tight">{t("doc.list.viewFilterValueFrom")}</Label>
+              <div className="grid grid-cols-2 gap-1">
+                <div className="space-y-0.5">
+                  <Label className="text-[10px] font-medium leading-tight">{t("doc.list.viewFilterValueFrom")}</Label>
                   <Input
-                    className="h-7 px-2 py-1 text-xs"
+                    className="h-6 min-h-0 rounded-sm px-1.5 py-0 text-[11px] leading-tight"
                     type={mapFieldDataTypeToInputType(field.dataType)}
                     value={draft.value}
                     onChange={(event) => setDraft((current) => (current ? { ...current, value: event.target.value } : current))}
                   />
                 </div>
-                <div className="space-y-1">
-                  <Label className="text-[11px] leading-tight">{t("doc.list.viewFilterValueTo")}</Label>
+                <div className="space-y-0.5">
+                  <Label className="text-[10px] font-medium leading-tight">{t("doc.list.viewFilterValueTo")}</Label>
                   <Input
-                    className="h-7 px-2 py-1 text-xs"
+                    className="h-6 min-h-0 rounded-sm px-1.5 py-0 text-[11px] leading-tight"
                     type={mapFieldDataTypeToInputType(field.dataType)}
                     value={draft.valueTo}
                     onChange={(event) => setDraft((current) => (current ? { ...current, valueTo: event.target.value } : current))}
@@ -226,20 +226,20 @@ export function ItemsHeaderFilterPanel(props: Props) {
                 </div>
               </div>
             ) : isMultiValueOperator(draft.operator) ? (
-              <div className="space-y-1">
-                <Label className="text-[11px] leading-tight">{t("doc.list.viewFilterValues")}</Label>
+              <div className="space-y-0.5">
+                <Label className="text-[10px] font-medium leading-tight">{t("doc.list.viewFilterValues")}</Label>
                 <Textarea
-                  className="min-h-14 resize-y px-2 py-1.5 text-xs"
+                  className="min-h-11 resize-y rounded-sm px-1.5 py-1 text-[11px] leading-snug"
                   placeholder={t("doc.list.viewFilterValues")}
                   value={draft.valuesText}
                   onChange={(event) => setDraft((current) => (current ? { ...current, valuesText: event.target.value } : current))}
                 />
               </div>
             ) : (
-              <div className="space-y-1">
-                <Label className="text-[11px] leading-tight">{t("doc.list.viewFilterValue")}</Label>
+              <div className="space-y-0.5">
+                <Label className="text-[10px] font-medium leading-tight">{t("doc.list.viewFilterValue")}</Label>
                 <Input
-                  className="h-7 px-2 py-1 text-xs"
+                  className="h-6 min-h-0 rounded-sm px-1.5 py-0 text-[11px] leading-tight"
                   type={mapFieldDataTypeToInputType(field.dataType)}
                   value={draft.value}
                   onChange={(event) => setDraft((current) => (current ? { ...current, value: event.target.value } : current))}
@@ -247,34 +247,34 @@ export function ItemsHeaderFilterPanel(props: Props) {
               </div>
             )}
 
-            <div className="flex items-center justify-between gap-1.5 pt-0.5">
+            <div className="flex items-center justify-between gap-1 pt-0">
               <Button
                 type="button"
                 variant="ghost"
                 size="icon"
-                className="h-7 w-7 shrink-0 [&_svg]:size-3.5"
+                className="h-6 w-6 shrink-0 rounded-sm [&_svg]:size-3"
                 title={t("doc.list.columnSettingsReset")}
                 aria-label={t("doc.list.columnSettingsReset")}
                 onClick={onReset}
               >
-                <RotateCcw className="h-3.5 w-3.5" />
+                <RotateCcw className="h-3 w-3" />
               </Button>
-              <div className="flex items-center gap-1.5">
+              <div className="flex items-center gap-1">
                 <Button
                   type="button"
                   variant="outline"
                   size="icon"
-                  className="h-7 w-7 shrink-0 [&_svg]:size-3.5"
+                  className="h-6 w-6 shrink-0 rounded-sm [&_svg]:size-3"
                   title={t("common.cancel")}
                   aria-label={t("common.cancel")}
                   onClick={() => onOpenChange(false)}
                 >
-                  <X className="h-3.5 w-3.5" />
+                  <X className="h-3 w-3" />
                 </Button>
                 <Button
                   type="button"
                   size="icon"
-                  className="h-7 w-7 shrink-0 [&_svg]:size-3.5"
+                  className="h-6 w-6 shrink-0 rounded-sm [&_svg]:size-3"
                   title={t("common.apply")}
                   aria-label={t("common.apply")}
                   disabled={!canApply}
@@ -297,7 +297,7 @@ export function ItemsHeaderFilterPanel(props: Props) {
                     onApply(nextRule);
                   }}
                 >
-                  <Check className="h-3.5 w-3.5" />
+                  <Check className="h-3 w-3" />
                 </Button>
               </div>
             </div>
