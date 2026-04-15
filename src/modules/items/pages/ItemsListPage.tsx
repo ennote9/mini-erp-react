@@ -102,15 +102,26 @@ function isTauriRuntime(): boolean {
   return typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
 }
 
-/** Browser download (plain `npm run dev`) or fallback when Tauri `save()` is dismissed / native write fails. */
-function downloadBufferInBrowser(buffer: ArrayBuffer, downloadFilename: string, mimeType: string) {
-  const blob = new Blob([buffer], { type: mimeType });
+/**
+ * Browser download (plain `npm run dev`) or fallback when Tauri `save()` is dismissed / native write fails.
+ *
+ * Important: many browsers ignore `click()` on a detached `<a>`, and revoking the blob URL immediately
+ * can cancel the download before it starts. Append to `document.body`, click, remove, revoke later.
+ */
+function downloadBufferInBrowser(data: BlobPart, downloadFilename: string, mimeType: string) {
+  const blob = new Blob([data], { type: mimeType });
   const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = downloadFilename;
-  a.click();
-  URL.revokeObjectURL(url);
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = downloadFilename;
+  anchor.rel = "noopener";
+  anchor.style.display = "none";
+  document.body.appendChild(anchor);
+  anchor.click();
+  anchor.remove();
+  window.setTimeout(() => {
+    URL.revokeObjectURL(url);
+  }, 30_000);
 }
 
 function readPersistedColumnSizing(): ColumnSizingState {
@@ -680,9 +691,9 @@ export function ItemsListPage() {
   );
 
   const listExcelLabels = useMemo(() => itemsListExcelLabels(t), [t, locale]);
-  const handleExportCurrentView = useCallback(() => {
+  const handleExportCurrentView = useCallback(async () => {
     const payload = buildExportPayload();
-    runExportWithSaveAs("items.xlsx", () =>
+    await runExportWithSaveAs("items.xlsx", () =>
       buildListViewXlsxBuffer({
         sheetName: listExcelLabels.sheetName,
         headers: payload.headers,
@@ -927,7 +938,13 @@ export function ItemsListPage() {
                 variant="outline"
                 size="sm"
                 className="!gap-0.5 h-[1.625rem] rounded-r-none border-0 border-r border-input !px-1 !py-0"
-                onClick={handleExportCurrentView}
+                onClick={async () => {
+                  try {
+                    await handleExportCurrentView();
+                  } catch (err) {
+                    console.error("[items-export] export failed", err);
+                  }
+                }}
               >
                 <FileSpreadsheet className="h-4 w-4 shrink-0" />
                 {t("doc.list.export")}
