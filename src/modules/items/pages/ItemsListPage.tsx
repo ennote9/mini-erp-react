@@ -687,7 +687,7 @@ export function ItemsListPage() {
         </div>
       ) : null}
 
-      <div className="min-h-0">
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col">
         <ItemsTanstackTable
           rows={displayItems}
           schema={itemsTableSchema}
@@ -773,7 +773,7 @@ export function ItemsListPage() {
             aria-label={t("ops.list.items.searchAria")}
             resultCount={displayItems.length}
           />
-          <div className="ml-auto flex shrink-0 flex-row items-center gap-2">
+          <div className="ml-auto flex min-w-0 flex-wrap items-center justify-end gap-2">
             {brandFilterId != null && (
               <div
                 className="flex h-8 max-w-[min(100%,18rem)] shrink-0 items-center gap-1.5 rounded-md border border-input bg-background px-2 text-xs"
@@ -918,29 +918,29 @@ export function ItemsListPage() {
             >
               {t("doc.list.viewSettings")}
             </Button>
-          </div>
-          <Button
-            type="button"
-            variant="default"
-            size="sm"
-            className="list-page__create-btn rounded-md bg-white text-black hover:bg-gray-200"
-            onClick={() => navigate(appendReturnTo("/items/new", currentReturnTo))}
-          >
-            <svg
-              className="h-3 w-3"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              aria-hidden="true"
+            <Button
+              type="button"
+              variant="default"
+              size="sm"
+              className="list-page__create-btn shrink-0 rounded-md bg-white text-black hover:bg-gray-200"
+              onClick={() => navigate(appendReturnTo("/items/new", currentReturnTo))}
             >
-              <path d="M12 5v14" />
-              <path d="M5 12h14" />
-            </svg>{" "}
-            {t("doc.list.create")}
-          </Button>
+              <svg
+                className="h-3 w-3"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                aria-hidden="true"
+              >
+                <path d="M12 5v14" />
+                <path d="M5 12h14" />
+              </svg>{" "}
+              {t("doc.list.create")}
+            </Button>
+          </div>
         </>
       }
     >

@@ -15,14 +15,14 @@ type Props = {
  */
 export function ListPageLayout({ header, controls, children }: Props) {
   return (
-    <div className="list-page">
+    <div className="list-page min-w-0">
       {header != null && (
         <div className="list-page__header">{header}</div>
       )}
       {controls != null && (
-        <div className="list-page__controls">{controls}</div>
+        <div className="list-page__controls min-w-0">{controls}</div>
       )}
-      <div className="list-page__content">{children}</div>
+      <div className="list-page__content min-w-0">{children}</div>
     </div>
   );
 }

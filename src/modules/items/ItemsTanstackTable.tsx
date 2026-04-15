@@ -87,11 +87,15 @@ export function ItemsTanstackTable(props: ItemsTanstackTableProps) {
   return (
     <div
       className={cn(
-        "min-h-0 rounded-md border border-border bg-background",
+        "flex min-h-0 min-w-0 flex-1 flex-col rounded-md border border-border bg-background",
         className,
       )}
     >
-      <div ref={scrollContainerRef} className="overflow-auto" data-items-table-scroll>
+      <div
+        ref={scrollContainerRef}
+        className="min-h-0 min-w-0 flex-1 overflow-auto"
+        data-items-table-scroll
+      >
         <table
           className="w-full border-collapse table-fixed text-sm"
           style={{ width: Math.max(totalWidth, 960) }}
