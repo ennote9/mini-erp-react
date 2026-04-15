@@ -94,6 +94,20 @@ function applyCategoryIdFilter(items: Item[], categoryId: string | null): Item[]
   return items.filter((x) => x.categoryId === categoryId);
 }
 
+const XLSX_MIME = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+const PDF_MIME = "application/pdf";
+
+/** Browser download fallback when Tauri `save()` returns null or native export fails. */
+function downloadBufferInBrowser(buffer: ArrayBuffer, downloadFilename: string, mimeType: string) {
+  const blob = new Blob([buffer], { type: mimeType });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = downloadFilename;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
 function readPersistedColumnSizing(): ColumnSizingState {
   if (typeof window === "undefined") return {};
   try {
@@ -610,18 +624,25 @@ export function ItemsListPage() {
 
   const runExportWithSaveAs = useCallback(
     async (defaultFilename: string, buildBuffer: () => Promise<ArrayBuffer>) => {
+      const extension = defaultFilename.toLowerCase().endsWith(".pdf") ? "pdf" : "xlsx";
+      const base = defaultFilename.replace(/\.[^.]+$/, "");
+      const generatedFilename = buildReadableUniqueFilename({ base, extension });
+      const fallbackMime = extension === "pdf" ? PDF_MIME : XLSX_MIME;
+
       try {
-        const extension = defaultFilename.toLowerCase().endsWith(".pdf") ? "pdf" : "xlsx";
-        const base = defaultFilename.replace(/\.[^.]+$/, "");
-        const generatedFilename = buildReadableUniqueFilename({ base, extension });
         const path = await save({
           defaultPath: generatedFilename,
           filters: [{ name: t("doc.page.excelFilterName"), extensions: ["xlsx"] }],
         });
-        if (path == null) return;
-        const safePath = await ensureUniqueExportPath(path);
-
         const buffer = await buildBuffer();
+
+        // `save()` resolves null when the dialog is dismissed — not an error, so the catch block never ran.
+        if (path == null) {
+          downloadBufferInBrowser(buffer, generatedFilename, fallbackMime);
+          return;
+        }
+
+        const safePath = await ensureUniqueExportPath(path);
         const bytes = new Uint8Array(buffer);
         let binary = "";
         for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
@@ -632,16 +653,12 @@ export function ItemsListPage() {
         setExportSuccess({ path: safePath, filename });
       } catch (err) {
         console.error("Export failed", err);
-        const buffer = await buildBuffer();
-        const blob = new Blob([buffer], {
-          type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement("a");
-        a.href = url;
-        a.download = defaultFilename;
-        a.click();
-        URL.revokeObjectURL(url);
+        try {
+          const buffer = await buildBuffer();
+          downloadBufferInBrowser(buffer, generatedFilename, fallbackMime);
+        } catch (fallbackErr) {
+          console.error("Export browser fallback failed", fallbackErr);
+        }
       }
     },
     [t],
