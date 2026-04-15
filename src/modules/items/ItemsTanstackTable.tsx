@@ -106,16 +106,16 @@ export function ItemsTanstackTable(props: ItemsTanstackTableProps) {
   const columns = useMemo(() => {
     const selectColumn: ColumnDef<ItemListRow, unknown> = {
       id: ITEMS_TABLE_SELECT_COLUMN_ID,
-      size: 32,
-      minSize: 30,
-      maxSize: 40,
+      size: 38,
+      minSize: 36,
+      maxSize: 44,
       enableSorting: false,
       enableResizing: false,
       enableHiding: false,
       meta: { align: "center" as const },
       header: ({ table }) => (
         <div
-          className="flex justify-center py-px"
+          className="flex w-full items-center justify-center"
           onClick={(event) => event.stopPropagation()}
           onPointerDown={(event) => event.stopPropagation()}
         >
@@ -139,7 +139,7 @@ export function ItemsTanstackTable(props: ItemsTanstackTableProps) {
       ),
       cell: ({ row }) => (
         <div
-          className="flex justify-center py-px"
+          className="flex w-full items-center justify-center"
           onClick={(event) => event.stopPropagation()}
           onPointerDown={(event) => event.stopPropagation()}
         >
@@ -232,17 +232,31 @@ export function ItemsTanstackTable(props: ItemsTanstackTableProps) {
                   const hasActiveFilter = headerFilterState?.[header.column.id] === true;
                   const isOpenFilterField = openHeaderFilterFieldId === header.column.id;
                   const isLastHeaderCell = header.index === headerGroup.headers.length - 1;
+                  const isSelectHeader = header.column.id === ITEMS_TABLE_SELECT_COLUMN_ID;
                   return (
                     <th
                       key={header.id}
                       className={cn(
-                        "group relative h-7 select-none bg-background px-2 text-[10px] font-medium uppercase tracking-wide text-muted-foreground",
+                        "group relative h-7 select-none bg-background",
+                        isSelectHeader
+                          ? "px-0 py-0 font-normal normal-case tracking-normal text-foreground"
+                          : "px-2 text-[10px] font-medium uppercase tracking-wide text-muted-foreground",
                         !isLastHeaderCell && "border-r border-border/50",
-                        meta?.align === "right" ? "text-right" : meta?.align === "center" ? "text-center" : "text-left",
+                        !isSelectHeader &&
+                          (meta?.align === "right" ? "text-right" : meta?.align === "center" ? "text-center" : "text-left"),
+                        isSelectHeader && "text-center",
                       )}
                       style={{ width: header.getSize(), minWidth: header.column.columnDef.minSize }}
                     >
-                      {header.isPlaceholder ? null : (
+                      {header.isPlaceholder ? null : isSelectHeader ? (
+                        <div
+                          className="flex h-full w-full items-center justify-center px-1.5"
+                          onClick={(event) => event.stopPropagation()}
+                          onPointerDown={(event) => event.stopPropagation()}
+                        >
+                          {flexRender(header.column.columnDef.header, header.getContext())}
+                        </div>
+                      ) : (
                         <div className="flex min-w-0 items-center gap-0.5">
                           {canSort ? (
                             <button
@@ -373,10 +387,13 @@ export function ItemsTanstackTable(props: ItemsTanstackTableProps) {
                       <td
                         key={cell.id}
                         className={cn(
-                          "truncate px-2 py-0.5 text-foreground/95",
-                          isSelectCell && "px-1",
+                          "px-2 py-0.5 text-foreground/95",
+                          isSelectCell
+                            ? "overflow-visible px-1.5 text-center"
+                            : "truncate",
                           !isLastBodyCell && "border-r border-border/50",
-                          meta?.align === "right" ? "text-right tabular-nums" : meta?.align === "center" ? "text-center" : "text-left",
+                          !isSelectCell &&
+                            (meta?.align === "right" ? "text-right tabular-nums" : meta?.align === "center" ? "text-center" : "text-left"),
                         )}
                         style={{ width: cell.column.getSize(), minWidth: cell.column.columnDef.minSize }}
                         title={isSelectCell ? undefined : String(cell.getValue() ?? "")}
