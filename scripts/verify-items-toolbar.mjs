@@ -11,7 +11,8 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const root = join(__dirname, "..");
 const shotPath = join(root, "artifacts", "items-toolbar-final.png");
 
-const url = process.env.VERIFY_ITEMS_URL ?? "http://127.0.0.1:1420/items";
+const url =
+  process.env.VERIFY_ITEMS_URL ?? "http://127.0.0.1:1420/items";
 
 const browser = await chromium.launch({ headless: true });
 const page = await browser.newPage({ viewport: { width: 520, height: 800 } });
@@ -48,6 +49,7 @@ try {
   await page.waitForTimeout(400);
 
   const metrics = await page.evaluate(() => {
+    const iw = window.innerWidth;
     const cluster = document.querySelector(".list-page__toolbar-actions-cluster");
     const create = document.querySelector(".list-page__controls .list-page__create-btn");
     const scrollHost = document.querySelector("[data-items-table-scroll]");
@@ -75,9 +77,9 @@ try {
         bottom: r.bottom,
         width: r.width,
         height: r.height,
-        clippedRight: r.right > vw + 0.5,
+        clippedRight: r.right > iw + 0.5,
         clippedLeft: r.left < -0.5,
-        fullyVisible: r.left >= -0.5 && r.right <= vw + 0.5 && r.width > 4 && r.height > 4,
+        fullyVisible: r.left >= -0.5 && r.right <= iw + 0.5 && r.width > 4 && r.height > 4,
       };
     }
     const table = scrollHost?.querySelector("table");
@@ -86,6 +88,7 @@ try {
     const hostClientW = scrollHost?.clientWidth ?? 0;
     return {
       vw,
+      innerWidth: iw,
       cluster: clusterMetrics,
       create: createMetrics,
       tableScrollsInsideHost: tableScrollW > hostClientW + 2,

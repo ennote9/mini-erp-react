@@ -763,7 +763,7 @@ export function ItemsListPage() {
     <ListPageLayout
       header={null}
       controls={
-        <>
+        <div className="list-page__controls-stack flex w-full min-w-0 flex-wrap items-center justify-between gap-x-4 gap-y-2">
           <ListPageSearch
             inputRef={listSearchInputRef}
             placeholder={t("ops.list.items.searchPlaceholder")}
@@ -773,7 +773,7 @@ export function ItemsListPage() {
             aria-label={t("ops.list.items.searchAria")}
             resultCount={displayItems.length}
           />
-          <div className="list-page__toolbar-actions-cluster ml-auto flex min-w-0 flex-wrap items-center justify-end gap-2">
+          <div className="list-page__toolbar-actions-cluster flex max-w-full min-w-0 flex-wrap items-center justify-end gap-2 overflow-x-auto">
             {brandFilterId != null && (
               <div
                 className="flex h-8 max-w-[min(100%,18rem)] shrink-0 items-center gap-1.5 rounded-md border border-input bg-background px-2 text-xs"
@@ -941,7 +941,7 @@ export function ItemsListPage() {
               {t("doc.list.create")}
             </Button>
           </div>
-        </>
+        </div>
       }
     >
       {listContent}

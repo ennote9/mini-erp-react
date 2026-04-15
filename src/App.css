@@ -62,6 +62,7 @@ summary,
 .app-page-content {
   flex: 1;
   min-height: 0;
+  min-width: 0;
   display: flex;
   flex-direction: column;
   overflow: auto;
@@ -236,12 +237,6 @@ summary,
   height: 2rem !important;
   min-height: 2rem !important;
   box-sizing: border-box;
-}
-
-/* Right-side toolbar cluster may wrap to multiple lines (/items Export+View+Create); do not clip at 2rem */
-.list-page__controls > .list-page__toolbar-actions-cluster {
-  height: auto !important;
-  min-height: 2rem !important;
 }
 .list-page__controls > .list-page__controls-stack {
   height: auto !important;
