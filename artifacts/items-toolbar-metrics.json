@@ -1,0 +1,25 @@
+{
+  "vw": 440,
+  "cluster": {
+    "rectHeight": 32,
+    "scrollHeight": 32,
+    "clientHeight": 32,
+    "computedHeight": "32px",
+    "computedMinHeight": "32px",
+    "computedOverflow": "visible"
+  },
+  "create": {
+    "left": 355.4375,
+    "right": 416,
+    "top": 117,
+    "bottom": 141,
+    "width": 60.5625,
+    "height": 24,
+    "clippedRight": false,
+    "clippedLeft": false,
+    "fullyVisible": true
+  },
+  "tableScrollsInsideHost": true,
+  "hostClientW": 387,
+  "tableScrollW": 1234
+}

@@ -773,7 +773,7 @@ export function ItemsListPage() {
             aria-label={t("ops.list.items.searchAria")}
             resultCount={displayItems.length}
           />
-          <div className="ml-auto flex min-w-0 flex-wrap items-center justify-end gap-2">
+          <div className="list-page__toolbar-actions-cluster ml-auto flex min-w-0 flex-wrap items-center justify-end gap-2">
             {brandFilterId != null && (
               <div
                 className="flex h-8 max-w-[min(100%,18rem)] shrink-0 items-center gap-1.5 rounded-md border border-input bg-background px-2 text-xs"
