@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { Check, RotateCcw, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -10,7 +11,6 @@ import {
   PopoverHeader,
   PopoverTitle,
 } from "@/components/ui/popover";
-import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { useTranslation } from "@/shared/i18n/context";
 import type { AgGridFilterOperator } from "@/shared/navigation/agGridColumnFilters";
@@ -25,6 +25,7 @@ import {
 type AnchorRect = {
   left: number;
   top: number;
+  width: number;
   height: number;
 };
 
@@ -40,7 +41,6 @@ type Props = {
 };
 
 type DraftState = {
-  enabled: boolean;
   operator: AgGridFilterOperator;
   value: string;
   valueTo: string;
@@ -94,7 +94,6 @@ function buildDraft(field: ListViewFieldRegistryEntry | null, rule: ListViewDeep
   const operator =
     rule && supportedOperators.includes(rule.operator) ? rule.operator : fallbackOperator;
   return {
-    enabled: rule?.enabled ?? true,
     operator,
     value: rule?.value ?? "",
     valueTo: rule?.valueTo ?? "",
@@ -137,13 +136,18 @@ export function ItemsHeaderFilterPanel(props: Props) {
       {anchorRect ? (
         <PopoverAnchor asChild>
           <div
-            className="pointer-events-none fixed z-40 h-0 w-0"
-            style={{ left: anchorRect.left, top: anchorRect.top + anchorRect.height }}
+            className="pointer-events-none fixed z-40"
+            style={{
+              left: anchorRect.left,
+              top: anchorRect.top,
+              width: anchorRect.width,
+              height: anchorRect.height,
+            }}
             aria-hidden
           />
         </PopoverAnchor>
       ) : null}
-      <PopoverContent align="start" side="bottom" sideOffset={8} className="w-80">
+      <PopoverContent align="end" side="bottom" sideOffset={8} className="w-80">
         <PopoverHeader className="mb-3">
           <PopoverTitle>{field?.label ?? t("doc.list.viewTabFiltering")}</PopoverTitle>
           <PopoverDescription>{t("doc.list.viewTabFiltering")}</PopoverDescription>
@@ -153,17 +157,6 @@ export function ItemsHeaderFilterPanel(props: Props) {
           <div className="text-sm text-muted-foreground">{t("common.noData")}</div>
         ) : (
           <div className="space-y-3">
-            <div className="flex items-center justify-between gap-3">
-              <Label htmlFor="items-header-filter-enabled" className="text-xs">
-                {t("doc.list.viewRuleEnabled")}
-              </Label>
-              <Switch
-                id="items-header-filter-enabled"
-                checked={draft.enabled}
-                onCheckedChange={(checked) => setDraft((current) => (current ? { ...current, enabled: checked === true } : current))}
-              />
-            </div>
-
             <div className="space-y-1.5">
               <Label className="text-xs">{t("gridFilters.operatorLabel")}</Label>
               <select
@@ -248,16 +241,32 @@ export function ItemsHeaderFilterPanel(props: Props) {
             )}
 
             <div className="flex items-center justify-between gap-2 pt-1">
-              <Button type="button" variant="ghost" size="sm" onClick={onReset}>
-                {t("doc.list.columnSettingsReset")}
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                title={t("doc.list.columnSettingsReset")}
+                aria-label={t("doc.list.columnSettingsReset")}
+                onClick={onReset}
+              >
+                <RotateCcw className="h-4 w-4" />
               </Button>
               <div className="flex items-center gap-2">
-                <Button type="button" variant="outline" size="sm" onClick={() => onOpenChange(false)}>
-                  {t("common.cancel")}
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="icon"
+                  title={t("common.cancel")}
+                  aria-label={t("common.cancel")}
+                  onClick={() => onOpenChange(false)}
+                >
+                  <X className="h-4 w-4" />
                 </Button>
                 <Button
                   type="button"
-                  size="sm"
+                  size="icon"
+                  title={t("common.apply")}
+                  aria-label={t("common.apply")}
                   disabled={!canApply}
                   onClick={() => {
                     if (!field || !draft) return;
@@ -272,13 +281,13 @@ export function ItemsHeaderFilterPanel(props: Props) {
                             .map((value) => value.trim())
                             .filter(Boolean)
                         : undefined,
-                      enabled: draft.enabled,
+                      enabled: true,
                       priority: rule?.priority ?? 0,
                     };
                     onApply(nextRule);
                   }}
                 >
-                  {t("common.apply")}
+                  <Check className="h-4 w-4" />
                 </Button>
               </div>
             </div>

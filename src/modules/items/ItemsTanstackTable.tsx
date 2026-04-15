@@ -26,8 +26,9 @@ type ItemsTanstackTableProps = {
   onSortingChange: OnChangeFn<SortingState>;
   onColumnSizingChange: OnChangeFn<ColumnSizingState>;
   onRowClick: (row: ItemListRow) => void;
-  onHeaderFilterClick?: (fieldId: string, anchorRect: { left: number; top: number; height: number }) => void;
+  onHeaderFilterClick?: (fieldId: string, anchorRect: { left: number; top: number; width: number; height: number }) => void;
   headerFilterState?: Record<string, boolean>;
+  openHeaderFilterFieldId?: string | null;
   t: TFunction;
   formatMoney: (value: number, fractionDigits?: number, currencyCode?: string) => string;
   className?: string;
@@ -47,6 +48,7 @@ export function ItemsTanstackTable(props: ItemsTanstackTableProps) {
     onRowClick,
     onHeaderFilterClick,
     headerFilterState,
+    openHeaderFilterFieldId,
     t,
     formatMoney,
     className,
@@ -109,22 +111,23 @@ export function ItemsTanstackTable(props: ItemsTanstackTableProps) {
                   const schemaColumn = schemaById.get(header.column.id);
                   const canFilter = schemaColumn?.filterable === true;
                   const hasActiveFilter = headerFilterState?.[header.column.id] === true;
+                  const isOpenFilterField = openHeaderFilterFieldId === header.column.id;
                   return (
                     <th
                       key={header.id}
                       className={cn(
-                        "group relative h-10 select-none bg-background px-3 text-xs font-medium uppercase tracking-wide text-muted-foreground",
+                        "group relative h-8.5 select-none bg-background px-2.5 text-[11px] font-medium uppercase tracking-wide text-muted-foreground",
                         meta?.align === "right" ? "text-right" : meta?.align === "center" ? "text-center" : "text-left",
                       )}
                       style={{ width: header.getSize(), minWidth: header.column.columnDef.minSize }}
                     >
                       {header.isPlaceholder ? null : (
-                        <div className="flex min-w-0 items-center gap-1">
+                        <div className="flex min-w-0 items-center gap-0.5">
                           {canSort ? (
                             <button
                               type="button"
                               className={cn(
-                                "flex min-w-0 flex-1 items-center gap-1 rounded-sm px-1 py-1 text-left text-inherit transition-colors hover:bg-muted/60 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring",
+                                "flex min-w-0 flex-1 items-center gap-0.5 rounded-sm px-1 py-0.5 leading-none text-left text-inherit transition-colors hover:bg-muted/60 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring",
                                 meta?.align === "right" && "justify-end",
                                 meta?.align === "center" && "justify-center",
                               )}
@@ -136,25 +139,25 @@ export function ItemsTanstackTable(props: ItemsTanstackTableProps) {
                               </span>
                               <span
                                 className={cn(
-                                  "flex h-3.5 w-3.5 shrink-0 items-center justify-center transition-opacity",
+                                  "flex h-3 w-3 shrink-0 items-center justify-center transition-opacity",
                                   sortState
                                     ? "opacity-100"
                                     : "opacity-0 group-hover:opacity-100 group-focus-within:opacity-100",
                                 )}
                               >
                                 {sortState === "asc" ? (
-                                  <ChevronUp className="h-3.5 w-3.5 shrink-0" />
+                                  <ChevronUp className="h-3 w-3 shrink-0" />
                                 ) : sortState === "desc" ? (
-                                  <ChevronDown className="h-3.5 w-3.5 shrink-0" />
+                                  <ChevronDown className="h-3 w-3 shrink-0" />
                                 ) : (
-                                  <ChevronsUpDown className="h-3.5 w-3.5 shrink-0 opacity-45" />
+                                  <ChevronsUpDown className="h-3 w-3 shrink-0 opacity-45" />
                                 )}
                               </span>
                             </button>
                           ) : (
                             <div
                               className={cn(
-                                "flex min-w-0 flex-1 items-center px-1 py-1",
+                                "flex min-w-0 flex-1 items-center px-1 py-0.5 leading-none",
                                 meta?.align === "right" && "justify-end",
                                 meta?.align === "center" && "justify-center",
                               )}
@@ -169,10 +172,12 @@ export function ItemsTanstackTable(props: ItemsTanstackTableProps) {
                             <button
                               type="button"
                               className={cn(
-                                "shrink-0 rounded-sm p-1 transition-colors hover:bg-muted/60 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring",
+                                "shrink-0 rounded-sm p-0.5 transition-colors hover:bg-muted/60 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring",
                                 hasActiveFilter
                                   ? "text-primary opacity-100"
-                                  : "pointer-events-none text-muted-foreground/70 opacity-0 group-hover:pointer-events-auto group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:opacity-100",
+                                  : isOpenFilterField
+                                    ? "text-muted-foreground/70 opacity-100"
+                                    : "pointer-events-none text-muted-foreground/70 opacity-0 focus-visible:pointer-events-auto focus-visible:opacity-100 group-hover:pointer-events-auto group-hover:opacity-100",
                               )}
                               aria-label={`${t("doc.list.viewTabFiltering")}: ${schemaColumn?.label ?? header.column.id}`}
                               title={`${t("doc.list.viewTabFiltering")}: ${schemaColumn?.label ?? header.column.id}`}
@@ -182,11 +187,12 @@ export function ItemsTanstackTable(props: ItemsTanstackTableProps) {
                                 onHeaderFilterClick?.(header.column.id, {
                                   left: rect.left,
                                   top: rect.top,
+                                  width: rect.width,
                                   height: rect.height,
                                 });
                               }}
                             >
-                              <Funnel className={cn("h-3.5 w-3.5", hasActiveFilter && "fill-current")} />
+                              <Funnel className={cn("h-3 w-3", hasActiveFilter && "fill-current")} />
                             </button>
                           ) : null}
                         </div>
@@ -240,7 +246,7 @@ export function ItemsTanstackTable(props: ItemsTanstackTableProps) {
                       <td
                         key={cell.id}
                         className={cn(
-                          "truncate px-3 py-2.5 text-sm text-foreground/95",
+                          "truncate px-2.5 py-1.5 text-sm leading-tight text-foreground/95",
                           meta?.align === "right" ? "text-right tabular-nums" : meta?.align === "center" ? "text-center" : "text-left",
                         )}
                         style={{ width: cell.column.getSize(), minWidth: cell.column.columnDef.minSize }}

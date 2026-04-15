@@ -63,6 +63,7 @@ type HeaderFilterAnchor = {
   fieldId: string;
   left: number;
   top: number;
+  width: number;
   height: number;
 };
 
@@ -428,11 +429,15 @@ export function ItemsListPage() {
     [columnSettingsRegistry],
   );
   const activeDeepFilterFieldState = useMemo(
-    () =>
-      Object.fromEntries(
-        Object.keys(deepFilterModel).map((fieldKey) => [fieldKey, true]),
-      ) as Record<string, boolean>,
-    [deepFilterModel],
+    () => {
+      const activeFieldMap: Record<string, boolean> = {};
+      for (const rule of columnSettingsDefinition?.deepFilters ?? []) {
+        if (rule.enabled !== true) continue;
+        activeFieldMap[rule.fieldKey] = true;
+      }
+      return activeFieldMap;
+    },
+    [columnSettingsDefinition],
   );
   const appliedRuleByFieldKey = useMemo(() => {
     const map = new Map<string, ListViewDeepFilterRule>();
@@ -694,6 +699,7 @@ export function ItemsListPage() {
           onColumnSizingChange={handleColumnSizingChange}
           onHeaderFilterClick={(fieldId, anchorRect) => setHeaderFilterAnchor({ fieldId, ...anchorRect })}
           headerFilterState={activeDeepFilterFieldState}
+          openHeaderFilterFieldId={activeHeaderFilterField}
           onRowClick={(row) => {
             if (hasMeaningfulTextSelection()) return;
             navigate(appendReturnTo(`/items/${row.id}`, currentReturnTo));
