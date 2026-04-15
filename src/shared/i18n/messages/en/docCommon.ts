@@ -418,6 +418,8 @@ export const docCommonEn = {
     exportSelectedRows: "Export selected rows",
     exportOptionsAria: "Export options",
     selectRowsForExport: "Select one or more rows in the grid first.",
+    rowSelectAllPageAria: "Select all visible rows",
+    rowSelectRowAria: "Select row {{code}}",
     exportAllLines: "Export all lines",
     exportSelectLinesFirst: "Select one or more lines in the grid first.",
     exportSelectionEditModeOnly: "Selection is available in edit mode only.",

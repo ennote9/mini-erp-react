@@ -2,7 +2,14 @@
  * Items list — first TanStack Table pilot renderer.
  * Keeps current search/view/persistence semantics while replacing AG Grid as the active renderer for /items.
  */
-import { functionalUpdate, type ColumnSizingState, type SortingState, type VisibilityState } from "@tanstack/react-table";
+import {
+  functionalUpdate,
+  type ColumnSizingState,
+  type OnChangeFn,
+  type RowSelectionState,
+  type SortingState,
+  type VisibilityState,
+} from "@tanstack/react-table";
 import { useMemo, useState, useRef, useCallback, useEffect } from "react";
 import { useLocation, useNavigate, useSearchParams, Link } from "react-router-dom";
 import { ensureItemsLoaded, isItemsRepositoryReady, itemRepository } from "../repository";
@@ -153,6 +160,7 @@ export function ItemsListPage() {
   const appReadRevision = useAppReadModelRevision();
   const [exportSuccess, setExportSuccess] = useState<{ path: string; filename: string } | null>(null);
   const [exportOpen, setExportOpen] = useState(false);
+  const [rowSelection, setRowSelection] = useState<RowSelectionState>({});
   const [pendingSortModel, setPendingSortModel] = useState<UrlGridSort[] | null>(null);
   const [columnSizing, setColumnSizing] = useState<ColumnSizingState>(() => readPersistedColumnSizing());
   const [itemsReady, setItemsReady] = useState(() => isItemsRepositoryReady());
@@ -652,7 +660,14 @@ export function ItemsListPage() {
     );
   }, [buildExportPayload, listExcelLabels, runExportWithSaveAs]);
 
-  const exportSelectedDisabled = true;
+  const handleRowSelectionChange = useCallback<OnChangeFn<RowSelectionState>>((updater) => {
+    setRowSelection((prev) => functionalUpdate(updater, prev));
+  }, []);
+
+  const exportSelectedDisabled = useMemo(
+    () => !Object.values(rowSelection).some(Boolean),
+    [rowSelection],
+  );
 
   const listContent = itemsReady ? (
     <>
@@ -695,6 +710,8 @@ export function ItemsListPage() {
           columnVisibility={tableColumnVisibility}
           columnOrder={tableColumnOrder}
           columnSizing={columnSizing}
+          rowSelection={rowSelection}
+          onRowSelectionChange={handleRowSelectionChange}
           onSortingChange={handleTanstackSortingChange}
           onColumnSizingChange={handleColumnSizingChange}
           onHeaderFilterClick={(fieldId, anchorRect) => setHeaderFilterAnchor({ fieldId, ...anchorRect })}
@@ -901,7 +918,15 @@ export function ItemsListPage() {
                       type="button"
                       disabled={exportSelectedDisabled}
                       className="w-full rounded-sm px-1.5 py-1 text-left text-sm hover:bg-accent disabled:cursor-not-allowed disabled:opacity-50"
-                      title={t("doc.list.selectRowsForExport")}
+                      title={
+                        exportSelectedDisabled
+                          ? t("doc.list.selectRowsForExport")
+                          : t("doc.list.exportSelectedRows")
+                      }
+                      onClick={() => {
+                        if (exportSelectedDisabled) return;
+                        setExportOpen(false);
+                      }}
                     >
                       {t("doc.list.exportSelectedRows")}
                     </button>

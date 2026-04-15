@@ -2,8 +2,10 @@ import {
   flexRender,
   getCoreRowModel,
   useReactTable,
+  type ColumnDef,
   type ColumnSizingState,
   type OnChangeFn,
+  type RowSelectionState,
   type SortingState,
   type Table,
   type VisibilityState,
@@ -11,6 +13,7 @@ import {
 import type { RefObject } from "react";
 import { useMemo } from "react";
 import { ChevronDown, ChevronsUpDown, ChevronUp, Funnel } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
 import { cn } from "@/lib/utils";
 import type { TFunction } from "@/shared/i18n";
 import type { ItemListRow } from "./listViewRowModel";
@@ -49,6 +52,9 @@ function getColumnResizeGuideLeftPx(table: Table<ItemListRow>): number | null {
   return header.getStart() + newW;
 }
 
+/** Synthetic TanStack column id — not part of persisted schema / sizing keys. */
+const ITEMS_TABLE_SELECT_COLUMN_ID = "__rowSelect__";
+
 type ItemsTanstackTableProps = {
   rows: ItemListRow[];
   schema: ItemsTableColumnSchema[];
@@ -56,6 +62,8 @@ type ItemsTanstackTableProps = {
   columnVisibility: VisibilityState;
   columnOrder: string[];
   columnSizing: ColumnSizingState;
+  rowSelection: RowSelectionState;
+  onRowSelectionChange: OnChangeFn<RowSelectionState>;
   onSortingChange: OnChangeFn<SortingState>;
   onColumnSizingChange: OnChangeFn<ColumnSizingState>;
   onRowClick: (row: ItemListRow) => void;
@@ -76,6 +84,8 @@ export function ItemsTanstackTable(props: ItemsTanstackTableProps) {
     columnVisibility,
     columnOrder,
     columnSizing,
+    rowSelection,
+    onRowSelectionChange,
     onSortingChange,
     onColumnSizingChange,
     onRowClick,
@@ -88,26 +98,88 @@ export function ItemsTanstackTable(props: ItemsTanstackTableProps) {
     scrollContainerRef,
   } = props;
 
-  const columns = useMemo(
-    () => buildItemsTanstackColumns({ schema, t, formatMoney }),
-    [schema, t, formatMoney],
+  const columnOrderWithSelect = useMemo(
+    () => [ITEMS_TABLE_SELECT_COLUMN_ID, ...columnOrder.filter((id) => id !== ITEMS_TABLE_SELECT_COLUMN_ID)],
+    [columnOrder],
   );
+
+  const columns = useMemo(() => {
+    const selectColumn: ColumnDef<ItemListRow, unknown> = {
+      id: ITEMS_TABLE_SELECT_COLUMN_ID,
+      size: 32,
+      minSize: 30,
+      maxSize: 40,
+      enableSorting: false,
+      enableResizing: false,
+      enableHiding: false,
+      meta: { align: "center" as const },
+      header: ({ table }) => (
+        <div
+          className="flex justify-center py-px"
+          onClick={(event) => event.stopPropagation()}
+          onPointerDown={(event) => event.stopPropagation()}
+        >
+          <Checkbox
+            aria-label={t("doc.list.rowSelectAllPageAria")}
+            checked={
+              table.getIsAllPageRowsSelected()
+                ? true
+                : table.getIsSomePageRowsSelected()
+                  ? "indeterminate"
+                  : false
+            }
+            onClick={(event) => event.stopPropagation()}
+            onPointerDown={(event) => event.stopPropagation()}
+            onCheckedChange={(value) => {
+              if (value === "indeterminate") return;
+              table.toggleAllPageRowsSelected(value === true);
+            }}
+          />
+        </div>
+      ),
+      cell: ({ row }) => (
+        <div
+          className="flex justify-center py-px"
+          onClick={(event) => event.stopPropagation()}
+          onPointerDown={(event) => event.stopPropagation()}
+        >
+          <Checkbox
+            aria-label={t("doc.list.rowSelectRowAria", { code: row.original.code })}
+            checked={row.getIsSelected()}
+            disabled={!row.getCanSelect()}
+            onClick={(event) => event.stopPropagation()}
+            onPointerDown={(event) => event.stopPropagation()}
+            onCheckedChange={(value) => {
+              if (value === "indeterminate") return;
+              row.toggleSelected(value === true);
+            }}
+          />
+        </div>
+      ),
+    };
+
+    return [selectColumn, ...buildItemsTanstackColumns({ schema, t, formatMoney })];
+  }, [schema, t, formatMoney]);
 
   const table = useReactTable({
     data: rows,
     columns,
     getCoreRowModel: getCoreRowModel(),
+    getRowId: (row) => row.id,
+    enableRowSelection: true,
     manualSorting: true,
     columnResizeMode: "onEnd",
     enableMultiSort: true,
     state: {
       sorting,
       columnVisibility,
-      columnOrder,
+      columnOrder: columnOrderWithSelect,
       columnSizing,
+      rowSelection,
     },
     onSortingChange,
     onColumnSizingChange,
+    onRowSelectionChange,
   });
 
   const visibleLeafColumns = table.getVisibleLeafColumns();
@@ -287,22 +359,29 @@ export function ItemsTanstackTable(props: ItemsTanstackTableProps) {
                 return (
                 <tr
                   key={row.id}
-                  className="cursor-pointer border-b border-border/60 transition-colors hover:bg-muted/40"
+                  className={cn(
+                    "cursor-pointer border-b border-border/60 transition-colors hover:bg-muted/40",
+                    row.getIsSelected() && "bg-muted/25",
+                  )}
                   onClick={() => onRowClick(row.original)}
                 >
                   {visibleCells.map((cell, cellIndex) => {
                     const meta = cell.column.columnDef.meta as { align?: "left" | "right" | "center" } | undefined;
                     const isLastBodyCell = cellIndex === visibleCells.length - 1;
+                    const isSelectCell = cell.column.id === ITEMS_TABLE_SELECT_COLUMN_ID;
                     return (
                       <td
                         key={cell.id}
                         className={cn(
                           "truncate px-2 py-0.5 text-foreground/95",
+                          isSelectCell && "px-1",
                           !isLastBodyCell && "border-r border-border/50",
                           meta?.align === "right" ? "text-right tabular-nums" : meta?.align === "center" ? "text-center" : "text-left",
                         )}
                         style={{ width: cell.column.getSize(), minWidth: cell.column.columnDef.minSize }}
-                        title={String(cell.getValue() ?? "")}
+                        title={isSelectCell ? undefined : String(cell.getValue() ?? "")}
+                        onClick={isSelectCell ? (event) => event.stopPropagation() : undefined}
+                        onPointerDown={isSelectCell ? (event) => event.stopPropagation() : undefined}
                       >
                         {flexRender(cell.column.columnDef.cell, cell.getContext())}
                       </td>
