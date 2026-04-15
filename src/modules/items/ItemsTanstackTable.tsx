@@ -97,7 +97,7 @@ export function ItemsTanstackTable(props: ItemsTanstackTableProps) {
         data-items-table-scroll
       >
         <table
-          className="w-full border-collapse table-fixed text-sm"
+          className="w-full border-collapse table-fixed text-[12px] leading-tight"
           style={{ width: Math.max(totalWidth, 960) }}
         >
           <colgroup>
@@ -120,7 +120,7 @@ export function ItemsTanstackTable(props: ItemsTanstackTableProps) {
                     <th
                       key={header.id}
                       className={cn(
-                        "group relative h-8.5 select-none bg-background px-2.5 text-[11px] font-medium uppercase tracking-wide text-muted-foreground",
+                        "group relative h-7 select-none bg-background px-2 text-[10px] font-medium uppercase tracking-wide text-muted-foreground",
                         meta?.align === "right" ? "text-right" : meta?.align === "center" ? "text-center" : "text-left",
                       )}
                       style={{ width: header.getSize(), minWidth: header.column.columnDef.minSize }}
@@ -131,7 +131,7 @@ export function ItemsTanstackTable(props: ItemsTanstackTableProps) {
                             <button
                               type="button"
                               className={cn(
-                                "flex min-w-0 flex-1 items-center gap-0.5 rounded-sm px-1 py-0.5 leading-none text-left text-inherit transition-colors hover:bg-muted/60 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring",
+                                "flex min-w-0 flex-1 items-center gap-0.5 rounded-sm px-1 py-px leading-none text-left text-inherit transition-colors hover:bg-muted/60 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring",
                                 meta?.align === "right" && "justify-end",
                                 meta?.align === "center" && "justify-center",
                               )}
@@ -161,7 +161,7 @@ export function ItemsTanstackTable(props: ItemsTanstackTableProps) {
                           ) : (
                             <div
                               className={cn(
-                                "flex min-w-0 flex-1 items-center px-1 py-0.5 leading-none",
+                                "flex min-w-0 flex-1 items-center px-1 py-px leading-none",
                                 meta?.align === "right" && "justify-end",
                                 meta?.align === "center" && "justify-center",
                               )}
@@ -231,7 +231,7 @@ export function ItemsTanstackTable(props: ItemsTanstackTableProps) {
             {table.getRowModel().rows.length === 0 ? (
               <tr>
                 <td
-                  className="px-4 py-8 text-center text-sm text-muted-foreground"
+                  className="px-4 py-8 text-center text-[12px] text-muted-foreground"
                   colSpan={visibleLeafColumns.length || 1}
                 >
                   {t("common.noData")}
@@ -250,7 +250,7 @@ export function ItemsTanstackTable(props: ItemsTanstackTableProps) {
                       <td
                         key={cell.id}
                         className={cn(
-                          "truncate px-2.5 py-1.5 text-sm leading-tight text-foreground/95",
+                          "truncate px-2 py-0.5 text-foreground/95",
                           meta?.align === "right" ? "text-right tabular-nums" : meta?.align === "center" ? "text-center" : "text-left",
                         )}
                         style={{ width: cell.column.getSize(), minWidth: cell.column.columnDef.minSize }}
