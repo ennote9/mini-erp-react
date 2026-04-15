@@ -642,24 +642,32 @@ export function ItemsListPage() {
       .filter((column) => tableColumnVisibility[column.id] !== false);
   }, [itemsTableSchema, tableColumnOrder, tableColumnVisibility]);
 
-  const buildExportPayload = useCallback((): { headers: string[]; rows: Array<Array<string | number>> } => {
-    const rows = displayItems.map((row, index) =>
-      visibleSchemaColumns.map((column) =>
-        formatItemsTableValue({
-          column,
-          value: column.id === "lineNo" ? index + 1 : row[column.accessorKey ?? "code"],
-          t,
-          formatMoney,
-          rowIndex: index,
-        }),
-      ),
-    );
+  const buildExportPayloadForRows = useCallback(
+    (rows: ItemListRow[]): { headers: string[]; rows: Array<Array<string | number>> } => {
+      const rowsOut = rows.map((row, index) =>
+        visibleSchemaColumns.map((column) =>
+          formatItemsTableValue({
+            column,
+            value: column.id === "lineNo" ? index + 1 : row[column.accessorKey ?? "code"],
+            t,
+            formatMoney,
+            rowIndex: index,
+          }),
+        ),
+      );
 
-    return {
-      headers: visibleSchemaColumns.map((column) => column.label),
-      rows,
-    };
-  }, [displayItems, visibleSchemaColumns, t, formatMoney]);
+      return {
+        headers: visibleSchemaColumns.map((column) => column.label),
+        rows: rowsOut,
+      };
+    },
+    [visibleSchemaColumns, t, formatMoney],
+  );
+
+  const buildExportPayload = useCallback(
+    (): { headers: string[]; rows: Array<Array<string | number>> } => buildExportPayloadForRows(displayItems),
+    [buildExportPayloadForRows, displayItems],
+  );
 
   const runExportWithSaveAs = useCallback(
     async (
@@ -794,6 +802,51 @@ export function ItemsListPage() {
       exportDiag,
     );
   }, [buildExportPayload, listExcelLabels, runExportWithSaveAs, searchParams]);
+
+  const handleExportSelectedRows = useCallback(async () => {
+    const selectedRows = displayItems.filter((row) => rowSelection[row.id] === true);
+    if (selectedRows.length === 0) return;
+
+    const exportDiag = searchParams.get("exportDiag") === "1";
+    const payload = buildExportPayloadForRows(selectedRows);
+    itemsExportDiagLog(exportDiag, "selected export payload built", {
+      headerCount: payload.headers.length,
+      selectedRowCount: selectedRows.length,
+    });
+
+    if (payload.headers.length === 0) {
+      await runExportWithSaveAs(
+        "items-selected.xlsx",
+        () =>
+          buildListViewXlsxBuffer({
+            sheetName: listExcelLabels.sheetName,
+            headers: ["—"],
+            rows: [["No visible columns. Use View settings to show at least one column, then export again."]],
+            tableNameBase: "ItemsListViewSelected",
+          }),
+        exportDiag,
+      );
+      return;
+    }
+
+    await runExportWithSaveAs(
+      "items-selected.xlsx",
+      async () => {
+        itemsExportDiagLog(exportDiag, "selected XLSX buffer build started");
+        const buf = await buildListViewXlsxBuffer({
+          sheetName: listExcelLabels.sheetName,
+          headers: payload.headers,
+          rows: payload.rows,
+          tableNameBase: "ItemsListViewSelected",
+        });
+        itemsExportDiagLog(exportDiag, "selected XLSX buffer build finished", {
+          byteLength: buf instanceof ArrayBuffer ? buf.byteLength : (buf as Uint8Array).byteLength,
+        });
+        return buf;
+      },
+      exportDiag,
+    );
+  }, [buildExportPayloadForRows, displayItems, listExcelLabels, rowSelection, runExportWithSaveAs, searchParams]);
 
   const handleRowSelectionChange = useCallback<OnChangeFn<RowSelectionState>>((updater) => {
     setRowSelection((prev) => functionalUpdate(updater, prev));
@@ -1064,9 +1117,15 @@ export function ItemsListPage() {
                           ? t("doc.list.selectRowsForExport")
                           : t("doc.list.exportSelectedRows")
                       }
-                      onClick={() => {
+                      onClick={async () => {
                         if (exportSelectedDisabled) return;
-                        setExportOpen(false);
+                        try {
+                          await handleExportSelectedRows();
+                        } catch (err) {
+                          console.error("[items-export] selected export failed", err);
+                        } finally {
+                          setExportOpen(false);
+                        }
                       }}
                     >
                       {t("doc.list.exportSelectedRows")}
