@@ -83,8 +83,8 @@ export function AppShell() {
       }
     >
       <AppSidebar />
-      <SidebarInset>
-        <div className="app-workspace flex min-h-svh flex-1 flex-col">
+      <SidebarInset className="min-w-0">
+        <div className="app-workspace flex min-h-svh min-w-0 flex-1 flex-col">
           <PageTopBar />
           <div className="app-page-content">
             <Outlet />

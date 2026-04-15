@@ -343,6 +343,11 @@ async function assertLayoutStressAndToolbarHealth(
   ).toBe(false);
 
   expect(layout.actionCluster, `${viewportLabel}: Action cluster missing`).toBeTruthy();
+  expect(
+    layout.actionCluster!.horizOverflow,
+    `${viewportLabel}: Action cluster must not use hidden horizontal overflow (scrollWidth ${layout.actionCluster!.scrollWidth} vs clientWidth ${layout.actionCluster!.clientWidth}) — avoids clipping the rightmost Create`,
+  ).toBe(false);
+
   expect(layout.create, `${viewportLabel}: Create button metrics missing`).toBeTruthy();
 
   expect(
@@ -395,8 +400,12 @@ test.describe("Items /items toolbar — Create not clipped", () => {
       `After apply: visible headers (${layoutAfterApply.visibleHeaderCellCount}) must be >= ${MIN_VISIBLE_HEADER_CELLS} (was ${layoutBefore.visibleHeaderCellCount} before modal)`,
     ).toBeGreaterThanOrEqual(MIN_VISIBLE_HEADER_CELLS);
 
+    /**
+     * Desktop-ish widths must clear `outerInViewport` (Create right edge ~1510px in this shell).
+     * Below ~1520px viewport the shell + padding still fits the toolbar but Create can sit past `innerWidth`.
+     */
     const widths = [
-      520, 500, 480, 460, 440, 420, 400, 380, 360, 340, 320, 300, 280, 260, 240,
+      1920, 1680, 1600, 1520, 520, 500, 480, 460, 440, 420, 400, 380, 360, 340, 320, 300, 280, 260, 240,
     ];
     for (const width of widths) {
       const label = `w${width}`;
