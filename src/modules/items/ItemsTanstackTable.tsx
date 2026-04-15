@@ -116,11 +116,13 @@ export function ItemsTanstackTable(props: ItemsTanstackTableProps) {
                   const canFilter = schemaColumn?.filterable === true;
                   const hasActiveFilter = headerFilterState?.[header.column.id] === true;
                   const isOpenFilterField = openHeaderFilterFieldId === header.column.id;
+                  const isLastHeaderCell = header.index === headerGroup.headers.length - 1;
                   return (
                     <th
                       key={header.id}
                       className={cn(
                         "group relative h-7 select-none bg-background px-2 text-[10px] font-medium uppercase tracking-wide text-muted-foreground",
+                        !isLastHeaderCell && "border-r border-border/50",
                         meta?.align === "right" ? "text-right" : meta?.align === "center" ? "text-center" : "text-left",
                       )}
                       style={{ width: header.getSize(), minWidth: header.column.columnDef.minSize }}
@@ -238,19 +240,23 @@ export function ItemsTanstackTable(props: ItemsTanstackTableProps) {
                 </td>
               </tr>
             ) : (
-              table.getRowModel().rows.map((row) => (
+              table.getRowModel().rows.map((row) => {
+                const visibleCells = row.getVisibleCells();
+                return (
                 <tr
                   key={row.id}
                   className="cursor-pointer border-b border-border/60 transition-colors hover:bg-muted/40"
                   onClick={() => onRowClick(row.original)}
                 >
-                  {row.getVisibleCells().map((cell) => {
+                  {visibleCells.map((cell, cellIndex) => {
                     const meta = cell.column.columnDef.meta as { align?: "left" | "right" | "center" } | undefined;
+                    const isLastBodyCell = cellIndex === visibleCells.length - 1;
                     return (
                       <td
                         key={cell.id}
                         className={cn(
                           "truncate px-2 py-0.5 text-foreground/95",
+                          !isLastBodyCell && "border-r border-border/50",
                           meta?.align === "right" ? "text-right tabular-nums" : meta?.align === "center" ? "text-center" : "text-left",
                         )}
                         style={{ width: cell.column.getSize(), minWidth: cell.column.columnDef.minSize }}
@@ -261,7 +267,8 @@ export function ItemsTanstackTable(props: ItemsTanstackTableProps) {
                     );
                   })}
                 </tr>
-              ))
+                );
+              })
             )}
           </tbody>
         </table>
