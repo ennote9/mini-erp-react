@@ -102,13 +102,25 @@ function isTauriRuntime(): boolean {
   return typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
 }
 
+/** Opt-in: add `?exportDiag=1` on `/items` — logs stages + runs Case A (minimal txt download) before real export. */
+function itemsExportDiagLog(enabled: boolean, message: string, detail?: unknown) {
+  if (!enabled) return;
+  console.info("[items-export]", message, detail ?? "");
+}
+
 /**
  * Browser download (plain `npm run dev`) or fallback when Tauri `save()` is dismissed / native write fails.
  *
  * Important: many browsers ignore `click()` on a detached `<a>`, and revoking the blob URL immediately
  * can cancel the download before it starts. Append to `document.body`, click, remove, revoke later.
  */
-function downloadBufferInBrowser(data: BlobPart, downloadFilename: string, mimeType: string) {
+function downloadBufferInBrowser(
+  data: BlobPart,
+  downloadFilename: string,
+  mimeType: string,
+  exportDiag = false,
+) {
+  itemsExportDiagLog(exportDiag, "browser download helper entered", { downloadFilename, mimeType });
   const blob = new Blob([data], { type: mimeType });
   const url = URL.createObjectURL(blob);
   const anchor = document.createElement("a");
@@ -122,6 +134,17 @@ function downloadBufferInBrowser(data: BlobPart, downloadFilename: string, mimeT
   window.setTimeout(() => {
     URL.revokeObjectURL(url);
   }, 30_000);
+  itemsExportDiagLog(exportDiag, "browser download helper completed", { downloadFilename });
+}
+
+/** ExcelJS `writeBuffer()` can resolve to `ArrayBuffer` or a typed array view depending on bundler/runtime. */
+function coerceWriteBufferResult(data: unknown): ArrayBuffer {
+  if (data instanceof ArrayBuffer) return data;
+  if (ArrayBuffer.isView(data)) {
+    const view = data as DataView | Uint8Array | Int8Array;
+    return new Uint8Array(view.buffer, view.byteOffset, view.byteLength).slice().buffer;
+  }
+  throw new Error(`[items-export] unexpected workbook buffer type: ${Object.prototype.toString.call(data)}`);
 }
 
 function readPersistedColumnSizing(): ColumnSizingState {
@@ -639,35 +662,57 @@ export function ItemsListPage() {
   }, [displayItems, visibleSchemaColumns, t, formatMoney]);
 
   const runExportWithSaveAs = useCallback(
-    async (defaultFilename: string, buildBuffer: () => Promise<ArrayBuffer>) => {
+    async (
+      defaultFilename: string,
+      buildBuffer: () => Promise<ArrayBuffer | Uint8Array>,
+      exportDiag = false,
+    ) => {
       const extension = defaultFilename.toLowerCase().endsWith(".pdf") ? "pdf" : "xlsx";
       const base = defaultFilename.replace(/\.[^.]+$/, "");
       const generatedFilename = buildReadableUniqueFilename({ base, extension });
       const fallbackMime = extension === "pdf" ? PDF_MIME : XLSX_MIME;
+      const tauri = isTauriRuntime();
+      itemsExportDiagLog(exportDiag, "runtime branch chosen", { isTauriRuntime: tauri });
 
       // Plain Vite dev (`npm run dev`): no Tauri IPC — never call `save()` (it can throw or no-op before fallback).
-      if (!isTauriRuntime()) {
+      if (!tauri) {
+        itemsExportDiagLog(exportDiag, "native save path skipped (browser/dev)");
         try {
-          const buffer = await buildBuffer();
-          downloadBufferInBrowser(buffer, generatedFilename, fallbackMime);
+          itemsExportDiagLog(exportDiag, "real XLSX buffer build started (browser path)");
+          const raw = await buildBuffer();
+          itemsExportDiagLog(exportDiag, "real XLSX buffer build finished (browser path)", {
+            byteLength: raw instanceof ArrayBuffer ? raw.byteLength : (raw as Uint8Array).byteLength,
+          });
+          const buffer = coerceWriteBufferResult(raw);
+          downloadBufferInBrowser(buffer, generatedFilename, fallbackMime, exportDiag);
         } catch (err) {
           console.error("Export failed", err);
+          itemsExportDiagLog(exportDiag, "catch/fallback entered (browser path)", { err: String(err) });
         }
         return;
       }
 
+      itemsExportDiagLog(exportDiag, "native save path entered (Tauri)");
       try {
         const path = await save({
           defaultPath: generatedFilename,
           filters: [{ name: t("doc.page.excelFilterName"), extensions: ["xlsx"] }],
         });
-        const buffer = await buildBuffer();
+        itemsExportDiagLog(exportDiag, "save() returned", { path: path ?? null });
+        itemsExportDiagLog(exportDiag, "real XLSX buffer build started (Tauri path)");
+        const raw = await buildBuffer();
+        itemsExportDiagLog(exportDiag, "real XLSX buffer build finished (Tauri path)", {
+          byteLength: raw instanceof ArrayBuffer ? raw.byteLength : (raw as Uint8Array).byteLength,
+        });
+        const buffer = coerceWriteBufferResult(raw);
 
         if (path == null) {
-          downloadBufferInBrowser(buffer, generatedFilename, fallbackMime);
+          itemsExportDiagLog(exportDiag, "save() null — browser download fallback");
+          downloadBufferInBrowser(buffer, generatedFilename, fallbackMime, exportDiag);
           return;
         }
 
+        itemsExportDiagLog(exportDiag, "native write path entered", { path });
         const safePath = await ensureUniqueExportPath(path);
         const bytes = new Uint8Array(buffer);
         let binary = "";
@@ -677,11 +722,14 @@ export function ItemsListPage() {
         await invoke("write_export_file", { path: safePath, contentsBase64 });
         const filename = safePath.replace(/^.*[/\\]/, "") || generatedFilename;
         setExportSuccess({ path: safePath, filename });
+        itemsExportDiagLog(exportDiag, "export success reached (Tauri write)", { filename });
       } catch (err) {
         console.error("Export failed", err);
+        itemsExportDiagLog(exportDiag, "catch/fallback entered (Tauri path)", { err: String(err) });
         try {
-          const buffer = await buildBuffer();
-          downloadBufferInBrowser(buffer, generatedFilename, fallbackMime);
+          const raw = await buildBuffer();
+          const buffer = coerceWriteBufferResult(raw);
+          downloadBufferInBrowser(buffer, generatedFilename, fallbackMime, exportDiag);
         } catch (fallbackErr) {
           console.error("Export browser fallback failed", fallbackErr);
         }
@@ -692,16 +740,60 @@ export function ItemsListPage() {
 
   const listExcelLabels = useMemo(() => itemsListExcelLabels(t), [t, locale]);
   const handleExportCurrentView = useCallback(async () => {
+    const exportDiag = searchParams.get("exportDiag") === "1";
+    if (exportDiag) {
+      itemsExportDiagLog(exportDiag, "export click entered", { exportDiag: true });
+      itemsExportDiagLog(exportDiag, "Case A — simple direct blob download started (same click flow)");
+      downloadBufferInBrowser(
+        "items-export delivery probe\n",
+        "items-export-probe.txt",
+        "text/plain",
+        exportDiag,
+      );
+      itemsExportDiagLog(exportDiag, "Case A — simple direct blob download helper returned");
+    }
+
     const payload = buildExportPayload();
-    await runExportWithSaveAs("items.xlsx", () =>
-      buildListViewXlsxBuffer({
-        sheetName: listExcelLabels.sheetName,
-        headers: payload.headers,
-        rows: payload.rows,
-        tableNameBase: "ItemsListView",
-      }),
+    itemsExportDiagLog(exportDiag, "real export payload built", {
+      headerCount: payload.headers.length,
+      rowCount: payload.rows.length,
+    });
+
+    // With zero visible columns, `addTable` receives `columns: []` and ExcelJS fails — previously a silent no-op in browser.
+    if (payload.headers.length === 0) {
+      itemsExportDiagLog(exportDiag, "zero visible columns — using placeholder XLSX (Case B substitute)");
+      await runExportWithSaveAs(
+        "items.xlsx",
+        () =>
+          buildListViewXlsxBuffer({
+            sheetName: listExcelLabels.sheetName,
+            headers: ["—"],
+            rows: [["No visible columns. Use View settings to show at least one column, then export again."]],
+            tableNameBase: "ItemsListView",
+          }),
+        exportDiag,
+      );
+      return;
+    }
+
+    await runExportWithSaveAs(
+      "items.xlsx",
+      async () => {
+        itemsExportDiagLog(exportDiag, "real XLSX buffer build started (payload path)");
+        const buf = await buildListViewXlsxBuffer({
+          sheetName: listExcelLabels.sheetName,
+          headers: payload.headers,
+          rows: payload.rows,
+          tableNameBase: "ItemsListView",
+        });
+        itemsExportDiagLog(exportDiag, "real XLSX buffer build finished (payload path)", {
+          byteLength: buf instanceof ArrayBuffer ? buf.byteLength : (buf as Uint8Array).byteLength,
+        });
+        return buf;
+      },
+      exportDiag,
     );
-  }, [buildExportPayload, listExcelLabels, runExportWithSaveAs]);
+  }, [buildExportPayload, listExcelLabels, runExportWithSaveAs, searchParams]);
 
   const handleRowSelectionChange = useCallback<OnChangeFn<RowSelectionState>>((updater) => {
     setRowSelection((prev) => functionalUpdate(updater, prev));
