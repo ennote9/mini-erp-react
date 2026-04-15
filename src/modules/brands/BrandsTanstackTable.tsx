@@ -203,7 +203,7 @@ export function BrandsTanstackTable(props: BrandsTanstackTableProps) {
         className="min-h-0 min-w-0 flex-1 overflow-auto"
         data-brands-table-scroll
       >
-        <div className="relative inline-block align-top" style={{ width: Math.max(totalWidth, 960) }}>
+        <div className="relative inline-block align-top" style={{ width: totalWidth }}>
           {resizeGuideLeftPx != null ? (
             <div
               aria-hidden
@@ -213,7 +213,7 @@ export function BrandsTanstackTable(props: BrandsTanstackTableProps) {
           ) : null}
           <table
             className="w-full border-collapse table-fixed text-[12px] leading-tight"
-            style={{ width: Math.max(totalWidth, 960) }}
+            style={{ width: totalWidth }}
           >
             <colgroup>
               {visibleLeafColumns.map((column) => (
