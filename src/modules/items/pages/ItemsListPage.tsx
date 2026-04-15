@@ -97,7 +97,12 @@ function applyCategoryIdFilter(items: Item[], categoryId: string | null): Item[]
 const XLSX_MIME = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
 const PDF_MIME = "application/pdf";
 
-/** Browser download fallback when Tauri `save()` returns null or native export fails. */
+/** True when the page runs inside the Tauri webview (not a standalone browser tab on the dev server). */
+function isTauriRuntime(): boolean {
+  return typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
+}
+
+/** Browser download (plain `npm run dev`) or fallback when Tauri `save()` is dismissed / native write fails. */
 function downloadBufferInBrowser(buffer: ArrayBuffer, downloadFilename: string, mimeType: string) {
   const blob = new Blob([buffer], { type: mimeType });
   const url = URL.createObjectURL(blob);
@@ -629,6 +634,17 @@ export function ItemsListPage() {
       const generatedFilename = buildReadableUniqueFilename({ base, extension });
       const fallbackMime = extension === "pdf" ? PDF_MIME : XLSX_MIME;
 
+      // Plain Vite dev (`npm run dev`): no Tauri IPC — never call `save()` (it can throw or no-op before fallback).
+      if (!isTauriRuntime()) {
+        try {
+          const buffer = await buildBuffer();
+          downloadBufferInBrowser(buffer, generatedFilename, fallbackMime);
+        } catch (err) {
+          console.error("Export failed", err);
+        }
+        return;
+      }
+
       try {
         const path = await save({
           defaultPath: generatedFilename,
@@ -636,7 +652,6 @@ export function ItemsListPage() {
         });
         const buffer = await buildBuffer();
 
-        // `save()` resolves null when the dialog is dismissed — not an error, so the catch block never ran.
         if (path == null) {
           downloadBufferInBrowser(buffer, generatedFilename, fallbackMime);
           return;
