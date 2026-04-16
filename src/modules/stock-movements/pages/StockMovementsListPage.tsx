@@ -1,171 +1,155 @@
 /**
- * Stock Movements — Stage 4: Readability polish — Movement Type badge, wider columns, readable datetime.
+ * Stock Movements list — TanStack Table (Items / Shipments list architecture).
  */
+import {
+  functionalUpdate,
+  type ColumnSizingState,
+  type OnChangeFn,
+  type RowSelectionState,
+  type SortingState,
+  type VisibilityState,
+} from "@tanstack/react-table";
 import { useMemo, useState, useRef, useCallback, useEffect } from "react";
-import { Link, useLocation, useSearchParams } from "react-router-dom";
-import { AgGridReact } from "ag-grid-react";
-import type { ColDef, ICellRendererParams, SelectionChangedEvent } from "ag-grid-community";
-import { stockMovementRepository } from "../repository";
+import { useLocation, useSearchParams } from "react-router-dom";
 import { itemRepository } from "../../items/repository";
 import { brandRepository } from "../../brands/repository";
 import { categoryRepository } from "../../categories/repository";
 import { warehouseRepository } from "../../warehouses/repository";
-import { receiptRepository } from "../../receipts/repository";
-import { shipmentRepository } from "../../shipments/repository";
-import { salesOrderRepository } from "../../sales-orders/repository";
-import { purchaseOrderRepository } from "../../purchase-orders/repository";
-import type { StockMovement } from "../model";
-import type { SourceDocumentType } from "../../../shared/domain";
 import { ListPageLayout } from "../../../shared/ui/list/ListPageLayout";
 import {
-  AgGridContainer,
-  AgGridMovementTypeCellRenderer,
   applyAgGridColumnFilters,
   applyDeepSortModel,
-  agGridDefaultColDef,
-  agGridDefaultGridOptions,
-  agGridRowNumberColDef,
-  agGridSelectionColumnDef,
-  decorateAgGridColumnDefsWithFilters,
-  useAgGridColumnFilterBridge,
-  useAgGridNoRowsOverlayLifecycle,
   useAgGridColumnSettings,
   AgGridColumnSettingsModal,
-  getVisibleAgGridExportColumns,
-  collectFilteredSortedRowNodes,
-  buildExportMatrixFromRowNodes,
   getAgGridNoRowsOverlayContent,
-  buildAgGridNoRowsOverlayTemplate,
   type AgGridColumnFilterConfig,
 } from "../../../shared/ui/ag-grid";
 import { ListPageSearch } from "../../../shared/ui/list/ListPageSearch";
 import { useListPageSearchHotkey } from "../../../shared/hotkeys";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Button } from "@/components/ui/button";
-import { ChevronDown, FileSpreadsheet, File, FolderOpen, X } from "lucide-react";
-import { save } from "@tauri-apps/plugin-dialog";
-import { invoke } from "@tauri-apps/api/core";
-import { revealItemInDir } from "@tauri-apps/plugin-opener";
+import { ChevronDown, FileSpreadsheet, File, FolderOpen, SlidersHorizontal, X } from "lucide-react";
 import { useTranslation } from "@/shared/i18n/context";
 import { useAppDisplayFormatters } from "@/shared/formatting";
 import { buildReadableUniqueFilename, ensureUniqueExportPath } from "@/shared/export/filenameBuilder";
 import { stockMovementsListExcelLabels } from "@/shared/i18n/excelListExportLabels";
 import { buildListViewXlsxBuffer } from "@/shared/export/listViewXlsx";
+import { save } from "@tauri-apps/plugin-dialog";
+import { invoke } from "@tauri-apps/api/core";
+import { revealItemInDir } from "@tauri-apps/plugin-opener";
 import { normalizeTrim } from "../../../shared/validation";
-import { applyUrlGridSort, getCurrentGridSort, readUrlGridSort, serializeUrlGridSort } from "@/shared/navigation/agGridSort";
+import { readUrlGridSort, serializeUrlGridSort, type UrlGridSort } from "@/shared/navigation/agGridSort";
 import {
   hasActiveAgGridColumnFilters,
   readUrlAgGridColumnFilters,
-  replaceUrlAgGridColumnFilters,
   withUrlAgGridColumnFilters,
-  type AgGridColumnFilterClause,
 } from "@/shared/navigation/agGridColumnFilters";
-import { replaceQueryParam } from "@/shared/navigation/returnTo";
+import {
+  buildUrlGridSortFromDeepSortRules,
+  pruneDeepSortRulesByHiddenFields,
+  type ListViewDeepFilterRule,
+} from "@/shared/ui/ag-grid/listViewConfig";
+import { buildNavigationStateKey, replaceQueryParam } from "@/shared/navigation/returnTo";
+import { useSessionScrollRestore } from "@/shared/navigation/useSessionScrollRestore";
+import { useAppReadModelRevision } from "@/shared/inventoryMasterPageBlocks/useAppReadModelRevision";
+import { buildMovementsListViewCatalog } from "../movementsListViewFieldCatalog";
+import { buildStockMovementListRows, type StockMovementListRow } from "../movementListRowModel";
+import { buildMovementsTableSchema, type MovementsTableColumnSchema } from "../movementsTableSchema";
+import { buildMovementsTableListViewState } from "../movementsListViewState";
+import { formatMovementsTableValue } from "../movementsTanstackColumns";
+import { MovementsTanstackTable } from "../MovementsTanstackTable";
+import { ItemsHeaderFilterPanel } from "@/modules/items/ItemsHeaderFilterPanel";
 
-type RowData = StockMovement & {
-  itemCode: string;
-  itemName: string;
-  warehouseName: string;
-  sourceDocumentLabel: string;
-  sourceDocumentHref: string | null;
-  /** Sales order or purchase order number when resolved from source shipment/receipt; otherwise "—". */
-  relatedOrderLabel: string;
-  /** Route to SO/PO detail when related order exists; null when label is "—". */
-  relatedOrderHref: string | null;
+const COLUMN_SIZING_STORAGE_KEY = "mini-erp:stock-movements:tanstack:columnSizing:v1";
+const MAX_REASONABLE_COLUMN_SIZE = 1200;
+
+type HeaderFilterAnchor = {
+  fieldId: string;
+  left: number;
+  top: number;
+  width: number;
+  height: number;
 };
 
-/** Display only the source document number/code; movement type is a separate column. */
-function getSourceDocument(
-  sourceDocumentType: SourceDocumentType,
-  sourceDocumentId: string,
-): { label: string; href: string | null } {
-  if (sourceDocumentType === "receipt") {
-    const doc = receiptRepository.getById(sourceDocumentId);
-    const number = doc?.number ?? sourceDocumentId;
-    return {
-      label: number,
-      href: `/receipts/${sourceDocumentId}`,
-    };
-  }
-  if (sourceDocumentType === "shipment") {
-    const doc = shipmentRepository.getById(sourceDocumentId);
-    const number = doc?.number ?? sourceDocumentId;
-    return {
-      label: number,
-      href: `/shipments/${sourceDocumentId}`,
-    };
-  }
-  return { label: sourceDocumentId, href: null };
+type PendingHeaderFilterCommit =
+  | { type: "apply"; rule: ListViewDeepFilterRule }
+  | { type: "reset"; fieldKey: string };
+
+const XLSX_MIME = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+
+function isTauriRuntime(): boolean {
+  return typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
 }
 
-const EMPTY_RELATED_ORDER = "\u2014";
-
-/**
- * Related planning order for the movement: SO from posted shipment, PO from posted receipt.
- * Reversal movements use the same source document id, so linkage matches the underlying receipt/shipment.
- */
-function getRelatedOrderDisplay(
-  sourceDocumentType: SourceDocumentType,
-  sourceDocumentId: string,
-): { label: string; href: string | null } {
-  if (sourceDocumentType === "shipment") {
-    const sh = shipmentRepository.getById(sourceDocumentId);
-    const soId = sh?.salesOrderId?.trim() ?? "";
-    if (soId === "") return { label: EMPTY_RELATED_ORDER, href: null };
-    const so = salesOrderRepository.getById(soId);
-    const num = so?.number?.trim() ?? "";
-    if (num === "") return { label: EMPTY_RELATED_ORDER, href: null };
-    return { label: num, href: `/sales-orders/${soId}` };
-  }
-  if (sourceDocumentType === "receipt") {
-    const rc = receiptRepository.getById(sourceDocumentId);
-    const poId = rc?.purchaseOrderId?.trim() ?? "";
-    if (poId === "") return { label: EMPTY_RELATED_ORDER, href: null };
-    const po = purchaseOrderRepository.getById(poId);
-    const num = po?.number?.trim() ?? "";
-    if (num === "") return { label: EMPTY_RELATED_ORDER, href: null };
-    return { label: num, href: `/purchase-orders/${poId}` };
-  }
-  return { label: EMPTY_RELATED_ORDER, href: null };
+function downloadBufferInBrowser(data: BlobPart, downloadFilename: string, mimeType: string) {
+  const blob = new Blob([data], { type: mimeType });
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = downloadFilename;
+  anchor.rel = "noopener";
+  anchor.style.display = "none";
+  document.body.appendChild(anchor);
+  anchor.click();
+  anchor.remove();
+  window.setTimeout(() => {
+    URL.revokeObjectURL(url);
+  }, 30_000);
 }
 
-function SourceDocumentCellRenderer(params: ICellRendererParams<RowData>) {
-  const data = params.data;
-  if (!data) return null;
-  const { sourceDocumentLabel, sourceDocumentHref } = data;
-  if (sourceDocumentHref) {
-    return (
-      <Link
-        to={sourceDocumentHref}
-        className="list-table__link"
-        onClick={(e) => e.stopPropagation()}
-      >
-        {sourceDocumentLabel}
-      </Link>
-    );
+function coerceWriteBufferResult(data: unknown): ArrayBuffer {
+  if (data instanceof ArrayBuffer) return data;
+  if (ArrayBuffer.isView(data)) {
+    const view = data as DataView | Uint8Array | Int8Array;
+    return new Uint8Array(view.buffer, view.byteOffset, view.byteLength).slice().buffer;
   }
-  return <span>{sourceDocumentLabel}</span>;
+  throw new Error(`unexpected workbook buffer type: ${Object.prototype.toString.call(data)}`);
 }
 
-function RelatedOrderCellRenderer(params: ICellRendererParams<RowData>) {
-  const data = params.data;
-  if (!data) return null;
-  const { relatedOrderLabel, relatedOrderHref } = data;
-  if (relatedOrderHref) {
-    return (
-      <Link
-        to={relatedOrderHref}
-        className="list-table__link"
-        onClick={(e) => e.stopPropagation()}
-      >
-        {relatedOrderLabel}
-      </Link>
-    );
+function readPersistedColumnSizing(): ColumnSizingState {
+  if (typeof window === "undefined") return {};
+  try {
+    const raw = window.localStorage.getItem(COLUMN_SIZING_STORAGE_KEY);
+    if (!raw) return {};
+    const parsed = JSON.parse(raw) as unknown;
+    if (!parsed || typeof parsed !== "object") return {};
+    return parsed as ColumnSizingState;
+  } catch {
+    return {};
   }
-  return <span>{relatedOrderLabel}</span>;
 }
 
-function filterBySearch(rows: RowData[], query: string): RowData[] {
+function writePersistedColumnSizing(value: ColumnSizingState) {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(COLUMN_SIZING_STORAGE_KEY, JSON.stringify(value));
+  } catch {
+    // ignore
+  }
+}
+
+function sanitizeColumnSizing(
+  value: ColumnSizingState,
+  schema: MovementsTableColumnSchema[],
+): ColumnSizingState {
+  const schemaById = new Map(schema.map((column) => [column.id, column]));
+  const sanitized: ColumnSizingState = {};
+
+  for (const [columnId, rawSize] of Object.entries(value)) {
+    const column = schemaById.get(columnId);
+    if (!column) continue;
+    if (typeof rawSize !== "number" || !Number.isFinite(rawSize)) continue;
+
+    const min = column.minSize ?? 48;
+    const max = Math.min(column.maxSize ?? MAX_REASONABLE_COLUMN_SIZE, MAX_REASONABLE_COLUMN_SIZE);
+    const nextSize = Math.max(min, Math.min(max, Math.round(rawSize)));
+    sanitized[columnId] = nextSize;
+  }
+
+  return sanitized;
+}
+
+function filterBySearch(rows: StockMovementListRow[], query: string): StockMovementListRow[] {
   const q = query.trim().toLowerCase();
   if (!q) return rows;
   return rows.filter(
@@ -178,17 +162,17 @@ function filterBySearch(rows: RowData[], query: string): RowData[] {
   );
 }
 
-function filterByWarehouseId(rows: RowData[], warehouseId: string | null): RowData[] {
+function filterByWarehouseId(rows: StockMovementListRow[], warehouseId: string | null): StockMovementListRow[] {
   if (warehouseId == null) return rows;
   return rows.filter((r) => r.warehouseId === warehouseId);
 }
 
-function filterByItemId(rows: RowData[], itemId: string | null): RowData[] {
+function filterByItemId(rows: StockMovementListRow[], itemId: string | null): StockMovementListRow[] {
   if (itemId == null) return rows;
   return rows.filter((r) => r.itemId === itemId);
 }
 
-function filterByBrandId(rows: RowData[], brandId: string | null): RowData[] {
+function filterByBrandId(rows: StockMovementListRow[], brandId: string | null): StockMovementListRow[] {
   if (brandId == null) return rows;
   const want = normalizeTrim(brandId);
   return rows.filter((r) => {
@@ -197,7 +181,7 @@ function filterByBrandId(rows: RowData[], brandId: string | null): RowData[] {
   });
 }
 
-function filterByCategoryId(rows: RowData[], categoryId: string | null): RowData[] {
+function filterByCategoryId(rows: StockMovementListRow[], categoryId: string | null): StockMovementListRow[] {
   if (categoryId == null) return rows;
   const want = normalizeTrim(categoryId);
   return rows.filter((r) => {
@@ -207,9 +191,28 @@ function filterByCategoryId(rows: RowData[], categoryId: string | null): RowData
 }
 
 export function StockMovementsListPage() {
-  const location = useLocation();
   const { t, locale } = useTranslation();
   const { formatDateTime: formatDateTimeUi, formatNumber } = useAppDisplayFormatters();
+  const location = useLocation();
+  const appReadRevision = useAppReadModelRevision();
+
+  const movementTypeLabel = useCallback(
+    (code: string) => {
+      const translated = t(`ops.stockMovements.types.${code}`);
+      return translated === code ? code : translated;
+    },
+    [t],
+  );
+
+  const formatQtyDeltaUi = useCallback(
+    (value: number | null | undefined): string => {
+      if (value == null || Number.isNaN(value) || !Number.isFinite(value)) return "";
+      const base = formatNumber(value, { minFractionDigits: Number.isInteger(value) ? 0 : 2, maxFractionDigits: 2 });
+      return value > 0 ? `+${base}` : base;
+    },
+    [formatNumber],
+  );
+
   const [searchParams, setSearchParams] = useSearchParams();
   const itemFilterId = useMemo(() => {
     const raw = searchParams.get("itemId");
@@ -236,114 +239,122 @@ export function StockMovementsListPage() {
     return trimmed === "" ? null : trimmed;
   }, [searchParams]);
 
-  const movementTypeLabel = useCallback(
-    (code: string) => {
-      const translated = t(`ops.stockMovements.types.${code}`);
-      return translated === code ? code : translated;
-    },
-    [t],
+  const searchQuery = searchParams.get("q") ?? "";
+  const searchParamsSort = searchParams.get("sort") ?? "";
+
+  const [exportSuccess, setExportSuccess] = useState<{ path: string; filename: string } | null>(null);
+  const [exportOpen, setExportOpen] = useState(false);
+  const [rowSelection, setRowSelection] = useState<RowSelectionState>({});
+  const [pendingSortModel, setPendingSortModel] = useState<UrlGridSort[] | null>(null);
+  const [columnSizing, setColumnSizing] = useState<ColumnSizingState>(() => readPersistedColumnSizing());
+  const [headerFilterAnchor, setHeaderFilterAnchor] = useState<HeaderFilterAnchor | null>(null);
+  const [pendingHeaderFilterCommit, setPendingHeaderFilterCommit] = useState<PendingHeaderFilterCommit | null>(null);
+  const [runtimeSortSerialized, setRuntimeSortSerialized] = useState(() =>
+    serializeUrlGridSort(readUrlGridSort(new URLSearchParams(location.search))),
   );
 
-  const [searchQuery, setSearchQuery] = useState("");
-  const initialSortModel = useMemo(
-    () => readUrlGridSort(new URLSearchParams(location.search)),
-    [location.search],
+  const gridContainerRef = useRef<HTMLDivElement | null>(null);
+  const listSearchInputRef = useRef<HTMLInputElement>(null);
+  useListPageSearchHotkey(listSearchInputRef);
+
+  useEffect(() => {
+    writePersistedColumnSizing(columnSizing);
+  }, [columnSizing]);
+
+  const listStateKey = useMemo(
+    () => buildNavigationStateKey(location.pathname, searchParams),
+    [location.pathname, searchParams],
   );
+  useSessionScrollRestore(listStateKey, gridContainerRef);
+
   const columnFilterModel = useMemo(
     () => readUrlAgGridColumnFilters(new URLSearchParams(location.search)),
     [location.search],
   );
-  const [runtimeSortSerialized, setRuntimeSortSerialized] = useState(() => serializeUrlGridSort(initialSortModel));
-  const [exportSuccess, setExportSuccess] = useState<{ path: string; filename: string } | null>(null);
-  const [exportOpen, setExportOpen] = useState(false);
-  const [selectedCount, setSelectedCount] = useState(0);
-  const gridRef = useRef<AgGridReact<RowData> | null>(null);
-  const listSearchInputRef = useRef<HTMLInputElement>(null);
-  useListPageSearchHotkey(listSearchInputRef);
 
-  const onSelectionChanged = useCallback((e: SelectionChangedEvent<RowData>) => {
-    setSelectedCount(e.api.getSelectedRows().length);
-  }, []);
-  const handleSortChanged = useCallback(() => {
-    const api = gridRef.current?.api;
-    if (!api) return;
-    const serialized = serializeUrlGridSort(getCurrentGridSort(api, ["selection", "rowNumber", "lineNo"]));
-    setRuntimeSortSerialized(serialized);
-    replaceQueryParam(searchParams, setSearchParams, "sort", serialized);
-  }, [searchParams, setSearchParams]);
-
-  const rowsWithNames = useMemo(() => {
-    const list = stockMovementRepository.list();
-    return list
-      .map((m) => {
-        const item = itemRepository.getById(m.itemId);
-        const warehouse = warehouseRepository.getById(m.warehouseId);
-        const { label: sourceDocumentLabel, href: sourceDocumentHref } = getSourceDocument(
-          m.sourceDocumentType,
-          m.sourceDocumentId,
-        );
-        const { label: relatedOrderLabel, href: relatedOrderHref } = getRelatedOrderDisplay(
-          m.sourceDocumentType,
-          m.sourceDocumentId,
-        );
-        return {
-          ...m,
-          itemCode: item?.code ?? m.itemId,
-          itemName: item?.name ?? m.itemId,
-          warehouseName: warehouse?.name ?? m.warehouseId,
-          sourceDocumentLabel,
-          sourceDocumentHref,
-          relatedOrderLabel,
-          relatedOrderHref,
-        };
-      })
-      .sort(
-        (a, b) =>
-          new Date(b.datetime).getTime() - new Date(a.datetime).getTime(),
-      );
-  }, [t, locale]);
-
-  const filteredRows = useMemo(() => {
-    const byBrand = filterByBrandId(rowsWithNames, brandFilterId);
-    const byCategory = filterByCategoryId(byBrand, categoryFilterId);
-    const byItem = filterByItemId(byCategory, itemFilterId);
-    const byWarehouse = filterByWarehouseId(byItem, warehouseFilterId);
-    return filterBySearch(byWarehouse, searchQuery);
-  }, [
-    rowsWithNames,
-    brandFilterId,
-    categoryFilterId,
-    itemFilterId,
-    warehouseFilterId,
-    searchQuery,
-  ]);
-
-  const stockMovementColumnFilterConfigs = useMemo<Record<string, AgGridColumnFilterConfig<RowData>>>(
-    () => ({
-      datetime: { kind: "datetime" },
-      movementType: {
-        kind: "enum",
-        getValue: (row) => movementTypeLabel(row.movementType),
-        options: Array.from(new Set(rowsWithNames.map((row) => movementTypeLabel(row.movementType))))
-          .filter(Boolean)
-          .sort((a, b) => a.localeCompare(b))
-          .map((value) => ({ value, label: value })),
-      },
-      itemCode: { kind: "text" },
-      itemName: { kind: "text" },
-      warehouseName: {
-        kind: "enum",
-        options: Array.from(new Set(rowsWithNames.map((row) => row.warehouseName)))
-          .filter(Boolean)
-          .sort((a, b) => a.localeCompare(b))
-          .map((value) => ({ value, label: value })),
-      },
-      qtyDelta: { kind: "number" },
-      sourceDocumentLabel: { kind: "text", getValue: (row) => row.sourceDocumentLabel },
-      relatedOrder: { kind: "text", getValue: (row) => row.relatedOrderLabel },
-    }),
-    [rowsWithNames, movementTypeLabel],
+  const setQueryValue = useCallback(
+    (key: string, value: string, defaultValue = "") => {
+      replaceQueryParam(searchParams, setSearchParams, key, value, defaultValue);
+    },
+    [searchParams, setSearchParams],
   );
+
+  const movementsTableSchema = useMemo(
+    () => buildMovementsTableSchema({ t }),
+    [t, locale, appReadRevision],
+  );
+
+  useEffect(() => {
+    setColumnSizing((current) => {
+      const next = sanitizeColumnSizing(current, movementsTableSchema);
+      const currentKeys = Object.keys(current);
+      const nextKeys = Object.keys(next);
+      if (
+        currentKeys.length === nextKeys.length &&
+        currentKeys.every((key) => current[key] === next[key])
+      ) {
+        return current;
+      }
+      return next;
+    });
+  }, [movementsTableSchema]);
+
+  const listRows = useMemo(() => buildStockMovementListRows(), [appReadRevision]);
+
+  const rowsAfterBrand = useMemo(
+    () => filterByBrandId(listRows, brandFilterId),
+    [listRows, brandFilterId],
+  );
+  const rowsAfterCategory = useMemo(
+    () => filterByCategoryId(rowsAfterBrand, categoryFilterId),
+    [rowsAfterBrand, categoryFilterId],
+  );
+  const rowsAfterItem = useMemo(
+    () => filterByItemId(rowsAfterCategory, itemFilterId),
+    [rowsAfterCategory, itemFilterId],
+  );
+  const rowsAfterWarehouse = useMemo(
+    () => filterByWarehouseId(rowsAfterItem, warehouseFilterId),
+    [rowsAfterItem, warehouseFilterId],
+  );
+
+  const filteredRows = useMemo(
+    () => filterBySearch(rowsAfterWarehouse, searchQuery),
+    [rowsAfterWarehouse, searchQuery],
+  );
+
+  const warehouseNameEnumOptions = useMemo(
+    () =>
+      Array.from(new Set(listRows.map((row) => row.warehouseName)))
+        .filter(Boolean)
+        .sort((a, b) => a.localeCompare(b))
+        .map((value) => ({ value, label: value })),
+    [listRows],
+  );
+
+  const movementTypeEnumOptions = useMemo(
+    () =>
+      Array.from(new Set(listRows.map((row) => movementTypeLabel(row.movementType))))
+        .filter(Boolean)
+        .sort((a, b) => a.localeCompare(b))
+        .map((value) => ({ value, label: value })),
+    [listRows, movementTypeLabel],
+  );
+
+  const movementsListViewCatalog = useMemo(
+    () =>
+      buildMovementsListViewCatalog({
+        t,
+        movementTypeLabel,
+        warehouseNameEnumOptions,
+        movementTypeEnumOptions,
+      }),
+    [t, locale, movementTypeLabel, warehouseNameEnumOptions, movementTypeEnumOptions],
+  );
+
+  const baseColumnDefs = movementsListViewCatalog.columnDefs;
+  const stockMovementFieldRegistry = movementsListViewCatalog.fieldRegistry;
+  const stockMovementColumnFilterConfigs = movementsListViewCatalog.filterConfigs;
 
   const displayRowsWithQueryFilters = useMemo(
     () => applyAgGridColumnFilters(filteredRows, columnFilterModel, stockMovementColumnFilterConfigs),
@@ -419,182 +430,7 @@ export function StockMovementsListPage() {
     setSearchParams(next, { replace: true });
   }, [searchParams, setSearchParams]);
 
-  const buildExportPayload = useCallback(
-    (mode: "current" | "selected"): { headers: string[]; rows: Array<Array<string | number>> } => {
-      const api = gridRef.current?.api;
-      if (!api) return { headers: [], rows: [] };
-      const columns = getVisibleAgGridExportColumns(api, { entityType: "stock-movements" });
-      const rowNodes =
-        mode === "selected"
-          ? api.getSelectedNodes()
-          : collectFilteredSortedRowNodes(api);
-      return {
-        headers: columns.map((x) => x.headerName),
-        rows: buildExportMatrixFromRowNodes(api, columns, rowNodes),
-      };
-    },
-    [],
-  );
-
-  const runExportWithSaveAs = useCallback(
-    async (defaultFilename: string, buildBuffer: () => Promise<ArrayBuffer>) => {
-      try {
-        const extension = defaultFilename.toLowerCase().endsWith(".pdf") ? "pdf" : "xlsx";
-        const base = defaultFilename.replace(/\.[^.]+$/, "");
-        const generatedFilename = buildReadableUniqueFilename({ base, extension });
-        const path = await save({
-          defaultPath: generatedFilename,
-          filters: [{ name: t("ops.importModal.excelFileFilterName"), extensions: ["xlsx"] }],
-        });
-        if (path == null) return;
-        const safePath = await ensureUniqueExportPath(path);
-
-        const buffer = await buildBuffer();
-        const bytes = new Uint8Array(buffer);
-        let binary = "";
-        for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
-        const contentsBase64 = btoa(binary);
-
-        await invoke("write_export_file", { path: safePath, contentsBase64 });
-        const filename = safePath.replace(/^.*[/\\]/, "") || generatedFilename;
-        setExportSuccess({ path: safePath, filename });
-      } catch (err) {
-        console.error("Export failed", err);
-        const buffer = await buildBuffer();
-        const blob = new Blob([buffer], {
-          type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement("a");
-        a.href = url;
-        a.download = defaultFilename;
-        a.click();
-        URL.revokeObjectURL(url);
-      }
-    },
-    [t],
-  );
-
-  const listExcelLabels = useMemo(() => stockMovementsListExcelLabels(t), [t, locale]);
-
-  const handleExportCurrentView = useCallback(() => {
-    const payload = buildExportPayload("current");
-    runExportWithSaveAs("stock-movements.xlsx", () =>
-      buildListViewXlsxBuffer({
-        sheetName: listExcelLabels.sheetName,
-        headers: payload.headers,
-        rows: payload.rows,
-        tableNameBase: "StockMovementsListView",
-      }),
-    );
-  }, [buildExportPayload, listExcelLabels, runExportWithSaveAs]);
-
-  const handleExportSelected = useCallback(() => {
-    const payload = buildExportPayload("selected");
-    if (payload.rows.length === 0) return;
-    runExportWithSaveAs("stock-movements-selected.xlsx", () =>
-      buildListViewXlsxBuffer({
-        sheetName: listExcelLabels.sheetName,
-        headers: payload.headers,
-        rows: payload.rows,
-        tableNameBase: "StockMovementsListViewSelected",
-      }),
-    );
-  }, [buildExportPayload, listExcelLabels, runExportWithSaveAs]);
-
-  const exportSelectedDisabled = selectedCount === 0;
-
-  const handleApplyColumnFilter = useCallback(
-    (colId: string, clause: AgGridColumnFilterClause) => {
-      replaceUrlAgGridColumnFilters(searchParams, setSearchParams, {
-        ...columnFilterModel,
-        [colId]: clause,
-      });
-    },
-    [columnFilterModel, searchParams, setSearchParams],
-  );
-
-  const formatQtyDeltaUi = useCallback(
-    (value: number | null | undefined): string => {
-      if (value == null || Number.isNaN(value) || !Number.isFinite(value)) return "";
-      const base = formatNumber(value, { minFractionDigits: Number.isInteger(value) ? 0 : 2, maxFractionDigits: 2 });
-      return value > 0 ? `+${base}` : base;
-    },
-    [formatNumber],
-  );
-
-  const handleResetColumnFilter = useCallback(
-    (colId: string) => {
-      const nextModel = { ...columnFilterModel };
-      delete nextModel[colId];
-      replaceUrlAgGridColumnFilters(searchParams, setSearchParams, nextModel);
-    },
-    [columnFilterModel, searchParams, setSearchParams],
-  );
-  const columnFilterBridge = useAgGridColumnFilterBridge(
-    columnFilterModel,
-    handleApplyColumnFilter,
-    handleResetColumnFilter,
-  );
-
-  const baseColumnDefs = useMemo<ColDef<RowData>[]>(
-    () => [
-      agGridRowNumberColDef,
-      {
-        field: "datetime",
-        headerName: t("doc.columns.dateTime"),
-        width: 200,
-        valueFormatter: (params) => formatDateTimeUi(params.value, { empty: "" }),
-      },
-      {
-        field: "movementType",
-        headerName: t("doc.columns.movementType"),
-        width: 120,
-        cellRenderer: AgGridMovementTypeCellRenderer,
-      },
-      {
-        field: "itemCode",
-        headerName: t("doc.columns.itemCode"),
-        width: 120,
-      },
-      {
-        field: "itemName",
-        headerName: t("doc.columns.itemName"),
-        minWidth: 160,
-      },
-      {
-        field: "warehouseName",
-        headerName: t("doc.columns.warehouse"),
-        minWidth: 120,
-      },
-      {
-        field: "qtyDelta",
-        headerName: t("doc.columns.qtyDelta"),
-        width: 110,
-        valueFormatter: (params) => formatQtyDeltaUi(params.value),
-      },
-      {
-        colId: "sourceDocumentLabel",
-        headerName: t("doc.columns.sourceDocument"),
-        minWidth: 132,
-        width: 148,
-        valueGetter: (params) => params.data?.sourceDocumentLabel ?? "",
-        cellRenderer: SourceDocumentCellRenderer,
-      },
-      {
-        colId: "relatedOrder",
-        headerName: t("doc.columns.relatedOrder"),
-        minWidth: 120,
-        width: 132,
-        valueGetter: (params) => params.data?.relatedOrderLabel ?? "",
-        cellRenderer: RelatedOrderCellRenderer,
-      },
-    ],
-    [t, locale, formatDateTimeUi, formatQtyDeltaUi],
-  );
-
   const {
-    columnDefs: settingsAwareBaseColumnDefs,
     draftItems: columnSettingsDraftItems,
     draftDeepFilters: columnSettingsDraftDeepFilters,
     draftDeepSorts: columnSettingsDraftDeepSorts,
@@ -608,6 +444,7 @@ export function StockMovementsListPage() {
     cancelDraft: cancelColumnSettingsDraft,
     deepFilterModel,
     deepSortModel,
+    definition: columnSettingsDefinition,
     registry: columnSettingsRegistry,
     personalViews: columnSettingsPersonalViews,
     activeViewId: columnSettingsActiveViewId,
@@ -619,32 +456,41 @@ export function StockMovementsListPage() {
     renameActivePersonalView: renameColumnSettingsActivePersonalView,
     deleteActivePersonalView: deleteColumnSettingsActivePersonalView,
     setActivePersonalViewAsDefault: setColumnSettingsActivePersonalViewAsDefault,
-  } = useAgGridColumnSettings<RowData>({
+  } = useAgGridColumnSettings<StockMovementListRow>({
     pageKey: "stock-movements",
     entityType: "stock-movements",
     baseColumnDefs,
+    fieldRegistry: stockMovementFieldRegistry,
+    allowHiddenFilterSort: true,
   });
-  const effectiveSortModel = useMemo(
-    () => {
-      const params = new URLSearchParams();
-      if (runtimeSortSerialized !== "") params.set("sort", runtimeSortSerialized);
-      const runtime = readUrlGridSort(params);
-      return runtime.length > 0 ? runtime : deepSortModel;
-    },
-    [runtimeSortSerialized, deepSortModel],
-  );
+
+  const effectiveSortModel = useMemo(() => {
+    if (pendingSortModel) return pendingSortModel;
+    const urlSort = readUrlGridSort(new URLSearchParams(searchParamsSort ? `sort=${searchParamsSort}` : ""));
+    const runtimeSort =
+      runtimeSortSerialized === ""
+        ? []
+        : readUrlGridSort(new URLSearchParams(`sort=${runtimeSortSerialized}`));
+    if (runtimeSort.length > 0 && runtimeSortSerialized !== searchParamsSort) return runtimeSort;
+    if (urlSort.length > 0) return urlSort;
+    if (runtimeSort.length > 0) return runtimeSort;
+    return deepSortModel;
+  }, [pendingSortModel, searchParamsSort, runtimeSortSerialized, deepSortModel]);
+
   const resolveDeepSortValue = useCallback(
-    (row: RowData, fieldKey: string): unknown => {
+    (row: StockMovementListRow, fieldKey: string): unknown => {
       const config = stockMovementColumnFilterConfigs[fieldKey];
       if (config?.getValue) return config.getValue(row);
       return (row as unknown as Record<string, unknown>)[fieldKey];
     },
     [stockMovementColumnFilterConfigs],
   );
+
   const displayRowsWithDeepFilters = useMemo(
     () => applyAgGridColumnFilters(displayRowsWithQueryFilters, deepFilterModel, stockMovementColumnFilterConfigs),
     [displayRowsWithQueryFilters, deepFilterModel, stockMovementColumnFilterConfigs],
   );
+
   const displayRows = useMemo(
     () =>
       applyDeepSortModel({
@@ -655,116 +501,482 @@ export function StockMovementsListPage() {
     [displayRowsWithDeepFilters, effectiveSortModel, resolveDeepSortValue],
   );
 
-  const noRowsOverlayTemplate = useMemo(
-    () =>
-      buildAgGridNoRowsOverlayTemplate(
-        getAgGridNoRowsOverlayContent(
-          {
-            baseRowCount: rowsWithNames.length,
-            visibleRowCount: displayRows.length,
-            searchActive,
-            filtersActive,
-          },
-          t,
-        ),
-      ),
-    [rowsWithNames.length, displayRows.length, searchActive, filtersActive, t, locale],
-  );
+  useEffect(() => {
+    if (deepSortModel.length === 0) return;
+    const nextSerialized = serializeUrlGridSort(deepSortModel);
+    if (nextSerialized === searchParamsSort) return;
+    const nextParams = new URLSearchParams(searchParams);
+    nextParams.set("sort", nextSerialized);
+    setSearchParams(nextParams, { replace: true });
+    setRuntimeSortSerialized(nextSerialized);
+  }, [deepSortModel, searchParams, searchParamsSort, setSearchParams]);
 
-  useAgGridNoRowsOverlayLifecycle(gridRef, noRowsOverlayTemplate, displayRows.length);
+  useEffect(() => {
+    if (!pendingSortModel) return;
+    const pendingSerialized = serializeUrlGridSort(pendingSortModel);
+    if (pendingSerialized === searchParamsSort) {
+      setPendingSortModel(null);
+    }
+  }, [pendingSortModel, searchParamsSort]);
 
-  const columnDefs = useMemo(
+  const neutralListViewState = useMemo(
     () =>
-      decorateAgGridColumnDefsWithFilters(
-        settingsAwareBaseColumnDefs,
-        stockMovementColumnFilterConfigs,
-        columnFilterBridge,
-      ),
+      buildMovementsTableListViewState({
+        definition: columnSettingsDefinition,
+        columnFilterModel,
+        sortModel: effectiveSortModel,
+        personalViews: columnSettingsPersonalViews,
+        activeViewId: columnSettingsActiveViewId,
+      }),
     [
-      settingsAwareBaseColumnDefs,
-      stockMovementColumnFilterConfigs,
-      columnFilterBridge,
+      columnSettingsDefinition,
+      columnFilterModel,
+      effectiveSortModel,
+      columnSettingsPersonalViews,
+      columnSettingsActiveViewId,
     ],
   );
-  useEffect(() => {
-    const api = gridRef.current?.api;
-    if (!api) return;
-    applyUrlGridSort(api, effectiveSortModel);
-  }, [columnDefs, effectiveSortModel]);
+
+  const fallbackColumnVisibility = useMemo<VisibilityState>(
+    () =>
+      Object.fromEntries(
+        movementsTableSchema.map((column) => [column.id, column.lockedVisible ? true : column.defaultVisible]),
+      ),
+    [movementsTableSchema],
+  );
+  const fallbackColumnOrder = useMemo(
+    () => movementsTableSchema.map((column) => column.id),
+    [movementsTableSchema],
+  );
+
+  const tableColumnVisibility = useMemo<VisibilityState>(() => {
+    const visibility = neutralListViewState.columnVisibility;
+    return Object.keys(visibility).length > 0 ? visibility : fallbackColumnVisibility;
+  }, [neutralListViewState.columnVisibility, fallbackColumnVisibility]);
+
+  const tableColumnOrder = useMemo(
+    () => (neutralListViewState.columnOrder.length > 0 ? neutralListViewState.columnOrder : fallbackColumnOrder),
+    [neutralListViewState.columnOrder, fallbackColumnOrder],
+  );
+
+  const registryByFieldKey = useMemo(
+    () => new Map(columnSettingsRegistry.map((entry) => [entry.fieldKey, entry])),
+    [columnSettingsRegistry],
+  );
+  const activeDeepFilterFieldState = useMemo(() => {
+    const activeFieldMap: Record<string, boolean> = {};
+    for (const rule of columnSettingsDefinition?.deepFilters ?? []) {
+      if (rule.enabled !== true) continue;
+      activeFieldMap[rule.fieldKey] = true;
+    }
+    return activeFieldMap;
+  }, [columnSettingsDefinition]);
+  const appliedRuleByFieldKey = useMemo(() => {
+    const map = new Map<string, ListViewDeepFilterRule>();
+    for (const rule of columnSettingsDefinition?.deepFilters ?? []) {
+      if (!map.has(rule.fieldKey)) map.set(rule.fieldKey, rule);
+    }
+    return map;
+  }, [columnSettingsDefinition]);
+  const activeHeaderFilterField = headerFilterAnchor?.fieldId ?? null;
+  const activeHeaderFilterRegistryField = activeHeaderFilterField
+    ? registryByFieldKey.get(activeHeaderFilterField) ?? null
+    : null;
+  const activeHeaderFilterConfig =
+    activeHeaderFilterField != null ? stockMovementColumnFilterConfigs[activeHeaderFilterField] : undefined;
+  const activeHeaderFilterRule =
+    activeHeaderFilterField != null ? appliedRuleByFieldKey.get(activeHeaderFilterField) ?? null : null;
+
+  const tanstackSorting = useMemo<SortingState>(
+    () =>
+      neutralListViewState.sorting.map((entry) => ({
+        id: entry.id,
+        desc: entry.direction === "desc",
+      })),
+    [neutralListViewState.sorting],
+  );
+
+  const handleTanstackSortingChange = useCallback(
+    (updater: SortingState | ((old: SortingState) => SortingState)) => {
+      const nextSorting = functionalUpdate(updater, tanstackSorting);
+      const nextSortModel = nextSorting.map((entry) => ({
+        colId: entry.id,
+        sort: entry.desc ? "desc" : "asc",
+      })) as UrlGridSort[];
+      const nextValue = serializeUrlGridSort(nextSortModel);
+      setPendingSortModel(nextSortModel);
+      setRuntimeSortSerialized(nextValue);
+      replaceQueryParam(searchParams, setSearchParams, "sort", nextValue);
+    },
+    [tanstackSorting, searchParams, setSearchParams],
+  );
+
+  const handleColumnSizingChange = useCallback(
+    (updater: ColumnSizingState | ((old: ColumnSizingState) => ColumnSizingState)) => {
+      setColumnSizing((current) => {
+        const next = sanitizeColumnSizing(functionalUpdate(updater, current), movementsTableSchema);
+        return next;
+      });
+    },
+    [movementsTableSchema],
+  );
 
   const handleApplyColumnSettings = useCallback(() => {
-    const api = gridRef.current?.api;
-    const { hiddenIds, nextItems } = applyColumnSettingsDraft();
-    if (api) {
-      api.applyColumnState({
-        state: nextItems.map((item) => ({
-          colId: item.id,
-          hide: item.visible ? false : true,
-        })),
-        applyOrder: true,
-      });
-    }
-    if (hiddenIds.length === 0) return;
+    const { hiddenIds } = applyColumnSettingsDraft();
+    const prunedDraftDeepSorts = pruneDeepSortRulesByHiddenFields(columnSettingsDraftDeepSorts, hiddenIds);
+    const nextDeepSortModel = buildUrlGridSortFromDeepSortRules(prunedDraftDeepSorts);
+    const nextDeepSortSerialized = serializeUrlGridSort(nextDeepSortModel);
+    const currentDeepSortSerialized = serializeUrlGridSort(deepSortModel);
+    const currentRuntimeSortSerialized = searchParamsSort;
+    const deepSortsChanged = nextDeepSortSerialized !== currentDeepSortSerialized;
+    const shouldSyncToDeepSort =
+      nextDeepSortModel.length > 0 && currentRuntimeSortSerialized !== nextDeepSortSerialized;
+    const runtimeUsesDeepSort =
+      (currentRuntimeSortSerialized === "" && deepSortModel.length > 0) ||
+      currentRuntimeSortSerialized === currentDeepSortSerialized;
 
-    const nextColumnFilterModel = { ...columnFilterModel };
-    for (const colId of hiddenIds) {
-      delete nextColumnFilterModel[colId];
+    let nextSortModel = effectiveSortModel;
+    if (deepSortsChanged || shouldSyncToDeepSort) {
+      if (nextDeepSortModel.length > 0) {
+        nextSortModel = nextDeepSortModel;
+      } else if (runtimeUsesDeepSort) {
+        nextSortModel = [];
+      }
+    } else if (hiddenIds.length > 0) {
+      nextSortModel = effectiveSortModel.filter((entry) => !hiddenIds.includes(entry.colId));
     }
-    const nextSortModel = effectiveSortModel.filter((entry) => !hiddenIds.includes(entry.colId));
-    const nextParams = withUrlAgGridColumnFilters(searchParams, nextColumnFilterModel);
+
+    let nextParams = new URLSearchParams(searchParams);
+    if (hiddenIds.length > 0) {
+      const nextColumnFilterModel = { ...columnFilterModel };
+      for (const colId of hiddenIds) delete nextColumnFilterModel[colId];
+      nextParams = withUrlAgGridColumnFilters(nextParams, nextColumnFilterModel);
+    }
+
     const nextSortSerialized = serializeUrlGridSort(nextSortModel);
-    if (nextSortSerialized === "") {
-      nextParams.delete("sort");
-    } else {
-      nextParams.set("sort", nextSortSerialized);
-    }
+    if (nextSortSerialized === "") nextParams.delete("sort");
+    else nextParams.set("sort", nextSortSerialized);
+
+    setPendingSortModel(nextSortModel);
     setSearchParams(nextParams, { replace: true });
     setRuntimeSortSerialized(nextSortSerialized);
-    if (api) {
-      applyUrlGridSort(api, nextSortModel);
-    }
   }, [
     applyColumnSettingsDraft,
     columnFilterModel,
+    columnSettingsDraftDeepSorts,
+    deepSortModel,
     effectiveSortModel,
     searchParams,
+    searchParamsSort,
     setSearchParams,
   ]);
+
+  const handleHeaderFilterApply = useCallback(
+    (nextRule: ListViewDeepFilterRule) => {
+      setColumnSettingsDraftDeepFilters((prev) => {
+        const others = prev.filter((rule) => rule.fieldKey !== nextRule.fieldKey);
+        return [
+          ...others,
+          {
+            ...nextRule,
+            priority: others.length,
+          },
+        ];
+      });
+      setHeaderFilterAnchor(null);
+      setPendingHeaderFilterCommit({ type: "apply", rule: nextRule });
+    },
+    [setColumnSettingsDraftDeepFilters],
+  );
+
+  const handleHeaderFilterReset = useCallback(() => {
+    if (!activeHeaderFilterField) return;
+    setColumnSettingsDraftDeepFilters((prev) => prev.filter((rule) => rule.fieldKey !== activeHeaderFilterField));
+    setHeaderFilterAnchor(null);
+    setPendingHeaderFilterCommit({ type: "reset", fieldKey: activeHeaderFilterField });
+  }, [activeHeaderFilterField, setColumnSettingsDraftDeepFilters]);
+
+  useEffect(() => {
+    if (!pendingHeaderFilterCommit) return;
+    handleApplyColumnSettings();
+    setPendingHeaderFilterCommit(null);
+  }, [handleApplyColumnSettings, pendingHeaderFilterCommit]);
+
+  const visibleSchemaColumns = useMemo(() => {
+    const schemaById = new Map(movementsTableSchema.map((column) => [column.id, column]));
+    return tableColumnOrder
+      .map((id) => schemaById.get(id))
+      .filter((column): column is MovementsTableColumnSchema => Boolean(column))
+      .filter((column) => tableColumnVisibility[column.id] !== false);
+  }, [movementsTableSchema, tableColumnOrder, tableColumnVisibility]);
+
+  const buildExportPayloadForRows = useCallback(
+    (rows: StockMovementListRow[]): { headers: string[]; rows: Array<Array<string | number>> } => {
+      const rowsOut = rows.map((row, index) =>
+        visibleSchemaColumns.map((column) =>
+          formatMovementsTableValue({
+            column,
+            value:
+              column.id === "lineNo"
+                ? index + 1
+                : row[(column.accessorKey ?? column.id) as keyof StockMovementListRow],
+            t,
+            formatDateTimeUi,
+            formatQtyDeltaUi,
+            movementTypeLabel,
+            rowIndex: index,
+          }),
+        ),
+      );
+
+      return {
+        headers: visibleSchemaColumns.map((column) => column.label),
+        rows: rowsOut,
+      };
+    },
+    [visibleSchemaColumns, t, formatDateTimeUi, formatQtyDeltaUi, movementTypeLabel],
+  );
+
+  const buildExportPayload = useCallback(
+    (): { headers: string[]; rows: Array<Array<string | number>> } => buildExportPayloadForRows(displayRows),
+    [buildExportPayloadForRows, displayRows],
+  );
+
+  const runExportWithSaveAs = useCallback(
+    async (defaultFilename: string, buildBuffer: () => Promise<ArrayBuffer | Uint8Array>) => {
+      const extension = defaultFilename.toLowerCase().endsWith(".pdf") ? "pdf" : "xlsx";
+      const base = defaultFilename.replace(/\.[^.]+$/, "");
+      const generatedFilename = buildReadableUniqueFilename({ base, extension });
+      const fallbackMime = extension === "pdf" ? "application/pdf" : XLSX_MIME;
+      const tauri = isTauriRuntime();
+
+      if (!tauri) {
+        try {
+          const raw = await buildBuffer();
+          const buffer = coerceWriteBufferResult(raw);
+          downloadBufferInBrowser(buffer, generatedFilename, fallbackMime);
+        } catch (err) {
+          console.error("Export failed", err);
+        }
+        return;
+      }
+
+      try {
+        const path = await save({
+          defaultPath: generatedFilename,
+          filters: [{ name: t("doc.page.excelFilterName"), extensions: ["xlsx"] }],
+        });
+        if (path == null) {
+          const raw = await buildBuffer();
+          const buffer = coerceWriteBufferResult(raw);
+          downloadBufferInBrowser(buffer, generatedFilename, fallbackMime);
+          return;
+        }
+
+        const safePath = await ensureUniqueExportPath(path);
+        const raw = await buildBuffer();
+        const buffer = coerceWriteBufferResult(raw);
+        const bytes = new Uint8Array(buffer);
+        let binary = "";
+        for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
+        const contentsBase64 = btoa(binary);
+
+        await invoke("write_export_file", { path: safePath, contentsBase64 });
+        const filename = safePath.replace(/^.*[/\\]/, "") || generatedFilename;
+        setExportSuccess({ path: safePath, filename });
+      } catch (err) {
+        console.error("Export failed", err);
+        try {
+          const raw = await buildBuffer();
+          const buffer = coerceWriteBufferResult(raw);
+          downloadBufferInBrowser(buffer, generatedFilename, fallbackMime);
+        } catch (fallbackErr) {
+          console.error("Export browser fallback failed", fallbackErr);
+        }
+      }
+    },
+    [t],
+  );
+
+  const listExcelLabels = useMemo(() => stockMovementsListExcelLabels(t), [t, locale]);
+
+  const handleExportCurrentView = useCallback(async () => {
+    const payload = buildExportPayload();
+    if (payload.headers.length === 0) {
+      await runExportWithSaveAs("stock-movements.xlsx", () =>
+        buildListViewXlsxBuffer({
+          sheetName: listExcelLabels.sheetName,
+          headers: ["—"],
+          rows: [["No visible columns. Use View settings to show at least one column, then export again."]],
+          tableNameBase: "StockMovementsListView",
+        }),
+      );
+      return;
+    }
+    await runExportWithSaveAs("stock-movements.xlsx", async () =>
+      buildListViewXlsxBuffer({
+        sheetName: listExcelLabels.sheetName,
+        headers: payload.headers,
+        rows: payload.rows,
+        tableNameBase: "StockMovementsListView",
+      }),
+    );
+  }, [buildExportPayload, listExcelLabels, runExportWithSaveAs]);
+
+  const handleExportSelectedRows = useCallback(async () => {
+    const selectedRows = displayRows.filter((row) => rowSelection[row.id] === true);
+    if (selectedRows.length === 0) return;
+
+    const payload = buildExportPayloadForRows(selectedRows);
+    if (payload.headers.length === 0) {
+      await runExportWithSaveAs("stock-movements-selected.xlsx", () =>
+        buildListViewXlsxBuffer({
+          sheetName: listExcelLabels.sheetName,
+          headers: ["—"],
+          rows: [["No visible columns. Use View settings to show at least one column, then export again."]],
+          tableNameBase: "StockMovementsListViewSelected",
+        }),
+      );
+      return;
+    }
+    await runExportWithSaveAs("stock-movements-selected.xlsx", async () =>
+      buildListViewXlsxBuffer({
+        sheetName: listExcelLabels.sheetName,
+        headers: payload.headers,
+        rows: payload.rows,
+        tableNameBase: "StockMovementsListViewSelected",
+      }),
+    );
+  }, [buildExportPayloadForRows, displayRows, listExcelLabels, rowSelection, runExportWithSaveAs]);
+
+  const handleRowSelectionChange = useCallback<OnChangeFn<RowSelectionState>>((updater) => {
+    setRowSelection((prev) => functionalUpdate(updater, prev));
+  }, []);
+
+  const exportSelectedDisabled = useMemo(
+    () => !Object.values(rowSelection).some(Boolean),
+    [rowSelection],
+  );
+
+  const noRowsOverlay = useMemo(
+    () =>
+      getAgGridNoRowsOverlayContent(
+        {
+          baseRowCount: listRows.length,
+          visibleRowCount: displayRows.length,
+          searchActive,
+          filtersActive,
+        },
+        t,
+      ),
+    [listRows.length, displayRows.length, searchActive, filtersActive, t, locale],
+  );
+
+  const listContent = (
+    <>
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+        <MovementsTanstackTable
+          rows={displayRows}
+          schema={movementsTableSchema}
+          sorting={tanstackSorting}
+          columnVisibility={tableColumnVisibility}
+          columnOrder={tableColumnOrder}
+          columnSizing={columnSizing}
+          rowSelection={rowSelection}
+          onRowSelectionChange={handleRowSelectionChange}
+          onSortingChange={handleTanstackSortingChange}
+          onColumnSizingChange={handleColumnSizingChange}
+          onHeaderFilterClick={(fieldId, anchorRect) => setHeaderFilterAnchor({ fieldId, ...anchorRect })}
+          headerFilterState={activeDeepFilterFieldState}
+          openHeaderFilterFieldId={activeHeaderFilterField}
+          t={t}
+          formatDateTimeUi={formatDateTimeUi}
+          formatQtyDeltaUi={formatQtyDeltaUi}
+          movementTypeLabel={movementTypeLabel}
+          scrollContainerRef={gridContainerRef}
+          emptyState={noRowsOverlay}
+        />
+        <ItemsHeaderFilterPanel
+          open={headerFilterAnchor != null}
+          anchorRect={headerFilterAnchor}
+          field={activeHeaderFilterRegistryField}
+          filterConfig={activeHeaderFilterConfig as AgGridColumnFilterConfig<unknown> | undefined}
+          rule={activeHeaderFilterRule}
+          onOpenChange={(open) => {
+            if (!open) setHeaderFilterAnchor(null);
+          }}
+          onApply={handleHeaderFilterApply}
+          onReset={handleHeaderFilterReset}
+        />
+      </div>
+
+      <AgGridColumnSettingsModal
+        open={columnSettingsOpen}
+        onOpenChange={(nextOpen) => {
+          if (nextOpen) {
+            openColumnSettings();
+            return;
+          }
+          cancelColumnSettingsDraft();
+        }}
+        items={columnSettingsDraftItems}
+        onItemsChange={(nextItems) => setColumnSettingsDraftItems(() => nextItems)}
+        filterRules={columnSettingsDraftDeepFilters}
+        onFilterRulesChange={(nextRules) => setColumnSettingsDraftDeepFilters(() => nextRules)}
+        sortRules={columnSettingsDraftDeepSorts}
+        onSortRulesChange={(nextRules) => setColumnSettingsDraftDeepSorts(() => nextRules)}
+        registry={columnSettingsRegistry}
+        filterConfigs={stockMovementColumnFilterConfigs as Record<string, AgGridColumnFilterConfig<unknown>>}
+        includeHiddenInFilterSort
+        personalViews={columnSettingsPersonalViews}
+        activeViewId={columnSettingsActiveViewId}
+        activeViewName={columnSettingsActiveViewName}
+        hasUnsavedChanges={columnSettingsHasUnsavedChanges}
+        onActivateView={activateColumnSettingsPersonalView}
+        onCreateView={createColumnSettingsPersonalViewFromCurrent}
+        onSaveChangesToActiveView={saveColumnSettingsActivePersonalViewFromCurrent}
+        onRenameActiveView={renameColumnSettingsActivePersonalView}
+        onDeleteActiveView={deleteColumnSettingsActivePersonalView}
+        onSetActiveAsDefault={setColumnSettingsActivePersonalViewAsDefault}
+        onApply={handleApplyColumnSettings}
+        onCancel={cancelColumnSettingsDraft}
+        onReset={resetColumnSettingsDraftToDefaults}
+      />
+    </>
+  );
 
   return (
     <ListPageLayout
       header={null}
       controls={
-        <>
+        <div className="list-page__controls-stack flex w-full min-w-0 flex-wrap items-center justify-between gap-x-4 gap-y-2">
           <ListPageSearch
             inputRef={listSearchInputRef}
             placeholder={t("ops.stockMovements.searchPlaceholder")}
             value={searchQuery}
-            onChange={setSearchQuery}
+            onChange={(value) => setQueryValue("q", value)}
+            debounceMs={220}
             aria-label={t("ops.stockMovements.searchAria")}
             resultCount={displayRows.length}
           />
-          <div className="flex flex-row items-center gap-2 shrink-0 ml-auto">
+          <div className="list-page__toolbar-actions-cluster flex max-w-full min-w-0 flex-wrap items-center justify-end gap-2">
             {brandFilterId != null && (
               <div
-                className="flex h-8 max-w-[min(100%,18rem)] items-center gap-1.5 rounded-md border border-input bg-background px-2 text-xs shrink-0"
+                className="flex h-8 max-w-[min(100%,18rem)] shrink-0 items-center gap-1.5 rounded-md border border-input bg-background px-2 text-xs"
                 role="status"
                 aria-label={t("ops.stockMovements.brandFilterAria")}
               >
-                <span className="text-muted-foreground whitespace-nowrap shrink-0">
+                <span className="shrink-0 whitespace-nowrap text-muted-foreground">
                   {t("ops.stockMovements.brandFilterPrefix")}
                 </span>
-                <span
-                  className="truncate font-medium text-foreground/90 min-w-0"
-                  title={brandFilterLabel}
-                >
+                <span className="min-w-0 truncate font-medium text-foreground/90" title={brandFilterLabel}>
                   {brandFilterLabel}
                 </span>
                 <Button
                   type="button"
                   variant="ghost"
                   size="sm"
-                  className="h-7 px-1.5 text-xs shrink-0 text-muted-foreground hover:text-foreground"
+                  className="h-7 shrink-0 px-1.5 text-xs text-muted-foreground hover:text-foreground"
                   onClick={clearBrandFilter}
                 >
                   {t("doc.list.clear")}
@@ -773,24 +985,21 @@ export function StockMovementsListPage() {
             )}
             {categoryFilterId != null && (
               <div
-                className="flex h-8 max-w-[min(100%,18rem)] items-center gap-1.5 rounded-md border border-input bg-background px-2 text-xs shrink-0"
+                className="flex h-8 max-w-[min(100%,18rem)] shrink-0 items-center gap-1.5 rounded-md border border-input bg-background px-2 text-xs"
                 role="status"
                 aria-label={t("ops.stockMovements.categoryFilterAria")}
               >
-                <span className="text-muted-foreground whitespace-nowrap shrink-0">
+                <span className="shrink-0 whitespace-nowrap text-muted-foreground">
                   {t("ops.stockMovements.categoryFilterPrefix")}
                 </span>
-                <span
-                  className="truncate font-medium text-foreground/90 min-w-0"
-                  title={categoryFilterLabel}
-                >
+                <span className="min-w-0 truncate font-medium text-foreground/90" title={categoryFilterLabel}>
                   {categoryFilterLabel}
                 </span>
                 <Button
                   type="button"
                   variant="ghost"
                   size="sm"
-                  className="h-7 px-1.5 text-xs shrink-0 text-muted-foreground hover:text-foreground"
+                  className="h-7 shrink-0 px-1.5 text-xs text-muted-foreground hover:text-foreground"
                   onClick={clearCategoryFilter}
                 >
                   {t("doc.list.clear")}
@@ -799,24 +1008,21 @@ export function StockMovementsListPage() {
             )}
             {itemFilterId != null && (
               <div
-                className="flex h-8 max-w-[min(100%,18rem)] items-center gap-1.5 rounded-md border border-input bg-background px-2 text-xs shrink-0"
+                className="flex h-8 max-w-[min(100%,18rem)] shrink-0 items-center gap-1.5 rounded-md border border-input bg-background px-2 text-xs"
                 role="status"
                 aria-label={t("ops.stockMovements.itemFilterAria")}
               >
-                <span className="text-muted-foreground whitespace-nowrap shrink-0">
+                <span className="shrink-0 whitespace-nowrap text-muted-foreground">
                   {t("ops.stockMovements.itemFilterPrefix")}
                 </span>
-                <span
-                  className="truncate font-medium text-foreground/90 min-w-0"
-                  title={itemFilterLabel}
-                >
+                <span className="min-w-0 truncate font-medium text-foreground/90" title={itemFilterLabel}>
                   {itemFilterLabel}
                 </span>
                 <Button
                   type="button"
                   variant="ghost"
                   size="sm"
-                  className="h-7 px-1.5 text-xs shrink-0 text-muted-foreground hover:text-foreground"
+                  className="h-7 shrink-0 px-1.5 text-xs text-muted-foreground hover:text-foreground"
                   onClick={clearItemFilter}
                 >
                   {t("doc.list.clear")}
@@ -825,24 +1031,19 @@ export function StockMovementsListPage() {
             )}
             {warehouseFilterId != null && (
               <div
-                className="flex h-8 max-w-[min(100%,18rem)] items-center gap-1.5 rounded-md border border-input bg-background px-2 text-xs shrink-0"
+                className="flex h-8 max-w-[min(100%,18rem)] shrink-0 items-center gap-1.5 rounded-md border border-input bg-background px-2 text-xs"
                 role="status"
                 aria-label={t("ops.stockBalances.warehouseFilterAria")}
               >
-                <span className="text-muted-foreground whitespace-nowrap shrink-0">
-                  {t("doc.columns.warehouse")}
-                </span>
-                <span
-                  className="truncate font-medium text-foreground/90 min-w-0"
-                  title={warehouseFilterLabel}
-                >
+                <span className="shrink-0 whitespace-nowrap text-muted-foreground">{t("doc.columns.warehouse")}</span>
+                <span className="min-w-0 truncate font-medium text-foreground/90" title={warehouseFilterLabel}>
                   {warehouseFilterLabel}
                 </span>
                 <Button
                   type="button"
                   variant="ghost"
                   size="sm"
-                  className="h-7 px-1.5 text-xs shrink-0 text-muted-foreground hover:text-foreground"
+                  className="h-7 shrink-0 px-1.5 text-xs text-muted-foreground hover:text-foreground"
                   onClick={clearWarehouseFilter}
                 >
                   {t("doc.list.clear")}
@@ -850,9 +1051,11 @@ export function StockMovementsListPage() {
               </div>
             )}
             {exportSuccess && (
-              <div className="h-8 w-max flex items-center gap-1.5 rounded-md border border-input bg-background px-2 text-sm shrink-0">
-                <span className="text-muted-foreground text-xs">{t("doc.list.exportCompleted")}</span>
-                <span className="font-medium text-xs truncate max-w-[12rem]" title={exportSuccess.filename}>{exportSuccess.filename}</span>
+              <div className="flex h-8 w-max shrink-0 items-center gap-1.5 rounded-md border border-input bg-background px-2 text-sm">
+                <span className="text-xs text-muted-foreground">{t("doc.list.exportCompleted")}</span>
+                <span className="max-w-[12rem] truncate text-xs font-medium" title={exportSuccess.filename}>
+                  {exportSuccess.filename}
+                </span>
                 <Button
                   type="button"
                   variant="ghost"
@@ -899,13 +1102,19 @@ export function StockMovementsListPage() {
                 </Button>
               </div>
             )}
-            <div className="flex items-stretch rounded-md border border-input shrink-0">
+            <div className="flex shrink-0 items-stretch rounded-md border border-input">
               <Button
                 type="button"
                 variant="outline"
                 size="sm"
-                className="h-[1.625rem] rounded-r-none border-0 border-r border-input !px-1 !py-0 !gap-0.5"
-                onClick={handleExportCurrentView}
+                className="!gap-0.5 h-[1.625rem] rounded-r-none border-0 border-r border-input !px-1 !py-0"
+                onClick={async () => {
+                  try {
+                    await handleExportCurrentView();
+                  } catch (err) {
+                    console.error("Export failed", err);
+                  }
+                }}
               >
                 <FileSpreadsheet className="h-4 w-4 shrink-0" />
                 {t("doc.list.export")}
@@ -928,10 +1137,20 @@ export function StockMovementsListPage() {
                       type="button"
                       disabled={exportSelectedDisabled}
                       className="w-full rounded-sm px-1.5 py-1 text-left text-sm hover:bg-accent disabled:cursor-not-allowed disabled:opacity-50"
-                      title={exportSelectedDisabled ? t("doc.list.selectRowsForExport") : undefined}
-                      onClick={() => {
-                        setExportOpen(false);
-                        if (!exportSelectedDisabled) handleExportSelected();
+                      title={
+                        exportSelectedDisabled
+                          ? t("doc.list.selectRowsForExport")
+                          : t("doc.list.exportSelectedRows")
+                      }
+                      onClick={async () => {
+                        if (exportSelectedDisabled) return;
+                        try {
+                          await handleExportSelectedRows();
+                        } catch (err) {
+                          console.error("Export failed", err);
+                        } finally {
+                          setExportOpen(false);
+                        }
                       }}
                     >
                       {t("doc.list.exportSelectedRows")}
@@ -944,64 +1163,18 @@ export function StockMovementsListPage() {
               type="button"
               variant="outline"
               size="sm"
-              className="h-[1.625rem] shrink-0"
+              data-icon="inline-start"
+              className="h-[1.625rem] shrink-0 !gap-0.5"
               onClick={openColumnSettings}
             >
+              <SlidersHorizontal className="h-4 w-4 shrink-0" aria-hidden />
               {t("doc.list.viewSettings")}
             </Button>
           </div>
-        </>
+        </div>
       }
     >
-      <AgGridContainer themeClass="stock-movements-grid" gridRef={gridRef}>
-        <AgGridReact<RowData>
-          {...agGridDefaultGridOptions}
-          ref={gridRef}
-          rowData={displayRows}
-          columnDefs={columnDefs}
-          defaultColDef={agGridDefaultColDef}
-          overlayNoRowsTemplate={noRowsOverlayTemplate}
-          onGridReady={(event) => {
-            applyUrlGridSort(event.api, effectiveSortModel);
-          }}
-          onSortChanged={handleSortChanged}
-          rowSelection={{ mode: "multiRow", checkboxes: true, headerCheckbox: true, enableClickSelection: true }}
-          selectionColumnDef={agGridSelectionColumnDef}
-          getRowId={(params) => params.data.id}
-          onSelectionChanged={onSelectionChanged}
-        />
-      </AgGridContainer>
-      <AgGridColumnSettingsModal
-        open={columnSettingsOpen}
-        onOpenChange={(nextOpen) => {
-          if (nextOpen) {
-            openColumnSettings();
-            return;
-          }
-          cancelColumnSettingsDraft();
-        }}
-        items={columnSettingsDraftItems}
-        onItemsChange={(nextItems) => setColumnSettingsDraftItems(() => nextItems)}
-        filterRules={columnSettingsDraftDeepFilters}
-        onFilterRulesChange={(nextRules) => setColumnSettingsDraftDeepFilters(() => nextRules)}
-        sortRules={columnSettingsDraftDeepSorts}
-        onSortRulesChange={(nextRules) => setColumnSettingsDraftDeepSorts(() => nextRules)}
-        registry={columnSettingsRegistry}
-        filterConfigs={stockMovementColumnFilterConfigs as Record<string, AgGridColumnFilterConfig<unknown>>}
-        personalViews={columnSettingsPersonalViews}
-        activeViewId={columnSettingsActiveViewId}
-        activeViewName={columnSettingsActiveViewName}
-        hasUnsavedChanges={columnSettingsHasUnsavedChanges}
-        onActivateView={activateColumnSettingsPersonalView}
-        onCreateView={createColumnSettingsPersonalViewFromCurrent}
-        onSaveChangesToActiveView={saveColumnSettingsActivePersonalViewFromCurrent}
-        onRenameActiveView={renameColumnSettingsActivePersonalView}
-        onDeleteActiveView={deleteColumnSettingsActivePersonalView}
-        onSetActiveAsDefault={setColumnSettingsActivePersonalViewAsDefault}
-        onApply={handleApplyColumnSettings}
-        onCancel={cancelColumnSettingsDraft}
-        onReset={resetColumnSettingsDraftToDefaults}
-      />
+      {listContent}
     </ListPageLayout>
   );
 }
