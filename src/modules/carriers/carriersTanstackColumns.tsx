@@ -1,7 +1,5 @@
 import { createColumnHelper, type ColumnDef } from "@tanstack/react-table";
 import type { TFunction } from "@/shared/i18n";
-import { GridOutlinePillBadge } from "@/shared/ui/ag-grid/GridOutlinePillBadge";
-import { carrierTypeLabelPillTone } from "@/shared/ui/ag-grid/gridOutlinePillMapping";
 import type { CarrierListRow } from "./carrierListRowModel";
 import type { CarriersTableColumnSchema } from "./carriersTableSchema";
 import { translateCarrierType } from "./carrierLabels";
@@ -86,24 +84,6 @@ export function buildCarriersTanstackColumns(
           }),
         enableSorting: false,
         enableHiding: false,
-        size: column.defaultSize,
-        minSize: column.minSize,
-        maxSize: column.maxSize,
-        meta,
-      });
-    }
-
-    if (column.id === "carrierType") {
-      return columnHelper.display({
-        id: column.id,
-        header: column.label,
-        cell: (ctx) => (
-          <GridOutlinePillBadge tone={carrierTypeLabelPillTone()}>
-            {translateCarrierType(t, ctx.row.original.carrierType)}
-          </GridOutlinePillBadge>
-        ),
-        enableSorting: column.sortable,
-        enableHiding: !column.lockedVisible,
         size: column.defaultSize,
         minSize: column.minSize,
         maxSize: column.maxSize,
