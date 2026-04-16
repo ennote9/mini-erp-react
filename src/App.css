@@ -1506,6 +1506,20 @@ summary,
   border-left: 3px solid var(--app-grid-focus);
 }
 
+/* Sales order lines (TanStack): line health + single-row edit accent */
+.doc-page .doc-lines__grid .doc-lines-grid--so table tbody tr.doc-lines__row--error td {
+  color: #f87171;
+}
+.doc-page .doc-lines__grid .doc-lines-grid--so table tbody tr.doc-lines__row--warning td {
+  color: #fbbf24;
+}
+.doc-page .doc-lines__grid .doc-lines-grid--so table tbody tr.doc-lines__row--editing td {
+  background-color: var(--app-surface-subtle);
+}
+.doc-page .doc-lines__grid .doc-lines-grid--so table tbody tr.doc-lines__row--editing td:first-child {
+  border-left: 3px solid var(--app-grid-focus);
+}
+
 /* Row-status column: compact dot + tooltip */
 .doc-lines__status {
   display: inline-block;

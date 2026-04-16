@@ -1,8 +1,7 @@
 import { useParams, useNavigate, useSearchParams } from "react-router-dom";
 import { useMemo, useState, useEffect, useRef, useCallback } from "react";
 import * as Dialog from "@radix-ui/react-dialog";
-import { AgGridReact } from "ag-grid-react";
-import type { ColDef, SelectionChangedEvent } from "ag-grid-community";
+import type { ColumnSizingState, RowSelectionState } from "@tanstack/react-table";
 import { salesOrderRepository } from "../repository";
 import { allocateStock, confirm, cancelDocument, createShipment, saveDraft } from "../service";
 import { customerRepository } from "../../customers/repository";
@@ -20,9 +19,7 @@ import { appendReturnTo, readReturnToParam } from "@/shared/navigation/returnTo"
 import { useUrlTabState } from "@/shared/navigation/useUrlTabState";
 import { brandRepository } from "../../brands/repository";
 import { categoryRepository } from "../../categories/repository";
-import type { SalesOrderLine } from "../model";
 import { DocumentPageLayout } from "../../../shared/ui/object/DocumentPageLayout";
-import { AgGridContainer } from "../../../shared/ui/ag-grid/AgGridContainer";
 import { Button } from "@/components/ui/button";
 import { DatePickerField } from "@/components/ui/date-picker-field";
 import { Input } from "@/components/ui/input";
@@ -31,11 +28,6 @@ import { Textarea } from "@/components/ui/textarea";
 import { SelectField } from "@/components/ui/select-field";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import {
-  agGridDefaultColDef,
-  agGridDefaultGridOptions,
-  agGridSelectionColumnDef,
-} from "../../../shared/ui/ag-grid/agGridDefaults";
 import { todayYYYYMMDD, normalizeDateForSO } from "../dateUtils";
 import { usePlanningDocumentHotkeys } from "../../../shared/hotkeys";
 import {
@@ -104,7 +96,6 @@ import { useSettings } from "../../../shared/settings/SettingsContext";
 import { useTranslation } from "@/shared/i18n/context";
 import { buildReadableUniqueFilename, ensureUniqueExportPath } from "@/shared/export/filenameBuilder";
 import { cn } from "@/lib/utils";
-import type { TFunction } from "@/shared/i18n/resolve";
 import { planningSalesOrderExportLabels } from "@/shared/i18n/excelPlanningExportLabels";
 import { translateZeroPriceReason, translateCancelReason } from "@/shared/i18n/reasonLabels";
 import {
@@ -116,31 +107,46 @@ import {
   ZERO_PRICE_LINE_REASON_CODES,
   isZeroPriceLineReasonCode,
   type CancelDocumentReasonCode,
-  type ZeroPriceLineReasonCode,
 } from "../../../shared/reasonCodes";
 import { normalizeTrim } from "../../../shared/validation";
-import {
-  computeSalesOrderFulfillment,
-  type SalesOrderFulfillment,
-  type SoLineFulfillment,
-} from "../../../shared/planningFulfillment";
-import {
-  computeSalesOrderAllocationView,
-  type SalesOrderAllocationView,
-  type SoLineAllocationRow,
-} from "../../../shared/soAllocation";
+import { computeSalesOrderFulfillment, type SoLineFulfillment } from "../../../shared/planningFulfillment";
+import { computeSalesOrderAllocationView, type SoLineAllocationRow } from "../../../shared/soAllocation";
 import { useAppDisplayFormatters } from "@/shared/formatting";
+import { SalesOrderLinesTanstackTable } from "../components/SalesOrderLinesTanstackTable";
+import {
+  buildSalesOrderEditableLinesTanstackColumns,
+  buildSalesOrderReadonlyLinesTanstackColumns,
+  type SalesOrderLineFormRow,
+  type SalesOrderLineWithItem,
+} from "../salesOrderLinesTanstackColumns";
 
-type LineWithItem = SalesOrderLine & { itemName: string };
+type LineFormRow = SalesOrderLineFormRow;
+type LineWithItem = SalesOrderLineWithItem;
 
-type LineFormRow = {
-  itemId: string;
-  qty: number;
-  unitPrice: number;
-  markdownCode?: string;
-  zeroPriceReasonCode: string;
-  _lineId: number;
-};
+const SO_LINES_EDITABLE_COL_SIZING_KEY = "mini-erp:so:lines:editable:tanstack:columnSizing:v1";
+const SO_LINES_READONLY_COL_SIZING_KEY = "mini-erp:so:lines:readonly:tanstack:columnSizing:v1";
+
+function readPersistedColumnSizing(key: string): ColumnSizingState {
+  if (typeof window === "undefined") return {};
+  try {
+    const raw = window.localStorage.getItem(key);
+    if (!raw) return {};
+    const parsed = JSON.parse(raw) as unknown;
+    if (!parsed || typeof parsed !== "object") return {};
+    return parsed as ColumnSizingState;
+  } catch {
+    return {};
+  }
+}
+
+function writePersistedColumnSizing(key: string, value: ColumnSizingState) {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(key, JSON.stringify(value));
+  } catch {
+    // ignore
+  }
+}
 
 type FormState = {
   date: string;
@@ -244,368 +250,6 @@ function agreementSignature(defaults: AgreementDefaults): string {
     defaults.paymentTermsDays ?? "",
     defaults.currency,
   ].join("|");
-}
-
-function soLinesDisplayColumnDefs(
-  t: TFunction,
-  fulfillmentByItemId: Map<string, SoLineFulfillment>,
-  allocationByItemId: Map<string, SoLineAllocationRow>,
-  includeAllocationColumns: boolean,
-  formatMoney: (value: number | null | undefined, fractionDigits?: number, empty?: string) => string,
-): ColDef<LineFormRow>[] {
-  const dash = t("domain.audit.summary.emDash");
-  const allocationCols: ColDef<LineFormRow>[] = includeAllocationColumns
-    ? [
-        {
-          headerName: t("doc.columns.reserved"),
-          width: 78,
-          minWidth: 70,
-          maxWidth: 88,
-          editable: false,
-          sortable: false,
-          valueGetter: (p) => {
-            const itemId = p.data?.itemId;
-            if (!itemId) return dash;
-            const a = allocationByItemId.get(itemId);
-            if (!a) return dash;
-            return String(a.reservedQty);
-          },
-        },
-        {
-          headerName: t("doc.columns.shortage"),
-          width: 78,
-          minWidth: 70,
-          maxWidth: 88,
-          editable: false,
-          sortable: false,
-          valueGetter: (p) => {
-            const itemId = p.data?.itemId;
-            if (!itemId) return dash;
-            const a = allocationByItemId.get(itemId);
-            if (!a) return dash;
-            return String(a.shortageQty);
-          },
-        },
-      ]
-    : [];
-
-  return [
-    {
-      headerName: t("doc.columns.lineNo"),
-      valueGetter: (params) =>
-        params.node?.rowIndex != null ? String(params.node.rowIndex + 1) : "",
-      width: 52,
-      minWidth: 48,
-      maxWidth: 56,
-      sortable: false,
-      resizable: true,
-    },
-    {
-      headerName: t("doc.columns.itemCode"),
-      width: 130,
-      minWidth: 120,
-      maxWidth: 140,
-      editable: false,
-      valueGetter: (p) => {
-        const markdownCode = p.data?.markdownCode?.trim();
-        if (markdownCode) return markdownCode.toUpperCase();
-        const itemId = p.data?.itemId;
-        if (!itemId) return "";
-        const item = itemRepository.getById(itemId);
-        return item?.code ?? itemId;
-      },
-    },
-    {
-      field: "itemId",
-      headerName: t("doc.columns.itemName"),
-      flex: 1,
-      minWidth: 180,
-      editable: false,
-      valueFormatter: (p) => {
-        if (!p.value) return "";
-        const item = itemRepository.getById(p.value);
-        return item?.name ?? p.value;
-      },
-    },
-    {
-      headerName: t("doc.columns.brand"),
-      width: 130,
-      minWidth: 120,
-      maxWidth: 140,
-      editable: false,
-      valueGetter: (p) => {
-        const itemId = p.data?.itemId;
-        if (!itemId) return "";
-        const item = itemRepository.getById(itemId);
-        if (!item?.brandId) return "";
-        const brand = brandRepository.getById(item.brandId);
-        return brand?.code ?? "";
-      },
-    },
-    {
-      headerName: t("doc.columns.category"),
-      width: 130,
-      minWidth: 120,
-      maxWidth: 140,
-      editable: false,
-      valueGetter: (p) => {
-        const itemId = p.data?.itemId;
-        if (!itemId) return "";
-        const item = itemRepository.getById(itemId);
-        if (!item?.categoryId) return "";
-        const category = categoryRepository.getById(item.categoryId);
-        return category?.code ?? "";
-      },
-    },
-    {
-      field: "qty",
-      headerName: t("doc.columns.qty"),
-      width: 80,
-      minWidth: 70,
-      maxWidth: 90,
-      editable: false,
-    },
-    {
-      headerName: t("doc.columns.shipped"),
-      width: 86,
-      minWidth: 78,
-      maxWidth: 96,
-      editable: false,
-      sortable: false,
-      valueGetter: (p) => {
-        const itemId = p.data?.itemId;
-        if (!itemId) return dash;
-        const f = fulfillmentByItemId.get(itemId);
-        if (!f) return dash;
-        return String(f.shippedQty);
-      },
-    },
-    {
-      headerName: t("doc.columns.remaining"),
-      width: 100,
-      minWidth: 88,
-      maxWidth: 112,
-      editable: false,
-      sortable: false,
-      valueGetter: (p) => {
-        const itemId = p.data?.itemId;
-        if (!itemId) return dash;
-        const f = fulfillmentByItemId.get(itemId);
-        if (!f) return dash;
-        if (f.remainingQty < 0)
-          return t("doc.fulfillment.remainingOver", { qty: f.remainingQty });
-        return String(f.remainingQty);
-      },
-    },
-    ...allocationCols,
-    {
-      field: "unitPrice",
-      headerName: t("doc.columns.unitPrice"),
-      width: 110,
-      minWidth: 100,
-      maxWidth: 120,
-      editable: false,
-      valueFormatter: (p) =>
-        typeof p.value === "number" && !Number.isNaN(p.value)
-          ? formatMoney(p.value, 2, "0")
-          : formatMoney(0, 2, "0"),
-    },
-    {
-      headerName: t("doc.columns.lineAmount"),
-      width: 120,
-      minWidth: 110,
-      maxWidth: 130,
-      editable: false,
-      valueGetter: (p) => {
-        const qty = p.data?.qty;
-        const unitPrice = p.data?.unitPrice;
-        if (typeof qty !== "number" || typeof unitPrice !== "number") return formatMoney(0, 2, "0");
-        const amount = lineAmountMoney(qty, unitPrice);
-        return Number.isNaN(amount) ? formatMoney(0, 2, "0") : formatMoney(amount, 2, "0");
-      },
-    },
-    {
-      headerName: t("doc.columns.zeroPriceReason"),
-      width: 150,
-      minWidth: 130,
-      maxWidth: 180,
-      editable: false,
-      valueGetter: (p) => {
-        const up = p.data?.unitPrice;
-        if (typeof up !== "number" || roundMoney(up) !== 0) return "";
-        const c = p.data?.zeroPriceReasonCode;
-        if (typeof c !== "string" || c === "") return "";
-        return translateZeroPriceReason(t, c as ZeroPriceLineReasonCode);
-      },
-    },
-  ];
-}
-
-function soLinesReadOnlyColumnDefs(
-  t: TFunction,
-  fulfillment: SalesOrderFulfillment | null,
-  allocation: SalesOrderAllocationView | null,
-  includeAllocationColumns: boolean,
-  formatMoney: (value: number | null | undefined, fractionDigits?: number, empty?: string) => string,
-): ColDef<LineWithItem>[] {
-  const dash = t("domain.audit.summary.emDash");
-  const allocationCols: ColDef<LineWithItem>[] = includeAllocationColumns
-    ? [
-        {
-          headerName: t("doc.columns.reserved"),
-          width: 78,
-          minWidth: 70,
-          maxWidth: 88,
-          sortable: false,
-          valueGetter: (p) => {
-            const lineId = p.data?.id;
-            if (!lineId || !allocation) return dash;
-            const row = allocation.lines.find((l) => l.lineId === lineId);
-            if (!row) return dash;
-            return String(row.reservedQty);
-          },
-        },
-        {
-          headerName: t("doc.columns.shortage"),
-          width: 78,
-          minWidth: 70,
-          maxWidth: 88,
-          sortable: false,
-          valueGetter: (p) => {
-            const lineId = p.data?.id;
-            if (!lineId || !allocation) return dash;
-            const row = allocation.lines.find((l) => l.lineId === lineId);
-            if (!row) return dash;
-            return String(row.shortageQty);
-          },
-        },
-      ]
-    : [];
-
-  return [
-    {
-      headerName: t("doc.columns.lineNo"),
-      valueGetter: (params) =>
-        params.node?.rowIndex != null ? String(params.node.rowIndex + 1) : "",
-      width: 52,
-      minWidth: 48,
-      maxWidth: 56,
-      sortable: false,
-      resizable: true,
-    },
-    {
-      headerName: t("doc.columns.itemCode"),
-      width: 130,
-      minWidth: 120,
-      maxWidth: 140,
-      valueGetter: (p) => {
-        const markdownCode = p.data?.markdownCode?.trim();
-        if (markdownCode) return markdownCode.toUpperCase();
-        const itemId = p.data?.itemId;
-        if (!itemId) return "";
-        const item = itemRepository.getById(itemId);
-        return item?.code ?? itemId;
-      },
-    },
-    { field: "itemName", headerName: t("doc.columns.itemName"), flex: 1, minWidth: 180 },
-    {
-      headerName: t("doc.columns.brand"),
-      width: 130,
-      minWidth: 120,
-      maxWidth: 140,
-      valueGetter: (p) => {
-        const itemId = p.data?.itemId;
-        if (!itemId) return "";
-        const item = itemRepository.getById(itemId);
-        if (!item?.brandId) return "";
-        const brand = brandRepository.getById(item.brandId);
-        return brand?.code ?? "";
-      },
-    },
-    {
-      headerName: t("doc.columns.category"),
-      width: 130,
-      minWidth: 120,
-      maxWidth: 140,
-      valueGetter: (p) => {
-        const itemId = p.data?.itemId;
-        if (!itemId) return "";
-        const item = itemRepository.getById(itemId);
-        if (!item?.categoryId) return "";
-        const category = categoryRepository.getById(item.categoryId);
-        return category?.code ?? "";
-      },
-    },
-    { field: "qty", headerName: t("doc.columns.qty"), width: 80, minWidth: 70, maxWidth: 90 },
-    {
-      headerName: t("doc.columns.shipped"),
-      width: 86,
-      minWidth: 78,
-      maxWidth: 96,
-      sortable: false,
-      valueGetter: (p) => {
-        const lineId = p.data?.id;
-        if (!lineId || !fulfillment) return dash;
-        const row = fulfillment.lines.find((l) => l.lineId === lineId);
-        if (!row) return dash;
-        return String(row.shippedQty);
-      },
-    },
-    {
-      headerName: t("doc.columns.remaining"),
-      width: 100,
-      minWidth: 88,
-      maxWidth: 112,
-      sortable: false,
-      valueGetter: (p) => {
-        const lineId = p.data?.id;
-        if (!lineId || !fulfillment) return dash;
-        const row = fulfillment.lines.find((l) => l.lineId === lineId);
-        if (!row) return dash;
-        if (row.remainingQty < 0)
-          return t("doc.fulfillment.remainingOver", { qty: row.remainingQty });
-        return String(row.remainingQty);
-      },
-    },
-    ...allocationCols,
-    {
-      field: "unitPrice",
-      headerName: t("doc.columns.unitPrice"),
-      width: 110,
-      minWidth: 100,
-      maxWidth: 120,
-      valueFormatter: (p) =>
-        typeof p.value === "number" && !Number.isNaN(p.value)
-          ? formatMoney(p.value, 2, "0")
-          : formatMoney(0, 2, "0"),
-    },
-    {
-      headerName: t("doc.columns.lineAmount"),
-      width: 120,
-      minWidth: 110,
-      maxWidth: 130,
-      valueGetter: (p) => {
-        const qty = p.data?.qty;
-        const unitPrice = p.data?.unitPrice;
-        if (typeof qty !== "number" || typeof unitPrice !== "number") return formatMoney(0, 2, "0");
-        const amount = lineAmountMoney(qty, unitPrice);
-        return Number.isNaN(amount) ? formatMoney(0, 2, "0") : formatMoney(amount, 2, "0");
-      },
-    },
-    {
-      headerName: t("doc.columns.zeroPriceReason"),
-      width: 150,
-      minWidth: 130,
-      maxWidth: 180,
-      valueGetter: (p) => {
-        const up = p.data?.unitPrice;
-        if (typeof up !== "number" || roundMoney(up) !== 0) return "";
-        const c = p.data?.zeroPriceReasonCode;
-        if (typeof c !== "string" || c === "") return "";
-        return translateZeroPriceReason(t, c as ZeroPriceLineReasonCode);
-      },
-    },
-  ];
 }
 
 function buildExportRowsFromFormLines(lines: LineFormRow[]): SoExportLineRow[] {
@@ -735,7 +379,13 @@ export function SalesOrderPage() {
     unitPrice: number;
   } | null>(null);
   const [actionIssues, setActionIssues] = useState<Issue[]>([]);
-  const [selectedLineIds, setSelectedLineIds] = useState<number[]>([]);
+  const [lineRowSelection, setLineRowSelection] = useState<RowSelectionState>({});
+  const [soEditableLinesColumnSizing, setSoEditableLinesColumnSizing] = useState<ColumnSizingState>(() =>
+    readPersistedColumnSizing(SO_LINES_EDITABLE_COL_SIZING_KEY),
+  );
+  const [soReadonlyLinesColumnSizing, setSoReadonlyLinesColumnSizing] = useState<ColumnSizingState>(() =>
+    readPersistedColumnSizing(SO_LINES_READONLY_COL_SIZING_KEY),
+  );
   const [isLineImportModalOpen, setIsLineImportModalOpen] = useState(false);
   const [lineImportInitialTab, setLineImportInitialTab] = useState<LineImportTab>("paste");
   const [exportSuccess, setExportSuccess] = useState<{ path: string; filename: string } | null>(null);
@@ -747,7 +397,6 @@ export function SalesOrderPage() {
   const [activeAgreementDefaults, setActiveAgreementDefaults] = useState<AgreementDefaults>(null);
   const [customerChangeConfirmOpen, setCustomerChangeConfirmOpen] = useState(false);
   const [pendingCustomerChange, setPendingCustomerChange] = useState<PendingCustomerChange | null>(null);
-  const linesGridRef = useRef<AgGridReact<LineFormRow> | null>(null);
   const lineEntryItemPickerRef = useRef<SalesOrderItemAutocompleteRef | null>(null);
   const lineEntryQtyInputRef = useRef<HTMLInputElement | null>(null);
   const lineEntryDropdownRightEdgeRef = useRef<HTMLDivElement | null>(null);
@@ -895,7 +544,7 @@ export function SalesOrderPage() {
         setLineEntryUnitPrice(0);
         setLineEntryMarkdownCode(null);
         setLineEntryZeroPriceReason("");
-        linesGridRef.current?.api?.deselectAll();
+        setLineRowSelection({});
       }
       setCustomerChangeConfirmOpen(false);
       setPendingCustomerChange(null);
@@ -966,6 +615,7 @@ export function SalesOrderPage() {
       setLineEntryZeroPriceReason("");
       setDuplicateChoicePending(null);
       setActiveAgreementDefaults(null);
+      setLineRowSelection({});
       return;
     }
     if (doc?.status === "draft" && id) {
@@ -1012,6 +662,7 @@ export function SalesOrderPage() {
       setDuplicateChoicePending(null);
       setPendingCustomerChange(null);
       setCustomerChangeConfirmOpen(false);
+      setLineRowSelection({});
     }
   }, [
     id,
@@ -1067,6 +718,74 @@ export function SalesOrderPage() {
   const isDraft = doc?.status === "draft";
   const isConfirmed = doc?.status === "confirmed";
   const isEditable = isNew || isDraft;
+
+  const selectedLineIds = useMemo(
+    () => Object.keys(lineRowSelection).filter((k) => lineRowSelection[k]).map((k) => Number(k)),
+    [lineRowSelection],
+  );
+
+  useEffect(() => {
+    writePersistedColumnSizing(SO_LINES_EDITABLE_COL_SIZING_KEY, soEditableLinesColumnSizing);
+  }, [soEditableLinesColumnSizing]);
+
+  useEffect(() => {
+    writePersistedColumnSizing(SO_LINES_READONLY_COL_SIZING_KEY, soReadonlyLinesColumnSizing);
+  }, [soReadonlyLinesColumnSizing]);
+
+  useEffect(() => {
+    if (!isEditable) setLineRowSelection({});
+  }, [isEditable]);
+
+  useEffect(() => {
+    if (!isEditable) return;
+    const valid = new Set(form.lines.map((l) => String(l._lineId)));
+    setLineRowSelection((prev) => {
+      const next = { ...prev };
+      let changed = false;
+      for (const k of Object.keys(next)) {
+        if (!valid.has(k)) {
+          delete next[k];
+          changed = true;
+        }
+      }
+      return changed ? next : prev;
+    });
+  }, [form.lines, isEditable]);
+
+  useEffect(() => {
+    if (!isEditable) return;
+    const ids = Object.keys(lineRowSelection)
+      .filter((k) => lineRowSelection[k])
+      .map((k) => Number(k));
+    setDuplicateChoicePending(null);
+    if (ids.length === 1) {
+      const row = form.lines.find((l) => l._lineId === ids[0]);
+      if (row) {
+        setEditingLineId(row._lineId);
+        setLineEntryItemId(row.itemId);
+        setLineEntryQty(row.qty);
+        setLineEntryUnitPrice(
+          roundMoney(typeof row.unitPrice === "number" && !Number.isNaN(row.unitPrice) ? row.unitPrice : 0),
+        );
+        setLineEntryMarkdownCode(row.markdownCode ?? null);
+        setLineEntryZeroPriceReason(typeof row.zeroPriceReasonCode === "string" ? row.zeroPriceReasonCode : "");
+      } else {
+        setEditingLineId(null);
+        setLineEntryItemId("");
+        setLineEntryQty(1);
+        setLineEntryUnitPrice(0);
+        setLineEntryMarkdownCode(null);
+        setLineEntryZeroPriceReason("");
+      }
+    } else {
+      setEditingLineId(null);
+      setLineEntryItemId("");
+      setLineEntryQty(1);
+      setLineEntryUnitPrice(0);
+      setLineEntryMarkdownCode(null);
+      setLineEntryZeroPriceReason("");
+    }
+  }, [lineRowSelection, form.lines, isEditable]);
 
   const workspaceMode = settings.general.workspaceMode;
   const profileOverrides = settings.general.profileOverrides;
@@ -1226,7 +945,7 @@ export function SalesOrderPage() {
       setLineEntryUnitPrice(0);
       setLineEntryMarkdownCode(null);
       setLineEntryZeroPriceReason("");
-      linesGridRef.current?.api?.deselectAll();
+      setLineRowSelection({});
     }
   }, [editingLineId]);
 
@@ -1373,7 +1092,7 @@ export function SalesOrderPage() {
     setLineEntryUnitPrice(0);
     setLineEntryMarkdownCode(null);
     setLineEntryZeroPriceReason("");
-    linesGridRef.current?.api?.deselectAll();
+    setLineRowSelection({});
   };
 
   const cancelEdit = () => {
@@ -1384,39 +1103,8 @@ export function SalesOrderPage() {
     setLineEntryMarkdownCode(null);
     setLineEntryZeroPriceReason("");
     setDuplicateChoicePending(null);
-    linesGridRef.current?.api?.deselectAll();
+    setLineRowSelection({});
   };
-
-  const onLinesSelectionChanged = useCallback((e: SelectionChangedEvent<LineFormRow>) => {
-    const rows = e.api.getSelectedRows();
-    const ids = rows.map((r) => r._lineId);
-    setSelectedLineIds(ids);
-    setDuplicateChoicePending(null);
-    if (rows.length === 1 && rows[0]) {
-      const row = rows[0];
-      setEditingLineId(row._lineId);
-      setLineEntryItemId(row.itemId);
-      setLineEntryQty(row.qty);
-      setLineEntryUnitPrice(
-        roundMoney(
-          typeof row.unitPrice === "number" && !Number.isNaN(row.unitPrice) && row.unitPrice >= 0
-            ? row.unitPrice
-            : 0,
-        ),
-      );
-      setLineEntryMarkdownCode(row.markdownCode ?? null);
-      setLineEntryZeroPriceReason(
-        typeof row.zeroPriceReasonCode === "string" ? row.zeroPriceReasonCode : "",
-      );
-    } else {
-      setEditingLineId(null);
-      setLineEntryItemId("");
-      setLineEntryQty(1);
-      setLineEntryUnitPrice(0);
-      setLineEntryMarkdownCode(null);
-      setLineEntryZeroPriceReason("");
-    }
-  }, []);
 
   const removeSelectedLines = useCallback(() => {
     const ids = new Set(selectedLineIds);
@@ -1424,8 +1112,7 @@ export function SalesOrderPage() {
       ...f,
       lines: f.lines.filter((l) => !ids.has(l._lineId)),
     }));
-    linesGridRef.current?.api?.deselectAll();
-    setSelectedLineIds([]);
+    setLineRowSelection({});
     setDuplicateChoicePending(null);
     if (editingLineId !== null && ids.has(editingLineId)) {
       setEditingLineId(null);
@@ -1582,18 +1269,23 @@ export function SalesOrderPage() {
     [health.issues, actionIssues],
   );
 
-  const getRowClass = useCallback(
-    (params: { data?: LineFormRow }) => {
-      if (!params.data) return undefined;
+  const getLineRowClassName = useCallback(
+    (row: LineFormRow) => {
       const parts: string[] = [];
-      if (params.data._lineId === editingLineId) parts.push("doc-lines__row--editing");
-      const h = health.lineHealth.get(params.data._lineId);
+      if (row._lineId === editingLineId) parts.push("doc-lines__row--editing");
+      const h = health.lineHealth.get(row._lineId);
       if (h === "error") parts.push("doc-lines__row--error");
       else if (h === "warning") parts.push("doc-lines__row--warning");
       return parts.length > 0 ? parts.join(" ") : undefined;
     },
     [health.lineHealth, editingLineId],
   );
+
+  const resolveSoLineRowSelectLabel = useCallback((row: LineFormRow) => {
+    const mc = row.markdownCode?.trim();
+    if (mc) return mc.toUpperCase();
+    return itemRepository.getById(row.itemId)?.code ?? row.itemId;
+  }, []);
 
   const soFulfillment = useMemo(() => {
     if (!id || isNew) return null;
@@ -1623,9 +1315,9 @@ export function SalesOrderPage() {
     return m;
   }, [soAllocationView]);
 
-  const linesColumnDefs = useMemo(
+  const editableLinesTanstackColumns = useMemo(
     () =>
-      soLinesDisplayColumnDefs(
+      buildSalesOrderEditableLinesTanstackColumns(
         t,
         soFulfillmentByItemId,
         soAllocationByItemId,
@@ -1635,9 +1327,9 @@ export function SalesOrderPage() {
     [t, locale, soFulfillmentByItemId, soAllocationByItemId, showSalesOrderAllocationUi, formatMoney],
   );
 
-  const readOnlyLinesColumnDefs = useMemo(
+  const readonlyLinesTanstackColumns = useMemo(
     () =>
-      soLinesReadOnlyColumnDefs(
+      buildSalesOrderReadonlyLinesTanstackColumns(
         t,
         soFulfillment,
         soAllocationView,
@@ -2965,19 +2657,20 @@ export function SalesOrderPage() {
               </div>
             )}
             <div className="doc-lines__grid">
-              <AgGridContainer themeClass="doc-lines-grid">
-                <AgGridReact<LineFormRow>
-                  ref={linesGridRef}
-                  rowData={form.lines}
-                  columnDefs={linesColumnDefs}
-                  defaultColDef={agGridDefaultColDef}
-                  getRowId={(p) => String(p.data._lineId)}
-                  getRowClass={getRowClass}
-                  rowSelection={isEditable ? { mode: "multiRow", checkboxes: true, headerCheckbox: true, enableClickSelection: true } : undefined}
-                  selectionColumnDef={isEditable ? agGridSelectionColumnDef : undefined}
-                  onSelectionChanged={isEditable ? onLinesSelectionChanged : undefined}
-                />
-              </AgGridContainer>
+              <SalesOrderLinesTanstackTable<LineFormRow>
+                className="doc-lines-grid doc-lines-grid--so"
+                rows={form.lines}
+                dataColumns={editableLinesTanstackColumns}
+                getRowId={(row) => String(row._lineId)}
+                columnSizing={soEditableLinesColumnSizing}
+                onColumnSizingChange={setSoEditableLinesColumnSizing}
+                enableRowSelection
+                rowSelection={lineRowSelection}
+                onRowSelectionChange={setLineRowSelection}
+                getRowClassName={getLineRowClassName}
+                resolveRowSelectLabel={resolveSoLineRowSelectLabel}
+                t={t}
+              />
             </div>
             {form.lines.length > 0 && (
               <div className="doc-lines__totals doc-lines__totals--sticky sticky bottom-0 z-10 mt-1.5 flex gap-6 rounded-md border border-border/70 bg-background/95 px-3 py-2 text-sm shadow-sm backdrop-blur supports-[backdrop-filter]:bg-background/80">
@@ -2998,15 +2691,15 @@ export function SalesOrderPage() {
             ) : (
               <>
                 <div className="doc-lines__grid">
-                  <AgGridContainer themeClass="doc-lines-grid">
-                    <AgGridReact<LineWithItem>
-                      {...agGridDefaultGridOptions}
-                      rowData={linesWithItem}
-                      columnDefs={readOnlyLinesColumnDefs}
-                      defaultColDef={agGridDefaultColDef}
-                      getRowId={(p) => p.data.id}
-                    />
-                  </AgGridContainer>
+                  <SalesOrderLinesTanstackTable<LineWithItem>
+                    className="doc-lines-grid doc-lines-grid--so"
+                    rows={linesWithItem}
+                    dataColumns={readonlyLinesTanstackColumns}
+                    getRowId={(row) => String(row.id)}
+                    columnSizing={soReadonlyLinesColumnSizing}
+                    onColumnSizingChange={setSoReadonlyLinesColumnSizing}
+                    t={t}
+                  />
                 </div>
                 <div className="doc-lines__totals doc-lines__totals--sticky sticky bottom-0 z-10 mt-1.5 flex gap-6 rounded-md border border-border/70 bg-background/95 px-3 py-2 text-sm shadow-sm backdrop-blur supports-[backdrop-filter]:bg-background/80">
                   <span>

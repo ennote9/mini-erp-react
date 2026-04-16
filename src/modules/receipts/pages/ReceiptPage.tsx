@@ -1,7 +1,6 @@
 import { useParams } from "react-router-dom";
-import { useMemo, useState, useCallback } from "react";
-import { AgGridReact } from "ag-grid-react";
-import type { ColDef, SelectionChangedEvent } from "ag-grid-community";
+import { useMemo, useState, useCallback, useEffect } from "react";
+import type { ColumnSizingState, RowSelectionState } from "@tanstack/react-table";
 import { receiptRepository } from "../repository";
 import { post, cancelDocument, reverseDocument, validateReceiptFull } from "../service";
 import { purchaseOrderRepository } from "../../purchase-orders/repository";
@@ -9,7 +8,6 @@ import { warehouseRepository } from "../../warehouses/repository";
 import { itemRepository } from "../../items/repository";
 import { brandRepository } from "../../brands/repository";
 import { categoryRepository } from "../../categories/repository";
-import type { ReceiptLine } from "../model";
 import { DocumentPageLayout } from "../../../shared/ui/object/DocumentPageLayout";
 import { StatusBadge } from "../../../shared/ui/feedback/StatusBadge";
 import { DocumentIssueStrip } from "../../../shared/ui/feedback/DocumentIssueStrip";
@@ -19,7 +17,6 @@ import {
   hasWarnings,
   type Issue,
 } from "../../../shared/issues";
-import { AgGridContainer } from "../../../shared/ui/ag-grid/AgGridContainer";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -28,11 +25,6 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import {
-  agGridDefaultColDef,
-  agGridDefaultGridOptions,
-  agGridSelectionColumnDef,
-} from "../../../shared/ui/ag-grid/agGridDefaults";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { ChevronDown, FileSpreadsheet, File, FolderOpen, X } from "lucide-react";
 import { buildLinesXlsxBuffer, buildDocumentXlsxBuffer, type ReceiptExportLineRow, type ReceiptDocumentSummary } from "../receiptExport";
@@ -43,7 +35,6 @@ import { factualDocumentIssuesForStrip } from "../../../shared/factualDocumentPa
 import { useTranslation } from "@/shared/i18n/context";
 import { useAppDisplayFormatters } from "@/shared/formatting";
 import { buildReadableUniqueFilename, ensureUniqueExportPath } from "@/shared/export/filenameBuilder";
-import type { TFunction } from "@/shared/i18n/resolve";
 import { receiptExcelExportLabels } from "@/shared/i18n/excelPlanningExportLabels";
 import { translateCancelReason, translateReversalReason } from "@/shared/i18n/reasonLabels";
 import {
@@ -61,68 +52,37 @@ import {
   type CancelDocumentReasonCode,
   type ReversalDocumentReasonCode,
 } from "../../../shared/reasonCodes";
+import { ReceiptLinesTanstackTable } from "../components/ReceiptLinesTanstackTable";
+import {
+  buildReceiptLinesTanstackColumns,
+  type ReceiptLineWithItem,
+} from "../receiptLinesTanstackColumns";
 
-type LineWithItem = ReceiptLine & { itemName: string; uom: string };
+const RECEIPT_LINES_COL_SIZING_KEY = "mini-erp:receipt:lines:tanstack:columnSizing:v1";
 
-function receiptLinesColumnDefs(t: TFunction): ColDef<LineWithItem>[] {
-  return [
-    {
-      headerName: t("doc.columns.lineNo"),
-      valueGetter: (params) =>
-        params.node?.rowIndex != null ? String(params.node.rowIndex + 1) : "",
-      width: 52,
-      minWidth: 48,
-      maxWidth: 56,
-      sortable: false,
-      resizable: true,
-    },
-    {
-      headerName: t("doc.columns.itemCode"),
-      width: 130,
-      minWidth: 120,
-      maxWidth: 140,
-      valueGetter: (p) => {
-        const itemId = p.data?.itemId;
-        if (!itemId) return "";
-        const item = itemRepository.getById(itemId);
-        return item?.code ?? itemId;
-      },
-    },
-    { field: "itemName", headerName: t("doc.columns.itemName"), flex: 1, minWidth: 180 },
-    {
-      headerName: t("doc.columns.brand"),
-      width: 130,
-      minWidth: 120,
-      maxWidth: 140,
-      valueGetter: (p) => {
-        const itemId = p.data?.itemId;
-        if (!itemId) return "";
-        const item = itemRepository.getById(itemId);
-        if (!item?.brandId) return "";
-        const brand = brandRepository.getById(item.brandId);
-        return brand?.code ?? "";
-      },
-    },
-    {
-      headerName: t("doc.columns.category"),
-      width: 130,
-      minWidth: 120,
-      maxWidth: 140,
-      valueGetter: (p) => {
-        const itemId = p.data?.itemId;
-        if (!itemId) return "";
-        const item = itemRepository.getById(itemId);
-        if (!item?.categoryId) return "";
-        const category = categoryRepository.getById(item.categoryId);
-        return category?.code ?? "";
-      },
-    },
-    { field: "qty", headerName: t("doc.columns.qty"), width: 100 },
-    { field: "uom", headerName: t("doc.columns.uom"), width: 80 },
-  ];
+function readPersistedColumnSizing(key: string): ColumnSizingState {
+  if (typeof window === "undefined") return {};
+  try {
+    const raw = window.localStorage.getItem(key);
+    if (!raw) return {};
+    const parsed = JSON.parse(raw) as unknown;
+    if (!parsed || typeof parsed !== "object") return {};
+    return parsed as ColumnSizingState;
+  } catch {
+    return {};
+  }
 }
 
-function buildExportRowsFromLinesWithItem(lines: LineWithItem[]): ReceiptExportLineRow[] {
+function writePersistedColumnSizing(key: string, value: ColumnSizingState) {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(key, JSON.stringify(value));
+  } catch {
+    // ignore
+  }
+}
+
+function buildExportRowsFromLinesWithItem(lines: ReceiptLineWithItem[]): ReceiptExportLineRow[] {
   return lines.map((line, idx) => {
     const item = itemRepository.getById(line.itemId);
     const qty = typeof line.qty === "number" && !Number.isNaN(line.qty) ? line.qty : 0;
@@ -157,7 +117,10 @@ export function ReceiptPage() {
     settings.documents.showDocumentEventLog;
   const [refresh, setRefresh] = useState(0);
   const [actionIssues, setActionIssues] = useState<Issue[]>([]);
-  const [selectedLineIds, setSelectedLineIds] = useState<string[]>([]);
+  const [lineRowSelection, setLineRowSelection] = useState<RowSelectionState>({});
+  const [receiptLinesColumnSizing, setReceiptLinesColumnSizing] = useState<ColumnSizingState>(() =>
+    readPersistedColumnSizing(RECEIPT_LINES_COL_SIZING_KEY),
+  );
   const [exportSuccess, setExportSuccess] = useState<{ path: string; filename: string } | null>(null);
   const [exportOpen, setExportOpen] = useState(false);
   const [cancelReasonDialogOpen, setCancelReasonDialogOpen] = useState(false);
@@ -187,7 +150,7 @@ export function ReceiptPage() {
   );
   const emDash = t("domain.audit.summary.emDash");
 
-  const linesWithItem = useMemo<LineWithItem[]>(() => {
+  const linesWithItem = useMemo<ReceiptLineWithItem[]>(() => {
     return lines.map((line) => {
       const item = itemRepository.getById(line.itemId);
       return {
@@ -198,16 +161,40 @@ export function ReceiptPage() {
     });
   }, [lines, emDash]);
 
-  const linesColumnDefs = useMemo(() => receiptLinesColumnDefs(t), [t, locale]);
+  const selectedLineIds = useMemo(
+    () => Object.keys(lineRowSelection).filter((k) => lineRowSelection[k]),
+    [lineRowSelection],
+  );
+
+  useEffect(() => {
+    writePersistedColumnSizing(RECEIPT_LINES_COL_SIZING_KEY, receiptLinesColumnSizing);
+  }, [receiptLinesColumnSizing]);
+
+  useEffect(() => {
+    const valid = new Set(linesWithItem.map((l) => l.id));
+    setLineRowSelection((prev) => {
+      const next = { ...prev };
+      let changed = false;
+      for (const k of Object.keys(next)) {
+        if (!valid.has(k)) {
+          delete next[k];
+          changed = true;
+        }
+      }
+      return changed ? next : prev;
+    });
+  }, [linesWithItem]);
+
+  const receiptLinesTanstackColumns = useMemo(() => buildReceiptLinesTanstackColumns(t), [t, locale]);
+
+  const resolveReceiptLineSelectLabel = useCallback((row: ReceiptLineWithItem) => {
+    const item = itemRepository.getById(row.itemId);
+    return item?.code ?? row.itemId;
+  }, []);
 
   const isDraft = doc?.status === "draft";
   const isPosted = doc?.status === "posted";
   const isReversed = doc?.status === "reversed";
-
-  const onLinesSelectionChanged = useCallback((e: SelectionChangedEvent<LineWithItem>) => {
-    const ids = e.api.getSelectedRows().map((r) => r.id);
-    setSelectedLineIds(ids);
-  }, []);
 
   const receiptNumberForFile = doc?.number ?? "receipt";
 
@@ -586,18 +573,18 @@ export function ReceiptPage() {
           <p className="doc-lines__empty">{t("doc.receipt.emptyLines")}</p>
         ) : (
           <div className="doc-lines__grid">
-            <AgGridContainer themeClass="doc-lines-grid">
-              <AgGridReact<LineWithItem>
-                {...agGridDefaultGridOptions}
-                rowData={linesWithItem}
-                columnDefs={linesColumnDefs}
-                defaultColDef={agGridDefaultColDef}
-                getRowId={(p) => p.data.id}
-                rowSelection={{ mode: "multiRow", checkboxes: true, headerCheckbox: true, enableClickSelection: true }}
-                selectionColumnDef={agGridSelectionColumnDef}
-                onSelectionChanged={onLinesSelectionChanged}
-              />
-            </AgGridContainer>
+            <ReceiptLinesTanstackTable
+              className="doc-lines-grid"
+              rows={linesWithItem}
+              dataColumns={receiptLinesTanstackColumns}
+              getRowId={(row) => row.id}
+              columnSizing={receiptLinesColumnSizing}
+              onColumnSizingChange={setReceiptLinesColumnSizing}
+              rowSelection={lineRowSelection}
+              onRowSelectionChange={setLineRowSelection}
+              resolveRowSelectLabel={resolveReceiptLineSelectLabel}
+              t={t}
+            />
           </div>
         )}
       </div>
