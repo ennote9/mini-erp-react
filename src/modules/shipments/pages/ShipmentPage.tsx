@@ -1,7 +1,6 @@
 import { useParams } from "react-router-dom";
 import { useMemo, useState, useCallback, useEffect, useRef } from "react";
-import { AgGridReact } from "ag-grid-react";
-import type { ColDef, SelectionChangedEvent } from "ag-grid-community";
+import type { ColumnSizingState, RowSelectionState } from "@tanstack/react-table";
 import { shipmentRepository } from "../repository";
 import {
   post,
@@ -18,8 +17,12 @@ import { itemRepository } from "../../items/repository";
 import { listSellableItemsForDocumentLines } from "../../items/orderLineItemsPolicy";
 import { brandRepository } from "../../brands/repository";
 import { categoryRepository } from "../../categories/repository";
-import type { ShipmentLine } from "../model";
 import { ShipmentItemAutocomplete, type ShipmentItemAutocompleteRef } from "../components";
+import { ShipmentLinesTanstackTable } from "../components/ShipmentLinesTanstackTable";
+import {
+  buildShipmentLinesTanstackColumns,
+  type ShipmentLineWithItemRow,
+} from "../shipmentLinesTanstackColumns";
 import { DocumentPageLayout } from "../../../shared/ui/object/DocumentPageLayout";
 import { BackButton } from "../../../shared/ui/list/BackButton";
 import { StatusBadge } from "../../../shared/ui/feedback/StatusBadge";
@@ -31,7 +34,6 @@ import {
   hasWarnings,
   type Issue,
 } from "../../../shared/issues";
-import { AgGridContainer } from "../../../shared/ui/ag-grid/AgGridContainer";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -43,11 +45,6 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import {
-  agGridDefaultColDef,
-  agGridDefaultGridOptions,
-  agGridSelectionColumnDef,
-} from "../../../shared/ui/ag-grid/agGridDefaults";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { ChevronDown, FileSpreadsheet, File, FolderOpen, X } from "lucide-react";
 import { buildLinesXlsxBuffer, buildDocumentXlsxBuffer, type ShipmentExportLineRow, type ShipmentDocumentSummary } from "../shipmentExport";
@@ -58,7 +55,6 @@ import { factualDocumentIssuesForStrip } from "../../../shared/factualDocumentPa
 import { useTranslation } from "@/shared/i18n/context";
 import { useAppDisplayFormatters } from "@/shared/formatting";
 import { buildReadableUniqueFilename, ensureUniqueExportPath } from "@/shared/export/filenameBuilder";
-import type { TFunction } from "@/shared/i18n/resolve";
 import { shipmentExcelExportLabels } from "@/shared/i18n/excelPlanningExportLabels";
 import { translateCancelReason, translateReversalReason } from "@/shared/i18n/reasonLabels";
 import {
@@ -81,80 +77,31 @@ import {
   markdownRepository,
 } from "@/modules/markdown-journal";
 
-type LineWithItem = ShipmentLine & { itemName: string; uom: string };
+const SHIPMENT_LINES_COL_SIZING_KEY = "mini-erp:shipment:lines:tanstack:columnSizing:v1";
 
-function shipmentLinesColumnDefs(t: TFunction): ColDef<LineWithItem>[] {
-  return [
-    {
-      headerName: t("doc.columns.lineNo"),
-      valueGetter: (params) =>
-        params.node?.rowIndex != null ? String(params.node.rowIndex + 1) : "",
-      width: 52,
-      minWidth: 48,
-      maxWidth: 56,
-      sortable: false,
-      resizable: true,
-    },
-    {
-      headerName: t("doc.columns.itemCode"),
-      width: 130,
-      minWidth: 120,
-      maxWidth: 140,
-      valueGetter: (p) => {
-        const itemId = p.data?.itemId;
-        if (!itemId) return "";
-        const item = itemRepository.getById(itemId);
-        return item?.code ?? itemId;
-      },
-      cellRenderer: (p: any) => {
-        const code = p.value;
-        const markdownCode = p.data?.markdownCode;
-        if (markdownCode) {
-          return (
-            <div className="flex flex-col leading-tight">
-              <span>{code}</span>
-              <span className="text-[10px] text-muted-foreground font-mono">{markdownCode}</span>
-            </div>
-          );
-        }
-        return code;
-      }
-    },
-    { field: "itemName", headerName: t("doc.columns.itemName"), flex: 1, minWidth: 180 },
-    {
-      headerName: t("doc.columns.brand"),
-      width: 130,
-      minWidth: 120,
-      maxWidth: 140,
-      valueGetter: (p) => {
-        const itemId = p.data?.itemId;
-        if (!itemId) return "";
-        const item = itemRepository.getById(itemId);
-        if (!item?.brandId) return "";
-        const brand = brandRepository.getById(item.brandId);
-        return brand?.code ?? "";
-      },
-    },
-    {
-      headerName: t("doc.columns.category"),
-      width: 130,
-      minWidth: 120,
-      maxWidth: 140,
-      valueGetter: (p) => {
-        const itemId = p.data?.itemId;
-        if (!itemId) return "";
-        const item = itemRepository.getById(itemId);
-        if (!item?.categoryId) return "";
-        const category = categoryRepository.getById(item.categoryId);
-        return category?.code ?? "";
-      },
-    },
-    { field: "qty", headerName: t("doc.columns.qty"), width: 100 },
-    { field: "uom", headerName: t("doc.columns.uom"), width: 80 },
-  ];
+function readPersistedColumnSizing(key: string): ColumnSizingState {
+  if (typeof window === "undefined") return {};
+  try {
+    const raw = window.localStorage.getItem(key);
+    if (!raw) return {};
+    const parsed = JSON.parse(raw) as unknown;
+    if (!parsed || typeof parsed !== "object") return {};
+    return parsed as ColumnSizingState;
+  } catch {
+    return {};
+  }
 }
 
-function buildExportRowsFromLinesWithItem(lines: LineWithItem[]): ShipmentExportLineRow[] {
+function writePersistedColumnSizing(key: string, value: ColumnSizingState) {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(key, JSON.stringify(value));
+  } catch {
+    // ignore
+  }
+}
+
+function buildExportRowsFromLinesWithItem(lines: ShipmentLineWithItemRow[]): ShipmentExportLineRow[] {
   return lines.map((line, idx) => {
     const item = itemRepository.getById(line.itemId);
     const qty = typeof line.qty === "number" && !Number.isNaN(line.qty) ? line.qty : 0;
@@ -190,7 +137,10 @@ export function ShipmentPage() {
     settings.documents.showDocumentEventLog;
   const [refresh, setRefresh] = useState(0);
   const [actionIssues, setActionIssues] = useState<Issue[]>([]);
-  const [selectedLineIds, setSelectedLineIds] = useState<string[]>([]);
+  const [lineRowSelection, setLineRowSelection] = useState<RowSelectionState>({});
+  const [shipmentLinesColumnSizing, setShipmentLinesColumnSizing] = useState<ColumnSizingState>(() =>
+    readPersistedColumnSizing(SHIPMENT_LINES_COL_SIZING_KEY),
+  );
   const [exportSuccess, setExportSuccess] = useState<{ path: string; filename: string } | null>(null);
   const [exportOpen, setExportOpen] = useState(false);
   const [cancelReasonDialogOpen, setCancelReasonDialogOpen] = useState(false);
@@ -268,7 +218,7 @@ export function ShipmentPage() {
   );
   const emDash = t("domain.audit.summary.emDash");
 
-  const linesWithItem = useMemo<LineWithItem[]>(() => {
+  const linesWithItem = useMemo<ShipmentLineWithItemRow[]>(() => {
     return lines.map((line) => {
       const item = itemRepository.getById(line.itemId);
       return {
@@ -279,7 +229,35 @@ export function ShipmentPage() {
     });
   }, [lines, emDash]);
 
-  const linesColumnDefs = useMemo(() => shipmentLinesColumnDefs(t), [t, locale]);
+  const selectedLineIds = useMemo(
+    () => Object.keys(lineRowSelection).filter((k) => lineRowSelection[k]),
+    [lineRowSelection],
+  );
+
+  useEffect(() => {
+    writePersistedColumnSizing(SHIPMENT_LINES_COL_SIZING_KEY, shipmentLinesColumnSizing);
+  }, [shipmentLinesColumnSizing]);
+
+  useEffect(() => {
+    const valid = new Set(lines.map((l) => l.id));
+    setLineRowSelection((prev) => {
+      const next = { ...prev };
+      let changed = false;
+      for (const k of Object.keys(next)) {
+        if (!valid.has(k)) {
+          delete next[k];
+          changed = true;
+        }
+      }
+      return changed ? next : prev;
+    });
+  }, [lines]);
+
+  const shipmentLinesTanstackColumns = useMemo(() => buildShipmentLinesTanstackColumns(t), [t, locale]);
+
+  const resolveShipmentLineRowSelectLabel = useCallback((row: ShipmentLineWithItemRow) => {
+    return itemRepository.getById(row.itemId)?.code ?? row.itemId;
+  }, []);
 
   const isDraft = doc?.status === "draft";
   const isPosted = doc?.status === "posted";
@@ -347,11 +325,6 @@ export function ShipmentPage() {
       draftRecipientPhone !== (doc.recipientPhone ?? "") ||
       draftDeliveryAddress !== (doc.deliveryAddress ?? "") ||
       draftDeliveryComment !== (doc.deliveryComment ?? ""));
-
-  const onLinesSelectionChanged = useCallback((e: SelectionChangedEvent<LineWithItem>) => {
-    const ids = e.api.getSelectedRows().map((r) => r.id);
-    setSelectedLineIds(ids);
-  }, []);
 
   const documentLineItems = useMemo(() => {
     const base = listSellableItemsForDocumentLines();
@@ -1126,18 +1099,19 @@ export function ShipmentPage() {
           <p className="doc-lines__empty">{t("doc.shipment.emptyLines")}</p>
         ) : (
           <div className="doc-lines__grid">
-            <AgGridContainer themeClass="doc-lines-grid">
-              <AgGridReact<LineWithItem>
-                {...agGridDefaultGridOptions}
-                rowData={linesWithItem}
-                columnDefs={linesColumnDefs}
-                defaultColDef={agGridDefaultColDef}
-                getRowId={(p) => p.data.id}
-                rowSelection={{ mode: "multiRow", checkboxes: true, headerCheckbox: true, enableClickSelection: true }}
-                selectionColumnDef={agGridSelectionColumnDef}
-                onSelectionChanged={onLinesSelectionChanged}
-              />
-            </AgGridContainer>
+            <ShipmentLinesTanstackTable<ShipmentLineWithItemRow>
+              className="doc-lines-grid doc-lines-grid--shipment"
+              rows={linesWithItem}
+              dataColumns={shipmentLinesTanstackColumns}
+              getRowId={(row) => row.id}
+              columnSizing={shipmentLinesColumnSizing}
+              onColumnSizingChange={setShipmentLinesColumnSizing}
+              enableRowSelection
+              rowSelection={lineRowSelection}
+              onRowSelectionChange={setLineRowSelection}
+              resolveRowSelectLabel={resolveShipmentLineRowSelectLabel}
+              t={t}
+            />
           </div>
         )}
       </div>
