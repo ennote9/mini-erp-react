@@ -1,7 +1,6 @@
 import { useParams, useNavigate, useSearchParams } from "react-router-dom";
 import { useMemo, useState, useEffect, useRef, useCallback } from "react";
-import { AgGridReact } from "ag-grid-react";
-import type { SelectionChangedEvent } from "ag-grid-community";
+import type { ColumnSizingState, RowSelectionState } from "@tanstack/react-table";
 import { purchaseOrderRepository } from "../repository";
 import { confirm, cancelDocument, createReceipt, saveDraft } from "../service";
 import { supplierRepository } from "../../suppliers/repository";
@@ -13,7 +12,6 @@ import { useAppReadModelRevision } from "@/shared/inventoryMasterPageBlocks/useA
 import { appendReturnTo, readReturnToParam } from "@/shared/navigation/returnTo";
 import { useUrlTabState } from "@/shared/navigation/useUrlTabState";
 import { DocumentPageLayout } from "../../../shared/ui/object/DocumentPageLayout";
-import { AgGridContainer } from "../../../shared/ui/ag-grid/AgGridContainer";
 import { Button } from "@/components/ui/button";
 import { DatePickerField } from "@/components/ui/date-picker-field";
 import { Input } from "@/components/ui/input";
@@ -21,11 +19,6 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import {
-  agGridDefaultColDef,
-  agGridDefaultGridOptions,
-  agGridSelectionColumnDef,
-} from "../../../shared/ui/ag-grid/agGridDefaults";
 import { normalizeDateForPO } from "../dateUtils";
 import { usePlanningDocumentHotkeys } from "../../../shared/hotkeys";
 import { roundMoney, sumPlanningDocumentLineAmounts } from "../../../shared/commercialMoney";
@@ -98,12 +91,38 @@ import {
   type LineFormRow,
   type LineWithItem,
 } from "../purchaseOrderPageModel";
-import {
-  ExecutionMetric,
-  poLinesDisplayColumnDefs,
-  poLinesReadOnlyColumnDefs,
-} from "../purchaseOrderPageGridConfig";
+import { ExecutionMetric } from "../purchaseOrderPageGridConfig";
 import { PurchaseOrderDocumentHeader } from "../components/PurchaseOrderDocumentHeader";
+import { PurchaseOrderLinesTanstackTable } from "../components/PurchaseOrderLinesTanstackTable";
+import {
+  buildPurchaseOrderEditableLinesTanstackColumns,
+  buildPurchaseOrderReadonlyLinesTanstackColumns,
+} from "../purchaseOrderLinesTanstackColumns";
+
+const PO_LINES_EDITABLE_COL_SIZING_KEY = "mini-erp:po:lines:editable:tanstack:columnSizing:v1";
+const PO_LINES_READONLY_COL_SIZING_KEY = "mini-erp:po:lines:readonly:tanstack:columnSizing:v1";
+
+function readPersistedColumnSizing(key: string): ColumnSizingState {
+  if (typeof window === "undefined") return {};
+  try {
+    const raw = window.localStorage.getItem(key);
+    if (!raw) return {};
+    const parsed = JSON.parse(raw) as unknown;
+    if (!parsed || typeof parsed !== "object") return {};
+    return parsed as ColumnSizingState;
+  } catch {
+    return {};
+  }
+}
+
+function writePersistedColumnSizing(key: string, value: ColumnSizingState) {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(key, JSON.stringify(value));
+  } catch {
+    // ignore localStorage failures
+  }
+}
 
 export function PurchaseOrderPage() {
   const { id } = useParams<{ id: string }>();
@@ -153,7 +172,13 @@ export function PurchaseOrderPage() {
     unitPrice: number;
   } | null>(null);
   const [actionIssues, setActionIssues] = useState<Issue[]>([]);
-  const [selectedLineIds, setSelectedLineIds] = useState<number[]>([]);
+  const [lineRowSelection, setLineRowSelection] = useState<RowSelectionState>({});
+  const [poEditableLinesColumnSizing, setPoEditableLinesColumnSizing] = useState<ColumnSizingState>(() =>
+    readPersistedColumnSizing(PO_LINES_EDITABLE_COL_SIZING_KEY),
+  );
+  const [poReadonlyLinesColumnSizing, setPoReadonlyLinesColumnSizing] = useState<ColumnSizingState>(() =>
+    readPersistedColumnSizing(PO_LINES_READONLY_COL_SIZING_KEY),
+  );
   const [isLineImportModalOpen, setIsLineImportModalOpen] = useState(false);
   const [lineImportInitialTab, setLineImportInitialTab] = useState<LineImportTab>("paste");
   const [exportOpen, setExportOpen] = useState(false);
@@ -162,7 +187,6 @@ export function PurchaseOrderPage() {
     allowedValues: ["lines", "execution", "payments", "attachments", "events"] as const,
     defaultValue: "lines",
   });
-  const linesGridRef = useRef<AgGridReact<LineFormRow> | null>(null);
   const lineEntryItemPickerRef = useRef<PurchaseOrderItemAutocompleteRef | null>(null);
   const lineEntryQtyInputRef = useRef<HTMLInputElement | null>(null);
   const lineEntryDropdownRightEdgeRef = useRef<HTMLDivElement | null>(null);
@@ -203,6 +227,7 @@ export function PurchaseOrderPage() {
       setLineEntryUnitPrice(0);
       setLineEntryZeroPriceReason("");
       setDuplicateChoicePending(null);
+      setLineRowSelection({});
       return;
     }
     if (doc?.status === "draft" && id) {
@@ -240,6 +265,7 @@ export function PurchaseOrderPage() {
       setLineEntryUnitPrice(0);
       setLineEntryZeroPriceReason("");
       setDuplicateChoicePending(null);
+      setLineRowSelection({});
     }
   }, [
     id,
@@ -283,7 +309,71 @@ export function PurchaseOrderPage() {
   const isDraft = doc?.status === "draft";
   const isConfirmed = doc?.status === "confirmed";
   const isEditable = isNew || isDraft;
+  const selectedLineIds = useMemo(
+    () => Object.keys(lineRowSelection).filter((k) => lineRowSelection[k]).map((k) => Number(k)),
+    [lineRowSelection],
+  );
   const displayNumber = !doc ? "—" : isNew ? "—" : doc.number;
+
+  useEffect(() => {
+    writePersistedColumnSizing(PO_LINES_EDITABLE_COL_SIZING_KEY, poEditableLinesColumnSizing);
+  }, [poEditableLinesColumnSizing]);
+
+  useEffect(() => {
+    writePersistedColumnSizing(PO_LINES_READONLY_COL_SIZING_KEY, poReadonlyLinesColumnSizing);
+  }, [poReadonlyLinesColumnSizing]);
+
+  useEffect(() => {
+    if (!isEditable) setLineRowSelection({});
+  }, [isEditable]);
+
+  useEffect(() => {
+    if (!isEditable) return;
+    const valid = new Set(form.lines.map((l) => String(l._lineId)));
+    setLineRowSelection((prev) => {
+      const next = { ...prev };
+      let changed = false;
+      for (const k of Object.keys(next)) {
+        if (!valid.has(k)) {
+          delete next[k];
+          changed = true;
+        }
+      }
+      return changed ? next : prev;
+    });
+  }, [form.lines, isEditable]);
+
+  useEffect(() => {
+    if (!isEditable) return;
+    const ids = Object.keys(lineRowSelection)
+      .filter((k) => lineRowSelection[k])
+      .map((k) => Number(k));
+    setDuplicateChoicePending(null);
+    if (ids.length === 1) {
+      const row = form.lines.find((l) => l._lineId === ids[0]);
+      if (row) {
+        setEditingLineId(row._lineId);
+        setLineEntryItemId(row.itemId);
+        setLineEntryQty(row.qty);
+        setLineEntryUnitPrice(
+          roundMoney(typeof row.unitPrice === "number" && !Number.isNaN(row.unitPrice) ? row.unitPrice : 0),
+        );
+        setLineEntryZeroPriceReason(typeof row.zeroPriceReasonCode === "string" ? row.zeroPriceReasonCode : "");
+      } else {
+        setEditingLineId(null);
+        setLineEntryItemId("");
+        setLineEntryQty(1);
+        setLineEntryUnitPrice(0);
+        setLineEntryZeroPriceReason("");
+      }
+    } else {
+      setEditingLineId(null);
+      setLineEntryItemId("");
+      setLineEntryQty(1);
+      setLineEntryUnitPrice(0);
+      setLineEntryZeroPriceReason("");
+    }
+  }, [lineRowSelection, form.lines, isEditable]);
   const poOrderTotalAmount = useMemo(
     () => computePurchaseOrderTotalFromLines(lines),
     [lines],
@@ -432,7 +522,7 @@ export function PurchaseOrderPage() {
       setLineEntryQty(1);
       setLineEntryUnitPrice(0);
       setLineEntryZeroPriceReason("");
-      linesGridRef.current?.api?.deselectAll();
+      setLineRowSelection({});
     }
   }, [editingLineId]);
 
@@ -523,7 +613,7 @@ export function PurchaseOrderPage() {
     setLineEntryQty(1);
     setLineEntryUnitPrice(0);
     setLineEntryZeroPriceReason("");
-    linesGridRef.current?.api?.deselectAll();
+    setLineRowSelection({});
   };
 
   const cancelEdit = () => {
@@ -533,33 +623,8 @@ export function PurchaseOrderPage() {
     setLineEntryUnitPrice(0);
     setLineEntryZeroPriceReason("");
     setDuplicateChoicePending(null);
-    linesGridRef.current?.api?.deselectAll();
+    setLineRowSelection({});
   };
-
-  const onLinesSelectionChanged = useCallback((e: SelectionChangedEvent<LineFormRow>) => {
-    const rows = e.api.getSelectedRows();
-    const ids = rows.map((r) => r._lineId);
-    setSelectedLineIds(ids);
-    setDuplicateChoicePending(null);
-    if (rows.length === 1 && rows[0]) {
-      const row = rows[0];
-      setEditingLineId(row._lineId);
-      setLineEntryItemId(row.itemId);
-      setLineEntryQty(row.qty);
-      setLineEntryUnitPrice(
-        roundMoney(typeof row.unitPrice === "number" && !Number.isNaN(row.unitPrice) ? row.unitPrice : 0),
-      );
-      setLineEntryZeroPriceReason(
-        typeof row.zeroPriceReasonCode === "string" ? row.zeroPriceReasonCode : "",
-      );
-    } else {
-      setEditingLineId(null);
-      setLineEntryItemId("");
-      setLineEntryQty(1);
-      setLineEntryUnitPrice(0);
-      setLineEntryZeroPriceReason("");
-    }
-  }, []);
 
   const removeSelectedLines = useCallback(() => {
     const ids = new Set(selectedLineIds);
@@ -567,8 +632,7 @@ export function PurchaseOrderPage() {
       ...f,
       lines: f.lines.filter((l) => !ids.has(l._lineId)),
     }));
-    linesGridRef.current?.api?.deselectAll();
-    setSelectedLineIds([]);
+    setLineRowSelection({});
     setDuplicateChoicePending(null);
     if (editingLineId !== null && ids.has(editingLineId)) {
       setEditingLineId(null);
@@ -805,18 +869,22 @@ export function PurchaseOrderPage() {
     [health.issues, actionIssues],
   );
 
-  const getRowClass = useCallback(
-    (params: { data?: LineFormRow }) => {
-      if (!params.data) return undefined;
+  const getLineRowClassName = useCallback(
+    (row: LineFormRow) => {
       const parts: string[] = [];
-      if (params.data._lineId === editingLineId) parts.push("doc-lines__row--editing");
-      const h = health.lineHealth.get(params.data._lineId);
+      if (row._lineId === editingLineId) parts.push("doc-lines__row--editing");
+      const h = health.lineHealth.get(row._lineId);
       if (h === "error") parts.push("doc-lines__row--error");
       else if (h === "warning") parts.push("doc-lines__row--warning");
       return parts.length > 0 ? parts.join(" ") : undefined;
     },
     [health.lineHealth, editingLineId],
   );
+
+  const resolvePoLineRowSelectLabel = useCallback((row: LineFormRow) => {
+    const item = itemRepository.getById(row.itemId);
+    return item?.code ?? row.itemId;
+  }, []);
 
   const poFulfillment = useMemo(() => {
     if (!id || isNew) return null;
@@ -832,13 +900,13 @@ export function PurchaseOrderPage() {
     return m;
   }, [poFulfillment]);
 
-  const linesColumnDefs = useMemo(
-    () => poLinesDisplayColumnDefs(t, fulfillmentByItemId, formatMoney),
+  const editableLinesTanstackColumns = useMemo(
+    () => buildPurchaseOrderEditableLinesTanstackColumns(t, fulfillmentByItemId, formatMoney),
     [fulfillmentByItemId, t, locale, formatMoney],
   );
 
-  const readOnlyLinesColumnDefs = useMemo(
-    () => poLinesReadOnlyColumnDefs(t, poFulfillment, formatMoney),
+  const readonlyLinesTanstackColumns = useMemo(
+    () => buildPurchaseOrderReadonlyLinesTanstackColumns(t, poFulfillment, formatMoney),
     [t, locale, poFulfillment, formatMoney],
   );
 
@@ -1614,20 +1682,20 @@ export function PurchaseOrderPage() {
               </div>
             )}
             <div className="doc-lines__grid">
-              <AgGridContainer themeClass="doc-lines-grid doc-lines-grid--po">
-                <AgGridReact<LineFormRow>
-                  {...agGridDefaultGridOptions}
-                  ref={linesGridRef}
-                  rowData={form.lines}
-                  columnDefs={linesColumnDefs}
-                  defaultColDef={agGridDefaultColDef}
-                  getRowId={(p) => String(p.data._lineId)}
-                  getRowClass={getRowClass}
-                  rowSelection={isEditable ? { mode: "multiRow", checkboxes: true, headerCheckbox: true, enableClickSelection: true } : undefined}
-                  selectionColumnDef={isEditable ? agGridSelectionColumnDef : undefined}
-                  onSelectionChanged={isEditable ? onLinesSelectionChanged : undefined}
-                />
-              </AgGridContainer>
+              <PurchaseOrderLinesTanstackTable<LineFormRow>
+                className="doc-lines-grid doc-lines-grid--po"
+                rows={form.lines}
+                dataColumns={editableLinesTanstackColumns}
+                getRowId={(row) => String(row._lineId)}
+                columnSizing={poEditableLinesColumnSizing}
+                onColumnSizingChange={setPoEditableLinesColumnSizing}
+                enableRowSelection
+                rowSelection={lineRowSelection}
+                onRowSelectionChange={setLineRowSelection}
+                getRowClassName={getLineRowClassName}
+                resolveRowSelectLabel={resolvePoLineRowSelectLabel}
+                t={t}
+              />
             </div>
             {form.lines.length > 0 && (
               <div className="doc-lines__totals doc-lines__totals--sticky sticky bottom-0 z-10 mt-1.5 flex gap-6 rounded-md border border-border/70 bg-background/95 px-3 py-2 text-sm shadow-sm backdrop-blur supports-[backdrop-filter]:bg-background/80">
@@ -1649,15 +1717,15 @@ export function PurchaseOrderPage() {
             ) : (
               <>
                 <div className="doc-lines__grid">
-                  <AgGridContainer themeClass="doc-lines-grid doc-lines-grid--po">
-                    <AgGridReact<LineWithItem>
-                      {...agGridDefaultGridOptions}
-                      rowData={linesWithItem}
-                      columnDefs={readOnlyLinesColumnDefs}
-                      defaultColDef={agGridDefaultColDef}
-                      getRowId={(p) => p.data.id}
-                    />
-                  </AgGridContainer>
+                  <PurchaseOrderLinesTanstackTable<LineWithItem>
+                    className="doc-lines-grid doc-lines-grid--po"
+                    rows={linesWithItem}
+                    dataColumns={readonlyLinesTanstackColumns}
+                    getRowId={(row) => row.id}
+                    columnSizing={poReadonlyLinesColumnSizing}
+                    onColumnSizingChange={setPoReadonlyLinesColumnSizing}
+                    t={t}
+                  />
                 </div>
                 <div className="doc-lines__totals doc-lines__totals--sticky sticky bottom-0 z-10 mt-1.5 flex gap-6 rounded-md border border-border/70 bg-background/95 px-3 py-2 text-sm shadow-sm backdrop-blur supports-[backdrop-filter]:bg-background/80">
                   <span>
