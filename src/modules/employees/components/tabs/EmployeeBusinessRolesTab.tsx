@@ -80,8 +80,8 @@ export function EmployeeBusinessRolesTab({ draft, patch }: EmployeeTabProps) {
       <Card>
         <CardHeader className="flex flex-row items-center justify-between py-3">
           <div>
-            <CardTitle className="text-sm">{t("employees.tabs.business.rolesTitle")}</CardTitle>
-            <CardDescription className="text-xs">{t("employees.tabs.business.rolesHint")}</CardDescription>
+            <CardTitle className="text-sm">{t("employees.tabs.businessRoles.rolesTitle")}</CardTitle>
+            <CardDescription className="text-xs">{t("employees.tabs.businessRoles.rolesHint")}</CardDescription>
           </div>
           <Button type="button" size="sm" variant="outline" className="h-7 gap-1 text-xs" onClick={addRole}>
             <Plus className="h-3.5 w-3.5" />
@@ -90,7 +90,7 @@ export function EmployeeBusinessRolesTab({ draft, patch }: EmployeeTabProps) {
         </CardHeader>
         <CardContent className="space-y-2">
           {b.assignedRoles.length === 0 ? (
-            <div className="text-xs text-muted-foreground">{t("employees.tabs.business.rolesEmpty")}</div>
+            <div className="text-xs text-muted-foreground">{t("employees.tabs.businessRoles.rolesEmpty")}</div>
           ) : (
             b.assignedRoles.map((row, i) => (
               <div key={i} className="grid gap-2 rounded-md border border-border/60 p-2 md:grid-cols-12">
@@ -138,8 +138,8 @@ export function EmployeeBusinessRolesTab({ draft, patch }: EmployeeTabProps) {
       <Card>
         <CardHeader className="flex flex-row items-center justify-between py-3">
           <div>
-            <CardTitle className="text-sm">{t("employees.tabs.business.processTitle")}</CardTitle>
-            <CardDescription className="text-xs">{t("employees.tabs.business.processHint")}</CardDescription>
+            <CardTitle className="text-sm">{t("employees.tabs.businessRoles.processTitle")}</CardTitle>
+            <CardDescription className="text-xs">{t("employees.tabs.businessRoles.processHint")}</CardDescription>
           </div>
           <Button type="button" size="sm" variant="outline" className="h-7 gap-1 text-xs" onClick={addParticipation}>
             <Plus className="h-3.5 w-3.5" />
@@ -148,7 +148,7 @@ export function EmployeeBusinessRolesTab({ draft, patch }: EmployeeTabProps) {
         </CardHeader>
         <CardContent className="space-y-2">
           {b.processParticipations.length === 0 ? (
-            <div className="text-xs text-muted-foreground">{t("employees.tabs.business.processEmpty")}</div>
+            <div className="text-xs text-muted-foreground">{t("employees.tabs.businessRoles.processEmpty")}</div>
           ) : (
             b.processParticipations.map((row, i) => (
               <div key={i} className="grid gap-2 rounded-md border border-border/60 p-2 md:grid-cols-12">
@@ -181,8 +181,8 @@ export function EmployeeBusinessRolesTab({ draft, patch }: EmployeeTabProps) {
 
       <Card>
         <CardHeader className="py-3">
-          <CardTitle className="text-sm">{t("employees.tabs.business.approvalTitle")}</CardTitle>
-          <CardDescription className="text-xs">{t("employees.tabs.business.approvalHint")}</CardDescription>
+          <CardTitle className="text-sm">{t("employees.tabs.businessRoles.approvalTitle")}</CardTitle>
+          <CardDescription className="text-xs">{t("employees.tabs.businessRoles.approvalHint")}</CardDescription>
         </CardHeader>
         <CardContent className="space-y-3">
           <div className="space-y-1.5">

@@ -5,9 +5,11 @@ import { kkIssuesMessages } from "./issuesMessagesKk";
 import { kkExportExcel } from "./exportExcelKk";
 import { financeKk } from "./financeKk";
 import { kkSettingsEntriesFull, kkSettingsOptionsFull } from "./settingsRegistryKk";
+import { employeesPagesKk } from "./employeesPagesKk";
 
 /** Kazakh UI overrides (missing keys inherit English). */
 export const kkMessages: MessageTree = {
+  ...employeesPagesKk,
   app: {
     name: "Шағын ERP",
     savingBeforeExit: "Шығар алдында деректер сақталуда...",

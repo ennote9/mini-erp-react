@@ -7,6 +7,7 @@ import { EMPLOYEE_MODULE_CODES, EMPLOYEE_PERMISSION_GROUPS } from "../../employe
 import { EMPLOYEE_PRIMARY_ROLE_CODES } from "../../employeeListConstants";
 import { translateSystemRoleCode } from "../../employeeListLabels";
 import type { EmployeeTabProps } from "./types";
+import { EmployeeAccessDataScopes } from "../EmployeeAccessDataScopes";
 
 function toggleCode(list: string[], code: string, on: boolean): string[] {
   const set = new Set(list);
@@ -193,6 +194,7 @@ export function EmployeeAccessTab({ draft, patch }: EmployeeTabProps) {
                   <Checkbox
                     id={`mod-${code}`}
                     checked={a.allowedModuleCodes.includes(code)}
+                    disabled={!a.isErpUser}
                     onCheckedChange={(v) =>
                       patch((p) => ({
                         ...p,
@@ -210,67 +212,31 @@ export function EmployeeAccessTab({ draft, patch }: EmployeeTabProps) {
               ))}
             </div>
           </div>
-          <div className="grid gap-2 md:grid-cols-3">
-            <div className="space-y-1.5">
-              <Label className="text-xs">{t("employees.fields.warehouseScopeIds")}</Label>
-              <Input
-                className="h-8 font-mono text-xs"
-                placeholder="id1,id2"
-                value={a.warehouseScopeIds.join(",")}
-                onChange={(e) =>
-                  patch((p) => ({
-                    ...p,
-                    access: {
-                      ...p.access,
-                      warehouseScopeIds: e.target.value
-                        .split(",")
-                        .map((s) => s.trim())
-                        .filter(Boolean),
-                    },
-                  }))
-                }
-              />
+          <div className="space-y-2 border-t border-border/60 pt-3">
+            <div>
+              <div className="text-xs font-medium text-foreground">{t("employees.tabs.access.scopesDataTitle")}</div>
+              <p className="mt-0.5 text-[11px] text-muted-foreground">{t("employees.tabs.access.scopesDataHint")}</p>
             </div>
-            <div className="space-y-1.5">
-              <Label className="text-xs">{t("employees.fields.categoryScopeIds")}</Label>
-              <Input
-                className="h-8 font-mono text-xs"
-                placeholder="id1,id2"
-                value={a.categoryScopeIds.join(",")}
-                onChange={(e) =>
-                  patch((p) => ({
-                    ...p,
-                    access: {
-                      ...p.access,
-                      categoryScopeIds: e.target.value
-                        .split(",")
-                        .map((s) => s.trim())
-                        .filter(Boolean),
-                    },
-                  }))
-                }
-              />
-            </div>
-            <div className="space-y-1.5">
-              <Label className="text-xs">{t("employees.fields.brandScopeIds")}</Label>
-              <Input
-                className="h-8 font-mono text-xs"
-                placeholder="id1,id2"
-                value={a.brandScopeIds.join(",")}
-                onChange={(e) =>
-                  patch((p) => ({
-                    ...p,
-                    access: {
-                      ...p.access,
-                      brandScopeIds: e.target.value
-                        .split(",")
-                        .map((s) => s.trim())
-                        .filter(Boolean),
-                    },
-                  }))
-                }
-              />
-            </div>
+            {!a.isErpUser ? (
+              <p className="text-xs text-muted-foreground">{t("employees.tabs.access.scopesDataDisabledHint")}</p>
+            ) : null}
+            <EmployeeAccessDataScopes
+              warehouseScopeIds={a.warehouseScopeIds}
+              categoryScopeIds={a.categoryScopeIds}
+              brandScopeIds={a.brandScopeIds}
+              disabled={!a.isErpUser}
+              onPatchScopes={(next) =>
+                patch((p) => ({
+                  ...p,
+                  access: {
+                    ...p.access,
+                    warehouseScopeIds: next.warehouseScopeIds,
+                    categoryScopeIds: next.categoryScopeIds,
+                    brandScopeIds: next.brandScopeIds,
+                  },
+                }))
+              }
+            />
           </div>
         </CardContent>
       </Card>

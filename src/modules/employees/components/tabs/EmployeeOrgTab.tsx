@@ -1,3 +1,4 @@
+import { useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -9,6 +10,10 @@ import type { EmployeeAssignmentScope } from "../../model";
 import { translateDepartmentCode, translatePositionCode } from "../../employeeListLabels";
 import type { EmployeeTabProps } from "./types";
 import { Plus, Trash2 } from "lucide-react";
+import { categoryRepository } from "@/modules/categories/repository";
+import { brandRepository } from "@/modules/brands/repository";
+import { warehouseRepository } from "@/modules/warehouses/repository";
+import { useAppReadModelRevision } from "@/shared/inventoryMasterPageBlocks/useAppReadModelRevision";
 
 const SCOPE_KINDS: EmployeeAssignmentScope["kind"][] = [
   "category",
@@ -21,10 +26,39 @@ const SCOPE_KINDS: EmployeeAssignmentScope["kind"][] = [
   "project",
 ];
 
+function masterCaption(code: string, name: string): string {
+  return `${code} · ${name}`;
+}
+
 export function EmployeeOrgTab({ draft, patch, selfId }: EmployeeTabProps) {
   const { t } = useTranslation();
   const o = draft.org;
   const managers = employeeRepository.list().filter((e) => e.id !== selfId && e.id !== draft.id);
+  const rev = useAppReadModelRevision();
+
+  const sortedCategories = useMemo(() => {
+    void rev;
+    return categoryRepository
+      .list()
+      .slice()
+      .sort((a, b) => masterCaption(a.code, a.name).localeCompare(masterCaption(b.code, b.name)));
+  }, [rev]);
+
+  const sortedBrands = useMemo(() => {
+    void rev;
+    return brandRepository
+      .list()
+      .slice()
+      .sort((a, b) => masterCaption(a.code, a.name).localeCompare(masterCaption(b.code, b.name)));
+  }, [rev]);
+
+  const sortedWarehouses = useMemo(() => {
+    void rev;
+    return warehouseRepository
+      .list()
+      .slice()
+      .sort((a, b) => masterCaption(a.code, a.name).localeCompare(masterCaption(b.code, b.name)));
+  }, [rev]);
 
   const addScope = () => {
     patch((p) => ({
@@ -193,6 +227,8 @@ export function EmployeeOrgTab({ draft, patch, selfId }: EmployeeTabProps) {
                         updateScope(index, {
                           ...row,
                           kind: e.target.value as EmployeeAssignmentScope["kind"],
+                          entityId: "",
+                          label: "",
                         })
                       }
                     >
@@ -204,12 +240,81 @@ export function EmployeeOrgTab({ draft, patch, selfId }: EmployeeTabProps) {
                     </select>
                   </div>
                   <div className="md:col-span-3">
-                    <Label className="text-[10px] text-muted-foreground">{t("employees.fields.entityId")}</Label>
-                    <Input
-                      className="mt-0.5 h-8 text-xs"
-                      value={row.entityId}
-                      onChange={(e) => updateScope(index, { ...row, entityId: e.target.value })}
-                    />
+                    <Label className="text-[10px] text-muted-foreground">
+                      {row.kind === "category" || row.kind === "brand" || row.kind === "warehouse"
+                        ? t("employees.fields.scopeMasterRecord")
+                        : t("employees.fields.entityId")}
+                    </Label>
+                    {row.kind === "category" ? (
+                      <select
+                        className="mt-0.5 flex h-8 w-full rounded-md border border-input bg-background px-2 text-xs"
+                        value={row.entityId}
+                        onChange={(e) => {
+                          const id = e.target.value;
+                          const c = categoryRepository.getById(id);
+                          updateScope(index, {
+                            ...row,
+                            entityId: id,
+                            label: c ? masterCaption(c.code, c.name) : "",
+                          });
+                        }}
+                      >
+                        <option value="">{t("employees.placeholders.selectRecord")}</option>
+                        {sortedCategories.map((c) => (
+                          <option key={c.id} value={c.id}>
+                            {masterCaption(c.code, c.name)}
+                          </option>
+                        ))}
+                      </select>
+                    ) : row.kind === "brand" ? (
+                      <select
+                        className="mt-0.5 flex h-8 w-full rounded-md border border-input bg-background px-2 text-xs"
+                        value={row.entityId}
+                        onChange={(e) => {
+                          const id = e.target.value;
+                          const b = brandRepository.getById(id);
+                          updateScope(index, {
+                            ...row,
+                            entityId: id,
+                            label: b ? masterCaption(b.code, b.name) : "",
+                          });
+                        }}
+                      >
+                        <option value="">{t("employees.placeholders.selectRecord")}</option>
+                        {sortedBrands.map((b) => (
+                          <option key={b.id} value={b.id}>
+                            {masterCaption(b.code, b.name)}
+                          </option>
+                        ))}
+                      </select>
+                    ) : row.kind === "warehouse" ? (
+                      <select
+                        className="mt-0.5 flex h-8 w-full rounded-md border border-input bg-background px-2 text-xs"
+                        value={row.entityId}
+                        onChange={(e) => {
+                          const id = e.target.value;
+                          const w = warehouseRepository.getById(id);
+                          updateScope(index, {
+                            ...row,
+                            entityId: id,
+                            label: w ? masterCaption(w.code, w.name) : "",
+                          });
+                        }}
+                      >
+                        <option value="">{t("employees.placeholders.selectRecord")}</option>
+                        {sortedWarehouses.map((w) => (
+                          <option key={w.id} value={w.id}>
+                            {masterCaption(w.code, w.name)}
+                          </option>
+                        ))}
+                      </select>
+                    ) : (
+                      <Input
+                        className="mt-0.5 h-8 text-xs"
+                        value={row.entityId}
+                        onChange={(e) => updateScope(index, { ...row, entityId: e.target.value })}
+                      />
+                    )}
                   </div>
                   <div className="md:col-span-5">
                     <Label className="text-[10px] text-muted-foreground">{t("employees.fields.scopeLabel")}</Label>

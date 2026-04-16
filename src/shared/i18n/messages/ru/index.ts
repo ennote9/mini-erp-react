@@ -5,9 +5,11 @@ import { ruIssuesMessages } from "./issuesMessagesRu";
 import { ruExportExcel } from "./exportExcelRu";
 import { financeRu } from "./financeRu";
 import { ruSettingsEntriesFull, ruSettingsOptionsFull } from "./settingsRegistryRu";
+import { employeesPagesRu } from "./employeesPagesRu";
 
 /** Russian UI overrides (missing keys inherit English). */
 export const ruMessages: MessageTree = {
+  ...employeesPagesRu,
   app: {
     name: "Мини ERP",
     savingBeforeExit: "Сохранение данных перед выходом...",

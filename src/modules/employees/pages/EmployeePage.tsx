@@ -8,7 +8,6 @@ import type { Employee } from "../model";
 import { DocumentPageLayout } from "@/shared/ui/object/DocumentPageLayout";
 import { BackButton } from "@/shared/ui/list/BackButton";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { DocumentIssueStrip } from "@/shared/ui/feedback/DocumentIssueStrip";
 import {
   actionWarning,
@@ -34,6 +33,30 @@ import { cn } from "@/lib/utils";
 
 function cloneEmployee(e: Employee): Employee {
   return JSON.parse(JSON.stringify(e)) as Employee;
+}
+
+function HeaderStatusGroup({
+  label,
+  value,
+  tone,
+}: {
+  label: string;
+  value: string;
+  tone: "neutral" | "danger" | "warn";
+}) {
+  return (
+    <div
+      className={cn(
+        "inline-flex min-w-0 max-w-full items-center gap-2 rounded-md border px-2 py-1 text-xs",
+        tone === "neutral" && "border-border bg-muted/30",
+        tone === "danger" && "border-destructive/40 bg-destructive/10",
+        tone === "warn" && "border-amber-500/35 bg-amber-500/5",
+      )}
+    >
+      <span className="shrink-0 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">{label}</span>
+      <span className="min-w-0 truncate font-medium text-foreground">{value}</span>
+    </div>
+  );
 }
 
 export function EmployeePage() {
@@ -160,11 +183,31 @@ export function EmployeePage() {
     ? t("employees.page.titleNew")
     : t("employees.page.titleEdit", { code: draft.identity.employeeCode });
 
+  const accessTone =
+    draft.access.accessStatus === "blocked"
+      ? "danger"
+      : draft.access.accessStatus === "pending"
+        ? "warn"
+        : "neutral";
+  const availabilityTone = draft.availability.kind === "dismissed" ? "danger" : "neutral";
+
   const summaryChips = (
-    <div className="flex flex-wrap items-center gap-2 text-xs">
-      <Badge variant="outline">{t(`employees.enums.recordStatus.${draft.identity.status}`)}</Badge>
-      <Badge variant="secondary">{t(`employees.enums.accessStatus.${draft.access.accessStatus}`)}</Badge>
-      <Badge variant="outline">{t(`employees.enums.availability.${draft.availability.kind}`)}</Badge>
+    <div className="flex flex-wrap items-center gap-2">
+      <HeaderStatusGroup
+        label={t("employees.header.record")}
+        value={t(`employees.enums.recordStatus.${draft.identity.status}`)}
+        tone="neutral"
+      />
+      <HeaderStatusGroup
+        label={t("employees.header.access")}
+        value={t(`employees.enums.accessStatus.${draft.access.accessStatus}`)}
+        tone={accessTone}
+      />
+      <HeaderStatusGroup
+        label={t("employees.header.availability")}
+        value={t(`employees.enums.availability.${draft.availability.kind}`)}
+        tone={availabilityTone}
+      />
     </div>
   );
 
