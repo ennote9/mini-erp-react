@@ -1,7 +1,7 @@
 import { useParams, useNavigate, useSearchParams } from "react-router-dom";
 import { useMemo, useState, useEffect, useRef, useCallback } from "react";
 import { AgGridReact } from "ag-grid-react";
-import type { ColDef, SelectionChangedEvent } from "ag-grid-community";
+import type { SelectionChangedEvent } from "ag-grid-community";
 import { purchaseOrderRepository } from "../repository";
 import { confirm, cancelDocument, createReceipt, saveDraft } from "../service";
 import { supplierRepository } from "../../suppliers/repository";
@@ -12,9 +12,6 @@ import { listSellableItemsForDocumentLines } from "../../items/orderLineItemsPol
 import { useAppReadModelRevision } from "@/shared/inventoryMasterPageBlocks/useAppReadModelRevision";
 import { appendReturnTo, readReturnToParam } from "@/shared/navigation/returnTo";
 import { useUrlTabState } from "@/shared/navigation/useUrlTabState";
-import { brandRepository } from "../../brands/repository";
-import { categoryRepository } from "../../categories/repository";
-import type { PurchaseOrderLine } from "../model";
 import { DocumentPageLayout } from "../../../shared/ui/object/DocumentPageLayout";
 import { AgGridContainer } from "../../../shared/ui/ag-grid/AgGridContainer";
 import { Button } from "@/components/ui/button";
@@ -29,13 +26,9 @@ import {
   agGridDefaultGridOptions,
   agGridSelectionColumnDef,
 } from "../../../shared/ui/ag-grid/agGridDefaults";
-import { todayYYYYMMDD, normalizeDateForPO } from "../dateUtils";
+import { normalizeDateForPO } from "../dateUtils";
 import { usePlanningDocumentHotkeys } from "../../../shared/hotkeys";
-import {
-  lineAmountMoney,
-  roundMoney,
-  sumPlanningDocumentLineAmounts,
-} from "../../../shared/commercialMoney";
+import { roundMoney, sumPlanningDocumentLineAmounts } from "../../../shared/commercialMoney";
 import { computePlanningDueDate, parsePaymentTermsDaysToStore } from "../../../shared/planningCommercialDates";
 import { getPurchaseOrderHealth } from "../../../shared/documentHealth";
 import {
@@ -43,14 +36,10 @@ import {
   actionIssueFromServiceMessage,
   actionWarning,
   combineIssues,
-  hasErrors,
-  hasWarnings,
   issueListContainsMessage,
   type Issue,
 } from "../../../shared/issues";
-import { DocumentIssueStrip } from "../../../shared/ui/feedback/DocumentIssueStrip";
 import { SelectField } from "@/components/ui/select-field";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
   DocumentLineImportModal,
   type LineImportTab,
@@ -61,18 +50,12 @@ import {
   ClipboardPaste,
   ClipboardList,
   Check,
-  ChevronDown,
-  CircleCheck,
   Coins,
   File,
-  FileSpreadsheet,
-  FileX,
-  FolderOpen,
   History,
   List,
   Paperclip,
   Plus,
-  Save,
   Trash2,
   Wallet,
   X,
@@ -88,7 +71,6 @@ import {
 } from "../poExport";
 import { save } from "@tauri-apps/plugin-dialog";
 import { invoke } from "@tauri-apps/api/core";
-import { revealItemInDir } from "@tauri-apps/plugin-opener";
 import {
   CancelDocumentReasonDialog,
   type CancelDocumentReasonPayload,
@@ -97,468 +79,31 @@ import { DocumentEventLogSection } from "../../../shared/ui/object/DocumentEvent
 import {
   ZERO_PRICE_LINE_REASON_CODES,
   type CancelDocumentReasonCode,
-  type ZeroPriceLineReasonCode,
 } from "../../../shared/reasonCodes";
 import { useTranslation } from "@/shared/i18n/context";
 import { buildReadableUniqueFilename, ensureUniqueExportPath } from "@/shared/export/filenameBuilder";
-import type { TFunction } from "@/shared/i18n/resolve";
 import { cn } from "@/lib/utils";
 import { planningPurchaseOrderExportLabels } from "@/shared/i18n/excelPlanningExportLabels";
 import { translateZeroPriceReason, translateCancelReason } from "@/shared/i18n/reasonLabels";
 import { translatePlanningFulfillmentState } from "@/shared/i18n/fulfillmentLabels";
-import {
-  computePurchaseOrderFulfillment,
-  type PurchaseOrderFulfillment,
-  type PoLineFulfillment,
-} from "../../../shared/planningFulfillment";
+import { computePurchaseOrderFulfillment, type PoLineFulfillment } from "../../../shared/planningFulfillment";
 import { useSettings } from "../../../shared/settings/SettingsContext";
 import { getEffectiveWorkspaceFeatureEnabled } from "../../../shared/workspace";
 import { computePurchaseOrderTotalFromLines } from "../purchaseOrderFinance";
 import { useAppDisplayFormatters } from "@/shared/formatting";
-
-type LineWithItem = PurchaseOrderLine & { itemName: string };
-
-type LineFormRow = {
-  itemId: string;
-  qty: number;
-  unitPrice: number;
-  zeroPriceReasonCode: string;
-  _lineId: number;
-};
-
-type FormState = {
-  date: string;
-  supplierId: string;
-  warehouseId: string;
-  preliminaryDeliveryDate: string;
-  actualArrivalDateTime: string;
-  paymentTermsDays: string;
-  comment: string;
-  lines: LineFormRow[];
-};
-
-function defaultForm(): FormState {
-  return {
-    date: todayYYYYMMDD(),
-    supplierId: "",
-    warehouseId: "",
-    preliminaryDeliveryDate: "",
-    actualArrivalDateTime: "",
-    paymentTermsDays: "",
-    comment: "",
-    lines: [],
-  };
-}
-
-function buildExportRowsFromFormLines(lines: LineFormRow[]): PoExportLineRow[] {
-  return lines.map((line, idx) => {
-    const item = itemRepository.getById(line.itemId);
-    const qty = typeof line.qty === "number" && !Number.isNaN(line.qty) ? line.qty : 0;
-    const unitPrice =
-      typeof line.unitPrice === "number" && !Number.isNaN(line.unitPrice) && line.unitPrice >= 0
-        ? roundMoney(line.unitPrice)
-        : 0;
-    const lineAmount = lineAmountMoney(qty, unitPrice);
-    const brand = item?.brandId ? brandRepository.getById(item.brandId)?.code ?? "" : "";
-    const category = item?.categoryId ? categoryRepository.getById(item.categoryId)?.code ?? "" : "";
-    return {
-      no: idx + 1,
-      itemCode: item?.code ?? line.itemId,
-      itemName: item?.name ?? line.itemId,
-      brand,
-      category,
-      qty,
-      unitPrice,
-      lineAmount,
-    };
-  });
-}
-
-function buildExportRowsFromLinesWithItem(lines: LineWithItem[]): PoExportLineRow[] {
-  return lines.map((line, idx) => {
-    const item = itemRepository.getById(line.itemId);
-    const qty = typeof line.qty === "number" && !Number.isNaN(line.qty) ? line.qty : 0;
-    const unitPrice =
-      typeof line.unitPrice === "number" && !Number.isNaN(line.unitPrice) && line.unitPrice >= 0
-        ? roundMoney(line.unitPrice)
-        : 0;
-    const lineAmount = lineAmountMoney(qty, unitPrice);
-    const brand = item?.brandId ? brandRepository.getById(item.brandId)?.code ?? "" : "";
-    const category = item?.categoryId ? categoryRepository.getById(item.categoryId)?.code ?? "" : "";
-    return {
-      no: idx + 1,
-      itemCode: item?.code ?? line.itemId,
-      itemName: line.itemName ?? item?.name ?? line.itemId,
-      brand,
-      category,
-      qty,
-      unitPrice,
-      lineAmount,
-    };
-  });
-}
-
-function poLinesDisplayColumnDefs(
-  t: TFunction,
-  fulfillmentByItemId: Map<string, PoLineFulfillment>,
-  formatMoney: (value: number | null | undefined, fractionDigits?: number, empty?: string) => string,
-): ColDef<LineFormRow>[] {
-  const dash = t("domain.audit.summary.emDash");
-  const centerCell = "po-grid-cell--center";
-  const centerHeader = "po-grid-header--center";
-  const numericCell = "po-grid-cell--center tabular-nums";
-  return [
-    {
-      headerName: t("doc.columns.lineNo"),
-      valueGetter: (params) =>
-        params.node?.rowIndex != null ? String(params.node.rowIndex + 1) : "",
-      width: 52,
-      minWidth: 48,
-      maxWidth: 56,
-      sortable: false,
-      resizable: true,
-      headerClass: centerHeader,
-      cellClass: centerCell,
-    },
-    {
-      headerName: t("doc.columns.itemCode"),
-      width: 130,
-      minWidth: 120,
-      maxWidth: 140,
-      editable: false,
-      headerClass: centerHeader,
-      cellClass: "po-grid-cell--center font-mono",
-      valueGetter: (p) => {
-        const itemId = p.data?.itemId;
-        if (!itemId) return "";
-        const item = itemRepository.getById(itemId);
-        return item?.code ?? itemId;
-      },
-    },
-    {
-      field: "itemId",
-      headerName: t("doc.columns.itemName"),
-      flex: 1,
-      minWidth: 180,
-      editable: false,
-      valueFormatter: (p) => {
-        if (!p.value) return "";
-        const item = itemRepository.getById(p.value);
-        return item?.name ?? p.value;
-      },
-    },
-    {
-      headerName: t("doc.columns.brand"),
-      width: 130,
-      minWidth: 120,
-      maxWidth: 140,
-      editable: false,
-      headerClass: centerHeader,
-      cellClass: centerCell,
-      valueGetter: (p) => {
-        const itemId = p.data?.itemId;
-        if (!itemId) return "";
-        const item = itemRepository.getById(itemId);
-        if (!item?.brandId) return "";
-        const brand = brandRepository.getById(item.brandId);
-        return brand?.code ?? "";
-      },
-    },
-    {
-      headerName: t("doc.columns.category"),
-      width: 130,
-      minWidth: 120,
-      maxWidth: 140,
-      editable: false,
-      headerClass: centerHeader,
-      cellClass: centerCell,
-      valueGetter: (p) => {
-        const itemId = p.data?.itemId;
-        if (!itemId) return "";
-        const item = itemRepository.getById(itemId);
-        if (!item?.categoryId) return "";
-        const category = categoryRepository.getById(item.categoryId);
-        return category?.code ?? "";
-      },
-    },
-    {
-      field: "qty",
-      headerName: t("doc.columns.qty"),
-      width: 80,
-      minWidth: 70,
-      maxWidth: 90,
-      editable: false,
-      headerClass: centerHeader,
-      cellClass: numericCell,
-    },
-    {
-      headerName: t("doc.columns.received"),
-      width: 86,
-      minWidth: 78,
-      maxWidth: 96,
-      editable: false,
-      sortable: false,
-      headerClass: centerHeader,
-      cellClass: numericCell,
-      valueGetter: (p) => {
-        const itemId = p.data?.itemId;
-        if (!itemId) return dash;
-        const f = fulfillmentByItemId.get(itemId);
-        if (!f) return dash;
-        return String(f.receivedQty);
-      },
-    },
-    {
-      headerName: t("doc.columns.remaining"),
-      width: 100,
-      minWidth: 88,
-      maxWidth: 112,
-      editable: false,
-      sortable: false,
-      headerClass: centerHeader,
-      cellClass: numericCell,
-      valueGetter: (p) => {
-        const itemId = p.data?.itemId;
-        if (!itemId) return dash;
-        const f = fulfillmentByItemId.get(itemId);
-        if (!f) return dash;
-        if (f.remainingQty < 0)
-          return t("doc.fulfillment.remainingOver", { qty: f.remainingQty });
-        return String(f.remainingQty);
-      },
-    },
-    {
-      field: "unitPrice",
-      headerName: t("doc.columns.unitPrice"),
-      width: 110,
-      minWidth: 100,
-      maxWidth: 120,
-      editable: false,
-      headerClass: centerHeader,
-      cellClass: numericCell,
-      valueFormatter: (p) =>
-        typeof p.value === "number" && !Number.isNaN(p.value)
-          ? formatMoney(p.value, 2, "0")
-          : formatMoney(0, 2, "0"),
-    },
-    {
-      headerName: t("doc.columns.lineAmount"),
-      width: 120,
-      minWidth: 110,
-      maxWidth: 130,
-      editable: false,
-      headerClass: centerHeader,
-      cellClass: numericCell,
-      valueGetter: (p) => {
-        const qty = p.data?.qty;
-        const unitPrice = p.data?.unitPrice;
-        if (typeof qty !== "number" || typeof unitPrice !== "number") return formatMoney(0, 2, "0");
-        const amount = lineAmountMoney(qty, unitPrice);
-        return Number.isNaN(amount) ? formatMoney(0, 2, "0") : formatMoney(amount, 2, "0");
-      },
-    },
-    {
-      headerName: t("doc.columns.zeroPriceReason"),
-      width: 150,
-      minWidth: 130,
-      maxWidth: 180,
-      editable: false,
-      headerClass: centerHeader,
-      cellClass: centerCell,
-      valueGetter: (p) => {
-        const up = p.data?.unitPrice;
-        if (typeof up !== "number" || roundMoney(up) !== 0) return "";
-        const c = p.data?.zeroPriceReasonCode;
-        if (typeof c !== "string" || c === "") return "";
-        return translateZeroPriceReason(t, c as ZeroPriceLineReasonCode);
-      },
-    },
-  ];
-}
-
-function poLinesReadOnlyColumnDefs(
-  t: TFunction,
-  fulfillment: PurchaseOrderFulfillment | null,
-  formatMoney: (value: number | null | undefined, fractionDigits?: number, empty?: string) => string,
-): ColDef<LineWithItem>[] {
-  const dash = t("domain.audit.summary.emDash");
-  const centerCell = "po-grid-cell--center";
-  const centerHeader = "po-grid-header--center";
-  const numericCell = "po-grid-cell--center tabular-nums";
-  return [
-    {
-      headerName: t("doc.columns.lineNo"),
-      valueGetter: (params) =>
-        params.node?.rowIndex != null ? String(params.node.rowIndex + 1) : "",
-      width: 52,
-      minWidth: 48,
-      maxWidth: 56,
-      sortable: false,
-      resizable: true,
-      headerClass: centerHeader,
-      cellClass: centerCell,
-    },
-    {
-      headerName: t("doc.columns.itemCode"),
-      width: 130,
-      minWidth: 120,
-      maxWidth: 140,
-      headerClass: centerHeader,
-      cellClass: "po-grid-cell--center font-mono",
-      valueGetter: (p) => {
-        const itemId = p.data?.itemId;
-        if (!itemId) return "";
-        const item = itemRepository.getById(itemId);
-        return item?.code ?? itemId;
-      },
-    },
-    { field: "itemName", headerName: t("doc.columns.itemName"), flex: 1, minWidth: 180 },
-    {
-      headerName: t("doc.columns.brand"),
-      width: 130,
-      minWidth: 120,
-      maxWidth: 140,
-      headerClass: centerHeader,
-      cellClass: centerCell,
-      valueGetter: (p) => {
-        const itemId = p.data?.itemId;
-        if (!itemId) return "";
-        const item = itemRepository.getById(itemId);
-        if (!item?.brandId) return "";
-        const brand = brandRepository.getById(item.brandId);
-        return brand?.code ?? "";
-      },
-    },
-    {
-      headerName: t("doc.columns.category"),
-      width: 130,
-      minWidth: 120,
-      maxWidth: 140,
-      headerClass: centerHeader,
-      cellClass: centerCell,
-      valueGetter: (p) => {
-        const itemId = p.data?.itemId;
-        if (!itemId) return "";
-        const item = itemRepository.getById(itemId);
-        if (!item?.categoryId) return "";
-        const category = categoryRepository.getById(item.categoryId);
-        return category?.code ?? "";
-      },
-    },
-    {
-      field: "qty",
-      headerName: t("doc.columns.qty"),
-      width: 80,
-      minWidth: 70,
-      maxWidth: 90,
-      headerClass: centerHeader,
-      cellClass: numericCell,
-    },
-    {
-      headerName: t("doc.columns.received"),
-      width: 86,
-      minWidth: 78,
-      maxWidth: 96,
-      sortable: false,
-      headerClass: centerHeader,
-      cellClass: numericCell,
-      valueGetter: (p) => {
-        const lineId = p.data?.id;
-        if (!lineId || !fulfillment) return dash;
-        const row = fulfillment.lines.find((l) => l.lineId === lineId);
-        if (!row) return dash;
-        return String(row.receivedQty);
-      },
-    },
-    {
-      headerName: t("doc.columns.remaining"),
-      width: 100,
-      minWidth: 88,
-      maxWidth: 112,
-      sortable: false,
-      headerClass: centerHeader,
-      cellClass: numericCell,
-      valueGetter: (p) => {
-        const lineId = p.data?.id;
-        if (!lineId || !fulfillment) return dash;
-        const row = fulfillment.lines.find((l) => l.lineId === lineId);
-        if (!row) return dash;
-        if (row.remainingQty < 0)
-          return t("doc.fulfillment.remainingOver", { qty: row.remainingQty });
-        return String(row.remainingQty);
-      },
-    },
-    {
-      field: "unitPrice",
-      headerName: t("doc.columns.unitPrice"),
-      width: 110,
-      minWidth: 100,
-      maxWidth: 120,
-      headerClass: centerHeader,
-      cellClass: numericCell,
-      valueFormatter: (p) =>
-        typeof p.value === "number" && !Number.isNaN(p.value)
-          ? formatMoney(p.value, 2, "0")
-          : formatMoney(0, 2, "0"),
-    },
-    {
-      headerName: t("doc.columns.lineAmount"),
-      width: 120,
-      minWidth: 110,
-      maxWidth: 130,
-      headerClass: centerHeader,
-      cellClass: numericCell,
-      valueGetter: (p) => {
-        const qty = p.data?.qty;
-        const unitPrice = p.data?.unitPrice;
-        if (typeof qty !== "number" || typeof unitPrice !== "number") return formatMoney(0, 2, "0");
-        const amount = lineAmountMoney(qty, unitPrice);
-        return Number.isNaN(amount) ? formatMoney(0, 2, "0") : formatMoney(amount, 2, "0");
-      },
-    },
-    {
-      headerName: t("doc.columns.zeroPriceReason"),
-      width: 150,
-      minWidth: 130,
-      maxWidth: 180,
-      headerClass: centerHeader,
-      cellClass: centerCell,
-      valueGetter: (p) => {
-        const up = p.data?.unitPrice;
-        if (typeof up !== "number" || roundMoney(up) !== 0) return "";
-        const c = p.data?.zeroPriceReasonCode;
-        if (typeof c !== "string" || c === "") return "";
-        return translateZeroPriceReason(t, c as ZeroPriceLineReasonCode);
-      },
-    },
-  ];
-}
-
-function ExecutionMetric({
-  label,
-  value,
-  danger = false,
-}: {
-  label: string;
-  value: string | number;
-  danger?: boolean;
-}) {
-  return (
-    <div className="rounded-md border border-border/60 bg-background px-2.5 py-2">
-      <p className="text-[0.65rem] font-medium uppercase tracking-wide text-muted-foreground">
-        {label}
-      </p>
-      <p
-        className={cn(
-          "mt-1 text-sm font-semibold tabular-nums",
-          danger ? "text-destructive" : "text-foreground",
-        )}
-      >
-        {value}
-      </p>
-    </div>
-  );
-}
+import { buildExportRowsFromFormLines, buildExportRowsFromLinesWithItem } from "../purchaseOrderPageExportBuilders";
+import {
+  defaultPurchaseOrderForm,
+  type FormState,
+  type LineFormRow,
+  type LineWithItem,
+} from "../purchaseOrderPageModel";
+import {
+  ExecutionMetric,
+  poLinesDisplayColumnDefs,
+  poLinesReadOnlyColumnDefs,
+} from "../purchaseOrderPageGridConfig";
+import { PurchaseOrderDocumentHeader } from "../components/PurchaseOrderDocumentHeader";
 
 export function PurchaseOrderPage() {
   const { id } = useParams<{ id: string }>();
@@ -595,7 +140,7 @@ export function PurchaseOrderPage() {
   );
 
   const nextLineIdRef = useRef(0);
-  const [form, setForm] = useState<FormState>(() => defaultForm());
+  const [form, setForm] = useState<FormState>(() => defaultPurchaseOrderForm());
   const [editingLineId, setEditingLineId] = useState<number | null>(null);
   const [lineEntryItemId, setLineEntryItemId] = useState("");
   const [lineEntryQty, setLineEntryQty] = useState(1);
@@ -651,7 +196,7 @@ export function PurchaseOrderPage() {
     if (isNew) {
       nextLineIdRef.current = 0;
       prevSupplierIdRef.current = null;
-      setForm(defaultForm());
+      setForm(defaultPurchaseOrderForm());
       setEditingLineId(null);
       setLineEntryItemId("");
       setLineEntryQty(1);
@@ -1333,197 +878,36 @@ export function PurchaseOrderPage() {
     <DocumentPageLayout
       breadcrumbItems={[]}
       header={
-        <div className="doc-header">
-          <div className="doc-header__title-row">
-            <h2 className="doc-header__title">{displayTitle}</h2>
-            {!isNew && (
-              <Badge
-                variant="outline"
-                className="h-6 rounded-full border-border px-2.5 text-xs font-medium leading-none text-foreground"
-              >
-                {t(`status.labels.${doc!.status}`)}
-              </Badge>
-            )}
-          </div>
-          <div className="doc-header__right">
-            {isEditable && (hasErrors(combinedIssues) || hasWarnings(combinedIssues)) && (
-              <DocumentIssueStrip issues={combinedIssues} />
-            )}
-            <div className="doc-header__actions">
-              {isEditable && (
-                <Button type="button" onClick={handleSave} title={t("doc.page.saveTitle")}>
-                  <Save aria-hidden />
-                  {t("common.save")}
-                </Button>
-              )}
-              {!isNew && isDraft && (
-                <Button
-                  type="button"
-                  onClick={handleConfirm}
-                  disabled={
-                    settings.documents.blockConfirmWhenPlanningHasBlockingErrors &&
-                    hasErrors(health.issues)
-                  }
-                  title={
-                    settings.documents.blockConfirmWhenPlanningHasBlockingErrors &&
-                    hasErrors(health.issues)
-                      ? t("doc.page.fixErrorsBeforeConfirm")
-                      : undefined
-                  }
-                >
-                  <CircleCheck aria-hidden />
-                  {t("doc.page.confirm")}
-                </Button>
-              )}
-              {!isNew && (
-                <Button
-                  type="button"
-                  onClick={handleCreateReceipt}
-                  disabled={!isConfirmed}
-                  title={!isConfirmed ? t("issues.save.poReceiptConfirmedOnly") : undefined}
-                >
-                  <span className="create-btn__plus">+</span> {t("doc.page.createReceipt")}
-                </Button>
-              )}
-              {!isNew && draftReceipt && (
-                <Button type="button" variant="outline" onClick={() => handleOpenReceipt(draftReceipt.id)}>
-                  {t("doc.po.openDraftReceipt")}
-                </Button>
-              )}
-              {!isNew && !draftReceipt && latestReceipt && (
-                <Button type="button" variant="outline" onClick={() => handleOpenReceipt(latestReceipt.id)}>
-                  {t("doc.po.openLatestReceipt")}
-                </Button>
-              )}
-              {!isNew && (isDraft || isConfirmed) && (
-                <Button type="button" variant="outline" onClick={handleCancelDocument}>
-                  <FileX aria-hidden />
-                  {t("doc.page.cancelDocument")}
-                </Button>
-              )}
-              {isEditable && (
-                <>
-                  {exportSuccess && (
-                    <div className="h-8 w-max flex max-w-[min(100%,20rem)] items-center gap-1.5 rounded-md border border-input bg-background px-2 text-sm shrink-0">
-                      <span className="text-muted-foreground text-xs">{t("doc.list.exportCompleted")}</span>
-                      <span className="font-medium text-xs truncate max-w-[12rem]" title={exportSuccess.filename}>
-                        {exportSuccess.filename}
-                      </span>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon"
-                        className="h-7 w-7 shrink-0 text-muted-foreground hover:text-foreground"
-                        title={t("doc.list.openFile")}
-                        aria-label={t("doc.list.openFile")}
-                        onClick={async () => {
-                          const path = exportSuccess.path;
-                          try {
-                            await invoke("open_export_file", { path });
-                            setExportSuccess(null);
-                          } catch (err) {
-                            console.error("Export failed", err);
-                            setExportSuccess(null);
-                          }
-                        }}
-                      >
-                        <File className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon"
-                        className="h-7 w-7 shrink-0 text-muted-foreground hover:text-foreground"
-                        title={t("doc.list.openFolder")}
-                        aria-label={t("doc.list.openFolder")}
-                        onClick={() => {
-                          revealItemInDir(exportSuccess.path);
-                          setExportSuccess(null);
-                        }}
-                      >
-                        <FolderOpen className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon"
-                        className="h-6 w-6 shrink-0 text-muted-foreground/80 hover:text-muted-foreground"
-                        title={t("doc.list.dismiss")}
-                        aria-label={t("doc.list.dismiss")}
-                        onClick={() => setExportSuccess(null)}
-                      >
-                        <X className="h-3 w-3" />
-                      </Button>
-                    </div>
-                  )}
-                  <div className="flex items-stretch rounded-md border border-input shrink-0">
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      className="h-[1.625rem] rounded-r-none border-0 border-r border-input !px-1 !py-0 !gap-0.5"
-                      onClick={handleExportMain}
-                    >
-                      <FileSpreadsheet className="h-4 w-4 shrink-0" />
-                      {t("doc.page.export")}
-                    </Button>
-                    <Popover open={exportOpen} onOpenChange={setExportOpen}>
-                      <PopoverTrigger asChild>
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="icon"
-                          className="h-[1.625rem] w-[1.625rem] shrink-0 rounded-l-none border-0 shadow-none"
-                          aria-label={t("doc.list.exportOptionsAria")}
-                        >
-                          <ChevronDown className="h-4 w-4" />
-                        </Button>
-                      </PopoverTrigger>
-                      <PopoverContent className="!w-max min-w-0 p-1.5" align="end" side="top">
-                        <div className="flex flex-col gap-0.5">
-                          <button
-                            type="button"
-                            disabled={exportSelectedDisabled}
-                            className="w-full rounded-sm px-1.5 py-1 text-left text-sm hover:bg-accent disabled:cursor-not-allowed disabled:opacity-50"
-                            title={
-                              exportSelectedDisabled
-                                ? !isEditable
-                                  ? t("doc.list.exportSelectionEditModeOnly")
-                                  : t("doc.list.exportSelectLinesFirst")
-                                : undefined
-                            }
-                            onClick={() => {
-                              setExportOpen(false);
-                              if (!exportSelectedDisabled) handleExportSelected();
-                            }}
-                          >
-                            {t("doc.list.exportSelectedRows")}
-                          </button>
-                          <button
-                            type="button"
-                            className="w-full rounded-sm px-1.5 py-1 text-left text-sm hover:bg-accent"
-                            onClick={() => {
-                              setExportOpen(false);
-                              handleExportAll();
-                            }}
-                          >
-                            {t("doc.list.exportAllLines")}
-                          </button>
-                        </div>
-                      </PopoverContent>
-                    </Popover>
-                  </div>
-                </>
-              )}
-              {isEditable && (
-                <Button type="button" variant="outline" onClick={handleCancel}>
-                  <X aria-hidden />
-                  {t("common.cancel")}
-                </Button>
-              )}
-            </div>
-          </div>
-        </div>
+        <PurchaseOrderDocumentHeader
+          displayTitle={displayTitle}
+          isNew={isNew}
+          doc={doc}
+          isEditable={isEditable}
+          isDraft={isDraft}
+          isConfirmed={isConfirmed}
+          combinedIssues={combinedIssues}
+          healthIssues={health.issues}
+          blockConfirmWhenPlanningHasBlockingErrors={
+            settings.documents.blockConfirmWhenPlanningHasBlockingErrors
+          }
+          onSave={handleSave}
+          onConfirm={handleConfirm}
+          onCreateReceipt={handleCreateReceipt}
+          draftReceipt={draftReceipt}
+          latestReceipt={latestReceipt}
+          onOpenReceipt={handleOpenReceipt}
+          onCancelDocument={handleCancelDocument}
+          exportSuccess={exportSuccess}
+          onExportSuccessDismiss={() => setExportSuccess(null)}
+          exportOpen={exportOpen}
+          onExportOpenChange={setExportOpen}
+          onExportMain={handleExportMain}
+          onExportSelected={handleExportSelected}
+          onExportAll={handleExportAll}
+          exportSelectedDisabled={exportSelectedDisabled}
+          onCancel={handleCancel}
+          t={t}
+        />
       }
       summary={null}
     >
