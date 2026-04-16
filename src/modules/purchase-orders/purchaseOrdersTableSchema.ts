@@ -1,0 +1,156 @@
+import type { TFunction } from "@/shared/i18n";
+import type { PurchaseOrderListRow } from "./purchaseOrderListRowModel";
+import type { ListViewFieldDataType } from "@/shared/ui/ag-grid/listViewConfig";
+import type {
+  ListViewFieldSourceType,
+  ListViewPerformanceCost,
+  ListViewRendererType,
+} from "@/shared/ui/ag-grid/listViewConfig/types";
+
+export type PurchaseOrdersTableFilterKind = "text" | "date" | "enum" | "none";
+export type PurchaseOrdersTableFormatKind = "none" | "po-date" | "planning-status";
+
+export type PurchaseOrdersTableColumnSchema = {
+  id: string;
+  label: string;
+  accessorKey?: keyof PurchaseOrderListRow;
+  dataType: ListViewFieldDataType;
+  sourceType: ListViewFieldSourceType;
+  defaultVisible: boolean;
+  lockedVisible: boolean;
+  sortable: boolean;
+  filterable: boolean;
+  exportable: boolean;
+  selectable: boolean;
+  defaultSize?: number;
+  minSize?: number;
+  maxSize?: number;
+  defaultFlex?: number;
+  rendererType: ListViewRendererType;
+  performanceCost: ListViewPerformanceCost;
+  filterKind: PurchaseOrdersTableFilterKind;
+  formatKind?: PurchaseOrdersTableFormatKind;
+  cellDataType?: boolean;
+};
+
+type BuildPurchaseOrdersTableSchemaInput = {
+  t: TFunction;
+};
+
+export function buildPurchaseOrdersTableSchema(
+  input: BuildPurchaseOrdersTableSchemaInput,
+): PurchaseOrdersTableColumnSchema[] {
+  const { t } = input;
+  return [
+    {
+      id: "lineNo",
+      label: t("doc.columns.lineNo"),
+      dataType: "identifier",
+      sourceType: "system",
+      defaultVisible: true,
+      lockedVisible: true,
+      sortable: false,
+      filterable: false,
+      exportable: true,
+      selectable: true,
+      defaultSize: 56,
+      minSize: 56,
+      maxSize: 56,
+      rendererType: "text",
+      performanceCost: "low",
+      filterKind: "none",
+    },
+    {
+      id: "number",
+      label: t("doc.columns.number"),
+      accessorKey: "number",
+      dataType: "identifier",
+      sourceType: "document",
+      defaultVisible: true,
+      lockedVisible: false,
+      sortable: true,
+      filterable: true,
+      exportable: true,
+      selectable: true,
+      defaultSize: 150,
+      minSize: 120,
+      rendererType: "text",
+      performanceCost: "low",
+      filterKind: "text",
+    },
+    {
+      id: "date",
+      label: t("doc.columns.date"),
+      accessorKey: "date",
+      dataType: "date",
+      sourceType: "document",
+      defaultVisible: true,
+      lockedVisible: false,
+      sortable: true,
+      filterable: true,
+      exportable: true,
+      selectable: true,
+      defaultSize: 140,
+      minSize: 120,
+      rendererType: "date",
+      performanceCost: "low",
+      filterKind: "date",
+      formatKind: "po-date",
+    },
+    {
+      id: "supplierName",
+      label: t("doc.columns.supplier"),
+      accessorKey: "supplierName",
+      dataType: "reference",
+      sourceType: "lookup",
+      defaultVisible: true,
+      lockedVisible: false,
+      sortable: true,
+      filterable: true,
+      exportable: true,
+      selectable: true,
+      minSize: 180,
+      defaultFlex: 1,
+      rendererType: "text",
+      performanceCost: "low",
+      filterKind: "enum",
+    },
+    {
+      id: "warehouseName",
+      label: t("doc.columns.warehouse"),
+      accessorKey: "warehouseName",
+      dataType: "reference",
+      sourceType: "lookup",
+      defaultVisible: true,
+      lockedVisible: false,
+      sortable: true,
+      filterable: true,
+      exportable: true,
+      selectable: true,
+      defaultSize: 160,
+      minSize: 140,
+      rendererType: "text",
+      performanceCost: "low",
+      filterKind: "enum",
+    },
+    {
+      id: "status",
+      label: t("doc.columns.status"),
+      accessorKey: "status",
+      dataType: "enum",
+      sourceType: "document",
+      defaultVisible: true,
+      lockedVisible: false,
+      sortable: true,
+      filterable: true,
+      exportable: true,
+      selectable: true,
+      defaultSize: 130,
+      minSize: 110,
+      rendererType: "status-badge",
+      performanceCost: "low",
+      filterKind: "enum",
+      formatKind: "planning-status",
+    },
+  ];
+}

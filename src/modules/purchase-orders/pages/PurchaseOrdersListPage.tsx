@@ -1,66 +1,182 @@
+/**
+ * Purchase orders list — TanStack Table renderer aligned with the Items list architecture.
+ */
+import {
+  functionalUpdate,
+  type ColumnSizingState,
+  type OnChangeFn,
+  type RowSelectionState,
+  type SortingState,
+  type VisibilityState,
+} from "@tanstack/react-table";
 import { useMemo, useState, useRef, useCallback, useEffect } from "react";
 import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
-import { AgGridReact } from "ag-grid-react";
-import type { ColDef, SelectionChangedEvent } from "ag-grid-community";
 import { purchaseOrderRepository } from "../repository";
-import { supplierRepository } from "../../suppliers/repository";
-import { warehouseRepository } from "../../warehouses/repository";
-import { itemRepository } from "../../items/repository";
-import { normalizeDateForPO } from "../dateUtils";
-import type { PurchaseOrder } from "../model";
+import { supplierRepository } from "@/modules/suppliers/repository";
+import { warehouseRepository } from "@/modules/warehouses/repository";
+import { itemRepository } from "@/modules/items/repository";
+import { toGeneratedCodeSearchTokens } from "@/shared/generatedVisibleCodes";
 import { ListPageLayout } from "../../../shared/ui/list/ListPageLayout";
 import {
-  AgGridContainer,
-  AgGridPlanningStatusCellRenderer,
   applyAgGridColumnFilters,
   applyDeepSortModel,
-  agGridDefaultColDef,
-  agGridDefaultGridOptions,
-  getAgGridRowNumberColDef,
-  agGridSelectionColumnDef,
-  decorateAgGridColumnDefsWithFilters,
-  useAgGridColumnFilterBridge,
-  useAgGridNoRowsOverlayLifecycle,
   useAgGridColumnSettings,
   AgGridColumnSettingsModal,
-  getVisibleAgGridExportColumns,
-  collectFilteredSortedRowNodes,
-  buildExportMatrixFromRowNodes,
   hasMeaningfulTextSelection,
   getAgGridNoRowsOverlayContent,
-  buildAgGridNoRowsOverlayTemplate,
   type AgGridColumnFilterConfig,
 } from "../../../shared/ui/ag-grid";
 import { ListPageSearch } from "../../../shared/ui/list/ListPageSearch";
 import { useListPageSearchHotkey } from "../../../shared/hotkeys";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { ChevronDown, FileSpreadsheet, File, FolderOpen, X } from "lucide-react";
+import { ChevronDown, FileSpreadsheet, File, FolderOpen, SlidersHorizontal, X } from "lucide-react";
 import { save } from "@tauri-apps/plugin-dialog";
 import { invoke } from "@tauri-apps/api/core";
 import { revealItemInDir } from "@tauri-apps/plugin-opener";
 import { useTranslation } from "@/shared/i18n/context";
-import { useAppDisplayFormatters } from "@/shared/formatting";
 import { buildReadableUniqueFilename, ensureUniqueExportPath } from "@/shared/export/filenameBuilder";
 import { purchaseOrdersListExcelLabels } from "@/shared/i18n/excelListExportLabels";
 import { buildListViewXlsxBuffer } from "@/shared/export/listViewXlsx";
-import { toGeneratedCodeSearchTokens } from "@/shared/generatedVisibleCodes";
-import { applyUrlGridSort, getCurrentGridSort, readUrlGridSort, serializeUrlGridSort } from "@/shared/navigation/agGridSort";
+import { useAppReadModelRevision } from "@/shared/inventoryMasterPageBlocks/useAppReadModelRevision";
+import { useAppDisplayFormatters } from "@/shared/formatting";
+import { readUrlGridSort, serializeUrlGridSort, type UrlGridSort } from "@/shared/navigation/agGridSort";
 import { appendReturnTo, buildNavigationStateKey, buildReturnToValue, replaceQueryParam } from "@/shared/navigation/returnTo";
 import { useSessionScrollRestore } from "@/shared/navigation/useSessionScrollRestore";
 import {
   hasActiveAgGridColumnFilters,
   readUrlAgGridColumnFilters,
-  replaceUrlAgGridColumnFilters,
   withUrlAgGridColumnFilters,
 } from "@/shared/navigation/agGridColumnFilters";
+import {
+  buildUrlGridSortFromDeepSortRules,
+  pruneDeepSortRulesByHiddenFields,
+  type ListViewDeepFilterRule,
+} from "@/shared/ui/ag-grid/listViewConfig";
+import { buildPurchaseOrdersListViewCatalog } from "../purchaseOrdersListViewFieldCatalog";
+import { buildPurchaseOrderListRows, type PurchaseOrderListRow } from "../purchaseOrderListRowModel";
+import { buildPurchaseOrdersTableSchema, type PurchaseOrdersTableColumnSchema } from "../purchaseOrdersTableSchema";
+import { buildPurchaseOrdersTableListViewState } from "../purchaseOrdersListViewState";
+import { formatPurchaseOrdersTableValue } from "../purchaseOrdersTanstackColumns";
+import { PurchaseOrdersTanstackTable } from "../PurchaseOrdersTanstackTable";
+import { ItemsHeaderFilterPanel } from "@/modules/items/ItemsHeaderFilterPanel";
 
-type RowData = PurchaseOrder & {
-  supplierName: string;
-  warehouseName: string;
+const COLUMN_SIZING_STORAGE_KEY = "mini-erp:purchase-orders:tanstack:columnSizing:v1";
+const MAX_REASONABLE_COLUMN_SIZE = 1200;
+
+type HeaderFilterAnchor = {
+  fieldId: string;
+  left: number;
+  top: number;
+  width: number;
+  height: number;
 };
 
-function filterBySearch(rows: RowData[], query: string): RowData[] {
+type PendingHeaderFilterCommit =
+  | {
+      type: "apply";
+      rule: ListViewDeepFilterRule;
+    }
+  | {
+      type: "reset";
+      fieldKey: string;
+    };
+
+const XLSX_MIME = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+const PDF_MIME = "application/pdf";
+
+function isTauriRuntime(): boolean {
+  return typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
+}
+
+function poExportDiagLog(enabled: boolean, message: string, detail?: unknown) {
+  if (!enabled) return;
+  console.info("[purchase-orders-export]", message, detail ?? "");
+}
+
+function downloadBufferInBrowser(
+  data: BlobPart,
+  downloadFilename: string,
+  mimeType: string,
+  exportDiag = false,
+) {
+  poExportDiagLog(exportDiag, "browser download helper entered", { downloadFilename, mimeType });
+  const blob = new Blob([data], { type: mimeType });
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = downloadFilename;
+  anchor.rel = "noopener";
+  anchor.style.display = "none";
+  document.body.appendChild(anchor);
+  anchor.click();
+  anchor.remove();
+  window.setTimeout(() => {
+    URL.revokeObjectURL(url);
+  }, 30_000);
+  poExportDiagLog(exportDiag, "browser download helper completed", { downloadFilename });
+}
+
+function coerceWriteBufferResult(data: unknown): ArrayBuffer {
+  if (data instanceof ArrayBuffer) return data;
+  if (ArrayBuffer.isView(data)) {
+    const view = data as DataView | Uint8Array | Int8Array;
+    return new Uint8Array(view.buffer, view.byteOffset, view.byteLength).slice().buffer;
+  }
+  throw new Error(`[purchase-orders-export] unexpected workbook buffer type: ${Object.prototype.toString.call(data)}`);
+}
+
+function readPersistedColumnSizing(): ColumnSizingState {
+  if (typeof window === "undefined") return {};
+  try {
+    const raw = window.localStorage.getItem(COLUMN_SIZING_STORAGE_KEY);
+    if (!raw) return {};
+    const parsed = JSON.parse(raw) as unknown;
+    if (!parsed || typeof parsed !== "object") return {};
+    return parsed as ColumnSizingState;
+  } catch {
+    return {};
+  }
+}
+
+function writePersistedColumnSizing(value: ColumnSizingState) {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(COLUMN_SIZING_STORAGE_KEY, JSON.stringify(value));
+  } catch {
+    // ignore
+  }
+}
+
+function sanitizeColumnSizing(
+  value: ColumnSizingState,
+  schema: PurchaseOrdersTableColumnSchema[],
+): ColumnSizingState {
+  const schemaById = new Map(schema.map((column) => [column.id, column]));
+  const sanitized: ColumnSizingState = {};
+
+  for (const [columnId, rawSize] of Object.entries(value)) {
+    const column = schemaById.get(columnId);
+    if (!column) continue;
+    if (typeof rawSize !== "number" || !Number.isFinite(rawSize)) continue;
+
+    const min = column.minSize ?? 48;
+    const max = Math.min(column.maxSize ?? MAX_REASONABLE_COLUMN_SIZE, MAX_REASONABLE_COLUMN_SIZE);
+    const nextSize = Math.max(min, Math.min(max, Math.round(rawSize)));
+    sanitized[columnId] = nextSize;
+  }
+
+  return sanitized;
+}
+
+function parseQueryId(searchParams: URLSearchParams, key: string): string | null {
+  const raw = searchParams.get(key);
+  if (raw == null) return null;
+  const trimmed = raw.trim();
+  return trimmed === "" ? null : trimmed;
+}
+
+function filterBySearch(rows: PurchaseOrderListRow[], query: string): PurchaseOrderListRow[] {
   const q = query.trim().toLowerCase();
   if (!q) return rows;
   const codeTokens = toGeneratedCodeSearchTokens(q);
@@ -72,35 +188,70 @@ function filterBySearch(rows: RowData[], query: string): RowData[] {
   });
 }
 
-function filterBySupplierId(rows: RowData[], supplierId: string | null): RowData[] {
+function filterBySupplierId(rows: PurchaseOrderListRow[], supplierId: string | null): PurchaseOrderListRow[] {
   if (supplierId == null) return rows;
   return rows.filter((r) => r.supplierId === supplierId);
 }
 
-function filterByWarehouseId(rows: RowData[], warehouseId: string | null): RowData[] {
+function filterByWarehouseId(rows: PurchaseOrderListRow[], warehouseId: string | null): PurchaseOrderListRow[] {
   if (warehouseId == null) return rows;
   return rows.filter((r) => r.warehouseId === warehouseId);
 }
 
-/** When `allowIds` is null, no item filter is applied. */
-function filterByDocumentIdSet(rows: RowData[], allowIds: Set<string> | null): RowData[] {
+function filterByDocumentIdSet(rows: PurchaseOrderListRow[], allowIds: Set<string> | null): PurchaseOrderListRow[] {
   if (allowIds == null) return rows;
   return rows.filter((r) => allowIds.has(r.id));
 }
 
-function parseQueryId(searchParams: URLSearchParams, key: string): string | null {
-  const raw = searchParams.get(key);
-  if (raw == null) return null;
-  const t = raw.trim();
-  return t === "" ? null : t;
-}
-
 export function PurchaseOrdersListPage() {
-  const location = useLocation();
-  const navigate = useNavigate();
   const { t, locale } = useTranslation();
   const { formatDate } = useAppDisplayFormatters();
+  const location = useLocation();
+  const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
+  const searchQuery = searchParams.get("q") ?? "";
+  const searchParamsSort = searchParams.get("sort") ?? "";
+  const appReadRevision = useAppReadModelRevision();
+  const [exportSuccess, setExportSuccess] = useState<{ path: string; filename: string } | null>(null);
+  const [exportOpen, setExportOpen] = useState(false);
+  const [rowSelection, setRowSelection] = useState<RowSelectionState>({});
+  const [pendingSortModel, setPendingSortModel] = useState<UrlGridSort[] | null>(null);
+  const [columnSizing, setColumnSizing] = useState<ColumnSizingState>(() => readPersistedColumnSizing());
+  const [headerFilterAnchor, setHeaderFilterAnchor] = useState<HeaderFilterAnchor | null>(null);
+  const [pendingHeaderFilterCommit, setPendingHeaderFilterCommit] = useState<PendingHeaderFilterCommit | null>(null);
+  const [runtimeSortSerialized, setRuntimeSortSerialized] = useState(() =>
+    serializeUrlGridSort(readUrlGridSort(new URLSearchParams(location.search))),
+  );
+  const gridContainerRef = useRef<HTMLDivElement | null>(null);
+  const listSearchInputRef = useRef<HTMLInputElement>(null);
+  useListPageSearchHotkey(listSearchInputRef);
+
+  useEffect(() => {
+    writePersistedColumnSizing(columnSizing);
+  }, [columnSizing]);
+
+  const listStateKey = useMemo(
+    () => buildNavigationStateKey(location.pathname, searchParams),
+    [location.pathname, searchParams],
+  );
+  useSessionScrollRestore(listStateKey, gridContainerRef);
+
+  const currentReturnTo = useMemo(
+    () => buildReturnToValue(location.pathname, location.search),
+    [location.pathname, location.search],
+  );
+  const columnFilterModel = useMemo(
+    () => readUrlAgGridColumnFilters(new URLSearchParams(location.search)),
+    [location.search],
+  );
+
+  const handleSearchQueryChange = useCallback(
+    (value: string) => {
+      replaceQueryParam(searchParams, setSearchParams, "q", value);
+    },
+    [searchParams, setSearchParams],
+  );
+
   const supplierFilterId = useMemo(() => parseQueryId(searchParams, "supplierId"), [searchParams]);
   const warehouseFilterId = useMemo(() => parseQueryId(searchParams, "warehouseId"), [searchParams]);
   const itemFilterId = useMemo(() => parseQueryId(searchParams, "itemId"), [searchParams]);
@@ -118,110 +269,77 @@ export function PurchaseOrdersListPage() {
       }
     }
     return ids;
-  }, [itemFilterId]);
+  }, [itemFilterId, appReadRevision]);
 
-  const searchQuery = searchParams.get("q") ?? "";
-  const [exportSuccess, setExportSuccess] = useState<{ path: string; filename: string } | null>(null);
-  const [exportOpen, setExportOpen] = useState(false);
-  const [selectedCount, setSelectedCount] = useState(0);
-  const gridRef = useRef<AgGridReact<RowData> | null>(null);
-  const gridContainerRef = useRef<HTMLDivElement | null>(null);
-  const listSearchInputRef = useRef<HTMLInputElement>(null);
-  useListPageSearchHotkey(listSearchInputRef);
-  const listStateKey = useMemo(
-    () => buildNavigationStateKey(location.pathname, searchParams),
-    [location.pathname, searchParams],
-  );
-  useSessionScrollRestore(listStateKey, gridContainerRef);
-  const currentReturnTo = useMemo(
-    () => buildReturnToValue(location.pathname, location.search),
-    [location.pathname, location.search],
-  );
-  const initialSortModel = useMemo(
-    () => readUrlGridSort(new URLSearchParams(location.search)),
-    [location.search],
-  );
-  const columnFilterModel = useMemo(
-    () => readUrlAgGridColumnFilters(new URLSearchParams(location.search)),
-    [location.search],
-  );
-  const [runtimeSortSerialized, setRuntimeSortSerialized] = useState(() => serializeUrlGridSort(initialSortModel));
-
-  const onSelectionChanged = useCallback((e: SelectionChangedEvent<RowData>) => {
-    setSelectedCount(e.api.getSelectedRows().length);
-  }, []);
-
-  const setQueryValue = useCallback(
-    (key: string, value: string, defaultValue = "") => {
-      replaceQueryParam(searchParams, setSearchParams, key, value, defaultValue);
-    },
-    [searchParams, setSearchParams],
-  );
-
-  const handleSortChanged = useCallback(() => {
-    const api = gridRef.current?.api;
-    if (!api) return;
-    const nextSortModel = getCurrentGridSort(api, ["selection", "lineNo"]);
-    const serialized = serializeUrlGridSort(nextSortModel);
-    setRuntimeSortSerialized(serialized);
-    replaceQueryParam(searchParams, setSearchParams, "sort", serialized);
-  }, [searchParams, setSearchParams]);
-
-  const rowsWithNames = useMemo(() => {
-    const list = purchaseOrderRepository.list();
-    return list.map((po) => {
-      const supplier = supplierRepository.getById(po.supplierId);
-      const warehouse = warehouseRepository.getById(po.warehouseId);
-      return {
-        ...po,
-        supplierName: supplier?.name ?? po.supplierId,
-        warehouseName: warehouse?.name ?? po.warehouseId,
-      };
-    });
-  }, []);
+  const listRows = useMemo(() => buildPurchaseOrderListRows(), [appReadRevision]);
 
   const filteredRows = useMemo(() => {
-    let next = filterBySearch(rowsWithNames, searchQuery);
+    let next = filterBySearch(listRows, searchQuery);
     next = filterBySupplierId(next, supplierFilterId);
     next = filterByWarehouseId(next, warehouseFilterId);
     next = filterByDocumentIdSet(next, purchaseOrderIdsContainingItem);
     return next;
-  }, [
-    rowsWithNames,
-    searchQuery,
-    supplierFilterId,
-    warehouseFilterId,
-    purchaseOrderIdsContainingItem,
-  ]);
+  }, [listRows, searchQuery, supplierFilterId, warehouseFilterId, purchaseOrderIdsContainingItem]);
 
-  const purchaseOrderColumnFilterConfigs = useMemo<Record<string, AgGridColumnFilterConfig<RowData>>>(
-    () => ({
-      number: { kind: "text" },
-      date: { kind: "date" },
-      supplierName: {
-        kind: "enum",
-        options: supplierRepository
-          .list()
-          .map((supplier) => ({ value: supplier.name, label: supplier.name })),
-      },
-      warehouseName: {
-        kind: "enum",
-        options: warehouseRepository
-          .list()
-          .map((warehouse) => ({ value: warehouse.name, label: warehouse.name })),
-      },
-      status: {
-        kind: "enum",
-        options: [
-          { value: "draft", label: t("status.planning.draft") },
-          { value: "confirmed", label: t("status.planning.confirmed") },
-          { value: "closed", label: t("status.planning.closed") },
-          { value: "cancelled", label: t("status.planning.cancelled") },
-        ],
-      },
-    }),
+  const supplierNameEnumOptions = useMemo(
+    () =>
+      supplierRepository.list().map((supplier) => ({
+        value: supplier.name,
+        label: supplier.name,
+      })),
+    [appReadRevision],
+  );
+
+  const warehouseNameEnumOptions = useMemo(
+    () =>
+      warehouseRepository.list().map((warehouse) => ({
+        value: warehouse.name,
+        label: warehouse.name,
+      })),
+    [appReadRevision],
+  );
+
+  const statusEnumOptions = useMemo(
+    () => [
+      { value: "draft", label: t("status.planning.draft") },
+      { value: "confirmed", label: t("status.planning.confirmed") },
+      { value: "closed", label: t("status.planning.closed") },
+      { value: "cancelled", label: t("status.planning.cancelled") },
+    ],
     [t, locale],
   );
+
+  const purchaseOrdersListViewCatalog = useMemo(
+    () =>
+      buildPurchaseOrdersListViewCatalog({
+        t,
+        formatDate,
+        supplierNameEnumOptions,
+        warehouseNameEnumOptions,
+        statusEnumOptions,
+      }),
+    [t, locale, formatDate, appReadRevision, supplierNameEnumOptions, warehouseNameEnumOptions, statusEnumOptions],
+  );
+  const purchaseOrdersTableSchema = useMemo(() => buildPurchaseOrdersTableSchema({ t }), [t, locale, appReadRevision]);
+
+  useEffect(() => {
+    setColumnSizing((current) => {
+      const next = sanitizeColumnSizing(current, purchaseOrdersTableSchema);
+      const currentKeys = Object.keys(current);
+      const nextKeys = Object.keys(next);
+      if (
+        currentKeys.length === nextKeys.length &&
+        currentKeys.every((key) => current[key] === next[key])
+      ) {
+        return current;
+      }
+      return next;
+    });
+  }, [purchaseOrdersTableSchema]);
+
+  const baseColumnDefs = purchaseOrdersListViewCatalog.columnDefs;
+  const purchaseOrderFieldRegistry = purchaseOrdersListViewCatalog.fieldRegistry;
+  const purchaseOrderColumnFilterConfigs = purchaseOrdersListViewCatalog.filterConfigs;
 
   const displayRowsWithQueryFilters = useMemo(
     () => applyAgGridColumnFilters(filteredRows, columnFilterModel, purchaseOrderColumnFilterConfigs),
@@ -241,24 +359,6 @@ export function PurchaseOrdersListPage() {
     if (s) return s.name || s.code || supplierFilterId;
     return supplierFilterId;
   }, [supplierFilterId]);
-
-  const clearSupplierFilter = useCallback(() => {
-    const next = new URLSearchParams(searchParams);
-    next.delete("supplierId");
-    setSearchParams(next, { replace: true });
-  }, [searchParams, setSearchParams]);
-
-  const clearWarehouseFilter = useCallback(() => {
-    const next = new URLSearchParams(searchParams);
-    next.delete("warehouseId");
-    setSearchParams(next, { replace: true });
-  }, [searchParams, setSearchParams]);
-
-  const clearItemFilter = useCallback(() => {
-    const next = new URLSearchParams(searchParams);
-    next.delete("itemId");
-    setSearchParams(next, { replace: true });
-  }, [searchParams, setSearchParams]);
 
   const warehouseFilterLabel = useMemo((): string => {
     if (warehouseFilterId == null) return "";
@@ -281,127 +381,25 @@ export function PurchaseOrdersListPage() {
     return itemFilterId;
   }, [itemFilterId, emDash]);
 
-  const buildExportPayload = useCallback(
-    (mode: "current" | "selected"): { headers: string[]; rows: Array<Array<string | number>> } => {
-      const api = gridRef.current?.api;
-      if (!api) return { headers: [], rows: [] };
-      const columns = getVisibleAgGridExportColumns(api, { entityType: "purchase-orders" });
-      const rowNodes =
-        mode === "selected"
-          ? api.getSelectedNodes()
-          : collectFilteredSortedRowNodes(api);
-      return {
-        headers: columns.map((x) => x.headerName),
-        rows: buildExportMatrixFromRowNodes(api, columns, rowNodes),
-      };
-    },
-    [],
-  );
+  const clearSupplierFilter = useCallback(() => {
+    const next = new URLSearchParams(searchParams);
+    next.delete("supplierId");
+    setSearchParams(next, { replace: true });
+  }, [searchParams, setSearchParams]);
 
-  const runExportWithSaveAs = useCallback(
-    async (defaultFilename: string, buildBuffer: () => Promise<ArrayBuffer>) => {
-      try {
-        const extension = defaultFilename.toLowerCase().endsWith(".pdf") ? "pdf" : "xlsx";
-        const base = defaultFilename.replace(/\.[^.]+$/, "");
-        const generatedFilename = buildReadableUniqueFilename({ base, extension });
-        const path = await save({
-          defaultPath: generatedFilename,
-          filters: [{ name: t("doc.page.excelFilterName"), extensions: ["xlsx"] }],
-        });
-        if (path == null) return;
-        const safePath = await ensureUniqueExportPath(path);
+  const clearWarehouseFilter = useCallback(() => {
+    const next = new URLSearchParams(searchParams);
+    next.delete("warehouseId");
+    setSearchParams(next, { replace: true });
+  }, [searchParams, setSearchParams]);
 
-        const buffer = await buildBuffer();
-        const bytes = new Uint8Array(buffer);
-        let binary = "";
-        for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
-        const contentsBase64 = btoa(binary);
-
-        await invoke("write_export_file", { path: safePath, contentsBase64 });
-        const filename = safePath.replace(/^.*[/\\]/, "") || generatedFilename;
-        setExportSuccess({ path: safePath, filename });
-      } catch (err) {
-        console.error("Export failed", err);
-        const buffer = await buildBuffer();
-        const blob = new Blob([buffer], {
-          type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement("a");
-        a.href = url;
-        a.download = defaultFilename;
-        a.click();
-        URL.revokeObjectURL(url);
-      }
-    },
-    [t],
-  );
-
-  const listExcelLabels = useMemo(() => purchaseOrdersListExcelLabels(t), [t, locale]);
-
-  const handleExportCurrentView = useCallback(() => {
-    const payload = buildExportPayload("current");
-    runExportWithSaveAs("purchase-orders.xlsx", () =>
-      buildListViewXlsxBuffer({
-        sheetName: listExcelLabels.sheetName,
-        headers: payload.headers,
-        rows: payload.rows,
-        tableNameBase: "PurchaseOrdersListView",
-      }),
-    );
-  }, [buildExportPayload, listExcelLabels, runExportWithSaveAs]);
-
-  const handleExportSelected = useCallback(() => {
-    const payload = buildExportPayload("selected");
-    if (payload.rows.length === 0) return;
-    runExportWithSaveAs("purchase-orders-selected.xlsx", () =>
-      buildListViewXlsxBuffer({
-        sheetName: listExcelLabels.sheetName,
-        headers: payload.headers,
-        rows: payload.rows,
-        tableNameBase: "PurchaseOrdersListViewSelected",
-      }),
-    );
-  }, [buildExportPayload, listExcelLabels, runExportWithSaveAs]);
-
-  const exportSelectedDisabled = selectedCount === 0;
-
-  const baseColumnDefs = useMemo<ColDef<RowData>[]>(
-    () => [
-      getAgGridRowNumberColDef(t),
-      {
-        field: "number",
-        headerName: t("doc.columns.number"),
-        width: 150,
-      },
-      {
-        field: "date",
-        headerName: t("doc.columns.date"),
-        width: 140,
-        valueFormatter: (params) => formatDate(normalizeDateForPO(params.value), { empty: "" }),
-      },
-      {
-        field: "supplierName",
-        headerName: t("doc.columns.supplier"),
-        minWidth: 180,
-      },
-      {
-        field: "warehouseName",
-        headerName: t("doc.columns.warehouse"),
-        minWidth: 160,
-      },
-      {
-        field: "status",
-        headerName: t("doc.columns.status"),
-        width: 130,
-        cellRenderer: AgGridPlanningStatusCellRenderer,
-      },
-    ],
-    [t, locale, formatDate],
-  );
+  const clearItemFilter = useCallback(() => {
+    const next = new URLSearchParams(searchParams);
+    next.delete("itemId");
+    setSearchParams(next, { replace: true });
+  }, [searchParams, setSearchParams]);
 
   const {
-    columnDefs: settingsAwareBaseColumnDefs,
     draftItems: columnSettingsDraftItems,
     draftDeepFilters: columnSettingsDraftDeepFilters,
     draftDeepSorts: columnSettingsDraftDeepSorts,
@@ -415,6 +413,7 @@ export function PurchaseOrdersListPage() {
     cancelDraft: cancelColumnSettingsDraft,
     deepFilterModel,
     deepSortModel,
+    definition: columnSettingsDefinition,
     registry: columnSettingsRegistry,
     personalViews: columnSettingsPersonalViews,
     activeViewId: columnSettingsActiveViewId,
@@ -426,22 +425,29 @@ export function PurchaseOrdersListPage() {
     renameActivePersonalView: renameColumnSettingsActivePersonalView,
     deleteActivePersonalView: deleteColumnSettingsActivePersonalView,
     setActivePersonalViewAsDefault: setColumnSettingsActivePersonalViewAsDefault,
-  } = useAgGridColumnSettings<RowData>({
+  } = useAgGridColumnSettings<PurchaseOrderListRow>({
     pageKey: "purchase-orders",
     entityType: "purchase-orders",
     baseColumnDefs,
+    fieldRegistry: purchaseOrderFieldRegistry,
+    allowHiddenFilterSort: true,
   });
-  const effectiveSortModel = useMemo(
-    () => {
-      const params = new URLSearchParams();
-      if (runtimeSortSerialized !== "") params.set("sort", runtimeSortSerialized);
-      const runtime = readUrlGridSort(params);
-      return runtime.length > 0 ? runtime : deepSortModel;
-    },
-    [runtimeSortSerialized, deepSortModel],
-  );
+
+  const effectiveSortModel = useMemo(() => {
+    if (pendingSortModel) return pendingSortModel;
+    const urlSort = readUrlGridSort(new URLSearchParams(searchParamsSort ? `sort=${searchParamsSort}` : ""));
+    const runtimeSort =
+      runtimeSortSerialized === ""
+        ? []
+        : readUrlGridSort(new URLSearchParams(`sort=${runtimeSortSerialized}`));
+    if (runtimeSort.length > 0 && runtimeSortSerialized !== searchParamsSort) return runtimeSort;
+    if (urlSort.length > 0) return urlSort;
+    if (runtimeSort.length > 0) return runtimeSort;
+    return deepSortModel;
+  }, [pendingSortModel, searchParamsSort, runtimeSortSerialized, deepSortModel]);
+
   const resolveDeepSortValue = useCallback(
-    (row: RowData, fieldKey: string): unknown => {
+    (row: PurchaseOrderListRow, fieldKey: string): unknown => {
       const config = purchaseOrderColumnFilterConfigs[fieldKey];
       if (config?.getValue) return config.getValue(row);
       return (row as unknown as Record<string, unknown>)[fieldKey];
@@ -453,6 +459,7 @@ export function PurchaseOrdersListPage() {
     () => applyAgGridColumnFilters(displayRowsWithQueryFilters, deepFilterModel, purchaseOrderColumnFilterConfigs),
     [displayRowsWithQueryFilters, deepFilterModel, purchaseOrderColumnFilterConfigs],
   );
+
   const displayRows = useMemo(
     () =>
       applyDeepSortModel({
@@ -463,140 +470,540 @@ export function PurchaseOrdersListPage() {
     [displayRowsWithDeepFilters, effectiveSortModel, resolveDeepSortValue],
   );
 
-  const noRowsOverlayTemplate = useMemo(
+  useEffect(() => {
+    if (deepSortModel.length === 0) return;
+    const nextSerialized = serializeUrlGridSort(deepSortModel);
+    if (nextSerialized === searchParamsSort) return;
+    const nextParams = new URLSearchParams(searchParams);
+    nextParams.set("sort", nextSerialized);
+    setSearchParams(nextParams, { replace: true });
+    setRuntimeSortSerialized(nextSerialized);
+  }, [deepSortModel, searchParams, searchParamsSort, setSearchParams]);
+
+  useEffect(() => {
+    if (!pendingSortModel) return;
+    const pendingSerialized = serializeUrlGridSort(pendingSortModel);
+    if (pendingSerialized === searchParamsSort) {
+      setPendingSortModel(null);
+    }
+  }, [pendingSortModel, searchParamsSort]);
+
+  const neutralListViewState = useMemo(
     () =>
-      buildAgGridNoRowsOverlayTemplate(
-        getAgGridNoRowsOverlayContent(
-          {
-            baseRowCount: rowsWithNames.length,
-            visibleRowCount: displayRows.length,
-            searchActive,
-            filtersActive,
-          },
-          t,
-        ),
-      ),
-    [rowsWithNames.length, displayRows.length, searchActive, filtersActive, t, locale],
-  );
-
-  useAgGridNoRowsOverlayLifecycle(gridRef, noRowsOverlayTemplate, displayRows.length);
-
-  const handleApplyColumnFilter = useCallback(
-    (colId: string, clause: { operator: any; value?: string; valueTo?: string; values?: string[] }) => {
-      replaceUrlAgGridColumnFilters(searchParams, setSearchParams, {
-        ...columnFilterModel,
-        [colId]: clause,
-      });
-    },
-    [searchParams, setSearchParams, columnFilterModel],
-  );
-
-  const handleResetColumnFilter = useCallback(
-    (colId: string) => {
-      const nextModel = { ...columnFilterModel };
-      delete nextModel[colId];
-      replaceUrlAgGridColumnFilters(searchParams, setSearchParams, nextModel);
-    },
-    [searchParams, setSearchParams, columnFilterModel],
-  );
-  const columnFilterBridge = useAgGridColumnFilterBridge(
-    columnFilterModel,
-    handleApplyColumnFilter,
-    handleResetColumnFilter,
-  );
-
-  const columnDefs = useMemo(
-    () =>
-      decorateAgGridColumnDefsWithFilters(
-        settingsAwareBaseColumnDefs,
-        purchaseOrderColumnFilterConfigs,
-        columnFilterBridge,
-      ),
+      buildPurchaseOrdersTableListViewState({
+        definition: columnSettingsDefinition,
+        columnFilterModel,
+        sortModel: effectiveSortModel,
+        personalViews: columnSettingsPersonalViews,
+        activeViewId: columnSettingsActiveViewId,
+      }),
     [
-      settingsAwareBaseColumnDefs,
-      purchaseOrderColumnFilterConfigs,
-      columnFilterBridge,
+      columnSettingsDefinition,
+      columnFilterModel,
+      effectiveSortModel,
+      columnSettingsPersonalViews,
+      columnSettingsActiveViewId,
     ],
   );
-  useEffect(() => {
-    const api = gridRef.current?.api;
-    if (!api) return;
-    applyUrlGridSort(api, effectiveSortModel);
-  }, [columnDefs, effectiveSortModel]);
+
+  const fallbackColumnVisibility = useMemo<VisibilityState>(
+    () =>
+      Object.fromEntries(
+        purchaseOrdersTableSchema.map((column) => [column.id, column.lockedVisible ? true : column.defaultVisible]),
+      ),
+    [purchaseOrdersTableSchema],
+  );
+  const fallbackColumnOrder = useMemo(
+    () => purchaseOrdersTableSchema.map((column) => column.id),
+    [purchaseOrdersTableSchema],
+  );
+
+  const tableColumnVisibility = useMemo<VisibilityState>(() => {
+    const visibility = neutralListViewState.columnVisibility;
+    return Object.keys(visibility).length > 0 ? visibility : fallbackColumnVisibility;
+  }, [neutralListViewState.columnVisibility, fallbackColumnVisibility]);
+
+  const tableColumnOrder = useMemo(
+    () => (neutralListViewState.columnOrder.length > 0 ? neutralListViewState.columnOrder : fallbackColumnOrder),
+    [neutralListViewState.columnOrder, fallbackColumnOrder],
+  );
+  const registryByFieldKey = useMemo(
+    () => new Map(columnSettingsRegistry.map((entry) => [entry.fieldKey, entry])),
+    [columnSettingsRegistry],
+  );
+  const activeDeepFilterFieldState = useMemo(() => {
+    const activeFieldMap: Record<string, boolean> = {};
+    for (const rule of columnSettingsDefinition?.deepFilters ?? []) {
+      if (rule.enabled !== true) continue;
+      activeFieldMap[rule.fieldKey] = true;
+    }
+    return activeFieldMap;
+  }, [columnSettingsDefinition]);
+  const appliedRuleByFieldKey = useMemo(() => {
+    const map = new Map<string, ListViewDeepFilterRule>();
+    for (const rule of columnSettingsDefinition?.deepFilters ?? []) {
+      if (!map.has(rule.fieldKey)) map.set(rule.fieldKey, rule);
+    }
+    return map;
+  }, [columnSettingsDefinition]);
+  const activeHeaderFilterField = headerFilterAnchor?.fieldId ?? null;
+  const activeHeaderFilterRegistryField = activeHeaderFilterField
+    ? registryByFieldKey.get(activeHeaderFilterField) ?? null
+    : null;
+  const activeHeaderFilterConfig =
+    activeHeaderFilterField != null ? purchaseOrderColumnFilterConfigs[activeHeaderFilterField] : undefined;
+  const activeHeaderFilterRule =
+    activeHeaderFilterField != null ? appliedRuleByFieldKey.get(activeHeaderFilterField) ?? null : null;
+
+  const tanstackSorting = useMemo<SortingState>(
+    () =>
+      neutralListViewState.sorting.map((entry) => ({
+        id: entry.id,
+        desc: entry.direction === "desc",
+      })),
+    [neutralListViewState.sorting],
+  );
+
+  const handleTanstackSortingChange = useCallback(
+    (updater: SortingState | ((old: SortingState) => SortingState)) => {
+      const nextSorting = functionalUpdate(updater, tanstackSorting);
+      const nextSortModel = nextSorting.map((entry) => ({
+        colId: entry.id,
+        sort: entry.desc ? "desc" : "asc",
+      })) as UrlGridSort[];
+      const nextValue = serializeUrlGridSort(nextSortModel);
+      setPendingSortModel(nextSortModel);
+      setRuntimeSortSerialized(nextValue);
+      replaceQueryParam(searchParams, setSearchParams, "sort", nextValue);
+    },
+    [tanstackSorting, searchParams, setSearchParams],
+  );
+
+  const handleColumnSizingChange = useCallback(
+    (updater: ColumnSizingState | ((old: ColumnSizingState) => ColumnSizingState)) => {
+      setColumnSizing((current) => {
+        const next = sanitizeColumnSizing(functionalUpdate(updater, current), purchaseOrdersTableSchema);
+        return next;
+      });
+    },
+    [purchaseOrdersTableSchema],
+  );
 
   const handleApplyColumnSettings = useCallback(() => {
-    const api = gridRef.current?.api;
-    const { hiddenIds, nextItems } = applyColumnSettingsDraft();
-    if (api) {
-      api.applyColumnState({
-        state: nextItems.map((item) => ({
-          colId: item.id,
-          hide: item.visible ? false : true,
-        })),
-        applyOrder: true,
-      });
-    }
-    if (hiddenIds.length === 0) return;
+    const { hiddenIds } = applyColumnSettingsDraft();
+    const prunedDraftDeepSorts = pruneDeepSortRulesByHiddenFields(
+      columnSettingsDraftDeepSorts,
+      hiddenIds,
+    );
+    const nextDeepSortModel = buildUrlGridSortFromDeepSortRules(prunedDraftDeepSorts);
+    const nextDeepSortSerialized = serializeUrlGridSort(nextDeepSortModel);
+    const currentDeepSortSerialized = serializeUrlGridSort(deepSortModel);
+    const currentRuntimeSortSerialized = searchParamsSort;
+    const deepSortsChanged = nextDeepSortSerialized !== currentDeepSortSerialized;
+    const shouldSyncToDeepSort =
+      nextDeepSortModel.length > 0 && currentRuntimeSortSerialized !== nextDeepSortSerialized;
+    const runtimeUsesDeepSort =
+      (currentRuntimeSortSerialized === "" && deepSortModel.length > 0) ||
+      currentRuntimeSortSerialized === currentDeepSortSerialized;
 
-    const nextColumnFilterModel = { ...columnFilterModel };
-    for (const colId of hiddenIds) {
-      delete nextColumnFilterModel[colId];
+    let nextSortModel = effectiveSortModel;
+    if (deepSortsChanged || shouldSyncToDeepSort) {
+      if (nextDeepSortModel.length > 0) {
+        nextSortModel = nextDeepSortModel;
+      } else if (runtimeUsesDeepSort) {
+        nextSortModel = [];
+      }
+    } else if (hiddenIds.length > 0) {
+      nextSortModel = effectiveSortModel.filter((entry) => !hiddenIds.includes(entry.colId));
     }
-    const currentSortModel = effectiveSortModel;
-    const nextSortModel = currentSortModel.filter((entry) => !hiddenIds.includes(entry.colId));
-    const nextParams = withUrlAgGridColumnFilters(searchParams, nextColumnFilterModel);
+
+    let nextParams = new URLSearchParams(searchParams);
+    if (hiddenIds.length > 0) {
+      const nextColumnFilterModel = { ...columnFilterModel };
+      for (const colId of hiddenIds) delete nextColumnFilterModel[colId];
+      nextParams = withUrlAgGridColumnFilters(nextParams, nextColumnFilterModel);
+    }
+
     const nextSortSerialized = serializeUrlGridSort(nextSortModel);
-    if (nextSortSerialized === "") {
-      nextParams.delete("sort");
-    } else {
-      nextParams.set("sort", nextSortSerialized);
-    }
+    if (nextSortSerialized === "") nextParams.delete("sort");
+    else nextParams.set("sort", nextSortSerialized);
+
+    setPendingSortModel(nextSortModel);
     setSearchParams(nextParams, { replace: true });
     setRuntimeSortSerialized(nextSortSerialized);
-    if (api) {
-      applyUrlGridSort(api, nextSortModel);
-    }
   }, [
     applyColumnSettingsDraft,
     columnFilterModel,
+    columnSettingsDraftDeepSorts,
+    deepSortModel,
     effectiveSortModel,
     searchParams,
+    searchParamsSort,
     setSearchParams,
   ]);
+
+  const handleHeaderFilterApply = useCallback(
+    (nextRule: ListViewDeepFilterRule) => {
+      setColumnSettingsDraftDeepFilters((prev) => {
+        const others = prev.filter((rule) => rule.fieldKey !== nextRule.fieldKey);
+        return [
+          ...others,
+          {
+            ...nextRule,
+            priority: others.length,
+          },
+        ];
+      });
+      setHeaderFilterAnchor(null);
+      setPendingHeaderFilterCommit({ type: "apply", rule: nextRule });
+    },
+    [setColumnSettingsDraftDeepFilters],
+  );
+
+  const handleHeaderFilterReset = useCallback(() => {
+    if (!activeHeaderFilterField) return;
+    setColumnSettingsDraftDeepFilters((prev) => prev.filter((rule) => rule.fieldKey !== activeHeaderFilterField));
+    setHeaderFilterAnchor(null);
+    setPendingHeaderFilterCommit({ type: "reset", fieldKey: activeHeaderFilterField });
+  }, [activeHeaderFilterField, setColumnSettingsDraftDeepFilters]);
+
+  useEffect(() => {
+    if (!pendingHeaderFilterCommit) return;
+    handleApplyColumnSettings();
+    setPendingHeaderFilterCommit(null);
+  }, [handleApplyColumnSettings, pendingHeaderFilterCommit]);
+
+  const visibleSchemaColumns = useMemo(() => {
+    const schemaById = new Map(purchaseOrdersTableSchema.map((column) => [column.id, column]));
+    return tableColumnOrder
+      .map((id) => schemaById.get(id))
+      .filter((column): column is PurchaseOrdersTableColumnSchema => Boolean(column))
+      .filter((column) => tableColumnVisibility[column.id] !== false);
+  }, [purchaseOrdersTableSchema, tableColumnOrder, tableColumnVisibility]);
+
+  const buildExportPayloadForRows = useCallback(
+    (rows: PurchaseOrderListRow[]): { headers: string[]; rows: Array<Array<string | number>> } => {
+      const rowsOut = rows.map((row, index) =>
+        visibleSchemaColumns.map((column) =>
+          formatPurchaseOrdersTableValue({
+            column,
+            value: column.id === "lineNo" ? index + 1 : row[column.accessorKey ?? "number"],
+            t,
+            formatDate,
+            rowIndex: index,
+          }),
+        ),
+      );
+
+      return {
+        headers: visibleSchemaColumns.map((column) => column.label),
+        rows: rowsOut,
+      };
+    },
+    [visibleSchemaColumns, t, formatDate],
+  );
+
+  const buildExportPayload = useCallback(
+    (): { headers: string[]; rows: Array<Array<string | number>> } => buildExportPayloadForRows(displayRows),
+    [buildExportPayloadForRows, displayRows],
+  );
+
+  const runExportWithSaveAs = useCallback(
+    async (
+      defaultFilename: string,
+      buildBuffer: () => Promise<ArrayBuffer | Uint8Array>,
+      exportDiag = false,
+    ) => {
+      const extension = defaultFilename.toLowerCase().endsWith(".pdf") ? "pdf" : "xlsx";
+      const base = defaultFilename.replace(/\.[^.]+$/, "");
+      const generatedFilename = buildReadableUniqueFilename({ base, extension });
+      const fallbackMime = extension === "pdf" ? PDF_MIME : XLSX_MIME;
+      const tauri = isTauriRuntime();
+      poExportDiagLog(exportDiag, "runtime branch chosen", { isTauriRuntime: tauri });
+
+      if (!tauri) {
+        poExportDiagLog(exportDiag, "native save path skipped (browser/dev)");
+        try {
+          poExportDiagLog(exportDiag, "real XLSX buffer build started (browser path)");
+          const raw = await buildBuffer();
+          poExportDiagLog(exportDiag, "real XLSX buffer build finished (browser path)", {
+            byteLength: raw instanceof ArrayBuffer ? raw.byteLength : (raw as Uint8Array).byteLength,
+          });
+          const buffer = coerceWriteBufferResult(raw);
+          downloadBufferInBrowser(buffer, generatedFilename, fallbackMime, exportDiag);
+        } catch (err) {
+          console.error("Export failed", err);
+          poExportDiagLog(exportDiag, "catch/fallback entered (browser path)", { err: String(err) });
+        }
+        return;
+      }
+
+      poExportDiagLog(exportDiag, "native save path entered (Tauri)");
+      try {
+        const path = await save({
+          defaultPath: generatedFilename,
+          filters: [{ name: t("doc.page.excelFilterName"), extensions: ["xlsx"] }],
+        });
+        poExportDiagLog(exportDiag, "save() returned", { path: path ?? null });
+        poExportDiagLog(exportDiag, "real XLSX buffer build started (Tauri path)");
+        const raw = await buildBuffer();
+        poExportDiagLog(exportDiag, "real XLSX buffer build finished (Tauri path)", {
+          byteLength: raw instanceof ArrayBuffer ? raw.byteLength : (raw as Uint8Array).byteLength,
+        });
+        const buffer = coerceWriteBufferResult(raw);
+
+        if (path == null) {
+          poExportDiagLog(exportDiag, "save() null — browser download fallback");
+          downloadBufferInBrowser(buffer, generatedFilename, fallbackMime, exportDiag);
+          return;
+        }
+
+        poExportDiagLog(exportDiag, "native write path entered", { path });
+        const safePath = await ensureUniqueExportPath(path);
+        const bytes = new Uint8Array(buffer);
+        let binary = "";
+        for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
+        const contentsBase64 = btoa(binary);
+
+        await invoke("write_export_file", { path: safePath, contentsBase64 });
+        const filename = safePath.replace(/^.*[/\\]/, "") || generatedFilename;
+        setExportSuccess({ path: safePath, filename });
+        poExportDiagLog(exportDiag, "export success reached (Tauri write)", { filename });
+      } catch (err) {
+        console.error("Export failed", err);
+        poExportDiagLog(exportDiag, "catch/fallback entered (Tauri path)", { err: String(err) });
+        try {
+          const raw = await buildBuffer();
+          const buffer = coerceWriteBufferResult(raw);
+          downloadBufferInBrowser(buffer, generatedFilename, fallbackMime, exportDiag);
+        } catch (fallbackErr) {
+          console.error("Export browser fallback failed", fallbackErr);
+        }
+      }
+    },
+    [t],
+  );
+
+  const listExcelLabels = useMemo(() => purchaseOrdersListExcelLabels(t), [t, locale]);
+
+  const handleExportCurrentView = useCallback(async () => {
+    const exportDiag = searchParams.get("exportDiag") === "1";
+    if (exportDiag) {
+      poExportDiagLog(exportDiag, "export click entered", { exportDiag: true });
+      downloadBufferInBrowser(
+        "purchase-orders-export delivery probe\n",
+        "purchase-orders-export-probe.txt",
+        "text/plain",
+        exportDiag,
+      );
+    }
+
+    const payload = buildExportPayload();
+    poExportDiagLog(exportDiag, "real export payload built", {
+      headerCount: payload.headers.length,
+      rowCount: payload.rows.length,
+    });
+
+    if (payload.headers.length === 0) {
+      poExportDiagLog(exportDiag, "zero visible columns — placeholder XLSX");
+      await runExportWithSaveAs(
+        "purchase-orders.xlsx",
+        () =>
+          buildListViewXlsxBuffer({
+            sheetName: listExcelLabels.sheetName,
+            headers: ["—"],
+            rows: [["No visible columns. Use View settings to show at least one column, then export again."]],
+            tableNameBase: "PurchaseOrdersListView",
+          }),
+        exportDiag,
+      );
+      return;
+    }
+
+    await runExportWithSaveAs(
+      "purchase-orders.xlsx",
+      async () => {
+        const buf = await buildListViewXlsxBuffer({
+          sheetName: listExcelLabels.sheetName,
+          headers: payload.headers,
+          rows: payload.rows,
+          tableNameBase: "PurchaseOrdersListView",
+        });
+        return buf;
+      },
+      exportDiag,
+    );
+  }, [buildExportPayload, listExcelLabels, runExportWithSaveAs, searchParams]);
+
+  const handleExportSelectedRows = useCallback(async () => {
+    const selectedRows = displayRows.filter((row) => rowSelection[row.id] === true);
+    if (selectedRows.length === 0) return;
+
+    const exportDiag = searchParams.get("exportDiag") === "1";
+    const payload = buildExportPayloadForRows(selectedRows);
+    poExportDiagLog(exportDiag, "selected export payload built", {
+      headerCount: payload.headers.length,
+      selectedRowCount: selectedRows.length,
+    });
+
+    if (payload.headers.length === 0) {
+      await runExportWithSaveAs(
+        "purchase-orders-selected.xlsx",
+        () =>
+          buildListViewXlsxBuffer({
+            sheetName: listExcelLabels.sheetName,
+            headers: ["—"],
+            rows: [["No visible columns. Use View settings to show at least one column, then export again."]],
+            tableNameBase: "PurchaseOrdersListViewSelected",
+          }),
+        exportDiag,
+      );
+      return;
+    }
+
+    await runExportWithSaveAs(
+      "purchase-orders-selected.xlsx",
+      async () => {
+        const buf = await buildListViewXlsxBuffer({
+          sheetName: listExcelLabels.sheetName,
+          headers: payload.headers,
+          rows: payload.rows,
+          tableNameBase: "PurchaseOrdersListViewSelected",
+        });
+        return buf;
+      },
+      exportDiag,
+    );
+  }, [buildExportPayloadForRows, displayRows, listExcelLabels, rowSelection, runExportWithSaveAs, searchParams]);
+
+  const handleRowSelectionChange = useCallback<OnChangeFn<RowSelectionState>>((updater) => {
+    setRowSelection((prev) => functionalUpdate(updater, prev));
+  }, []);
+
+  const exportSelectedDisabled = useMemo(
+    () => !Object.values(rowSelection).some(Boolean),
+    [rowSelection],
+  );
+
+  const noRowsOverlay = useMemo(
+    () =>
+      getAgGridNoRowsOverlayContent(
+        {
+          baseRowCount: listRows.length,
+          visibleRowCount: displayRows.length,
+          searchActive,
+          filtersActive,
+        },
+        t,
+      ),
+    [listRows.length, displayRows.length, searchActive, filtersActive, t, locale],
+  );
+
+  const listContent = (
+    <>
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+        <PurchaseOrdersTanstackTable
+          rows={displayRows}
+          schema={purchaseOrdersTableSchema}
+          sorting={tanstackSorting}
+          columnVisibility={tableColumnVisibility}
+          columnOrder={tableColumnOrder}
+          columnSizing={columnSizing}
+          rowSelection={rowSelection}
+          onRowSelectionChange={handleRowSelectionChange}
+          onSortingChange={handleTanstackSortingChange}
+          onColumnSizingChange={handleColumnSizingChange}
+          onHeaderFilterClick={(fieldId, anchorRect) => setHeaderFilterAnchor({ fieldId, ...anchorRect })}
+          headerFilterState={activeDeepFilterFieldState}
+          openHeaderFilterFieldId={activeHeaderFilterField}
+          onRowClick={(row) => {
+            if (hasMeaningfulTextSelection()) return;
+            navigate(appendReturnTo(`/purchase-orders/${row.id}`, currentReturnTo));
+          }}
+          t={t}
+          formatDate={formatDate}
+          scrollContainerRef={gridContainerRef}
+          emptyState={noRowsOverlay}
+        />
+        <ItemsHeaderFilterPanel
+          open={headerFilterAnchor != null}
+          anchorRect={headerFilterAnchor}
+          field={activeHeaderFilterRegistryField}
+          filterConfig={activeHeaderFilterConfig as AgGridColumnFilterConfig<unknown> | undefined}
+          rule={activeHeaderFilterRule}
+          onOpenChange={(open) => {
+            if (!open) setHeaderFilterAnchor(null);
+          }}
+          onApply={handleHeaderFilterApply}
+          onReset={handleHeaderFilterReset}
+        />
+      </div>
+
+      <AgGridColumnSettingsModal
+        open={columnSettingsOpen}
+        onOpenChange={(nextOpen) => {
+          if (nextOpen) {
+            openColumnSettings();
+            return;
+          }
+          cancelColumnSettingsDraft();
+        }}
+        items={columnSettingsDraftItems}
+        onItemsChange={(nextItems) => setColumnSettingsDraftItems(() => nextItems)}
+        filterRules={columnSettingsDraftDeepFilters}
+        onFilterRulesChange={(nextRules) => setColumnSettingsDraftDeepFilters(() => nextRules)}
+        sortRules={columnSettingsDraftDeepSorts}
+        onSortRulesChange={(nextRules) => setColumnSettingsDraftDeepSorts(() => nextRules)}
+        registry={columnSettingsRegistry}
+        filterConfigs={purchaseOrderColumnFilterConfigs as Record<string, AgGridColumnFilterConfig<unknown>>}
+        includeHiddenInFilterSort
+        personalViews={columnSettingsPersonalViews}
+        activeViewId={columnSettingsActiveViewId}
+        activeViewName={columnSettingsActiveViewName}
+        hasUnsavedChanges={columnSettingsHasUnsavedChanges}
+        onActivateView={activateColumnSettingsPersonalView}
+        onCreateView={createColumnSettingsPersonalViewFromCurrent}
+        onSaveChangesToActiveView={saveColumnSettingsActivePersonalViewFromCurrent}
+        onRenameActiveView={renameColumnSettingsActivePersonalView}
+        onDeleteActiveView={deleteColumnSettingsActivePersonalView}
+        onSetActiveAsDefault={setColumnSettingsActivePersonalViewAsDefault}
+        onApply={handleApplyColumnSettings}
+        onCancel={cancelColumnSettingsDraft}
+        onReset={resetColumnSettingsDraftToDefaults}
+      />
+    </>
+  );
 
   return (
     <ListPageLayout
       header={null}
       controls={
-        <>
+        <div className="list-page__controls-stack flex w-full min-w-0 flex-wrap items-center justify-between gap-x-4 gap-y-2">
           <ListPageSearch
             inputRef={listSearchInputRef}
             placeholder={t("ops.list.purchaseOrders.searchPlaceholder")}
             value={searchQuery}
-            onChange={(value) => setQueryValue("q", value)}
+            onChange={handleSearchQueryChange}
             debounceMs={220}
             aria-label={t("ops.list.purchaseOrders.searchAria")}
             resultCount={displayRows.length}
           />
-          <div className="flex flex-row flex-wrap items-center gap-2 shrink-0 ml-auto justify-end">
+          <div className="list-page__toolbar-actions-cluster flex max-w-full min-w-0 flex-wrap items-center justify-end gap-2">
             {warehouseFilterId != null && (
               <div
-                className="flex h-8 max-w-[min(100%,18rem)] items-center gap-1.5 rounded-md border border-input bg-background px-2 text-xs shrink-0"
+                className="flex h-8 max-w-[min(100%,18rem)] shrink-0 items-center gap-1.5 rounded-md border border-input bg-background px-2 text-xs"
                 role="status"
                 aria-label={t("ops.list.purchaseOrders.filterWarehouseAria")}
               >
-                <span className="text-muted-foreground whitespace-nowrap shrink-0">{t("doc.columns.warehouse")}</span>
-                <span
-                  className="truncate font-medium text-foreground/90 min-w-0"
-                  title={warehouseFilterLabel}
-                >
+                <span className="shrink-0 whitespace-nowrap text-muted-foreground">{t("doc.columns.warehouse")}</span>
+                <span className="min-w-0 truncate font-medium text-foreground/90" title={warehouseFilterLabel}>
                   {warehouseFilterLabel}
                 </span>
                 <Button
                   type="button"
                   variant="ghost"
                   size="sm"
-                  className="h-7 px-1.5 text-xs shrink-0 text-muted-foreground hover:text-foreground"
+                  className="h-7 shrink-0 px-1.5 text-xs text-muted-foreground hover:text-foreground"
                   onClick={clearWarehouseFilter}
                 >
                   {t("doc.list.clear")}
@@ -605,22 +1012,19 @@ export function PurchaseOrdersListPage() {
             )}
             {itemFilterId != null && (
               <div
-                className="flex h-8 max-w-[min(100%,20rem)] items-center gap-1.5 rounded-md border border-input bg-background px-2 text-xs shrink-0"
+                className="flex h-8 max-w-[min(100%,20rem)] shrink-0 items-center gap-1.5 rounded-md border border-input bg-background px-2 text-xs"
                 role="status"
                 aria-label={t("ops.list.purchaseOrders.filterItemAria")}
               >
-                <span className="text-muted-foreground whitespace-nowrap shrink-0">{t("doc.page.itemLabel")}</span>
-                <span
-                  className="truncate font-medium text-foreground/90 min-w-0"
-                  title={itemFilterLabel}
-                >
+                <span className="shrink-0 whitespace-nowrap text-muted-foreground">{t("doc.page.itemLabel")}</span>
+                <span className="min-w-0 truncate font-medium text-foreground/90" title={itemFilterLabel}>
                   {itemFilterLabel}
                 </span>
                 <Button
                   type="button"
                   variant="ghost"
                   size="sm"
-                  className="h-7 px-1.5 text-xs shrink-0 text-muted-foreground hover:text-foreground"
+                  className="h-7 shrink-0 px-1.5 text-xs text-muted-foreground hover:text-foreground"
                   onClick={clearItemFilter}
                 >
                   {t("doc.list.clear")}
@@ -629,22 +1033,19 @@ export function PurchaseOrdersListPage() {
             )}
             {supplierFilterId != null && (
               <div
-                className="flex h-8 max-w-[min(100%,18rem)] items-center gap-1.5 rounded-md border border-input bg-background px-2 text-xs shrink-0"
+                className="flex h-8 max-w-[min(100%,18rem)] shrink-0 items-center gap-1.5 rounded-md border border-input bg-background px-2 text-xs"
                 role="status"
                 aria-label={t("ops.list.purchaseOrders.filterSupplierAria")}
               >
-                <span className="text-muted-foreground whitespace-nowrap shrink-0">{t("doc.columns.supplier")}</span>
-                <span
-                  className="truncate font-medium text-foreground/90 min-w-0"
-                  title={supplierFilterLabel}
-                >
+                <span className="shrink-0 whitespace-nowrap text-muted-foreground">{t("doc.columns.supplier")}</span>
+                <span className="min-w-0 truncate font-medium text-foreground/90" title={supplierFilterLabel}>
                   {supplierFilterLabel}
                 </span>
                 <Button
                   type="button"
                   variant="ghost"
                   size="sm"
-                  className="h-7 px-1.5 text-xs shrink-0 text-muted-foreground hover:text-foreground"
+                  className="h-7 shrink-0 px-1.5 text-xs text-muted-foreground hover:text-foreground"
                   onClick={clearSupplierFilter}
                 >
                   {t("doc.list.clear")}
@@ -652,9 +1053,11 @@ export function PurchaseOrdersListPage() {
               </div>
             )}
             {exportSuccess && (
-              <div className="h-8 w-max flex items-center gap-1.5 rounded-md border border-input bg-background px-2 text-sm shrink-0">
-                <span className="text-muted-foreground text-xs">{t("doc.list.exportCompleted")}</span>
-                <span className="font-medium text-xs truncate max-w-[12rem]" title={exportSuccess.filename}>{exportSuccess.filename}</span>
+              <div className="flex h-8 w-max shrink-0 items-center gap-1.5 rounded-md border border-input bg-background px-2 text-sm">
+                <span className="text-xs text-muted-foreground">{t("doc.list.exportCompleted")}</span>
+                <span className="max-w-[12rem] truncate text-xs font-medium" title={exportSuccess.filename}>
+                  {exportSuccess.filename}
+                </span>
                 <Button
                   type="button"
                   variant="ghost"
@@ -701,13 +1104,19 @@ export function PurchaseOrdersListPage() {
                 </Button>
               </div>
             )}
-            <div className="flex items-stretch rounded-md border border-input shrink-0">
+            <div className="flex shrink-0 items-stretch rounded-md border border-input">
               <Button
                 type="button"
                 variant="outline"
                 size="sm"
-                className="h-[1.625rem] rounded-r-none border-0 border-r border-input !px-1 !py-0 !gap-0.5"
-                onClick={handleExportCurrentView}
+                className="!gap-0.5 h-[1.625rem] rounded-r-none border-0 border-r border-input !px-1 !py-0"
+                onClick={async () => {
+                  try {
+                    await handleExportCurrentView();
+                  } catch (err) {
+                    console.error("[purchase-orders-export] export failed", err);
+                  }
+                }}
               >
                 <FileSpreadsheet className="h-4 w-4 shrink-0" />
                 {t("doc.list.export")}
@@ -730,10 +1139,20 @@ export function PurchaseOrdersListPage() {
                       type="button"
                       disabled={exportSelectedDisabled}
                       className="w-full rounded-sm px-1.5 py-1 text-left text-sm hover:bg-accent disabled:cursor-not-allowed disabled:opacity-50"
-                      title={exportSelectedDisabled ? t("doc.list.selectRowsForExport") : undefined}
-                      onClick={() => {
-                        setExportOpen(false);
-                        if (!exportSelectedDisabled) handleExportSelected();
+                      title={
+                        exportSelectedDisabled
+                          ? t("doc.list.selectRowsForExport")
+                          : t("doc.list.exportSelectedRows")
+                      }
+                      onClick={async () => {
+                        if (exportSelectedDisabled) return;
+                        try {
+                          await handleExportSelectedRows();
+                        } catch (err) {
+                          console.error("[purchase-orders-export] selected export failed", err);
+                        } finally {
+                          setExportOpen(false);
+                        }
                       }}
                     >
                       {t("doc.list.exportSelectedRows")}
@@ -746,77 +1165,40 @@ export function PurchaseOrdersListPage() {
               type="button"
               variant="outline"
               size="sm"
-              className="h-[1.625rem] shrink-0"
+              data-icon="inline-start"
+              className="h-[1.625rem] shrink-0 !gap-0.5"
               onClick={openColumnSettings}
             >
+              <SlidersHorizontal className="h-4 w-4 shrink-0" aria-hidden />
               {t("doc.list.viewSettings")}
             </Button>
+            <Button
+              type="button"
+              variant="default"
+              size="sm"
+              className="list-page__create-btn shrink-0 rounded-md bg-white text-black hover:bg-gray-200"
+              onClick={() => navigate(appendReturnTo("/purchase-orders/new", currentReturnTo))}
+            >
+              <svg
+                className="h-3 w-3"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                aria-hidden="true"
+              >
+                <path d="M12 5v14" />
+                <path d="M5 12h14" />
+              </svg>{" "}
+              {t("doc.list.create")}
+            </Button>
           </div>
-          <Button
-            type="button"
-            variant="default"
-            size="sm"
-            className="list-page__create-btn rounded-md bg-white text-black hover:bg-gray-200"
-            onClick={() => navigate(appendReturnTo("/purchase-orders/new", currentReturnTo))}
-          >
-            <svg className="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M12 5v14" /><path d="M5 12h14" /></svg> {t("doc.list.create")}
-          </Button>
-        </>
+        </div>
       }
     >
-      <AgGridContainer ref={gridContainerRef} themeClass="purchase-orders-grid" gridRef={gridRef}>
-        <AgGridReact<RowData>
-          {...agGridDefaultGridOptions}
-          ref={gridRef}
-          rowData={displayRows}
-          columnDefs={columnDefs}
-            defaultColDef={agGridDefaultColDef}
-            overlayNoRowsTemplate={noRowsOverlayTemplate}
-            onGridReady={(event) => {
-              applyUrlGridSort(event.api, effectiveSortModel);
-            }}
-            onSortChanged={handleSortChanged}
-            rowSelection={{ mode: "multiRow", checkboxes: true, headerCheckbox: true, enableClickSelection: true }}
-            selectionColumnDef={agGridSelectionColumnDef}
-            getRowId={(params) => params.data.id}
-            onRowClicked={(e) => {
-              if (hasMeaningfulTextSelection()) return;
-              if (e.data) navigate(appendReturnTo(`/purchase-orders/${e.data.id}`, currentReturnTo));
-            }}
-            onSelectionChanged={onSelectionChanged}
-          />
-      </AgGridContainer>
-      <AgGridColumnSettingsModal
-        open={columnSettingsOpen}
-        onOpenChange={(nextOpen) => {
-          if (nextOpen) {
-            openColumnSettings();
-            return;
-          }
-          cancelColumnSettingsDraft();
-        }}
-        items={columnSettingsDraftItems}
-        onItemsChange={(nextItems) => setColumnSettingsDraftItems(() => nextItems)}
-        filterRules={columnSettingsDraftDeepFilters}
-        onFilterRulesChange={(nextRules) => setColumnSettingsDraftDeepFilters(() => nextRules)}
-        sortRules={columnSettingsDraftDeepSorts}
-        onSortRulesChange={(nextRules) => setColumnSettingsDraftDeepSorts(() => nextRules)}
-        registry={columnSettingsRegistry}
-        filterConfigs={purchaseOrderColumnFilterConfigs as Record<string, AgGridColumnFilterConfig<unknown>>}
-        personalViews={columnSettingsPersonalViews}
-        activeViewId={columnSettingsActiveViewId}
-        activeViewName={columnSettingsActiveViewName}
-        hasUnsavedChanges={columnSettingsHasUnsavedChanges}
-        onActivateView={activateColumnSettingsPersonalView}
-        onCreateView={createColumnSettingsPersonalViewFromCurrent}
-        onSaveChangesToActiveView={saveColumnSettingsActivePersonalViewFromCurrent}
-        onRenameActiveView={renameColumnSettingsActivePersonalView}
-        onDeleteActiveView={deleteColumnSettingsActivePersonalView}
-        onSetActiveAsDefault={setColumnSettingsActivePersonalViewAsDefault}
-        onApply={handleApplyColumnSettings}
-        onCancel={cancelColumnSettingsDraft}
-        onReset={resetColumnSettingsDraftToDefaults}
-      />
+      {listContent}
     </ListPageLayout>
   );
 }
