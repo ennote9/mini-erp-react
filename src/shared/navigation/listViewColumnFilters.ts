@@ -1,8 +1,8 @@
 import type { SetURLSearchParams } from "react-router-dom";
 
-export type AgGridFilterKind = "text" | "enum" | "number" | "date" | "datetime" | "boolean";
+export type ListViewFilterKind = "text" | "enum" | "number" | "date" | "datetime" | "boolean";
 
-export type AgGridFilterOperator =
+export type ListViewFilterOperator =
   | "contains"
   | "not_contains"
   | "equals"
@@ -28,18 +28,18 @@ export type AgGridFilterOperator =
   | "is_true"
   | "is_false";
 
-export type AgGridColumnFilterClause = {
-  operator: AgGridFilterOperator;
+export type ListViewColumnFilterClause = {
+  operator: ListViewFilterOperator;
   value?: string;
   valueTo?: string;
   values?: string[];
 };
 
-export type AgGridColumnFilterModel = Record<string, AgGridColumnFilterClause>;
+export type ListViewColumnFilterModel = Record<string, ListViewColumnFilterClause>;
 
-export function serializeAgGridColumnFilterClause(
+export function serializeListViewColumnFilterClause(
   colId: string,
-  clause: AgGridColumnFilterClause,
+  clause: ListViewColumnFilterClause,
 ): string {
   const parts = [encodeURIComponent(colId), encodeURIComponent(clause.operator)];
   if (Array.isArray(clause.values) && clause.values.length > 0) {
@@ -62,14 +62,16 @@ function parseValueList(raw: string | undefined): string[] {
     .filter(Boolean);
 }
 
-export function parseAgGridColumnFilterClause(raw: string): { colId: string; clause: AgGridColumnFilterClause } | null {
+export function parseListViewColumnFilterClause(
+  raw: string,
+): { colId: string; clause: ListViewColumnFilterClause } | null {
   const parts = raw.split("~");
   if (parts.length < 2) return null;
   const colId = decodeURIComponent(parts[0] ?? "").trim();
-  const operator = decodeURIComponent(parts[1] ?? "").trim() as AgGridFilterOperator;
+  const operator = decodeURIComponent(parts[1] ?? "").trim() as ListViewFilterOperator;
   if (!colId || !operator) return null;
 
-  const clause: AgGridColumnFilterClause = { operator };
+  const clause: ListViewColumnFilterClause = { operator };
   if (parts.length >= 4) {
     clause.value = decodeURIComponent(parts[2] ?? "");
     clause.valueTo = decodeURIComponent(parts[3] ?? "");
@@ -84,52 +86,52 @@ export function parseAgGridColumnFilterClause(raw: string): { colId: string; cla
   return { colId, clause };
 }
 
-export function readUrlAgGridColumnFilters(
+export function readUrlListViewColumnFilters(
   searchParams: URLSearchParams,
   key = "cf",
-): AgGridColumnFilterModel {
-  const next: AgGridColumnFilterModel = {};
+): ListViewColumnFilterModel {
+  const next: ListViewColumnFilterModel = {};
   for (const raw of searchParams.getAll(key)) {
-    const parsed = parseAgGridColumnFilterClause(raw);
+    const parsed = parseListViewColumnFilterClause(raw);
     if (!parsed) continue;
     next[parsed.colId] = parsed.clause;
   }
   return next;
 }
 
-export function writeUrlAgGridColumnFilters(
-  model: AgGridColumnFilterModel,
+export function writeUrlListViewColumnFilters(
+  model: ListViewColumnFilterModel,
   key = "cf",
 ): [string, string][] {
   return Object.entries(model)
     .sort(([a], [b]) => a.localeCompare(b))
-    .map(([colId, clause]) => [key, serializeAgGridColumnFilterClause(colId, clause)]);
+    .map(([colId, clause]) => [key, serializeListViewColumnFilterClause(colId, clause)]);
 }
 
-export function withUrlAgGridColumnFilters(
+export function withUrlListViewColumnFilters(
   searchParams: URLSearchParams,
-  model: AgGridColumnFilterModel,
+  model: ListViewColumnFilterModel,
   key = "cf",
 ): URLSearchParams {
   const next = new URLSearchParams(searchParams);
   next.delete(key);
-  for (const [paramKey, value] of writeUrlAgGridColumnFilters(model, key)) {
+  for (const [paramKey, value] of writeUrlListViewColumnFilters(model, key)) {
     next.append(paramKey, value);
   }
   return next;
 }
 
-export function replaceUrlAgGridColumnFilters(
+export function replaceUrlListViewColumnFilters(
   searchParams: URLSearchParams,
   setSearchParams: SetURLSearchParams,
-  model: AgGridColumnFilterModel,
+  model: ListViewColumnFilterModel,
   key = "cf",
 ): void {
-  setSearchParams(withUrlAgGridColumnFilters(searchParams, model, key), {
+  setSearchParams(withUrlListViewColumnFilters(searchParams, model, key), {
     replace: true,
   });
 }
 
-export function hasActiveAgGridColumnFilters(model: AgGridColumnFilterModel): boolean {
+export function hasActiveListViewColumnFilters(model: ListViewColumnFilterModel): boolean {
   return Object.keys(model).length > 0;
 }

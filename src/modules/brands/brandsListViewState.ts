@@ -1,12 +1,12 @@
-import type { AgGridFilterOperator } from "@/shared/navigation/agGridColumnFilters";
-import type { AgGridColumnFilterModel } from "@/shared/navigation/agGridColumnFilters";
-import type { UrlGridSort } from "@/shared/navigation/agGridSort";
+import type { ListViewFilterOperator } from "@/shared/navigation/listViewColumnFilters";
+import type { ListViewColumnFilterModel } from "@/shared/navigation/listViewColumnFilters";
+import type { ListViewUrlSort } from "@/shared/navigation/listViewUrlSort";
 import type {
   ListViewDeepFilterRule,
   ListViewDeepSortRule,
   ListViewDefinition,
-} from "@/shared/ui/ag-grid/listViewConfig";
-import type { AgGridPersonalView } from "@/shared/ui/ag-grid/columnSettings";
+} from "@/shared/ui/list-view/listViewConfig";
+import type { ListViewPersonalView } from "@/shared/ui/list-view/listViewColumnSettings";
 
 export type BrandsTableColumnVisibilityState = Record<string, boolean>;
 
@@ -18,7 +18,7 @@ export type BrandsTableSortingRule = {
 
 export type BrandsTableColumnFilterRule = {
   id: string;
-  operator: AgGridFilterOperator;
+  operator: ListViewFilterOperator;
   value?: string;
   valueTo?: string;
   values?: string[];
@@ -66,7 +66,7 @@ export function buildBrandsTableWorkingDefinition(
   };
 }
 
-export function buildBrandsTableSortingState(sortModel: UrlGridSort[]): BrandsTableSortingRule[] {
+export function buildBrandsTableSortingState(sortModel: ListViewUrlSort[]): BrandsTableSortingRule[] {
   return sortModel.map((entry, index) => ({
     id: entry.colId,
     direction: entry.sort,
@@ -75,7 +75,7 @@ export function buildBrandsTableSortingState(sortModel: UrlGridSort[]): BrandsTa
 }
 
 export function buildBrandsTableColumnFilters(
-  columnFilterModel: AgGridColumnFilterModel,
+  columnFilterModel: ListViewColumnFilterModel,
 ): BrandsTableColumnFilterRule[] {
   return Object.entries(columnFilterModel).map(([id, clause]) => ({
     id,
@@ -87,7 +87,7 @@ export function buildBrandsTableColumnFilters(
 }
 
 export function buildBrandsTablePersonalViews(
-  personalViews: AgGridPersonalView[],
+  personalViews: ListViewPersonalView[],
 ): { personalViews: BrandsTablePersonalView[]; defaultViewId: string | null } {
   const mapped = personalViews.map((view) => ({
     id: view.viewId,
@@ -103,9 +103,9 @@ export function buildBrandsTablePersonalViews(
 
 export function buildBrandsTableListViewState(input: {
   definition: ListViewDefinition | null;
-  columnFilterModel: AgGridColumnFilterModel;
-  sortModel: UrlGridSort[];
-  personalViews: AgGridPersonalView[];
+  columnFilterModel: ListViewColumnFilterModel;
+  sortModel: ListViewUrlSort[];
+  personalViews: ListViewPersonalView[];
   activeViewId: string | null;
 }): BrandsTableListViewState {
   const workingDefinition = buildBrandsTableWorkingDefinition(input.definition);

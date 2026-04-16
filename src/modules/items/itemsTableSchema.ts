@@ -3,12 +3,12 @@ import { categoryRepository } from "@/modules/categories/repository";
 import type { TFunction } from "@/shared/i18n";
 import type {
   ListViewFieldDataType,
-} from "@/shared/ui/ag-grid/listViewConfig";
+} from "@/shared/ui/list-view/listViewConfig";
 import type {
   ListViewFieldSourceType,
   ListViewPerformanceCost,
   ListViewRendererType,
-} from "@/shared/ui/ag-grid/listViewConfig/types";
+} from "@/shared/ui/list-view/listViewConfig/types";
 import type { ItemListRow } from "./listViewRowModel";
 
 export type ItemsTableFilterKind = "text" | "number" | "enum" | "boolean" | "none";

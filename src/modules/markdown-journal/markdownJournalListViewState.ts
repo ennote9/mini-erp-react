@@ -1,12 +1,12 @@
-import type { AgGridFilterOperator } from "@/shared/navigation/agGridColumnFilters";
-import type { AgGridColumnFilterModel } from "@/shared/navigation/agGridColumnFilters";
-import type { UrlGridSort } from "@/shared/navigation/agGridSort";
+import type { ListViewFilterOperator } from "@/shared/navigation/listViewColumnFilters";
+import type { ListViewColumnFilterModel } from "@/shared/navigation/listViewColumnFilters";
+import type { ListViewUrlSort } from "@/shared/navigation/listViewUrlSort";
 import type {
   ListViewDeepFilterRule,
   ListViewDeepSortRule,
   ListViewDefinition,
-} from "@/shared/ui/ag-grid/listViewConfig";
-import type { AgGridPersonalView } from "@/shared/ui/ag-grid/columnSettings";
+} from "@/shared/ui/list-view/listViewConfig";
+import type { ListViewPersonalView } from "@/shared/ui/list-view/listViewColumnSettings";
 
 export type MarkdownJournalTableColumnVisibilityState = Record<string, boolean>;
 
@@ -18,7 +18,7 @@ export type MarkdownJournalTableSortingRule = {
 
 export type MarkdownJournalTableColumnFilterRule = {
   id: string;
-  operator: AgGridFilterOperator;
+  operator: ListViewFilterOperator;
   value?: string;
   valueTo?: string;
   values?: string[];
@@ -64,7 +64,7 @@ export function buildMarkdownJournalTableWorkingDefinition(
   };
 }
 
-export function buildMarkdownJournalTableSortingState(sortModel: UrlGridSort[]): MarkdownJournalTableSortingRule[] {
+export function buildMarkdownJournalTableSortingState(sortModel: ListViewUrlSort[]): MarkdownJournalTableSortingRule[] {
   return sortModel.map((entry, index) => ({
     id: entry.colId,
     direction: entry.sort,
@@ -73,7 +73,7 @@ export function buildMarkdownJournalTableSortingState(sortModel: UrlGridSort[]):
 }
 
 export function buildMarkdownJournalTableColumnFilters(
-  columnFilterModel: AgGridColumnFilterModel,
+  columnFilterModel: ListViewColumnFilterModel,
 ): MarkdownJournalTableColumnFilterRule[] {
   return Object.entries(columnFilterModel).map(([id, clause]) => ({
     id,
@@ -85,7 +85,7 @@ export function buildMarkdownJournalTableColumnFilters(
 }
 
 export function buildMarkdownJournalTablePersonalViews(
-  personalViews: AgGridPersonalView[],
+  personalViews: ListViewPersonalView[],
 ): { personalViews: MarkdownJournalTablePersonalView[]; defaultViewId: string | null } {
   const mapped = personalViews.map((view) => ({
     id: view.viewId,
@@ -101,9 +101,9 @@ export function buildMarkdownJournalTablePersonalViews(
 
 export function buildMarkdownJournalTableListViewState(input: {
   definition: ListViewDefinition | null;
-  columnFilterModel: AgGridColumnFilterModel;
-  sortModel: UrlGridSort[];
-  personalViews: AgGridPersonalView[];
+  columnFilterModel: ListViewColumnFilterModel;
+  sortModel: ListViewUrlSort[];
+  personalViews: ListViewPersonalView[];
   activeViewId: string | null;
 }): MarkdownJournalTableListViewState {
   const workingDefinition = buildMarkdownJournalTableWorkingDefinition(input.definition);

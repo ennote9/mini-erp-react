@@ -3,7 +3,7 @@ import { cva, type VariantProps } from "class-variance-authority";
 import { cn } from "@/lib/utils";
 
 /**
- * Compact outline pill for categorical/state values inside AG Grid cells (not a full-cell border).
+ * Compact outline pill for categorical/state values inside table cells (not a full-cell border).
  * Chromatically neutral only (no green/amber/rose cues) — scanning relies on label text, not hue.
  */
 const neutralPill =
@@ -27,17 +27,17 @@ const gridOutlinePillVariants = cva(
   },
 );
 
-export type GridOutlinePillTone = NonNullable<VariantProps<typeof gridOutlinePillVariants>["tone"]>;
+export type OutlinePillTone = NonNullable<VariantProps<typeof gridOutlinePillVariants>["tone"]>;
 
-export type GridOutlinePillBadgeProps = React.HTMLAttributes<HTMLSpanElement> &
+export type OutlinePillBadgeProps = React.HTMLAttributes<HTMLSpanElement> &
   VariantProps<typeof gridOutlinePillVariants>;
 
-export function GridOutlinePillBadge({
+export function OutlinePillBadge({
   className,
   tone,
   children,
   ...props
-}: GridOutlinePillBadgeProps) {
+}: OutlinePillBadgeProps) {
   return (
     <span className={cn(gridOutlinePillVariants({ tone }), "grid-outline-pill", className)} {...props}>
       {children}

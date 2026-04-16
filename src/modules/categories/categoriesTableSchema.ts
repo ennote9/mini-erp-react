@@ -1,10 +1,10 @@
 import type { TFunction } from "@/shared/i18n";
-import type { ListViewFieldDataType } from "@/shared/ui/ag-grid/listViewConfig";
+import type { ListViewFieldDataType } from "@/shared/ui/list-view/listViewConfig";
 import type {
   ListViewFieldSourceType,
   ListViewPerformanceCost,
   ListViewRendererType,
-} from "@/shared/ui/ag-grid/listViewConfig/types";
+} from "@/shared/ui/list-view/listViewConfig/types";
 import type { CategoryListRow } from "./categoryListRowModel";
 
 export type CategoriesTableFilterKind = "text" | "boolean" | "none";

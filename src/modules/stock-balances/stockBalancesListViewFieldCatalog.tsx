@@ -1,11 +1,11 @@
 import type { ListColumnDef } from "@/shared/ui/list-view/listColumnDef";
 import type { TFunction } from "@/shared/i18n";
 import type {
-  AgGridColumnFilterConfig,
-  AgGridColumnFilterOption,
+  ListViewColumnFilterConfig,
+  ListViewColumnFilterOption,
   ListViewFieldRegistryEntry,
-} from "@/shared/ui/ag-grid";
-import { getAgGridRowNumberColDef } from "@/shared/ui/ag-grid/agGridDefaults";
+} from "@/shared/ui/list-view";
+import { getListViewRowNumberColumnDef } from "@/shared/ui/list-view/listViewColumnDefaults";
 import type { StockBalanceCoverageStatus } from "@/shared/stockBalancesOperationalMetrics";
 import { STOCK_STYLE_VALUES, type StockStyle } from "@/shared/inventoryStyle";
 import type { StockBalanceListRow } from "./stockBalanceListRowModel";
@@ -14,7 +14,7 @@ import { buildStockBalancesTableSchema, type StockBalancesTableColumnSchema } fr
 type StockBalancesFieldCatalogEntry = {
   registry: ListViewFieldRegistryEntry;
   colDef: ListColumnDef<StockBalanceListRow>;
-  filterConfig?: AgGridColumnFilterConfig<StockBalanceListRow>;
+  filterConfig?: ListViewColumnFilterConfig<StockBalanceListRow>;
 };
 
 export type BuildStockBalancesListViewCatalogInput = {
@@ -22,8 +22,8 @@ export type BuildStockBalancesListViewCatalogInput = {
   showOperationalGrid: boolean;
   styleLabel: (s: StockStyle) => string;
   coverageLabel: (s: StockBalanceCoverageStatus) => string;
-  warehouseNameEnumOptions: AgGridColumnFilterOption[];
-  coverageEnumOptions: AgGridColumnFilterOption[];
+  warehouseNameEnumOptions: ListViewColumnFilterOption[];
+  coverageEnumOptions: ListViewColumnFilterOption[];
 };
 
 function mapSchemaToRegistry(column: StockBalancesTableColumnSchema): ListViewFieldRegistryEntry {
@@ -48,7 +48,7 @@ function mapSchemaToRegistry(column: StockBalancesTableColumnSchema): ListViewFi
 function mapSchemaToFilterConfig(
   column: StockBalancesTableColumnSchema,
   input: BuildStockBalancesListViewCatalogInput,
-): AgGridColumnFilterConfig<StockBalanceListRow> | undefined {
+): ListViewColumnFilterConfig<StockBalanceListRow> | undefined {
   if (!column.filterable) return undefined;
 
   switch (column.filterKind) {
@@ -93,7 +93,7 @@ function buildColDefFromSchema(
   const { styleLabel } = input;
 
   if (column.id === "lineNo") {
-    return getAgGridRowNumberColDef(input.t);
+    return getListViewRowNumberColumnDef(input.t);
   }
 
   const colDef: ListColumnDef<StockBalanceListRow> = {
@@ -133,12 +133,12 @@ function createStockBalancesFieldCatalog(input: BuildStockBalancesListViewCatalo
 /** Full filter configs including operational fields when workspace hides those columns (URL / deep filters still apply). */
 function buildExtendedFilterConfigs(
   input: BuildStockBalancesListViewCatalogInput,
-): Record<string, AgGridColumnFilterConfig<StockBalanceListRow>> {
+): Record<string, ListViewColumnFilterConfig<StockBalanceListRow>> {
   const entries = createStockBalancesFieldCatalog(input);
   const map = Object.fromEntries(
     entries
       .filter(
-        (entry): entry is StockBalancesFieldCatalogEntry & { filterConfig: AgGridColumnFilterConfig<StockBalanceListRow> } =>
+        (entry): entry is StockBalancesFieldCatalogEntry & { filterConfig: ListViewColumnFilterConfig<StockBalanceListRow> } =>
           Boolean(entry.filterConfig),
       )
       .map((entry) => [entry.registry.fieldKey, entry.filterConfig]),
@@ -158,7 +158,7 @@ function buildExtendedFilterConfigs(
 export function buildStockBalancesListViewCatalog(input: BuildStockBalancesListViewCatalogInput): {
   fieldRegistry: ListViewFieldRegistryEntry[];
   columnDefs: ListColumnDef<StockBalanceListRow>[];
-  filterConfigs: Record<string, AgGridColumnFilterConfig<StockBalanceListRow>>;
+  filterConfigs: Record<string, ListViewColumnFilterConfig<StockBalanceListRow>>;
 } {
   const entries = createStockBalancesFieldCatalog(input);
   const filterConfigs = buildExtendedFilterConfigs(input);

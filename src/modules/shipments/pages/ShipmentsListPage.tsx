@@ -16,14 +16,14 @@ import { carrierRepository } from "@/modules/carriers/repository";
 import { toGeneratedCodeSearchTokens } from "@/shared/generatedVisibleCodes";
 import { ListPageLayout } from "../../../shared/ui/list/ListPageLayout";
 import {
-  applyAgGridColumnFilters,
+  applyListViewColumnFilters,
   applyDeepSortModel,
-  useAgGridColumnSettings,
-  AgGridColumnSettingsModal,
+  useListViewColumnSettings,
+  ListViewColumnSettingsModal,
   hasMeaningfulTextSelection,
-  getAgGridNoRowsOverlayContent,
-  type AgGridColumnFilterConfig,
-} from "../../../shared/ui/ag-grid";
+  getListViewEmptyStateContent,
+  type ListViewColumnFilterConfig,
+} from "../../../shared/ui/list-view";
 import { ListPageSearch } from "../../../shared/ui/list/ListPageSearch";
 import { useListPageSearchHotkey } from "../../../shared/hotkeys";
 import { Button } from "@/components/ui/button";
@@ -38,19 +38,19 @@ import { shipmentsListExcelLabels } from "@/shared/i18n/excelListExportLabels";
 import { buildListViewXlsxBuffer } from "@/shared/export/listViewXlsx";
 import { useAppReadModelRevision } from "@/shared/inventoryMasterPageBlocks/useAppReadModelRevision";
 import { useAppDisplayFormatters } from "@/shared/formatting";
-import { readUrlGridSort, serializeUrlGridSort, type UrlGridSort } from "@/shared/navigation/agGridSort";
+import { readListViewUrlSort, serializeListViewUrlSort, type ListViewUrlSort } from "@/shared/navigation/listViewUrlSort";
 import { appendReturnTo, buildNavigationStateKey, buildReturnToValue, replaceQueryParam } from "@/shared/navigation/returnTo";
 import { useSessionScrollRestore } from "@/shared/navigation/useSessionScrollRestore";
 import {
-  hasActiveAgGridColumnFilters,
-  readUrlAgGridColumnFilters,
-  withUrlAgGridColumnFilters,
-} from "@/shared/navigation/agGridColumnFilters";
+  hasActiveListViewColumnFilters,
+  readUrlListViewColumnFilters,
+  withUrlListViewColumnFilters,
+} from "@/shared/navigation/listViewColumnFilters";
 import {
-  buildUrlGridSortFromDeepSortRules,
+  buildListViewUrlSortFromDeepSortRules,
   pruneDeepSortRulesByHiddenFields,
   type ListViewDeepFilterRule,
-} from "@/shared/ui/ag-grid/listViewConfig";
+} from "@/shared/ui/list-view/listViewConfig";
 import { buildShipmentsListViewCatalog } from "../shipmentsListViewFieldCatalog";
 import { buildShipmentListRows, type ShipmentListRow } from "../shipmentListRowModel";
 import { buildShipmentsTableSchema, type ShipmentsTableColumnSchema } from "../shipmentsTableSchema";
@@ -215,12 +215,12 @@ export function ShipmentsListPage() {
   const [exportSuccess, setExportSuccess] = useState<{ path: string; filename: string } | null>(null);
   const [exportOpen, setExportOpen] = useState(false);
   const [rowSelection, setRowSelection] = useState<RowSelectionState>({});
-  const [pendingSortModel, setPendingSortModel] = useState<UrlGridSort[] | null>(null);
+  const [pendingSortModel, setPendingSortModel] = useState<ListViewUrlSort[] | null>(null);
   const [columnSizing, setColumnSizing] = useState<ColumnSizingState>(() => readPersistedColumnSizing());
   const [headerFilterAnchor, setHeaderFilterAnchor] = useState<HeaderFilterAnchor | null>(null);
   const [pendingHeaderFilterCommit, setPendingHeaderFilterCommit] = useState<PendingHeaderFilterCommit | null>(null);
   const [runtimeSortSerialized, setRuntimeSortSerialized] = useState(() =>
-    serializeUrlGridSort(readUrlGridSort(new URLSearchParams(location.search))),
+    serializeListViewUrlSort(readListViewUrlSort(new URLSearchParams(location.search))),
   );
   const gridContainerRef = useRef<HTMLDivElement | null>(null);
   const listSearchInputRef = useRef<HTMLInputElement>(null);
@@ -241,7 +241,7 @@ export function ShipmentsListPage() {
     [location.pathname, location.search],
   );
   const columnFilterModel = useMemo(
-    () => readUrlAgGridColumnFilters(new URLSearchParams(location.search)),
+    () => readUrlListViewColumnFilters(new URLSearchParams(location.search)),
     [location.search],
   );
 
@@ -315,7 +315,7 @@ export function ShipmentsListPage() {
   const shipmentColumnFilterConfigs = shipmentsListViewCatalog.filterConfigs;
 
   const displayRowsWithQueryFilters = useMemo(
-    () => applyAgGridColumnFilters(filteredRows, columnFilterModel, shipmentColumnFilterConfigs),
+    () => applyListViewColumnFilters(filteredRows, columnFilterModel, shipmentColumnFilterConfigs),
     [filteredRows, columnFilterModel, shipmentColumnFilterConfigs],
   );
 
@@ -323,7 +323,7 @@ export function ShipmentsListPage() {
   const filtersActive =
     warehouseFilterId != null ||
     carrierFilterId != null ||
-    hasActiveAgGridColumnFilters(columnFilterModel);
+    hasActiveListViewColumnFilters(columnFilterModel);
 
   const warehouseFilterLabel = useMemo((): string => {
     if (warehouseFilterId == null) return "";
@@ -377,7 +377,7 @@ export function ShipmentsListPage() {
     renameActivePersonalView: renameColumnSettingsActivePersonalView,
     deleteActivePersonalView: deleteColumnSettingsActivePersonalView,
     setActivePersonalViewAsDefault: setColumnSettingsActivePersonalViewAsDefault,
-  } = useAgGridColumnSettings<ShipmentListRow>({
+  } = useListViewColumnSettings<ShipmentListRow>({
     pageKey: "shipments",
     entityType: "shipments",
     baseColumnDefs,
@@ -387,11 +387,11 @@ export function ShipmentsListPage() {
 
   const effectiveSortModel = useMemo(() => {
     if (pendingSortModel) return pendingSortModel;
-    const urlSort = readUrlGridSort(new URLSearchParams(searchParamsSort ? `sort=${searchParamsSort}` : ""));
+    const urlSort = readListViewUrlSort(new URLSearchParams(searchParamsSort ? `sort=${searchParamsSort}` : ""));
     const runtimeSort =
       runtimeSortSerialized === ""
         ? []
-        : readUrlGridSort(new URLSearchParams(`sort=${runtimeSortSerialized}`));
+        : readListViewUrlSort(new URLSearchParams(`sort=${runtimeSortSerialized}`));
     if (runtimeSort.length > 0 && runtimeSortSerialized !== searchParamsSort) return runtimeSort;
     if (urlSort.length > 0) return urlSort;
     if (runtimeSort.length > 0) return runtimeSort;
@@ -408,7 +408,7 @@ export function ShipmentsListPage() {
   );
 
   const displayRowsWithDeepFilters = useMemo(
-    () => applyAgGridColumnFilters(displayRowsWithQueryFilters, deepFilterModel, shipmentColumnFilterConfigs),
+    () => applyListViewColumnFilters(displayRowsWithQueryFilters, deepFilterModel, shipmentColumnFilterConfigs),
     [displayRowsWithQueryFilters, deepFilterModel, shipmentColumnFilterConfigs],
   );
 
@@ -424,7 +424,7 @@ export function ShipmentsListPage() {
 
   useEffect(() => {
     if (deepSortModel.length === 0) return;
-    const nextSerialized = serializeUrlGridSort(deepSortModel);
+    const nextSerialized = serializeListViewUrlSort(deepSortModel);
     if (nextSerialized === searchParamsSort) return;
     const nextParams = new URLSearchParams(searchParams);
     nextParams.set("sort", nextSerialized);
@@ -434,7 +434,7 @@ export function ShipmentsListPage() {
 
   useEffect(() => {
     if (!pendingSortModel) return;
-    const pendingSerialized = serializeUrlGridSort(pendingSortModel);
+    const pendingSerialized = serializeListViewUrlSort(pendingSortModel);
     if (pendingSerialized === searchParamsSort) {
       setPendingSortModel(null);
     }
@@ -522,8 +522,8 @@ export function ShipmentsListPage() {
       const nextSortModel = nextSorting.map((entry) => ({
         colId: entry.id,
         sort: entry.desc ? "desc" : "asc",
-      })) as UrlGridSort[];
-      const nextValue = serializeUrlGridSort(nextSortModel);
+      })) as ListViewUrlSort[];
+      const nextValue = serializeListViewUrlSort(nextSortModel);
       setPendingSortModel(nextSortModel);
       setRuntimeSortSerialized(nextValue);
       replaceQueryParam(searchParams, setSearchParams, "sort", nextValue);
@@ -547,9 +547,9 @@ export function ShipmentsListPage() {
       columnSettingsDraftDeepSorts,
       hiddenIds,
     );
-    const nextDeepSortModel = buildUrlGridSortFromDeepSortRules(prunedDraftDeepSorts);
-    const nextDeepSortSerialized = serializeUrlGridSort(nextDeepSortModel);
-    const currentDeepSortSerialized = serializeUrlGridSort(deepSortModel);
+    const nextDeepSortModel = buildListViewUrlSortFromDeepSortRules(prunedDraftDeepSorts);
+    const nextDeepSortSerialized = serializeListViewUrlSort(nextDeepSortModel);
+    const currentDeepSortSerialized = serializeListViewUrlSort(deepSortModel);
     const currentRuntimeSortSerialized = searchParamsSort;
     const deepSortsChanged = nextDeepSortSerialized !== currentDeepSortSerialized;
     const shouldSyncToDeepSort =
@@ -573,10 +573,10 @@ export function ShipmentsListPage() {
     if (hiddenIds.length > 0) {
       const nextColumnFilterModel = { ...columnFilterModel };
       for (const colId of hiddenIds) delete nextColumnFilterModel[colId];
-      nextParams = withUrlAgGridColumnFilters(nextParams, nextColumnFilterModel);
+      nextParams = withUrlListViewColumnFilters(nextParams, nextColumnFilterModel);
     }
 
-    const nextSortSerialized = serializeUrlGridSort(nextSortModel);
+    const nextSortSerialized = serializeListViewUrlSort(nextSortModel);
     if (nextSortSerialized === "") nextParams.delete("sort");
     else nextParams.set("sort", nextSortSerialized);
 
@@ -839,7 +839,7 @@ export function ShipmentsListPage() {
 
   const noRowsOverlay = useMemo(
     () =>
-      getAgGridNoRowsOverlayContent(
+      getListViewEmptyStateContent(
         {
           baseRowCount: listRows.length,
           visibleRowCount: displayRows.length,
@@ -881,7 +881,7 @@ export function ShipmentsListPage() {
           open={headerFilterAnchor != null}
           anchorRect={headerFilterAnchor}
           field={activeHeaderFilterRegistryField}
-          filterConfig={activeHeaderFilterConfig as AgGridColumnFilterConfig<unknown> | undefined}
+          filterConfig={activeHeaderFilterConfig as ListViewColumnFilterConfig<unknown> | undefined}
           rule={activeHeaderFilterRule}
           onOpenChange={(open) => {
             if (!open) setHeaderFilterAnchor(null);
@@ -891,7 +891,7 @@ export function ShipmentsListPage() {
         />
       </div>
 
-      <AgGridColumnSettingsModal
+      <ListViewColumnSettingsModal
         open={columnSettingsOpen}
         onOpenChange={(nextOpen) => {
           if (nextOpen) {
@@ -907,7 +907,7 @@ export function ShipmentsListPage() {
         sortRules={columnSettingsDraftDeepSorts}
         onSortRulesChange={(nextRules) => setColumnSettingsDraftDeepSorts(() => nextRules)}
         registry={columnSettingsRegistry}
-        filterConfigs={shipmentColumnFilterConfigs as Record<string, AgGridColumnFilterConfig<unknown>>}
+        filterConfigs={shipmentColumnFilterConfigs as Record<string, ListViewColumnFilterConfig<unknown>>}
         includeHiddenInFilterSort
         personalViews={columnSettingsPersonalViews}
         activeViewId={columnSettingsActiveViewId}

@@ -1,27 +1,27 @@
 import type {
-  AgGridColumnFilterClause,
-  AgGridColumnFilterModel,
-  AgGridFilterKind,
-  AgGridFilterOperator,
-} from "@/shared/navigation/agGridColumnFilters";
+  ListViewColumnFilterClause,
+  ListViewColumnFilterModel,
+  ListViewFilterKind,
+  ListViewFilterOperator,
+} from "@/shared/navigation/listViewColumnFilters";
 
 type FilterPrimitive = string | number | boolean | null | undefined;
 
-export type AgGridColumnFilterOption = {
+export type ListViewColumnFilterOption = {
   value: string;
   label: string;
 };
 
-export type AgGridColumnFilterConfig<T> = {
-  kind: AgGridFilterKind;
+export type ListViewColumnFilterConfig<T> = {
+  kind: ListViewFilterKind;
   getValue?: (row: T) => FilterPrimitive | FilterPrimitive[];
-  operators?: AgGridFilterOperator[];
-  options?: AgGridColumnFilterOption[];
+  operators?: ListViewFilterOperator[];
+  options?: ListViewColumnFilterOption[];
 };
 
-const FILTERABLE_KINDS = new Set<AgGridFilterKind>(["text", "enum", "number", "date", "datetime", "boolean"]);
+const FILTERABLE_KINDS = new Set<ListViewFilterKind>(["text", "enum", "number", "date", "datetime", "boolean"]);
 
-export function defaultOperatorsForKind(kind: AgGridFilterKind): AgGridFilterOperator[] {
+export function defaultOperatorsForKind(kind: ListViewFilterKind): ListViewFilterOperator[] {
   switch (kind) {
     case "text":
       return [
@@ -60,7 +60,7 @@ export function defaultOperatorsForKind(kind: AgGridFilterKind): AgGridFilterOpe
   }
 }
 
-function isNoValueOperator(operator: AgGridFilterOperator): boolean {
+function isNoValueOperator(operator: ListViewFilterOperator): boolean {
   return (
     operator === "is_empty" ||
     operator === "is_not_empty" ||
@@ -69,11 +69,11 @@ function isNoValueOperator(operator: AgGridFilterOperator): boolean {
   );
 }
 
-function isMultiValueOperator(operator: AgGridFilterOperator): boolean {
+function isMultiValueOperator(operator: ListViewFilterOperator): boolean {
   return operator === "in" || operator === "not_in";
 }
 
-function isRangeOperator(operator: AgGridFilterOperator): boolean {
+function isRangeOperator(operator: ListViewFilterOperator): boolean {
   return operator === "between" || operator === "not_between";
 }
 
@@ -117,7 +117,7 @@ function isEmptyCandidate(candidate: string): boolean {
   return candidate.trim() === "";
 }
 
-function evaluateText(values: string[], clause: AgGridColumnFilterClause): boolean {
+function evaluateText(values: string[], clause: ListViewColumnFilterClause): boolean {
   const normalizedValues = values.map((value) => value.toLowerCase());
   const rawValue = (clause.value ?? "").trim().toLowerCase();
   const rawValues = (clause.values ?? []).map((value) => value.trim().toLowerCase()).filter(Boolean);
@@ -148,11 +148,11 @@ function evaluateText(values: string[], clause: AgGridColumnFilterClause): boole
   }
 }
 
-function evaluateEnum(values: string[], clause: AgGridColumnFilterClause): boolean {
+function evaluateEnum(values: string[], clause: ListViewColumnFilterClause): boolean {
   return evaluateText(values, clause);
 }
 
-function evaluateNumber(value: FilterPrimitive, clause: AgGridColumnFilterClause): boolean {
+function evaluateNumber(value: FilterPrimitive, clause: ListViewColumnFilterClause): boolean {
   const candidate = parseNumberValue(value);
   const left = parseNumberValue(clause.value ?? "");
   const right = parseNumberValue(clause.valueTo ?? "");
@@ -186,7 +186,7 @@ function evaluateNumber(value: FilterPrimitive, clause: AgGridColumnFilterClause
 function evaluateDateLike(
   kind: "date" | "datetime",
   value: FilterPrimitive,
-  clause: AgGridColumnFilterClause,
+  clause: ListViewColumnFilterClause,
 ): boolean {
   const parser = kind === "date" ? parseDateValue : parseDateTimeValue;
   const candidate = parser(value);
@@ -219,7 +219,7 @@ function evaluateDateLike(
   }
 }
 
-function evaluateBoolean(value: FilterPrimitive, clause: AgGridColumnFilterClause): boolean {
+function evaluateBoolean(value: FilterPrimitive, clause: ListViewColumnFilterClause): boolean {
   const candidate =
     typeof value === "boolean" ? value : normalizeText(value) === "" ? null : normalizeText(value).toLowerCase() === "true";
   switch (clause.operator) {
@@ -237,9 +237,9 @@ function evaluateBoolean(value: FilterPrimitive, clause: AgGridColumnFilterClaus
 }
 
 function isValidClause<T>(
-  clause: AgGridColumnFilterClause | null | undefined,
-  config?: AgGridColumnFilterConfig<T>,
-): clause is AgGridColumnFilterClause {
+  clause: ListViewColumnFilterClause | null | undefined,
+  config?: ListViewColumnFilterConfig<T>,
+): clause is ListViewColumnFilterClause {
   if (!clause || !config || !FILTERABLE_KINDS.has(config.kind)) return false;
   const operators = config.operators ?? defaultOperatorsForKind(config.kind);
   if (!operators.includes(clause.operator)) return false;
@@ -256,8 +256,8 @@ function isValidClause<T>(
 function evaluateClause<T>(
   row: T,
   colId: string,
-  clause: AgGridColumnFilterClause,
-  config: AgGridColumnFilterConfig<T>,
+  clause: ListViewColumnFilterClause,
+  config: ListViewColumnFilterConfig<T>,
 ): boolean {
   const value: FilterPrimitive | FilterPrimitive[] = config.getValue
     ? config.getValue(row)
@@ -280,10 +280,10 @@ function evaluateClause<T>(
   }
 }
 
-export function applyAgGridColumnFilters<T>(
+export function applyListViewColumnFilters<T>(
   rows: T[],
-  model: AgGridColumnFilterModel,
-  configs: Record<string, AgGridColumnFilterConfig<T>>,
+  model: ListViewColumnFilterModel,
+  configs: Record<string, ListViewColumnFilterConfig<T>>,
 ): T[] {
   const activeEntries = Object.entries(model).filter(([colId, clause]) => isValidClause(clause, configs[colId]));
   if (activeEntries.length === 0) return rows;
@@ -292,12 +292,12 @@ export function applyAgGridColumnFilters<T>(
   );
 }
 
-export function applyAgGridColumnFiltersCombined<T>(
+export function applyListViewColumnFiltersCombined<T>(
   rows: T[],
-  models: AgGridColumnFilterModel[],
-  configs: Record<string, AgGridColumnFilterConfig<T>>,
+  models: ListViewColumnFilterModel[],
+  configs: Record<string, ListViewColumnFilterConfig<T>>,
 ): T[] {
-  const activeEntries: Array<{ colId: string; clause: AgGridColumnFilterClause }> = [];
+  const activeEntries: Array<{ colId: string; clause: ListViewColumnFilterClause }> = [];
   for (const model of models) {
     for (const [colId, clause] of Object.entries(model)) {
       if (!isValidClause(clause, configs[colId])) continue;

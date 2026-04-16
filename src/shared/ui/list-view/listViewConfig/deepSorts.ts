@@ -1,4 +1,4 @@
-import type { UrlGridSort } from "@/shared/navigation/agGridSort";
+import type { ListViewUrlSort } from "@/shared/navigation/listViewUrlSort";
 import type { ListViewDeepSortRule, ListViewFieldRegistryEntry } from "./types";
 
 function normalizeDirection(value: unknown): "asc" | "desc" | null {
@@ -40,7 +40,7 @@ export function normalizeDeepSortRules(input: {
     .map((rule, index) => ({ ...rule, priority: index }));
 }
 
-export function buildUrlGridSortFromDeepSortRules(rules: ListViewDeepSortRule[]): UrlGridSort[] {
+export function buildListViewUrlSortFromDeepSortRules(rules: ListViewDeepSortRule[]): ListViewUrlSort[] {
   return [...rules]
     .filter((rule) => rule.enabled)
     .sort((a, b) => a.priority - b.priority)
@@ -103,7 +103,7 @@ function compareUnknownValues(left: unknown, right: unknown): number {
 
 export function applyDeepSortModel<T>(input: {
   rows: T[];
-  sortModel: UrlGridSort[];
+  sortModel: ListViewUrlSort[];
   getFieldValue: (row: T, fieldKey: string) => unknown;
 }): T[] {
   const { rows, sortModel, getFieldValue } = input;

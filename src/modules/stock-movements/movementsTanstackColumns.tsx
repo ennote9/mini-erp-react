@@ -1,8 +1,8 @@
 import { Link } from "react-router-dom";
 import { createColumnHelper, type ColumnDef } from "@tanstack/react-table";
 import type { TFunction } from "@/shared/i18n";
-import { movementTypeToPillTone } from "@/shared/ui/ag-grid/gridOutlinePillMapping";
-import { GridOutlinePillBadge } from "@/shared/ui/ag-grid/GridOutlinePillBadge";
+import { movementTypeToPillTone } from "@/shared/ui/list-view/outlinePillMapping";
+import { OutlinePillBadge } from "@/shared/ui/list-view/OutlinePillBadge";
 import type { StockMovementListRow } from "./movementListRowModel";
 import type { MovementsTableColumnSchema } from "./movementsTableSchema";
 
@@ -126,9 +126,9 @@ export function buildMovementsTanstackColumns(
           const translated = t(key);
           const label = translated === raw ? raw : translated;
           return (
-            <GridOutlinePillBadge tone={movementTypeToPillTone(raw)} className="max-w-full">
+            <OutlinePillBadge tone={movementTypeToPillTone(raw)} className="max-w-full">
               {label}
-            </GridOutlinePillBadge>
+            </OutlinePillBadge>
           );
         },
         enableSorting: column.sortable,

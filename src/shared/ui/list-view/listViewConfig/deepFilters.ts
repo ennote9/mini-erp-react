@@ -1,11 +1,11 @@
-import type { AgGridColumnFilterClause, AgGridColumnFilterModel, AgGridFilterOperator } from "@/shared/navigation/agGridColumnFilters";
+import type { ListViewColumnFilterClause, ListViewColumnFilterModel, ListViewFilterOperator } from "@/shared/navigation/listViewColumnFilters";
 import type { ListViewDeepFilterRule, ListViewFieldDataType, ListViewFieldRegistryEntry } from "./types";
 
-const EMPTY_OPERATORS = new Set<AgGridFilterOperator>(["is_empty", "is_not_empty", "is_true", "is_false"]);
-const RANGE_OPERATORS = new Set<AgGridFilterOperator>(["between", "not_between"]);
-const MULTI_OPERATORS = new Set<AgGridFilterOperator>(["in", "not_in"]);
+const EMPTY_OPERATORS = new Set<ListViewFilterOperator>(["is_empty", "is_not_empty", "is_true", "is_false"]);
+const RANGE_OPERATORS = new Set<ListViewFilterOperator>(["between", "not_between"]);
+const MULTI_OPERATORS = new Set<ListViewFilterOperator>(["in", "not_in"]);
 
-const COMPATIBILITY: Record<ListViewFieldDataType, AgGridFilterOperator[]> = {
+const COMPATIBILITY: Record<ListViewFieldDataType, ListViewFilterOperator[]> = {
   string: ["contains", "not_contains", "equals", "not_equals", "starts_with", "ends_with", "in", "not_in", "is_empty", "is_not_empty"],
   identifier: ["contains", "not_contains", "equals", "not_equals", "starts_with", "ends_with", "in", "not_in", "is_empty", "is_not_empty"],
   reference: ["contains", "not_contains", "equals", "not_equals", "starts_with", "ends_with", "in", "not_in", "is_empty", "is_not_empty"],
@@ -17,7 +17,7 @@ const COMPATIBILITY: Record<ListViewFieldDataType, AgGridFilterOperator[]> = {
   enum: ["equals", "not_equals", "in", "not_in", "is_empty", "is_not_empty"],
 };
 
-export function getSupportedOperatorsByFieldType(dataType: ListViewFieldDataType): AgGridFilterOperator[] {
+export function getSupportedOperatorsByFieldType(dataType: ListViewFieldDataType): ListViewFilterOperator[] {
   return COMPATIBILITY[dataType] ?? [];
 }
 
@@ -78,12 +78,12 @@ export function normalizeDeepFilterRules(input: {
   return normalized.sort((a, b) => a.priority - b.priority).map((rule, index) => ({ ...rule, priority: index }));
 }
 
-export function buildAgGridModelFromDeepFilterRules(rules: ListViewDeepFilterRule[]): AgGridColumnFilterModel {
-  const model: AgGridColumnFilterModel = {};
+export function buildListViewColumnFilterModelFromDeepRules(rules: ListViewDeepFilterRule[]): ListViewColumnFilterModel {
+  const model: ListViewColumnFilterModel = {};
   const sorted = [...rules].filter((rule) => rule.enabled).sort((a, b) => a.priority - b.priority);
   for (const rule of sorted) {
     if (!isRuleValueValid(rule)) continue;
-    const clause: AgGridColumnFilterClause = { operator: rule.operator };
+    const clause: ListViewColumnFilterClause = { operator: rule.operator };
     if (rule.value !== undefined) clause.value = rule.value;
     if (rule.valueTo !== undefined) clause.valueTo = rule.valueTo;
     if (rule.values !== undefined) clause.values = rule.values;

@@ -1,8 +1,8 @@
 import { createColumnHelper, type ColumnDef } from "@tanstack/react-table";
 import type { TFunction } from "@/shared/i18n";
 import type { StockBalanceCoverageStatus } from "@/shared/stockBalancesOperationalMetrics";
-import { stockCoverageToPillTone } from "@/shared/ui/ag-grid/gridOutlinePillMapping";
-import { GridOutlinePillBadge } from "@/shared/ui/ag-grid/GridOutlinePillBadge";
+import { stockCoverageToPillTone } from "@/shared/ui/list-view/outlinePillMapping";
+import { OutlinePillBadge } from "@/shared/ui/list-view/OutlinePillBadge";
 import type { StockStyle } from "@/shared/inventoryStyle";
 import type { StockBalanceListRow } from "./stockBalanceListRowModel";
 import type { StockBalancesTableColumnSchema } from "./stockBalancesTableSchema";
@@ -108,9 +108,9 @@ export function buildStockBalancesTanstackColumns(
           const raw = ctx.getValue() as StockBalanceCoverageStatus | undefined;
           if (raw == null) return <span className="text-muted-foreground">—</span>;
           return (
-            <GridOutlinePillBadge tone={stockCoverageToPillTone(raw)} className="max-w-full">
+            <OutlinePillBadge tone={stockCoverageToPillTone(raw)} className="max-w-full">
               {coverageLabel(raw)}
-            </GridOutlinePillBadge>
+            </OutlinePillBadge>
           );
         },
         enableSorting: column.sortable,

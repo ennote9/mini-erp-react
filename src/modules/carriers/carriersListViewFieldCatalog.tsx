@@ -1,11 +1,11 @@
 import type { ListColumnDef } from "@/shared/ui/list-view/listColumnDef";
 import type { TFunction } from "@/shared/i18n";
 import type {
-  AgGridColumnFilterConfig,
-  AgGridColumnFilterOption,
+  ListViewColumnFilterConfig,
+  ListViewColumnFilterOption,
   ListViewFieldRegistryEntry,
-} from "@/shared/ui/ag-grid";
-import { getAgGridRowNumberColDef } from "@/shared/ui/ag-grid/agGridDefaults";
+} from "@/shared/ui/list-view";
+import { getListViewRowNumberColumnDef } from "@/shared/ui/list-view/listViewColumnDefaults";
 import type { CarrierListRow } from "./carrierListRowModel";
 import {
   buildCarriersTableSchema,
@@ -16,14 +16,14 @@ import { translateCarrierType } from "./carrierLabels";
 type CarrierFieldCatalogEntry = {
   registry: ListViewFieldRegistryEntry;
   colDef: ListColumnDef<CarrierListRow>;
-  filterConfig?: AgGridColumnFilterConfig<CarrierListRow>;
+  filterConfig?: ListViewColumnFilterConfig<CarrierListRow>;
 };
 
 type BuildCarriersFieldCatalogInput = {
   t: TFunction;
   formatMoney: (value: number, fractionDigits?: number, currencyCode?: string) => string;
   /** Translated carrier type labels — matches legacy AG Grid enum filter (distinct, sorted). */
-  carrierTypeEnumOptions: AgGridColumnFilterOption[];
+  carrierTypeEnumOptions: ListViewColumnFilterOption[];
 };
 
 function mapSchemaToRegistry(column: CarriersTableColumnSchema): ListViewFieldRegistryEntry {
@@ -48,7 +48,7 @@ function mapSchemaToRegistry(column: CarriersTableColumnSchema): ListViewFieldRe
 function mapSchemaToFilterConfig(
   column: CarriersTableColumnSchema,
   input: BuildCarriersFieldCatalogInput,
-): AgGridColumnFilterConfig<CarrierListRow> | undefined {
+): ListViewColumnFilterConfig<CarrierListRow> | undefined {
   if (!column.filterable) return undefined;
 
   switch (column.filterKind) {
@@ -81,7 +81,7 @@ function buildColDefFromSchema(
   const emDash = t("domain.audit.summary.emDash");
 
   if (column.id === "lineNo") {
-    return getAgGridRowNumberColDef(t);
+    return getListViewRowNumberColumnDef(t);
   }
 
   const colDef: ListColumnDef<CarrierListRow> = {
@@ -132,13 +132,13 @@ function createCarriersFieldCatalog(input: BuildCarriersFieldCatalogInput): Carr
 export function buildCarriersListViewCatalog(input: BuildCarriersFieldCatalogInput): {
   fieldRegistry: ListViewFieldRegistryEntry[];
   columnDefs: ListColumnDef<CarrierListRow>[];
-  filterConfigs: Record<string, AgGridColumnFilterConfig<CarrierListRow>>;
+  filterConfigs: Record<string, ListViewColumnFilterConfig<CarrierListRow>>;
 } {
   const entries = createCarriersFieldCatalog(input);
   const filterConfigs = Object.fromEntries(
     entries
       .filter(
-        (entry): entry is CarrierFieldCatalogEntry & { filterConfig: AgGridColumnFilterConfig<CarrierListRow> } =>
+        (entry): entry is CarrierFieldCatalogEntry & { filterConfig: ListViewColumnFilterConfig<CarrierListRow> } =>
           Boolean(entry.filterConfig),
       )
       .map((entry) => [entry.registry.fieldKey, entry.filterConfig]),

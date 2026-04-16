@@ -1,12 +1,12 @@
-import type { AgGridFilterOperator } from "@/shared/navigation/agGridColumnFilters";
-import type { AgGridColumnFilterModel } from "@/shared/navigation/agGridColumnFilters";
-import type { UrlGridSort } from "@/shared/navigation/agGridSort";
+import type { ListViewFilterOperator } from "@/shared/navigation/listViewColumnFilters";
+import type { ListViewColumnFilterModel } from "@/shared/navigation/listViewColumnFilters";
+import type { ListViewUrlSort } from "@/shared/navigation/listViewUrlSort";
 import type {
   ListViewDeepFilterRule,
   ListViewDeepSortRule,
   ListViewDefinition,
-} from "@/shared/ui/ag-grid/listViewConfig";
-import type { AgGridPersonalView } from "@/shared/ui/ag-grid/columnSettings";
+} from "@/shared/ui/list-view/listViewConfig";
+import type { ListViewPersonalView } from "@/shared/ui/list-view/listViewColumnSettings";
 
 export type SalesOrdersTableColumnVisibilityState = Record<string, boolean>;
 
@@ -18,7 +18,7 @@ export type SalesOrdersTableSortingRule = {
 
 export type SalesOrdersTableColumnFilterRule = {
   id: string;
-  operator: AgGridFilterOperator;
+  operator: ListViewFilterOperator;
   value?: string;
   valueTo?: string;
   values?: string[];
@@ -66,7 +66,7 @@ export function buildSalesOrdersTableWorkingDefinition(
   };
 }
 
-export function buildSalesOrdersTableSortingState(sortModel: UrlGridSort[]): SalesOrdersTableSortingRule[] {
+export function buildSalesOrdersTableSortingState(sortModel: ListViewUrlSort[]): SalesOrdersTableSortingRule[] {
   return sortModel.map((entry, index) => ({
     id: entry.colId,
     direction: entry.sort,
@@ -75,7 +75,7 @@ export function buildSalesOrdersTableSortingState(sortModel: UrlGridSort[]): Sal
 }
 
 export function buildSalesOrdersTableColumnFilters(
-  columnFilterModel: AgGridColumnFilterModel,
+  columnFilterModel: ListViewColumnFilterModel,
 ): SalesOrdersTableColumnFilterRule[] {
   return Object.entries(columnFilterModel).map(([id, clause]) => ({
     id,
@@ -87,7 +87,7 @@ export function buildSalesOrdersTableColumnFilters(
 }
 
 export function buildSalesOrdersTablePersonalViews(
-  personalViews: AgGridPersonalView[],
+  personalViews: ListViewPersonalView[],
 ): { personalViews: SalesOrdersTablePersonalView[]; defaultViewId: string | null } {
   const mapped = personalViews.map((view) => ({
     id: view.viewId,
@@ -103,9 +103,9 @@ export function buildSalesOrdersTablePersonalViews(
 
 export function buildSalesOrdersTableListViewState(input: {
   definition: ListViewDefinition | null;
-  columnFilterModel: AgGridColumnFilterModel;
-  sortModel: UrlGridSort[];
-  personalViews: AgGridPersonalView[];
+  columnFilterModel: ListViewColumnFilterModel;
+  sortModel: ListViewUrlSort[];
+  personalViews: ListViewPersonalView[];
   activeViewId: string | null;
 }): SalesOrdersTableListViewState {
   const workingDefinition = buildSalesOrdersTableWorkingDefinition(input.definition);

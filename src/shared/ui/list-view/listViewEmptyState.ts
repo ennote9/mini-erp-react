@@ -1,13 +1,13 @@
 type TranslateFn = (key: string) => string;
 
-export type AgGridNoRowsOverlayInput = {
+export type ListViewEmptyStateInput = {
   baseRowCount: number;
   visibleRowCount: number;
   searchActive: boolean;
   filtersActive: boolean;
 };
 
-export type AgGridNoRowsOverlayContent = {
+export type ListViewEmptyStateContent = {
   title: string;
   hint: string;
 };
@@ -29,10 +29,10 @@ function escapeHtml(value: string): string {
     .replace(/'/g, "&#39;");
 }
 
-export function getAgGridNoRowsOverlayContent(
-  input: AgGridNoRowsOverlayInput,
+export function getListViewEmptyStateContent(
+  input: ListViewEmptyStateInput,
   t: TranslateFn,
-): AgGridNoRowsOverlayContent | null {
+): ListViewEmptyStateContent | null {
   if (input.visibleRowCount > 0) return null;
 
   if (input.baseRowCount === 0 && !input.searchActive && !input.filtersActive) {
@@ -69,9 +69,10 @@ export function getAgGridNoRowsOverlayContent(
   };
 }
 
-export function buildAgGridNoRowsOverlayTemplate(content: AgGridNoRowsOverlayContent | null): string | undefined {
+export function buildListViewEmptyStateHtmlTemplate(content: ListViewEmptyStateContent | null): string | undefined {
   if (!content) return undefined;
   const title = escapeHtml(content.title);
-  const hint = content.hint.trim() === "" ? "" : `<div class="ag-overlay-no-rows-center__hint">${escapeHtml(content.hint)}</div>`;
-  return `<div class="ag-overlay-no-rows-center"><div class="ag-overlay-no-rows-center__title">${title}</div>${hint}</div>`;
+  const hint =
+    content.hint.trim() === "" ? "" : `<div class="list-view-empty__hint">${escapeHtml(content.hint)}</div>`;
+  return `<div class="list-view-empty"><div class="list-view-empty__title">${title}</div>${hint}</div>`;
 }

@@ -1,7 +1,7 @@
 import type { ListColumnDef } from "@/shared/ui/list-view/listColumnDef";
 import type { TFunction } from "@/shared/i18n";
-import type { AgGridColumnFilterConfig, ListViewFieldRegistryEntry } from "@/shared/ui/ag-grid";
-import { getAgGridRowNumberColDef } from "@/shared/ui/ag-grid/agGridDefaults";
+import type { ListViewColumnFilterConfig, ListViewFieldRegistryEntry } from "@/shared/ui/list-view";
+import { getListViewRowNumberColumnDef } from "@/shared/ui/list-view/listViewColumnDefaults";
 import type { ItemListRow } from "./listViewRowModel";
 import {
   buildItemsTableSchema,
@@ -12,7 +12,7 @@ import {
 type ItemFieldCatalogEntry = {
   registry: ListViewFieldRegistryEntry;
   colDef: ListColumnDef<ItemListRow>;
-  filterConfig?: AgGridColumnFilterConfig<ItemListRow>;
+  filterConfig?: ListViewColumnFilterConfig<ItemListRow>;
 };
 
 type BuildItemsFieldCatalogInput = {
@@ -43,7 +43,7 @@ function mapSchemaOptions(options: ItemsTableOption[] | undefined) {
   return (options ?? []).map((option) => ({ value: option.value, label: option.label }));
 }
 
-function mapSchemaToFilterConfig(column: ItemsTableColumnSchema): AgGridColumnFilterConfig<ItemListRow> | undefined {
+function mapSchemaToFilterConfig(column: ItemsTableColumnSchema): ListViewColumnFilterConfig<ItemListRow> | undefined {
   if (!column.filterable) return undefined;
 
   switch (column.filterKind) {
@@ -70,7 +70,7 @@ function buildColDefFromSchema(
 ): ListColumnDef<ItemListRow> {
   const { t, formatMoney } = input;
   if (column.id === "lineNo") {
-    return getAgGridRowNumberColDef(t);
+    return getListViewRowNumberColumnDef(t);
   }
 
   const colDef: ListColumnDef<ItemListRow> = {
@@ -118,12 +118,12 @@ function createItemsFieldCatalog(input: BuildItemsFieldCatalogInput): ItemFieldC
 export function buildItemsListViewCatalog(input: BuildItemsFieldCatalogInput): {
   fieldRegistry: ListViewFieldRegistryEntry[];
   columnDefs: ListColumnDef<ItemListRow>[];
-  filterConfigs: Record<string, AgGridColumnFilterConfig<ItemListRow>>;
+  filterConfigs: Record<string, ListViewColumnFilterConfig<ItemListRow>>;
 } {
   const entries = createItemsFieldCatalog(input);
   const filterConfigs = Object.fromEntries(
     entries
-      .filter((entry): entry is ItemFieldCatalogEntry & { filterConfig: AgGridColumnFilterConfig<ItemListRow> } => Boolean(entry.filterConfig))
+      .filter((entry): entry is ItemFieldCatalogEntry & { filterConfig: ListViewColumnFilterConfig<ItemListRow> } => Boolean(entry.filterConfig))
       .map((entry) => [entry.registry.fieldKey, entry.filterConfig]),
   );
 

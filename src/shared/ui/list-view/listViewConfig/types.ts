@@ -1,4 +1,4 @@
-import type { AgGridFilterOperator } from "@/shared/navigation/agGridColumnFilters";
+import type { ListViewFilterOperator } from "@/shared/navigation/listViewColumnFilters";
 
 export type ListViewEntityType =
   | "items"
@@ -60,7 +60,7 @@ export type ListViewColumnState = {
 
 export type ListViewDeepFilterRule = {
   fieldKey: string;
-  operator: AgGridFilterOperator;
+  operator: ListViewFilterOperator;
   value?: string;
   valueTo?: string;
   values?: string[];

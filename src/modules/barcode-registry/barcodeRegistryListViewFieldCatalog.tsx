@@ -2,11 +2,11 @@ import type { ListColumnDef } from "@/shared/ui/list-view/listColumnDef";
 import type { TFunction } from "@/shared/i18n";
 import type { ItemBarcodeSymbology } from "@/modules/items";
 import type {
-  AgGridColumnFilterConfig,
-  AgGridColumnFilterOption,
+  ListViewColumnFilterConfig,
+  ListViewColumnFilterOption,
   ListViewFieldRegistryEntry,
-} from "@/shared/ui/ag-grid";
-import { getAgGridRowNumberColDef } from "@/shared/ui/ag-grid/agGridDefaults";
+} from "@/shared/ui/list-view";
+import { getListViewRowNumberColumnDef } from "@/shared/ui/list-view/listViewColumnDefaults";
 import type {
   BarcodeRegistryEntryType,
   BarcodeRegistryRow,
@@ -20,7 +20,7 @@ import {
 type BarcodeRegistryFieldCatalogEntry = {
   registry: ListViewFieldRegistryEntry;
   colDef: ListColumnDef<BarcodeRegistryRow>;
-  filterConfig?: AgGridColumnFilterConfig<BarcodeRegistryRow>;
+  filterConfig?: ListViewColumnFilterConfig<BarcodeRegistryRow>;
 };
 
 export type BuildBarcodeRegistryFieldCatalogInput = {
@@ -29,10 +29,10 @@ export type BuildBarcodeRegistryFieldCatalogInput = {
   sourceLabel: (value: BarcodeRegistrySource) => string;
   symbologyLabel: (value?: ItemBarcodeSymbology) => string;
   markdownStatusLabel: (value?: string) => string;
-  entryTypeEnumOptions: AgGridColumnFilterOption[];
-  sourceEnumOptions: AgGridColumnFilterOption[];
-  symbologyEnumOptions: AgGridColumnFilterOption[];
-  markdownStatusEnumOptions: AgGridColumnFilterOption[];
+  entryTypeEnumOptions: ListViewColumnFilterOption[];
+  sourceEnumOptions: ListViewColumnFilterOption[];
+  symbologyEnumOptions: ListViewColumnFilterOption[];
+  markdownStatusEnumOptions: ListViewColumnFilterOption[];
 };
 
 function mapSchemaToRegistry(column: BarcodeRegistryTableColumnSchema): ListViewFieldRegistryEntry {
@@ -57,7 +57,7 @@ function mapSchemaToRegistry(column: BarcodeRegistryTableColumnSchema): ListView
 function mapSchemaToFilterConfig(
   column: BarcodeRegistryTableColumnSchema,
   input: BuildBarcodeRegistryFieldCatalogInput,
-): AgGridColumnFilterConfig<BarcodeRegistryRow> | undefined {
+): ListViewColumnFilterConfig<BarcodeRegistryRow> | undefined {
   if (!column.filterable) return undefined;
 
   switch (column.filterKind) {
@@ -107,7 +107,7 @@ function buildColDefFromSchema(
   const emDash = t("domain.audit.summary.emDash");
 
   if (column.id === "lineNo") {
-    return getAgGridRowNumberColDef(t);
+    return getListViewRowNumberColumnDef(t);
   }
 
   const colDef: ListColumnDef<BarcodeRegistryRow> = {
@@ -172,13 +172,13 @@ function createBarcodeRegistryFieldCatalog(
 export function buildBarcodeRegistryListViewCatalog(input: BuildBarcodeRegistryFieldCatalogInput): {
   fieldRegistry: ListViewFieldRegistryEntry[];
   columnDefs: ListColumnDef<BarcodeRegistryRow>[];
-  filterConfigs: Record<string, AgGridColumnFilterConfig<BarcodeRegistryRow>>;
+  filterConfigs: Record<string, ListViewColumnFilterConfig<BarcodeRegistryRow>>;
 } {
   const entries = createBarcodeRegistryFieldCatalog(input);
   const filterConfigs = Object.fromEntries(
     entries
       .filter(
-        (entry): entry is BarcodeRegistryFieldCatalogEntry & { filterConfig: AgGridColumnFilterConfig<BarcodeRegistryRow> } =>
+        (entry): entry is BarcodeRegistryFieldCatalogEntry & { filterConfig: ListViewColumnFilterConfig<BarcodeRegistryRow> } =>
           Boolean(entry.filterConfig),
       )
       .map((entry) => [entry.registry.fieldKey, entry.filterConfig]),

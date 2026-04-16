@@ -1,12 +1,12 @@
-export type UrlGridSort = {
+export type ListViewUrlSort = {
   colId: string;
   sort: "asc" | "desc";
 };
 
-export function readUrlGridSort(
+export function readListViewUrlSort(
   searchParams: URLSearchParams,
   key = "sort",
-): UrlGridSort[] {
+): ListViewUrlSort[] {
   const raw = searchParams.get(key)?.trim() ?? "";
   if (raw === "") return [];
   return raw
@@ -16,22 +16,22 @@ export function readUrlGridSort(
       if (!colId || (dir !== "asc" && dir !== "desc")) return null;
       return { colId, sort: dir };
     })
-    .filter((entry): entry is UrlGridSort => entry !== null);
+    .filter((entry): entry is ListViewUrlSort => entry !== null);
 }
 
-export function writeUrlGridSort(sortModel: UrlGridSort[], key = "sort"): [string, string][] {
+export function writeListViewUrlSort(sortModel: ListViewUrlSort[], key = "sort"): [string, string][] {
   if (sortModel.length === 0) return [];
   return [[key, sortModel.map((entry) => `${entry.colId}:${entry.sort}`).join(",")]];
 }
 
-export function serializeUrlGridSort(sortModel: UrlGridSort[]): string {
+export function serializeListViewUrlSort(sortModel: ListViewUrlSort[]): string {
   return sortModel.map((entry) => `${entry.colId}:${entry.sort}`).join(",");
 }
 
-export function readUrlGridSortValue(
+export function readListViewUrlSortValue(
   searchParams: URLSearchParams,
   key = "sort",
 ): string | null {
-  const serialized = serializeUrlGridSort(readUrlGridSort(searchParams, key));
+  const serialized = serializeListViewUrlSort(readListViewUrlSort(searchParams, key));
   return serialized === "" ? null : serialized;
 }

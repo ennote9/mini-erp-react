@@ -1,11 +1,11 @@
 import type { ListColumnDef } from "@/shared/ui/list-view/listColumnDef";
 import type { TFunction } from "@/shared/i18n";
 import type {
-  AgGridColumnFilterConfig,
-  AgGridColumnFilterOption,
+  ListViewColumnFilterConfig,
+  ListViewColumnFilterOption,
   ListViewFieldRegistryEntry,
-} from "@/shared/ui/ag-grid";
-import { getAgGridRowNumberColDef } from "@/shared/ui/ag-grid/agGridDefaults";
+} from "@/shared/ui/list-view";
+import { getListViewRowNumberColumnDef } from "@/shared/ui/list-view/listViewColumnDefaults";
 import { normalizeDateForSO } from "./dateUtils";
 import type { SalesOrderListRow } from "./salesOrderListRowModel";
 import { buildSalesOrdersTableSchema, type SalesOrdersTableColumnSchema } from "./salesOrdersTableSchema";
@@ -13,15 +13,15 @@ import { buildSalesOrdersTableSchema, type SalesOrdersTableColumnSchema } from "
 type SalesOrdersFieldCatalogEntry = {
   registry: ListViewFieldRegistryEntry;
   colDef: ListColumnDef<SalesOrderListRow>;
-  filterConfig?: AgGridColumnFilterConfig<SalesOrderListRow>;
+  filterConfig?: ListViewColumnFilterConfig<SalesOrderListRow>;
 };
 
 export type BuildSalesOrdersListViewCatalogInput = {
   t: TFunction;
   formatDate: (value: string | null | undefined, options?: { empty?: string }) => string;
-  customerNameEnumOptions: AgGridColumnFilterOption[];
-  warehouseNameEnumOptions: AgGridColumnFilterOption[];
-  statusEnumOptions: AgGridColumnFilterOption[];
+  customerNameEnumOptions: ListViewColumnFilterOption[];
+  warehouseNameEnumOptions: ListViewColumnFilterOption[];
+  statusEnumOptions: ListViewColumnFilterOption[];
 };
 
 function mapSchemaToRegistry(column: SalesOrdersTableColumnSchema): ListViewFieldRegistryEntry {
@@ -46,7 +46,7 @@ function mapSchemaToRegistry(column: SalesOrdersTableColumnSchema): ListViewFiel
 function mapSchemaToFilterConfig(
   column: SalesOrdersTableColumnSchema,
   input: BuildSalesOrdersListViewCatalogInput,
-): AgGridColumnFilterConfig<SalesOrderListRow> | undefined {
+): ListViewColumnFilterConfig<SalesOrderListRow> | undefined {
   if (!column.filterable) return undefined;
 
   switch (column.filterKind) {
@@ -90,7 +90,7 @@ function buildColDefFromSchema(
   const { t, formatDate } = input;
 
   if (column.id === "lineNo") {
-    return getAgGridRowNumberColDef(t);
+    return getListViewRowNumberColumnDef(t);
   }
 
   const colDef: ListColumnDef<SalesOrderListRow> = {
@@ -139,7 +139,7 @@ function createSalesOrdersFieldCatalog(input: BuildSalesOrdersListViewCatalogInp
 export function buildSalesOrdersListViewCatalog(input: BuildSalesOrdersListViewCatalogInput): {
   fieldRegistry: ListViewFieldRegistryEntry[];
   columnDefs: ListColumnDef<SalesOrderListRow>[];
-  filterConfigs: Record<string, AgGridColumnFilterConfig<SalesOrderListRow>>;
+  filterConfigs: Record<string, ListViewColumnFilterConfig<SalesOrderListRow>>;
 } {
   const entries = createSalesOrdersFieldCatalog(input);
   const filterConfigs = Object.fromEntries(
@@ -147,7 +147,7 @@ export function buildSalesOrdersListViewCatalog(input: BuildSalesOrdersListViewC
       .filter(
         (
           entry,
-        ): entry is SalesOrdersFieldCatalogEntry & { filterConfig: AgGridColumnFilterConfig<SalesOrderListRow> } =>
+        ): entry is SalesOrdersFieldCatalogEntry & { filterConfig: ListViewColumnFilterConfig<SalesOrderListRow> } =>
           Boolean(entry.filterConfig),
       )
       .map((entry) => [entry.registry.fieldKey, entry.filterConfig]),

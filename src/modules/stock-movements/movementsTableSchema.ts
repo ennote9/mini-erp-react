@@ -1,11 +1,11 @@
 import type { TFunction } from "@/shared/i18n";
 import type { StockMovementListRow } from "./movementListRowModel";
-import type { ListViewFieldDataType } from "@/shared/ui/ag-grid/listViewConfig";
+import type { ListViewFieldDataType } from "@/shared/ui/list-view/listViewConfig";
 import type {
   ListViewFieldSourceType,
   ListViewPerformanceCost,
   ListViewRendererType,
-} from "@/shared/ui/ag-grid/listViewConfig/types";
+} from "@/shared/ui/list-view/listViewConfig/types";
 
 export type MovementsTableFilterKind = "text" | "enum" | "number" | "datetime" | "none";
 export type MovementsTableFormatKind =

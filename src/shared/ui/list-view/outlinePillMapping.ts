@@ -1,8 +1,8 @@
-import type { GridOutlinePillTone } from "./GridOutlinePillBadge";
+import type { OutlinePillTone } from "./OutlinePillBadge";
 import type { StockBalanceCoverageStatus } from "@/shared/stockBalancesOperationalMetrics";
 
 /** Planning: PO / SO document lifecycle */
-export function planningStatusToPillTone(status: string): GridOutlinePillTone {
+export function planningStatusToPillTone(status: string): OutlinePillTone {
   switch (status) {
     case "draft":
       return "neutral";
@@ -18,7 +18,7 @@ export function planningStatusToPillTone(status: string): GridOutlinePillTone {
 }
 
 /** Factual: receipt / shipment */
-export function factualStatusToPillTone(status: string): GridOutlinePillTone {
+export function factualStatusToPillTone(status: string): OutlinePillTone {
   switch (status) {
     case "draft":
       return "neutral";
@@ -33,7 +33,7 @@ export function factualStatusToPillTone(status: string): GridOutlinePillTone {
   }
 }
 
-export function stockCoverageToPillTone(s: StockBalanceCoverageStatus): GridOutlinePillTone {
+export function stockCoverageToPillTone(s: StockBalanceCoverageStatus): OutlinePillTone {
   switch (s) {
     case "covered":
       return "positive";
@@ -47,7 +47,7 @@ export function stockCoverageToPillTone(s: StockBalanceCoverageStatus): GridOutl
 }
 
 /** Stock movement direction / reversal */
-export function movementTypeToPillTone(mt: string): GridOutlinePillTone {
+export function movementTypeToPillTone(mt: string): OutlinePillTone {
   switch (mt) {
     case "receipt":
       return "positive";
@@ -61,11 +61,11 @@ export function movementTypeToPillTone(mt: string): GridOutlinePillTone {
   }
 }
 
-export function activeBooleanToPillTone(isActive: boolean): GridOutlinePillTone {
+export function activeBooleanToPillTone(isActive: boolean): OutlinePillTone {
   return isActive ? "positive" : "muted";
 }
 
 /** Master-data carrier type — single restrained tone to avoid noisy grids */
-export function carrierTypeLabelPillTone(): GridOutlinePillTone {
+export function carrierTypeLabelPillTone(): OutlinePillTone {
   return "neutral";
 }

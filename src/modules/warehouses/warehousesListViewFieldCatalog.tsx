@@ -1,11 +1,11 @@
 import type { ListColumnDef } from "@/shared/ui/list-view/listColumnDef";
 import type { TFunction } from "@/shared/i18n";
 import type {
-  AgGridColumnFilterConfig,
-  AgGridColumnFilterOption,
+  ListViewColumnFilterConfig,
+  ListViewColumnFilterOption,
   ListViewFieldRegistryEntry,
-} from "@/shared/ui/ag-grid";
-import { getAgGridRowNumberColDef } from "@/shared/ui/ag-grid/agGridDefaults";
+} from "@/shared/ui/list-view";
+import { getListViewRowNumberColumnDef } from "@/shared/ui/list-view/listViewColumnDefaults";
 import type { WarehouseListRow } from "./warehouseListRowModel";
 import {
   buildWarehousesTableSchema,
@@ -15,14 +15,14 @@ import {
 type WarehouseFieldCatalogEntry = {
   registry: ListViewFieldRegistryEntry;
   colDef: ListColumnDef<WarehouseListRow>;
-  filterConfig?: AgGridColumnFilterConfig<WarehouseListRow>;
+  filterConfig?: ListViewColumnFilterConfig<WarehouseListRow>;
 };
 
 type BuildWarehousesFieldCatalogInput = {
   t: TFunction;
   formatMoney: (value: number, fractionDigits?: number, currencyCode?: string) => string;
   /** Distinct warehouse types from current data — matches legacy AG Grid enum filter options. */
-  warehouseTypeEnumOptions: AgGridColumnFilterOption[];
+  warehouseTypeEnumOptions: ListViewColumnFilterOption[];
 };
 
 function mapSchemaToRegistry(column: WarehousesTableColumnSchema): ListViewFieldRegistryEntry {
@@ -47,7 +47,7 @@ function mapSchemaToRegistry(column: WarehousesTableColumnSchema): ListViewField
 function mapSchemaToFilterConfig(
   column: WarehousesTableColumnSchema,
   input: BuildWarehousesFieldCatalogInput,
-): AgGridColumnFilterConfig<WarehouseListRow> | undefined {
+): ListViewColumnFilterConfig<WarehouseListRow> | undefined {
   if (!column.filterable) return undefined;
 
   switch (column.filterKind) {
@@ -73,7 +73,7 @@ function buildColDefFromSchema(
   const emDash = t("domain.audit.summary.emDash");
 
   if (column.id === "lineNo") {
-    return getAgGridRowNumberColDef(t);
+    return getListViewRowNumberColumnDef(t);
   }
 
   const colDef: ListColumnDef<WarehouseListRow> = {
@@ -120,13 +120,13 @@ function createWarehousesFieldCatalog(input: BuildWarehousesFieldCatalogInput): 
 export function buildWarehousesListViewCatalog(input: BuildWarehousesFieldCatalogInput): {
   fieldRegistry: ListViewFieldRegistryEntry[];
   columnDefs: ListColumnDef<WarehouseListRow>[];
-  filterConfigs: Record<string, AgGridColumnFilterConfig<WarehouseListRow>>;
+  filterConfigs: Record<string, ListViewColumnFilterConfig<WarehouseListRow>>;
 } {
   const entries = createWarehousesFieldCatalog(input);
   const filterConfigs = Object.fromEntries(
     entries
       .filter(
-        (entry): entry is WarehouseFieldCatalogEntry & { filterConfig: AgGridColumnFilterConfig<WarehouseListRow> } =>
+        (entry): entry is WarehouseFieldCatalogEntry & { filterConfig: ListViewColumnFilterConfig<WarehouseListRow> } =>
           Boolean(entry.filterConfig),
       )
       .map((entry) => [entry.registry.fieldKey, entry.filterConfig]),

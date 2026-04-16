@@ -1,11 +1,11 @@
 import type { ListColumnDef } from "@/shared/ui/list-view/listColumnDef";
 import type { TFunction } from "@/shared/i18n";
 import type {
-  AgGridColumnFilterConfig,
-  AgGridColumnFilterOption,
+  ListViewColumnFilterConfig,
+  ListViewColumnFilterOption,
   ListViewFieldRegistryEntry,
-} from "@/shared/ui/ag-grid";
-import { getAgGridRowNumberColDef } from "@/shared/ui/ag-grid/agGridDefaults";
+} from "@/shared/ui/list-view";
+import { getListViewRowNumberColumnDef } from "@/shared/ui/list-view/listViewColumnDefaults";
 import { normalizeDateForPO } from "./dateUtils";
 import type { PurchaseOrderListRow } from "./purchaseOrderListRowModel";
 import {
@@ -16,15 +16,15 @@ import {
 type PurchaseOrdersFieldCatalogEntry = {
   registry: ListViewFieldRegistryEntry;
   colDef: ListColumnDef<PurchaseOrderListRow>;
-  filterConfig?: AgGridColumnFilterConfig<PurchaseOrderListRow>;
+  filterConfig?: ListViewColumnFilterConfig<PurchaseOrderListRow>;
 };
 
 export type BuildPurchaseOrdersListViewCatalogInput = {
   t: TFunction;
   formatDate: (value: string | null | undefined, options?: { empty?: string }) => string;
-  supplierNameEnumOptions: AgGridColumnFilterOption[];
-  warehouseNameEnumOptions: AgGridColumnFilterOption[];
-  statusEnumOptions: AgGridColumnFilterOption[];
+  supplierNameEnumOptions: ListViewColumnFilterOption[];
+  warehouseNameEnumOptions: ListViewColumnFilterOption[];
+  statusEnumOptions: ListViewColumnFilterOption[];
 };
 
 function mapSchemaToRegistry(column: PurchaseOrdersTableColumnSchema): ListViewFieldRegistryEntry {
@@ -49,7 +49,7 @@ function mapSchemaToRegistry(column: PurchaseOrdersTableColumnSchema): ListViewF
 function mapSchemaToFilterConfig(
   column: PurchaseOrdersTableColumnSchema,
   input: BuildPurchaseOrdersListViewCatalogInput,
-): AgGridColumnFilterConfig<PurchaseOrderListRow> | undefined {
+): ListViewColumnFilterConfig<PurchaseOrderListRow> | undefined {
   if (!column.filterable) return undefined;
 
   switch (column.filterKind) {
@@ -93,7 +93,7 @@ function buildColDefFromSchema(
   const { t, formatDate } = input;
 
   if (column.id === "lineNo") {
-    return getAgGridRowNumberColDef(t);
+    return getListViewRowNumberColumnDef(t);
   }
 
   const colDef: ListColumnDef<PurchaseOrderListRow> = {
@@ -142,7 +142,7 @@ function createPurchaseOrdersFieldCatalog(
 export function buildPurchaseOrdersListViewCatalog(input: BuildPurchaseOrdersListViewCatalogInput): {
   fieldRegistry: ListViewFieldRegistryEntry[];
   columnDefs: ListColumnDef<PurchaseOrderListRow>[];
-  filterConfigs: Record<string, AgGridColumnFilterConfig<PurchaseOrderListRow>>;
+  filterConfigs: Record<string, ListViewColumnFilterConfig<PurchaseOrderListRow>>;
 } {
   const entries = createPurchaseOrdersFieldCatalog(input);
   const filterConfigs = Object.fromEntries(
@@ -151,7 +151,7 @@ export function buildPurchaseOrdersListViewCatalog(input: BuildPurchaseOrdersLis
         (
           entry,
         ): entry is PurchaseOrdersFieldCatalogEntry & {
-          filterConfig: AgGridColumnFilterConfig<PurchaseOrderListRow>;
+          filterConfig: ListViewColumnFilterConfig<PurchaseOrderListRow>;
         } => Boolean(entry.filterConfig),
       )
       .map((entry) => [entry.registry.fieldKey, entry.filterConfig]),

@@ -1,11 +1,11 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { ListColumnDef } from "@/shared/ui/list-view/listColumnDef";
-import type { AgGridColumnFilterModel } from "@/shared/navigation/agGridColumnFilters";
-import type { UrlGridSort } from "@/shared/navigation/agGridSort";
+import type { ListViewColumnFilterModel } from "@/shared/navigation/listViewColumnFilters";
+import type { ListViewUrlSort } from "@/shared/navigation/listViewUrlSort";
 import {
-  buildAgGridModelFromDeepFilterRules,
+  buildListViewColumnFilterModelFromDeepRules,
   buildDefaultListViewDefinition,
-  buildUrlGridSortFromDeepSortRules,
+  buildListViewUrlSortFromDeepSortRules,
   getListViewFieldRegistry,
   mergeListViewDefinitionWithRegistry,
   normalizeDeepFilterRules,
@@ -23,7 +23,7 @@ import {
 const STORAGE_PREFIX = "mini-erp:grid-columns:v1:";
 const PERSISTED_VERSION = 2;
 
-export type AgGridColumnSettingsItem = {
+export type ListViewColumnSettingsItem = {
   id: string;
   label: string;
   visible: boolean;
@@ -31,7 +31,7 @@ export type AgGridColumnSettingsItem = {
   lockedOrder: boolean;
 };
 
-export type AgGridPersonalView = {
+export type ListViewPersonalView = {
   viewId: string;
   name: string;
   isDefault: boolean;
@@ -172,7 +172,7 @@ function buildRegistryForMeta<T>(
 function itemsFromDefinition<T>(
   definition: ListViewDefinition,
   meta: InternalColumnMeta<T>[],
-): AgGridColumnSettingsItem[] {
+): ListViewColumnSettingsItem[] {
   const byId = new Map(meta.map((entry) => [entry.id, entry]));
   return definition.columns
     .slice()
@@ -188,14 +188,14 @@ function itemsFromDefinition<T>(
         lockedOrder: source.lockedOrder,
       };
     })
-    .filter((item): item is AgGridColumnSettingsItem => item !== null);
+    .filter((item): item is ListViewColumnSettingsItem => item !== null);
 }
 
-function sanitizeSettingsItems(items: AgGridColumnSettingsItem[]): AgGridColumnSettingsItem[] {
+function sanitizeSettingsItems(items: ListViewColumnSettingsItem[]): ListViewColumnSettingsItem[] {
   return items.map((item) => (item.lockedVisible ? { ...item, visible: true } : item));
 }
 
-function columnsFromItems(items: AgGridColumnSettingsItem[]) {
+function columnsFromItems(items: ListViewColumnSettingsItem[]) {
   return items.map((item, index) => ({
     fieldKey: item.id,
     visible: item.lockedVisible ? true : item.visible,
@@ -207,7 +207,7 @@ function visibleFieldKeysFromColumns(columns: Array<{ fieldKey: string; visible:
   return new Set(columns.filter((column) => column.visible).map((column) => column.fieldKey));
 }
 
-function applySettingsToDefs<T>(meta: InternalColumnMeta<T>[], items: AgGridColumnSettingsItem[]): ListColumnDef<T>[] {
+function applySettingsToDefs<T>(meta: InternalColumnMeta<T>[], items: ListViewColumnSettingsItem[]): ListColumnDef<T>[] {
   const byId = new Map(meta.map((entry) => [entry.id, entry.colDef]));
   const seen = new Set<string>();
   const ordered: ListColumnDef<T>[] = [];
@@ -362,7 +362,7 @@ function definitionSignature(definition: ListViewDefinition | null): string {
   return definition ? JSON.stringify(definition) : "";
 }
 
-type UseAgGridColumnSettingsParams<T> = {
+type UseListViewColumnSettingsParams<T> = {
   pageKey: string;
   entityType: ListViewEntityType;
   baseColumnDefs: ListColumnDef<T>[];
@@ -370,11 +370,11 @@ type UseAgGridColumnSettingsParams<T> = {
   allowHiddenFilterSort?: boolean;
 };
 
-export type UseAgGridColumnSettingsResult<T> = {
+export type UseListViewColumnSettingsResult<T> = {
   columnDefs: ListColumnDef<T>[];
-  committedItems: AgGridColumnSettingsItem[];
-  draftItems: AgGridColumnSettingsItem[];
-  setDraftItems: (updater: (prev: AgGridColumnSettingsItem[]) => AgGridColumnSettingsItem[]) => void;
+  committedItems: ListViewColumnSettingsItem[];
+  draftItems: ListViewColumnSettingsItem[];
+  setDraftItems: (updater: (prev: ListViewColumnSettingsItem[]) => ListViewColumnSettingsItem[]) => void;
   draftDeepFilters: ListViewDeepFilterRule[];
   setDraftDeepFilters: (updater: (prev: ListViewDeepFilterRule[]) => ListViewDeepFilterRule[]) => void;
   draftDeepSorts: ListViewDeepSortRule[];
@@ -382,14 +382,14 @@ export type UseAgGridColumnSettingsResult<T> = {
   settingsOpen: boolean;
   openSettings: () => void;
   closeSettings: () => void;
-  applyDraft: () => { hiddenIds: string[]; nextItems: AgGridColumnSettingsItem[] };
+  applyDraft: () => { hiddenIds: string[]; nextItems: ListViewColumnSettingsItem[] };
   resetDraftToDefaults: () => void;
   cancelDraft: () => void;
-  deepFilterModel: AgGridColumnFilterModel;
-  deepSortModel: UrlGridSort[];
+  deepFilterModel: ListViewColumnFilterModel;
+  deepSortModel: ListViewUrlSort[];
   definition: ListViewDefinition | null;
   registry: ListViewFieldRegistryEntry[];
-  personalViews: AgGridPersonalView[];
+  personalViews: ListViewPersonalView[];
   activeViewId: string | null;
   activeViewName: string | null;
   hasUnsavedChanges: boolean;
@@ -401,13 +401,13 @@ export type UseAgGridColumnSettingsResult<T> = {
   setActivePersonalViewAsDefault: () => boolean;
 };
 
-export function useAgGridColumnSettings<T>({
+export function useListViewColumnSettings<T>({
   pageKey,
   entityType,
   baseColumnDefs,
   fieldRegistry,
   allowHiddenFilterSort = false,
-}: UseAgGridColumnSettingsParams<T>): UseAgGridColumnSettingsResult<T> {
+}: UseListViewColumnSettingsParams<T>): UseListViewColumnSettingsResult<T> {
   const normalizedBaseDefs = useMemo(() => normalizeColDefsWithStableIds(baseColumnDefs), [baseColumnDefs]);
   const meta = useMemo(() => buildColumnMeta(normalizedBaseDefs), [normalizedBaseDefs]);
   const registry = useMemo(
@@ -456,7 +456,7 @@ export function useAgGridColumnSettings<T>({
   );
 
   const setDraftItems = useCallback(
-    (updater: (prev: AgGridColumnSettingsItem[]) => AgGridColumnSettingsItem[]) => {
+    (updater: (prev: ListViewColumnSettingsItem[]) => ListViewColumnSettingsItem[]) => {
       setDraftDefinition((prev) => {
         if (!prev) return prev;
         const nextItems = sanitizeSettingsItems(updater(itemsFromDefinition(prev, meta)));
@@ -714,7 +714,7 @@ export function useAgGridColumnSettings<T>({
     return definitionSignature(activeView.listViewDefinition) !== definitionSignature(definition);
   }, [activeView, definition]);
 
-  const personalViews = useMemo<AgGridPersonalView[]>(
+  const personalViews = useMemo<ListViewPersonalView[]>(
     () =>
       (personalViewsMeta?.personalViews ?? []).map((view) => ({
         viewId: view.viewId,
@@ -727,11 +727,11 @@ export function useAgGridColumnSettings<T>({
 
   const columnDefs = useMemo(() => applySettingsToDefs(meta, committedItems), [meta, committedItems]);
   const deepFilterModel = useMemo(
-    () => buildAgGridModelFromDeepFilterRules(definition?.deepFilters ?? []),
+    () => buildListViewColumnFilterModelFromDeepRules(definition?.deepFilters ?? []),
     [definition?.deepFilters],
   );
   const deepSortModel = useMemo(
-    () => buildUrlGridSortFromDeepSortRules(definition?.deepSorts ?? []),
+    () => buildListViewUrlSortFromDeepSortRules(definition?.deepSorts ?? []),
     [definition?.deepSorts],
   );
 

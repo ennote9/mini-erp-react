@@ -1,12 +1,12 @@
 import type { TFunction } from "@/shared/i18n";
 import type {
   ListViewFieldDataType,
-} from "@/shared/ui/ag-grid/listViewConfig";
+} from "@/shared/ui/list-view/listViewConfig";
 import type {
   ListViewFieldSourceType,
   ListViewPerformanceCost,
   ListViewRendererType,
-} from "@/shared/ui/ag-grid/listViewConfig/types";
+} from "@/shared/ui/list-view/listViewConfig/types";
 import type { BrandListRow } from "./brandListRowModel";
 
 export type BrandsTableFilterKind = "text" | "boolean" | "none";

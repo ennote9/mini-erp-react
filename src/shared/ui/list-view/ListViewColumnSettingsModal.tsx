@@ -9,9 +9,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { useTranslation } from "@/shared/i18n/context";
-import type { AgGridFilterOperator } from "@/shared/navigation/agGridColumnFilters";
-import type { AgGridColumnFilterConfig } from "./AgGridColumnFilters";
-import type { AgGridColumnSettingsItem, AgGridPersonalView } from "./columnSettings";
+import type { ListViewFilterOperator } from "@/shared/navigation/listViewColumnFilters";
+import type { ListViewColumnFilterConfig } from "./ListViewColumnFilters";
+import type { ListViewColumnSettingsItem, ListViewPersonalView } from "./listViewColumnSettings";
 import {
   getSupportedOperatorsByFieldType,
   type ListViewDeepFilterRule,
@@ -23,16 +23,16 @@ import {
 type Props = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  items: AgGridColumnSettingsItem[];
-  onItemsChange: (next: AgGridColumnSettingsItem[]) => void;
+  items: ListViewColumnSettingsItem[];
+  onItemsChange: (next: ListViewColumnSettingsItem[]) => void;
   filterRules: ListViewDeepFilterRule[];
   onFilterRulesChange: (next: ListViewDeepFilterRule[]) => void;
   sortRules: ListViewDeepSortRule[];
   onSortRulesChange: (next: ListViewDeepSortRule[]) => void;
   registry: ListViewFieldRegistryEntry[];
-  filterConfigs?: Record<string, AgGridColumnFilterConfig<unknown>>;
+  filterConfigs?: Record<string, ListViewColumnFilterConfig<unknown>>;
   includeHiddenInFilterSort?: boolean;
-  personalViews: AgGridPersonalView[];
+  personalViews: ListViewPersonalView[];
   activeViewId: string | null;
   activeViewName: string | null;
   hasUnsavedChanges: boolean;
@@ -50,7 +50,7 @@ type Props = {
 type ConfiguratorTab = "fields" | "filtering" | "sorting";
 
 type RowProps = {
-  item: AgGridColumnSettingsItem;
+  item: ListViewColumnSettingsItem;
   selected: boolean;
   onToggleVisible: (id: string, checked: boolean) => void;
   onSelect: (id: string, ctrlToggle: boolean) => void;
@@ -242,28 +242,28 @@ function SortableSortRuleRow({
   );
 }
 
-const NO_VALUE_OPERATORS = new Set<AgGridFilterOperator>(["is_empty", "is_not_empty", "is_true", "is_false"]);
-const RANGE_OPERATORS = new Set<AgGridFilterOperator>(["between", "not_between"]);
-const MULTI_OPERATORS = new Set<AgGridFilterOperator>(["in", "not_in"]);
+const NO_VALUE_OPERATORS = new Set<ListViewFilterOperator>(["is_empty", "is_not_empty", "is_true", "is_false"]);
+const RANGE_OPERATORS = new Set<ListViewFilterOperator>(["between", "not_between"]);
+const MULTI_OPERATORS = new Set<ListViewFilterOperator>(["in", "not_in"]);
 
-function isNoValueOperator(operator: AgGridFilterOperator): boolean {
+function isNoValueOperator(operator: ListViewFilterOperator): boolean {
   return NO_VALUE_OPERATORS.has(operator);
 }
 
-function isRangeOperator(operator: AgGridFilterOperator): boolean {
+function isRangeOperator(operator: ListViewFilterOperator): boolean {
   return RANGE_OPERATORS.has(operator);
 }
 
-function isMultiValueOperator(operator: AgGridFilterOperator): boolean {
+function isMultiValueOperator(operator: ListViewFilterOperator): boolean {
   return MULTI_OPERATORS.has(operator);
 }
 
-function firstOperatorForField(field: ListViewFieldRegistryEntry): AgGridFilterOperator | null {
+function firstOperatorForField(field: ListViewFieldRegistryEntry): ListViewFilterOperator | null {
   const operators = getSupportedOperatorsByFieldType(field.dataType);
   return operators.length > 0 ? operators[0] : null;
 }
 
-function operatorLabel(t: (key: string) => string, operator: AgGridFilterOperator): string {
+function operatorLabel(t: (key: string) => string, operator: ListViewFilterOperator): string {
   return t(`gridFilters.operators.${operator}`);
 }
 
@@ -281,7 +281,7 @@ function mapFieldDataTypeToInputType(dataType: ListViewFieldDataType): "text" | 
   }
 }
 
-export function AgGridColumnSettingsModal({
+export function ListViewColumnSettingsModal({
   open,
   onOpenChange,
   items,
@@ -1162,7 +1162,7 @@ export function AgGridColumnSettingsModal({
                           onClick={(event) => event.stopPropagation()}
                           onChange={(event) =>
                             handleChangeFilterRule(index, {
-                              operator: event.target.value as AgGridFilterOperator,
+                              operator: event.target.value as ListViewFilterOperator,
                               value: undefined,
                               valueTo: undefined,
                               values: undefined,

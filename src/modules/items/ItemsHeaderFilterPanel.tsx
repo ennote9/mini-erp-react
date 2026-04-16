@@ -13,14 +13,14 @@ import {
 } from "@/components/ui/popover";
 import { Textarea } from "@/components/ui/textarea";
 import { useTranslation } from "@/shared/i18n/context";
-import type { AgGridFilterOperator } from "@/shared/navigation/agGridColumnFilters";
-import type { AgGridColumnFilterConfig } from "@/shared/ui/ag-grid";
+import type { ListViewFilterOperator } from "@/shared/navigation/listViewColumnFilters";
+import type { ListViewColumnFilterConfig } from "@/shared/ui/list-view";
 import {
   getSupportedOperatorsByFieldType,
   type ListViewDeepFilterRule,
   type ListViewFieldDataType,
   type ListViewFieldRegistryEntry,
-} from "@/shared/ui/ag-grid/listViewConfig";
+} from "@/shared/ui/list-view/listViewConfig";
 
 type AnchorRect = {
   left: number;
@@ -33,7 +33,7 @@ type Props = {
   open: boolean;
   anchorRect: AnchorRect | null;
   field: ListViewFieldRegistryEntry | null;
-  filterConfig?: AgGridColumnFilterConfig<unknown>;
+  filterConfig?: ListViewColumnFilterConfig<unknown>;
   rule: ListViewDeepFilterRule | null;
   onOpenChange: (open: boolean) => void;
   onApply: (rule: ListViewDeepFilterRule) => void;
@@ -41,35 +41,35 @@ type Props = {
 };
 
 type DraftState = {
-  operator: AgGridFilterOperator;
+  operator: ListViewFilterOperator;
   value: string;
   valueTo: string;
   valuesText: string;
 };
 
-const NO_VALUE_OPERATORS = new Set<AgGridFilterOperator>(["is_empty", "is_not_empty", "is_true", "is_false"]);
-const RANGE_OPERATORS = new Set<AgGridFilterOperator>(["between", "not_between"]);
-const MULTI_OPERATORS = new Set<AgGridFilterOperator>(["in", "not_in"]);
+const NO_VALUE_OPERATORS = new Set<ListViewFilterOperator>(["is_empty", "is_not_empty", "is_true", "is_false"]);
+const RANGE_OPERATORS = new Set<ListViewFilterOperator>(["between", "not_between"]);
+const MULTI_OPERATORS = new Set<ListViewFilterOperator>(["in", "not_in"]);
 
-function isNoValueOperator(operator: AgGridFilterOperator): boolean {
+function isNoValueOperator(operator: ListViewFilterOperator): boolean {
   return NO_VALUE_OPERATORS.has(operator);
 }
 
-function isRangeOperator(operator: AgGridFilterOperator): boolean {
+function isRangeOperator(operator: ListViewFilterOperator): boolean {
   return RANGE_OPERATORS.has(operator);
 }
 
-function isMultiValueOperator(operator: AgGridFilterOperator): boolean {
+function isMultiValueOperator(operator: ListViewFilterOperator): boolean {
   return MULTI_OPERATORS.has(operator);
 }
 
-function firstOperatorForField(field: ListViewFieldRegistryEntry | null): AgGridFilterOperator | null {
+function firstOperatorForField(field: ListViewFieldRegistryEntry | null): ListViewFilterOperator | null {
   if (!field) return null;
   const operators = getSupportedOperatorsByFieldType(field.dataType);
   return operators.length > 0 ? operators[0] : null;
 }
 
-function operatorLabel(t: (key: string) => string, operator: AgGridFilterOperator): string {
+function operatorLabel(t: (key: string) => string, operator: ListViewFilterOperator): string {
   return t(`gridFilters.operators.${operator}`);
 }
 
@@ -171,7 +171,7 @@ export function ItemsHeaderFilterPanel(props: Props) {
                     current
                       ? {
                           ...current,
-                          operator: event.target.value as AgGridFilterOperator,
+                          operator: event.target.value as ListViewFilterOperator,
                           value: "",
                           valueTo: "",
                           valuesText: "",

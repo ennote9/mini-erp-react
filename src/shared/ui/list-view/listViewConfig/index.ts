@@ -7,12 +7,12 @@ export {
 export {
   getSupportedOperatorsByFieldType,
   normalizeDeepFilterRules,
-  buildAgGridModelFromDeepFilterRules,
+  buildListViewColumnFilterModelFromDeepRules,
   pruneDeepFilterRulesByHiddenFields,
 } from "./deepFilters";
 export {
   normalizeDeepSortRules,
-  buildUrlGridSortFromDeepSortRules,
+  buildListViewUrlSortFromDeepSortRules,
   pruneDeepSortRulesByHiddenFields,
   applyDeepSortModel,
 } from "./deepSorts";

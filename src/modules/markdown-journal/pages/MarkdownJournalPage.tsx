@@ -15,28 +15,28 @@ import { ListPageLayout } from "@/shared/ui/list/ListPageLayout";
 import { ListPageSearch } from "@/shared/ui/list/ListPageSearch";
 import { useListPageSearchHotkey } from "@/shared/hotkeys";
 import {
-  AgGridColumnSettingsModal,
-  applyAgGridColumnFilters,
+  ListViewColumnSettingsModal,
+  applyListViewColumnFilters,
   applyDeepSortModel,
-  getAgGridNoRowsOverlayContent,
+  getListViewEmptyStateContent,
   hasMeaningfulTextSelection,
-  useAgGridColumnSettings,
-  type AgGridColumnFilterConfig,
-} from "@/shared/ui/ag-grid";
+  useListViewColumnSettings,
+  type ListViewColumnFilterConfig,
+} from "@/shared/ui/list-view";
 import { useTranslation } from "@/shared/i18n/context";
 import { useAppDisplayFormatters } from "@/shared/formatting";
 import { useAppReadModelRevision } from "@/shared/inventoryMasterPageBlocks/useAppReadModelRevision";
-import { readUrlGridSort, serializeUrlGridSort, type UrlGridSort } from "@/shared/navigation/agGridSort";
+import { readListViewUrlSort, serializeListViewUrlSort, type ListViewUrlSort } from "@/shared/navigation/listViewUrlSort";
 import {
-  hasActiveAgGridColumnFilters,
-  readUrlAgGridColumnFilters,
-  withUrlAgGridColumnFilters,
-} from "@/shared/navigation/agGridColumnFilters";
+  hasActiveListViewColumnFilters,
+  readUrlListViewColumnFilters,
+  withUrlListViewColumnFilters,
+} from "@/shared/navigation/listViewColumnFilters";
 import {
-  buildUrlGridSortFromDeepSortRules,
+  buildListViewUrlSortFromDeepSortRules,
   pruneDeepSortRulesByHiddenFields,
   type ListViewDeepFilterRule,
-} from "@/shared/ui/ag-grid/listViewConfig";
+} from "@/shared/ui/list-view/listViewConfig";
 import { appendReturnTo, buildNavigationStateKey, buildReturnToValue, replaceQueryParam } from "@/shared/navigation/returnTo";
 import { useSessionScrollRestore } from "@/shared/navigation/useSessionScrollRestore";
 import { buildReadableUniqueFilename, ensureUniqueExportPath } from "@/shared/export/filenameBuilder";
@@ -172,7 +172,7 @@ export function MarkdownJournalPage() {
   const [exportOpen, setExportOpen] = useState(false);
   const [exportSuccess, setExportSuccess] = useState<{ path: string; filename: string } | null>(null);
   const [rowSelection, setRowSelection] = useState<RowSelectionState>({});
-  const [pendingSortModel, setPendingSortModel] = useState<UrlGridSort[] | null>(null);
+  const [pendingSortModel, setPendingSortModel] = useState<ListViewUrlSort[] | null>(null);
   const [journalColumnSizing, setJournalColumnSizing] = useState<ColumnSizingState>(() =>
     readPersistedColumnSizing(JOURNAL_COLUMN_SIZING_STORAGE_KEY),
   );
@@ -183,7 +183,7 @@ export function MarkdownJournalPage() {
   const [pendingHeaderFilterCommit, setPendingHeaderFilterCommit] = useState<PendingHeaderFilterCommit | null>(null);
   const headerFilterCommitViewRef = useRef<MarkdownRegisterView>(view);
   const [runtimeSortSerialized, setRuntimeSortSerialized] = useState(() =>
-    serializeUrlGridSort(readUrlGridSort(new URLSearchParams(location.search))),
+    serializeListViewUrlSort(readListViewUrlSort(new URLSearchParams(location.search))),
   );
 
   const listSearchInputRef = useRef<HTMLInputElement>(null);
@@ -226,7 +226,7 @@ export function MarkdownJournalPage() {
   );
 
   const columnFilterModel = useMemo(
-    () => readUrlAgGridColumnFilters(new URLSearchParams(location.search)),
+    () => readUrlListViewColumnFilters(new URLSearchParams(location.search)),
     [location.search],
   );
 
@@ -297,7 +297,7 @@ export function MarkdownJournalPage() {
     renameActivePersonalView: renameJournalActivePersonalView,
     deleteActivePersonalView: deleteJournalActivePersonalView,
     setActivePersonalViewAsDefault: setJournalActivePersonalViewAsDefault,
-  } = useAgGridColumnSettings<JournalRow>({
+  } = useListViewColumnSettings<JournalRow>({
     pageKey: "markdown-journal:journals",
     entityType: "markdown-journal-journals",
     baseColumnDefs: journalsListViewCatalog.columnDefs,
@@ -331,7 +331,7 @@ export function MarkdownJournalPage() {
     renameActivePersonalView: renameCodeActivePersonalView,
     deleteActivePersonalView: deleteCodeActivePersonalView,
     setActivePersonalViewAsDefault: setCodeActivePersonalViewAsDefault,
-  } = useAgGridColumnSettings<MarkdownCodeRow>({
+  } = useListViewColumnSettings<MarkdownCodeRow>({
     pageKey: "markdown-journal:codes",
     entityType: "markdown-journal-codes",
     baseColumnDefs: codesListViewCatalog.columnDefs,
@@ -343,9 +343,9 @@ export function MarkdownJournalPage() {
 
   const effectiveSortModel = useMemo(() => {
     if (pendingSortModel) return pendingSortModel;
-    const urlSort = readUrlGridSort(new URLSearchParams(searchParamsSort ? `sort=${searchParamsSort}` : ""));
+    const urlSort = readListViewUrlSort(new URLSearchParams(searchParamsSort ? `sort=${searchParamsSort}` : ""));
     const runtimeSort =
-      runtimeSortSerialized === "" ? [] : readUrlGridSort(new URLSearchParams(`sort=${runtimeSortSerialized}`));
+      runtimeSortSerialized === "" ? [] : readListViewUrlSort(new URLSearchParams(`sort=${runtimeSortSerialized}`));
     if (runtimeSort.length > 0 && runtimeSortSerialized !== searchParamsSort) return runtimeSort;
     if (urlSort.length > 0) return urlSort;
     if (runtimeSort.length > 0) return runtimeSort;
@@ -354,7 +354,7 @@ export function MarkdownJournalPage() {
 
   useEffect(() => {
     if (!pendingSortModel) return;
-    const pendingSerialized = serializeUrlGridSort(pendingSortModel);
+    const pendingSerialized = serializeListViewUrlSort(pendingSortModel);
     if (pendingSerialized === searchParamsSort) {
       setPendingSortModel(null);
     }
@@ -403,12 +403,12 @@ export function MarkdownJournalPage() {
   }, [codeRows, prefillItemId, searchQuery]);
 
   const displayJournalRowsWithQueryFilters = useMemo(
-    () => applyAgGridColumnFilters(filteredJournalRows, columnFilterModel, journalColumnFilterConfigs),
+    () => applyListViewColumnFilters(filteredJournalRows, columnFilterModel, journalColumnFilterConfigs),
     [filteredJournalRows, columnFilterModel, journalColumnFilterConfigs],
   );
 
   const displayCodeRowsWithQueryFilters = useMemo(
-    () => applyAgGridColumnFilters(filteredCodeRows, columnFilterModel, codeColumnFilterConfigs),
+    () => applyListViewColumnFilters(filteredCodeRows, columnFilterModel, codeColumnFilterConfigs),
     [filteredCodeRows, columnFilterModel, codeColumnFilterConfigs],
   );
 
@@ -433,7 +433,7 @@ export function MarkdownJournalPage() {
   const displayJournalRows = useMemo(
     () =>
       applyDeepSortModel({
-        rows: applyAgGridColumnFilters(
+        rows: applyListViewColumnFilters(
           displayJournalRowsWithQueryFilters,
           journalDeepFilterModel,
           journalColumnFilterConfigs,
@@ -453,7 +453,7 @@ export function MarkdownJournalPage() {
   const displayCodeRows = useMemo(
     () =>
       applyDeepSortModel({
-        rows: applyAgGridColumnFilters(
+        rows: applyListViewColumnFilters(
           displayCodeRowsWithQueryFilters,
           codeDeepFilterModel,
           codeColumnFilterConfigs,
@@ -558,8 +558,8 @@ export function MarkdownJournalPage() {
       const nextSortModel = nextSorting.map((entry) => ({
         colId: entry.id,
         sort: entry.desc ? ("desc" as const) : ("asc" as const),
-      })) as UrlGridSort[];
-      const nextValue = serializeUrlGridSort(nextSortModel);
+      })) as ListViewUrlSort[];
+      const nextValue = serializeListViewUrlSort(nextSortModel);
       setPendingSortModel(nextSortModel);
       setRuntimeSortSerialized(nextValue);
       replaceQueryParam(searchParams, setSearchParams, "sort", nextValue);
@@ -615,14 +615,14 @@ export function MarkdownJournalPage() {
     (params: {
       applyDraft: () => { hiddenIds: string[] };
       draftDeepSorts: typeof journalDraftDeepSorts;
-      deepSortModel: UrlGridSort[];
-      effectiveSort: UrlGridSort[];
+      deepSortModel: ListViewUrlSort[];
+      effectiveSort: ListViewUrlSort[];
     }) => {
       const { hiddenIds } = params.applyDraft();
       const prunedDraftDeepSorts = pruneDeepSortRulesByHiddenFields(params.draftDeepSorts, hiddenIds);
-      const nextDeepSortModel = buildUrlGridSortFromDeepSortRules(prunedDraftDeepSorts);
-      const nextDeepSortSerialized = serializeUrlGridSort(nextDeepSortModel);
-      const currentDeepSortSerialized = serializeUrlGridSort(params.deepSortModel);
+      const nextDeepSortModel = buildListViewUrlSortFromDeepSortRules(prunedDraftDeepSorts);
+      const nextDeepSortSerialized = serializeListViewUrlSort(nextDeepSortModel);
+      const currentDeepSortSerialized = serializeListViewUrlSort(params.deepSortModel);
       const currentRuntimeSortSerialized = searchParamsSort;
       const deepSortsChanged = nextDeepSortSerialized !== currentDeepSortSerialized;
       const shouldSyncToDeepSort =
@@ -646,10 +646,10 @@ export function MarkdownJournalPage() {
       if (hiddenIds.length > 0) {
         const nextColumnFilterModel = { ...columnFilterModel };
         for (const colId of hiddenIds) delete nextColumnFilterModel[colId];
-        nextParams = withUrlAgGridColumnFilters(nextParams, nextColumnFilterModel);
+        nextParams = withUrlListViewColumnFilters(nextParams, nextColumnFilterModel);
       }
 
-      const nextSortSerialized = serializeUrlGridSort(nextSortModel);
+      const nextSortSerialized = serializeListViewUrlSort(nextSortModel);
       if (nextSortSerialized === "") nextParams.delete("sort");
       else nextParams.set("sort", nextSortSerialized);
 
@@ -933,13 +933,13 @@ export function MarkdownJournalPage() {
   );
 
   const searchActive = searchQuery.trim() !== "";
-  const filtersActive = prefillItemId !== "" || hasActiveAgGridColumnFilters(columnFilterModel);
+  const filtersActive = prefillItemId !== "" || hasActiveListViewColumnFilters(columnFilterModel);
   const baseRowsCount = isJournalView ? journalRows.length : codeRows.length;
   const activeRows = isJournalView ? displayJournalRows : displayCodeRows;
 
   const noRowsOverlay = useMemo(
     () =>
-      getAgGridNoRowsOverlayContent(
+      getListViewEmptyStateContent(
         {
           baseRowCount: baseRowsCount,
           visibleRowCount: activeRows.length,
@@ -1020,7 +1020,7 @@ export function MarkdownJournalPage() {
           open={headerFilterAnchor != null}
           anchorRect={headerFilterAnchor}
           field={activeHeaderFilterRegistryField}
-          filterConfig={activeHeaderFilterConfig as AgGridColumnFilterConfig<unknown> | undefined}
+          filterConfig={activeHeaderFilterConfig as ListViewColumnFilterConfig<unknown> | undefined}
           rule={activeHeaderFilterRule}
           onOpenChange={(open) => {
             if (!open) setHeaderFilterAnchor(null);
@@ -1031,7 +1031,7 @@ export function MarkdownJournalPage() {
       </div>
 
       {isJournalView ? (
-        <AgGridColumnSettingsModal
+        <ListViewColumnSettingsModal
           open={journalSettingsOpen}
           onOpenChange={(nextOpen) => {
             if (nextOpen) {
@@ -1047,7 +1047,7 @@ export function MarkdownJournalPage() {
           sortRules={journalDraftDeepSorts}
           onSortRulesChange={(nextRules) => setJournalDraftDeepSorts(() => nextRules)}
           registry={journalRegistry}
-          filterConfigs={journalColumnFilterConfigs as Record<string, AgGridColumnFilterConfig<unknown>>}
+          filterConfigs={journalColumnFilterConfigs as Record<string, ListViewColumnFilterConfig<unknown>>}
           includeHiddenInFilterSort
           personalViews={journalPersonalViews}
           activeViewId={journalActiveViewId}
@@ -1064,7 +1064,7 @@ export function MarkdownJournalPage() {
           onReset={resetJournalDraftToDefaults}
         />
       ) : (
-        <AgGridColumnSettingsModal
+        <ListViewColumnSettingsModal
           open={codeSettingsOpen}
           onOpenChange={(nextOpen) => {
             if (nextOpen) {
@@ -1080,7 +1080,7 @@ export function MarkdownJournalPage() {
           sortRules={codeDraftDeepSorts}
           onSortRulesChange={(nextRules) => setCodeDraftDeepSorts(() => nextRules)}
           registry={codeRegistry}
-          filterConfigs={codeColumnFilterConfigs as Record<string, AgGridColumnFilterConfig<unknown>>}
+          filterConfigs={codeColumnFilterConfigs as Record<string, ListViewColumnFilterConfig<unknown>>}
           includeHiddenInFilterSort
           personalViews={codePersonalViews}
           activeViewId={codeActiveViewId}

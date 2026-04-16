@@ -23,9 +23,3 @@ export function getListViewRowNumberColumnDef(t: TFunction): ListColumnDef {
     headerName: t("doc.columns.lineNo"),
   };
 }
-
-/** @deprecated Use {@link getListViewRowNumberColumnDef} */
-export const getAgGridRowNumberColDef = getListViewRowNumberColumnDef;
-
-/** @deprecated Use {@link listViewRowNumberColumnDef} */
-export const agGridRowNumberColDef = listViewRowNumberColumnDef;

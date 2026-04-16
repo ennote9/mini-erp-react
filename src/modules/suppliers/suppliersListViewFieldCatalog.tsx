@@ -1,7 +1,7 @@
 import type { ListColumnDef } from "@/shared/ui/list-view/listColumnDef";
 import type { TFunction } from "@/shared/i18n";
-import type { AgGridColumnFilterConfig, ListViewFieldRegistryEntry } from "@/shared/ui/ag-grid";
-import { getAgGridRowNumberColDef } from "@/shared/ui/ag-grid/agGridDefaults";
+import type { ListViewColumnFilterConfig, ListViewFieldRegistryEntry } from "@/shared/ui/list-view";
+import { getListViewRowNumberColumnDef } from "@/shared/ui/list-view/listViewColumnDefaults";
 import type { SupplierListRow } from "./supplierListRowModel";
 import {
   buildSuppliersTableSchema,
@@ -11,7 +11,7 @@ import {
 type SupplierFieldCatalogEntry = {
   registry: ListViewFieldRegistryEntry;
   colDef: ListColumnDef<SupplierListRow>;
-  filterConfig?: AgGridColumnFilterConfig<SupplierListRow>;
+  filterConfig?: ListViewColumnFilterConfig<SupplierListRow>;
 };
 
 type BuildSuppliersFieldCatalogInput = {
@@ -40,7 +40,7 @@ function mapSchemaToRegistry(column: SuppliersTableColumnSchema): ListViewFieldR
 
 function mapSchemaToFilterConfig(
   column: SuppliersTableColumnSchema,
-): AgGridColumnFilterConfig<SupplierListRow> | undefined {
+): ListViewColumnFilterConfig<SupplierListRow> | undefined {
   if (!column.filterable) return undefined;
 
   switch (column.filterKind) {
@@ -64,7 +64,7 @@ function buildColDefFromSchema(
   const emDash = t("domain.audit.summary.emDash");
 
   if (column.id === "lineNo") {
-    return getAgGridRowNumberColDef(t);
+    return getListViewRowNumberColumnDef(t);
   }
 
   const colDef: ListColumnDef<SupplierListRow> = {
@@ -118,13 +118,13 @@ function createSuppliersFieldCatalog(input: BuildSuppliersFieldCatalogInput): Su
 export function buildSuppliersListViewCatalog(input: BuildSuppliersFieldCatalogInput): {
   fieldRegistry: ListViewFieldRegistryEntry[];
   columnDefs: ListColumnDef<SupplierListRow>[];
-  filterConfigs: Record<string, AgGridColumnFilterConfig<SupplierListRow>>;
+  filterConfigs: Record<string, ListViewColumnFilterConfig<SupplierListRow>>;
 } {
   const entries = createSuppliersFieldCatalog(input);
   const filterConfigs = Object.fromEntries(
     entries
       .filter(
-        (entry): entry is SupplierFieldCatalogEntry & { filterConfig: AgGridColumnFilterConfig<SupplierListRow> } =>
+        (entry): entry is SupplierFieldCatalogEntry & { filterConfig: ListViewColumnFilterConfig<SupplierListRow> } =>
           Boolean(entry.filterConfig),
       )
       .map((entry) => [entry.registry.fieldKey, entry.filterConfig]),

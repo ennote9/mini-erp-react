@@ -1,25 +1,25 @@
 import type { ListColumnDef } from "@/shared/ui/list-view/listColumnDef";
 import type { TFunction } from "@/shared/i18n";
 import type {
-  AgGridColumnFilterConfig,
-  AgGridColumnFilterOption,
+  ListViewColumnFilterConfig,
+  ListViewColumnFilterOption,
   ListViewFieldRegistryEntry,
-} from "@/shared/ui/ag-grid";
-import { getAgGridRowNumberColDef } from "@/shared/ui/ag-grid/agGridDefaults";
+} from "@/shared/ui/list-view";
+import { getListViewRowNumberColumnDef } from "@/shared/ui/list-view/listViewColumnDefaults";
 import type { ReceiptListRow } from "./receiptListRowModel";
 import { buildReceiptsTableSchema, type ReceiptsTableColumnSchema } from "./receiptsTableSchema";
 
 type ReceiptsFieldCatalogEntry = {
   registry: ListViewFieldRegistryEntry;
   colDef: ListColumnDef<ReceiptListRow>;
-  filterConfig?: AgGridColumnFilterConfig<ReceiptListRow>;
+  filterConfig?: ListViewColumnFilterConfig<ReceiptListRow>;
 };
 
 export type BuildReceiptsListViewCatalogInput = {
   t: TFunction;
   formatDate: (value: string | null | undefined, options?: { empty?: string }) => string;
-  warehouseNameEnumOptions: AgGridColumnFilterOption[];
-  statusEnumOptions: AgGridColumnFilterOption[];
+  warehouseNameEnumOptions: ListViewColumnFilterOption[];
+  statusEnumOptions: ListViewColumnFilterOption[];
 };
 
 function mapSchemaToRegistry(column: ReceiptsTableColumnSchema): ListViewFieldRegistryEntry {
@@ -44,7 +44,7 @@ function mapSchemaToRegistry(column: ReceiptsTableColumnSchema): ListViewFieldRe
 function mapSchemaToFilterConfig(
   column: ReceiptsTableColumnSchema,
   input: BuildReceiptsListViewCatalogInput,
-): AgGridColumnFilterConfig<ReceiptListRow> | undefined {
+): ListViewColumnFilterConfig<ReceiptListRow> | undefined {
   if (!column.filterable) return undefined;
 
   switch (column.filterKind) {
@@ -81,7 +81,7 @@ function buildColDefFromSchema(
   const { t, formatDate } = input;
 
   if (column.id === "lineNo") {
-    return getAgGridRowNumberColDef(t);
+    return getListViewRowNumberColumnDef(t);
   }
 
   const colDef: ListColumnDef<ReceiptListRow> = {
@@ -126,13 +126,13 @@ function createReceiptsFieldCatalog(input: BuildReceiptsListViewCatalogInput): R
 export function buildReceiptsListViewCatalog(input: BuildReceiptsListViewCatalogInput): {
   fieldRegistry: ListViewFieldRegistryEntry[];
   columnDefs: ListColumnDef<ReceiptListRow>[];
-  filterConfigs: Record<string, AgGridColumnFilterConfig<ReceiptListRow>>;
+  filterConfigs: Record<string, ListViewColumnFilterConfig<ReceiptListRow>>;
 } {
   const entries = createReceiptsFieldCatalog(input);
   const filterConfigs = Object.fromEntries(
     entries
       .filter(
-        (entry): entry is ReceiptsFieldCatalogEntry & { filterConfig: AgGridColumnFilterConfig<ReceiptListRow> } =>
+        (entry): entry is ReceiptsFieldCatalogEntry & { filterConfig: ListViewColumnFilterConfig<ReceiptListRow> } =>
           Boolean(entry.filterConfig),
       )
       .map((entry) => [entry.registry.fieldKey, entry.filterConfig]),
