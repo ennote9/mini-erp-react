@@ -1,0 +1,272 @@
+import type { TFunction } from "@/shared/i18n";
+import type { ListViewFieldDataType } from "@/shared/ui/list-view/listViewConfig";
+import type {
+  ListViewFieldSourceType,
+  ListViewPerformanceCost,
+  ListViewRendererType,
+} from "@/shared/ui/list-view/listViewConfig/types";
+import type { EmployeeListRow } from "./employeeListRowModel";
+
+export type EmployeesTableFilterKind = "text" | "boolean" | "enum" | "none";
+
+export type EmployeesTableColumnSchema = {
+  id: string;
+  label: string;
+  accessorKey?: keyof EmployeeListRow;
+  dataType: ListViewFieldDataType;
+  sourceType: ListViewFieldSourceType;
+  defaultVisible: boolean;
+  lockedVisible: boolean;
+  sortable: boolean;
+  filterable: boolean;
+  exportable: boolean;
+  selectable: boolean;
+  defaultSize?: number;
+  minSize?: number;
+  maxSize?: number;
+  defaultFlex?: number;
+  rendererType: ListViewRendererType;
+  performanceCost: ListViewPerformanceCost;
+  filterKind: EmployeesTableFilterKind;
+  /** For enum filters — stable row values */
+  enumField?: keyof EmployeeListRow;
+};
+
+type BuildEmployeesTableSchemaInput = {
+  t: TFunction;
+};
+
+export function buildEmployeesTableSchema(input: BuildEmployeesTableSchemaInput): EmployeesTableColumnSchema[] {
+  const { t } = input;
+  return [
+    {
+      id: "lineNo",
+      label: t("doc.columns.lineNo"),
+      dataType: "identifier",
+      sourceType: "system",
+      defaultVisible: true,
+      lockedVisible: true,
+      sortable: false,
+      filterable: false,
+      exportable: true,
+      selectable: true,
+      defaultSize: 56,
+      minSize: 56,
+      maxSize: 56,
+      rendererType: "text",
+      performanceCost: "low",
+      filterKind: "none",
+    },
+    {
+      id: "employeeCode",
+      label: t("employees.list.columns.employeeCode"),
+      accessorKey: "employeeCode",
+      dataType: "identifier",
+      sourceType: "document",
+      defaultVisible: true,
+      lockedVisible: false,
+      sortable: true,
+      filterable: true,
+      exportable: true,
+      selectable: true,
+      defaultSize: 120,
+      rendererType: "text",
+      performanceCost: "low",
+      filterKind: "text",
+    },
+    {
+      id: "fullName",
+      label: t("employees.list.columns.fullName"),
+      accessorKey: "fullName",
+      dataType: "string",
+      sourceType: "document",
+      defaultVisible: true,
+      lockedVisible: false,
+      sortable: true,
+      filterable: true,
+      exportable: true,
+      selectable: true,
+      minSize: 160,
+      defaultFlex: 1,
+      rendererType: "text",
+      performanceCost: "low",
+      filterKind: "text",
+    },
+    {
+      id: "displayName",
+      label: t("employees.list.columns.displayName"),
+      accessorKey: "displayName",
+      dataType: "string",
+      sourceType: "document",
+      defaultVisible: true,
+      lockedVisible: false,
+      sortable: true,
+      filterable: true,
+      exportable: true,
+      selectable: true,
+      defaultSize: 120,
+      rendererType: "text",
+      performanceCost: "low",
+      filterKind: "text",
+    },
+    {
+      id: "status",
+      label: t("employees.list.columns.status"),
+      accessorKey: "status",
+      dataType: "enum",
+      sourceType: "document",
+      defaultVisible: true,
+      lockedVisible: false,
+      sortable: true,
+      filterable: true,
+      exportable: true,
+      selectable: true,
+      defaultSize: 110,
+      rendererType: "status-badge",
+      performanceCost: "low",
+      filterKind: "enum",
+      enumField: "status",
+    },
+    {
+      id: "positionCode",
+      label: t("employees.list.columns.position"),
+      accessorKey: "positionCode",
+      dataType: "string",
+      sourceType: "document",
+      defaultVisible: true,
+      lockedVisible: false,
+      sortable: true,
+      filterable: true,
+      exportable: true,
+      selectable: true,
+      defaultSize: 140,
+      rendererType: "text",
+      performanceCost: "low",
+      filterKind: "text",
+    },
+    {
+      id: "departmentCode",
+      label: t("employees.list.columns.department"),
+      accessorKey: "departmentCode",
+      dataType: "string",
+      sourceType: "document",
+      defaultVisible: true,
+      lockedVisible: false,
+      sortable: true,
+      filterable: true,
+      exportable: true,
+      selectable: true,
+      defaultSize: 120,
+      rendererType: "text",
+      performanceCost: "low",
+      filterKind: "text",
+    },
+    {
+      id: "primaryRoleCode",
+      label: t("employees.list.columns.primaryRole"),
+      accessorKey: "primaryRoleCode",
+      dataType: "enum",
+      sourceType: "document",
+      defaultVisible: true,
+      lockedVisible: false,
+      sortable: true,
+      filterable: true,
+      exportable: true,
+      selectable: true,
+      defaultSize: 120,
+      rendererType: "text",
+      performanceCost: "low",
+      filterKind: "enum",
+      enumField: "primaryRoleCode",
+    },
+    {
+      id: "managerDisplay",
+      label: t("employees.list.columns.manager"),
+      accessorKey: "managerDisplay",
+      dataType: "string",
+      sourceType: "derived",
+      defaultVisible: true,
+      lockedVisible: false,
+      sortable: true,
+      filterable: true,
+      exportable: true,
+      selectable: true,
+      defaultSize: 130,
+      rendererType: "text",
+      performanceCost: "low",
+      filterKind: "text",
+    },
+    {
+      id: "isErpUser",
+      label: t("employees.list.columns.erpUser"),
+      accessorKey: "isErpUser",
+      dataType: "boolean",
+      sourceType: "document",
+      defaultVisible: true,
+      lockedVisible: false,
+      sortable: true,
+      filterable: true,
+      exportable: true,
+      selectable: true,
+      defaultSize: 96,
+      minSize: 88,
+      rendererType: "boolean-badge",
+      performanceCost: "low",
+      filterKind: "boolean",
+    },
+    {
+      id: "accessStatus",
+      label: t("employees.list.columns.accessStatus"),
+      accessorKey: "accessStatus",
+      dataType: "enum",
+      sourceType: "document",
+      defaultVisible: true,
+      lockedVisible: false,
+      sortable: true,
+      filterable: true,
+      exportable: true,
+      selectable: true,
+      defaultSize: 120,
+      rendererType: "status-badge",
+      performanceCost: "low",
+      filterKind: "enum",
+      enumField: "accessStatus",
+    },
+    {
+      id: "availabilityKind",
+      label: t("employees.list.columns.availability"),
+      accessorKey: "availabilityKind",
+      dataType: "enum",
+      sourceType: "document",
+      defaultVisible: true,
+      lockedVisible: false,
+      sortable: true,
+      filterable: true,
+      exportable: true,
+      selectable: true,
+      defaultSize: 130,
+      rendererType: "status-badge",
+      performanceCost: "low",
+      filterKind: "enum",
+      enumField: "availabilityKind",
+    },
+    {
+      id: "lastLoginAt",
+      label: t("employees.list.columns.lastLogin"),
+      accessorKey: "lastLoginAt",
+      dataType: "datetime",
+      sourceType: "document",
+      defaultVisible: true,
+      lockedVisible: false,
+      sortable: true,
+      filterable: true,
+      exportable: true,
+      selectable: true,
+      defaultSize: 150,
+      minSize: 130,
+      rendererType: "date",
+      performanceCost: "low",
+      filterKind: "text",
+    },
+  ];
+}

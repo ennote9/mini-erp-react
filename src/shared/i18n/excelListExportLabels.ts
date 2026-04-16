@@ -66,6 +66,27 @@ export function suppliersListExcelLabels(t: TFunction): ExcelListSheetLabels {
   };
 }
 
+export function employeesListExcelLabels(t: TFunction): ExcelListSheetLabels {
+  return {
+    sheetName: t("exportExcel.list.employees"),
+    headers: [
+      t("exportExcel.list.colNo"),
+      t("employees.list.columns.employeeCode"),
+      t("employees.list.columns.fullName"),
+      t("employees.list.columns.displayName"),
+      t("employees.list.columns.status"),
+      t("employees.list.columns.position"),
+      t("employees.list.columns.department"),
+      t("employees.list.columns.primaryRole"),
+      t("employees.list.columns.manager"),
+      t("employees.list.columns.erpUser"),
+      t("employees.list.columns.accessStatus"),
+      t("employees.list.columns.availability"),
+      t("employees.list.columns.lastLogin"),
+    ],
+  };
+}
+
 export function customersListExcelLabels(t: TFunction): ExcelListSheetLabels {
   return {
     sheetName: t("exportExcel.list.customers"),

@@ -16,7 +16,8 @@ export type ListViewEntityType =
   | "categories"
   | "barcodes"
   | "markdown-journal-journals"
-  | "markdown-journal-codes";
+  | "markdown-journal-codes"
+  | "employees";
 
 export type ListViewFieldDataType =
   | "string"

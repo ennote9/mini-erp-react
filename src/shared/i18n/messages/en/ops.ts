@@ -222,6 +222,14 @@ export const opsEn = {
       searchAria: "Search categories",
       searchPlaceholder: "Search",
     },
+    employees: {
+      emptyFiltered: "No employees match current search or filters",
+      emptyDefault: "No employees yet",
+      hintFilter: "Try changing the search or filter.",
+      hintCreate: "Create an employee record for identity, access, and responsibility.",
+      searchAria: "Search employees",
+      searchPlaceholder: "Search",
+    },
     suppliers: {
       emptyFiltered: "No suppliers match current search or filters",
       emptyDefault: "No suppliers yet",

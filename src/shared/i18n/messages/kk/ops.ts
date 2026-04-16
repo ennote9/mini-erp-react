@@ -224,6 +224,14 @@ export const kkOps: MessageTree = {
       searchAria: "Санаттарды іздеу",
       searchPlaceholder: "Іздеу",
     },
+    employees: {
+      emptyFiltered: "Қызметкерлерді ағымдағы іздеу немесе сүзгімен сәйкестендіру мүмкін емес",
+      emptyDefault: "Әлі қызметкерлер жоқ",
+      hintFilter: "Іздеу немесе сүзгіні өзгертіп көріңіз.",
+      hintCreate: "Бірінші қызметкер жазбасын жеке басқару, кіру және жауапкершілік үшін жасаңыз.",
+      searchAria: "Қызметкерлерді іздеу",
+      searchPlaceholder: "Іздеу",
+    },
     suppliers: {
       emptyFiltered: "Ағымдағы іздеу немесе сүзгілер бойынша жеткізушілер жоқ",
       emptyDefault: "Жеткізушілер әлі жоқ",

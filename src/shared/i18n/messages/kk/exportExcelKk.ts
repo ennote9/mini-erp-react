@@ -39,6 +39,7 @@ export const kkExportExcel: MessageTree = {
     customers: "Клиенттер",
     warehouses: "Қоймалар",
     carriers: "Тасымалдаушылар",
+    employees: "Қызметкерлер",
     items: "Тауарлар",
     purchaseOrders: "Сатып алу тапсырыстары",
     salesOrders: "Сату тапсырыстары",

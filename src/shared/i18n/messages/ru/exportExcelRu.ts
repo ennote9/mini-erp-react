@@ -39,6 +39,7 @@ export const ruExportExcel: MessageTree = {
     customers: "Клиенты",
     warehouses: "Склады",
     carriers: "Перевозчики",
+    employees: "Сотрудники",
     items: "Номенклатура",
     purchaseOrders: "Заказы поставщикам",
     salesOrders: "Заказы клиентов",

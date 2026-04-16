@@ -224,6 +224,14 @@ export const ruOps: MessageTree = {
       searchAria: "Поиск категорий",
       searchPlaceholder: "Поиск",
     },
+    employees: {
+      emptyFiltered: "Нет сотрудников по текущему поиску или фильтрам",
+      emptyDefault: "Сотрудников пока нет",
+      hintFilter: "Измените поиск или фильтр.",
+      hintCreate: "Создайте первую карточку сотрудника для идентичности, доступа и ответственности.",
+      searchAria: "Поиск сотрудников",
+      searchPlaceholder: "Поиск",
+    },
     suppliers: {
       emptyFiltered: "Нет поставщиков по текущему поиску или фильтрам",
       emptyDefault: "Поставщиков пока нет",

@@ -10,10 +10,12 @@ import { masterPagesEn } from "./masterPages";
 import { issuesMessagesEn } from "./issuesMessages";
 import { exportExcelEn } from "./exportExcelEn";
 import { financeEn } from "./finance";
+import { employeesPagesEn } from "./employeesPages";
 
 /** English message tree (source of truth + fallback). */
 export const enMessages: MessageTree = {
   ...coreEn,
+  ...employeesPagesEn,
   settings: settingsEn as unknown as MessageTree,
   dashboard: dashboardEn as unknown as MessageTree,
   domain: domainEn as unknown as MessageTree,

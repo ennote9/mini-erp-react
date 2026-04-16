@@ -40,6 +40,7 @@ export const exportExcelEn: MessageTree = {
     customers: "Customers",
     warehouses: "Warehouses",
     carriers: "Carriers",
+    employees: "Employees",
     items: "Items",
     purchaseOrders: "Purchase orders",
     salesOrders: "Sales orders",
