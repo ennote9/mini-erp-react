@@ -1,170 +1,222 @@
-import { useEffect, useMemo, useRef, useState, useCallback } from "react";
+/**
+ * Markdown Journal register — journals + markdown codes lists (TanStack, Items / Movements pattern).
+ */
+import { functionalUpdate, type ColumnSizingState, type OnChangeFn, type RowSelectionState, type SortingState } from "@tanstack/react-table";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
-import { AgGridReact } from "ag-grid-react";
-import type { ColDef } from "ag-grid-community";
 import { Button } from "@/components/ui/button";
 import { ButtonGroup, ButtonGroupSeparator } from "@/components/ui/button-group";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { ChevronDown, File, FileSpreadsheet, FolderOpen, X } from "lucide-react";
+import { ChevronDown, File, FileSpreadsheet, FolderOpen, SlidersHorizontal, X } from "lucide-react";
 import { save } from "@tauri-apps/plugin-dialog";
 import { invoke } from "@tauri-apps/api/core";
 import { revealItemInDir } from "@tauri-apps/plugin-opener";
-import { itemRepository } from "@/modules/items/repository";
-import { warehouseRepository } from "@/modules/warehouses/repository";
-import { markdownRepository } from "../repository";
-import { markdownJournalRepository } from "../journalRepository";
-import { markdownJournalLineRepository } from "../journalLineRepository";
-import type { MarkdownJournalStatus } from "../model";
-import { useTranslation } from "@/shared/i18n/context";
-import { useAppDisplayFormatters } from "@/shared/formatting";
-import { useAppReadModelRevision } from "@/shared/inventoryMasterPageBlocks/useAppReadModelRevision";
 import { ListPageLayout } from "@/shared/ui/list/ListPageLayout";
 import { ListPageSearch } from "@/shared/ui/list/ListPageSearch";
 import { useListPageSearchHotkey } from "@/shared/hotkeys";
 import {
   AgGridColumnSettingsModal,
-  AgGridContainer,
   applyAgGridColumnFilters,
   applyDeepSortModel,
-  agGridDefaultColDef,
-  agGridDefaultGridOptions,
-  agGridSelectionColumnDef,
-  buildAgGridNoRowsOverlayTemplate,
-  buildExportMatrixFromRowNodes,
-  collectFilteredSortedRowNodes,
-  decorateAgGridColumnDefsWithFilters,
   getAgGridNoRowsOverlayContent,
-  getAgGridRowNumberColDef,
-  getVisibleAgGridExportColumns,
   hasMeaningfulTextSelection,
-  type AgGridColumnFilterConfig,
-  useAgGridColumnFilterBridge,
   useAgGridColumnSettings,
-  useAgGridNoRowsOverlayLifecycle,
+  type AgGridColumnFilterConfig,
 } from "@/shared/ui/ag-grid";
-import {
-  MARKDOWN_JOURNAL_STATUS_FILTERS,
-} from "../pageConfig";
-import { applyUrlGridSort, getCurrentGridSort, readUrlGridSort, serializeUrlGridSort } from "@/shared/navigation/agGridSort";
+import { useTranslation } from "@/shared/i18n/context";
+import { useAppDisplayFormatters } from "@/shared/formatting";
+import { useAppReadModelRevision } from "@/shared/inventoryMasterPageBlocks/useAppReadModelRevision";
+import { readUrlGridSort, serializeUrlGridSort, type UrlGridSort } from "@/shared/navigation/agGridSort";
 import {
   hasActiveAgGridColumnFilters,
   readUrlAgGridColumnFilters,
-  replaceUrlAgGridColumnFilters,
-  type AgGridColumnFilterClause,
   withUrlAgGridColumnFilters,
 } from "@/shared/navigation/agGridColumnFilters";
+import {
+  buildUrlGridSortFromDeepSortRules,
+  pruneDeepSortRulesByHiddenFields,
+  type ListViewDeepFilterRule,
+} from "@/shared/ui/ag-grid/listViewConfig";
 import { appendReturnTo, buildNavigationStateKey, buildReturnToValue, replaceQueryParam } from "@/shared/navigation/returnTo";
 import { useSessionScrollRestore } from "@/shared/navigation/useSessionScrollRestore";
 import { buildReadableUniqueFilename, ensureUniqueExportPath } from "@/shared/export/filenameBuilder";
 import { buildListViewXlsxBuffer } from "@/shared/export/listViewXlsx";
+import { ItemsHeaderFilterPanel } from "@/modules/items/ItemsHeaderFilterPanel";
+import { buildMarkdownCodesListViewCatalog, buildMarkdownJournalsListViewCatalog } from "../markdownJournalListViewFieldCatalog";
+import { buildJournalRows, buildMarkdownCodeRows, type JournalRow, type MarkdownCodeRow } from "../markdownJournalListRowModel";
+import { buildMarkdownJournalTableListViewState } from "../markdownJournalListViewState";
+import {
+  buildMarkdownCodesTableSchema,
+  buildMarkdownJournalsTableSchema,
+  type MarkdownJournalTanstackColumnSchema,
+} from "../markdownJournalTableSchema";
+import {
+  buildMarkdownCodesTanstackColumns,
+  buildMarkdownJournalsTanstackColumns,
+  formatMarkdownCodeTableValue,
+  formatMarkdownJournalTableValue,
+} from "../markdownJournalTanstackColumns";
+import { MarkdownJournalTanstackTable } from "../MarkdownJournalTanstackTable";
+import { markdownJournalLineRepository } from "../journalLineRepository";
 
 type MarkdownRegisterView = "journals" | "codes";
 
-type JournalRow = {
-  id: string;
-  number: string;
-  status: MarkdownJournalStatus;
-  sourceWarehouseLabel: string;
-  targetWarehouseLabel: string;
-  lineCount: number;
-  totalQty: number;
-  createdAt: string;
-  postedAt: string;
-  comment: string;
+const JOURNAL_COLUMN_SIZING_STORAGE_KEY = "mini-erp:markdown-journal:journals:tanstack:columnSizing:v1";
+const CODE_COLUMN_SIZING_STORAGE_KEY = "mini-erp:markdown-journal:codes:tanstack:columnSizing:v1";
+const MAX_REASONABLE_COLUMN_SIZE = 1200;
+
+type HeaderFilterAnchor = {
+  fieldId: string;
+  left: number;
+  top: number;
+  width: number;
+  height: number;
 };
 
-type MarkdownCodeRow = {
-  id: string;
-  journalId: string;
-  journalNumber: string;
-  itemId: string;
-  markdownCode: string;
-  itemCode: string;
-  itemName: string;
-  quantity: number;
-  markdownPrice: number;
-  warehouseLabel: string;
-  statusLabel: string;
-  reasonLabel: string;
-  postedAt: string;
-};
+type PendingHeaderFilterCommit =
+  | { type: "apply"; rule: ListViewDeepFilterRule }
+  | { type: "reset"; fieldKey: string };
 
-type ActiveRow = JournalRow | MarkdownCodeRow;
+const XLSX_MIME = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
 
-function journalStatusLabel(
-  status: MarkdownJournalStatus,
-  t: (key: string) => string,
-): string {
-  switch (status) {
-    case "draft":
-      return t("status.factual.draft");
-    case "posted":
-      return t("status.factual.posted");
-    case "cancelled":
-      return t("status.factual.cancelled");
-    default:
-      return status;
+function isTauriRuntime(): boolean {
+  return typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
+}
+
+function downloadBufferInBrowser(data: BlobPart, downloadFilename: string, mimeType: string) {
+  const blob = new Blob([data], { type: mimeType });
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = downloadFilename;
+  anchor.rel = "noopener";
+  anchor.style.display = "none";
+  document.body.appendChild(anchor);
+  anchor.click();
+  anchor.remove();
+  window.setTimeout(() => {
+    URL.revokeObjectURL(url);
+  }, 30_000);
+}
+
+function coerceWriteBufferResult(data: unknown): ArrayBuffer {
+  if (data instanceof ArrayBuffer) return data;
+  if (ArrayBuffer.isView(data)) {
+    const view = data as DataView | Uint8Array | Int8Array;
+    return new Uint8Array(view.buffer, view.byteOffset, view.byteLength).slice().buffer;
+  }
+  throw new Error(`unexpected workbook buffer type: ${Object.prototype.toString.call(data)}`);
+}
+
+function readPersistedColumnSizing(storageKey: string): ColumnSizingState {
+  if (typeof window === "undefined") return {};
+  try {
+    const raw = window.localStorage.getItem(storageKey);
+    if (!raw) return {};
+    const parsed = JSON.parse(raw) as unknown;
+    if (!parsed || typeof parsed !== "object") return {};
+    return parsed as ColumnSizingState;
+  } catch {
+    return {};
   }
 }
 
-function warehouseLabelFor(id: string): string {
-  const warehouse = warehouseRepository.getById(id);
-  return warehouse ? `${warehouse.code} — ${warehouse.name}` : id;
+function writePersistedColumnSizing(storageKey: string, value: ColumnSizingState) {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(storageKey, JSON.stringify(value));
+  } catch {
+    // ignore
+  }
+}
+
+function sanitizeColumnSizing(
+  value: ColumnSizingState,
+  schema: MarkdownJournalTanstackColumnSchema[],
+): ColumnSizingState {
+  const schemaById = new Map(schema.map((column) => [column.id, column]));
+  const sanitized: ColumnSizingState = {};
+
+  for (const [columnId, rawSize] of Object.entries(value)) {
+    const column = schemaById.get(columnId);
+    if (!column) continue;
+    if (typeof rawSize !== "number" || !Number.isFinite(rawSize)) continue;
+
+    const min = column.minSize ?? 48;
+    const max = Math.min(column.maxSize ?? MAX_REASONABLE_COLUMN_SIZE, MAX_REASONABLE_COLUMN_SIZE);
+    const nextSize = Math.max(min, Math.min(max, Math.round(rawSize)));
+    sanitized[columnId] = nextSize;
+  }
+
+  return sanitized;
 }
 
 export function MarkdownJournalPage() {
-  const { t } = useTranslation();
+  const { t, locale } = useTranslation();
   const { formatMoney } = useAppDisplayFormatters();
   const location = useLocation();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const appRevision = useAppReadModelRevision();
-  const prefillItemId = searchParams.get("itemId") ?? "";
-  const viewFromQuery = searchParams.get("view");
 
-  const search = searchParams.get("q") ?? "";
+  const viewFromQuery = searchParams.get("view");
   const [view, setView] = useState<MarkdownRegisterView>(
     viewFromQuery === "codes" || viewFromQuery === "lines" ? "codes" : "journals",
   );
-  const [runtimeSortSerialized, setRuntimeSortSerialized] = useState("");
+  const isJournalView = view === "journals";
+
+  const searchQuery = searchParams.get("q") ?? "";
+  const searchParamsSort = searchParams.get("sort") ?? "";
+  const prefillItemId = searchParams.get("itemId") ?? "";
+
   const [exportOpen, setExportOpen] = useState(false);
-  const [selectedCount, setSelectedCount] = useState(0);
   const [exportSuccess, setExportSuccess] = useState<{ path: string; filename: string } | null>(null);
+  const [rowSelection, setRowSelection] = useState<RowSelectionState>({});
+  const [pendingSortModel, setPendingSortModel] = useState<UrlGridSort[] | null>(null);
+  const [journalColumnSizing, setJournalColumnSizing] = useState<ColumnSizingState>(() =>
+    readPersistedColumnSizing(JOURNAL_COLUMN_SIZING_STORAGE_KEY),
+  );
+  const [codeColumnSizing, setCodeColumnSizing] = useState<ColumnSizingState>(() =>
+    readPersistedColumnSizing(CODE_COLUMN_SIZING_STORAGE_KEY),
+  );
+  const [headerFilterAnchor, setHeaderFilterAnchor] = useState<HeaderFilterAnchor | null>(null);
+  const [pendingHeaderFilterCommit, setPendingHeaderFilterCommit] = useState<PendingHeaderFilterCommit | null>(null);
+  const headerFilterCommitViewRef = useRef<MarkdownRegisterView>(view);
+  const [runtimeSortSerialized, setRuntimeSortSerialized] = useState(() =>
+    serializeUrlGridSort(readUrlGridSort(new URLSearchParams(location.search))),
+  );
+
   const listSearchInputRef = useRef<HTMLInputElement>(null);
-  const gridRef = useRef<AgGridReact<ActiveRow> | null>(null);
   const gridContainerRef = useRef<HTMLDivElement | null>(null);
   useListPageSearchHotkey(listSearchInputRef);
+
   const listStateKey = useMemo(
     () => buildNavigationStateKey(location.pathname, searchParams),
     [location.pathname, searchParams],
   );
   useSessionScrollRestore(listStateKey, gridContainerRef);
+
   const currentReturnTo = useMemo(
     () => buildReturnToValue(location.pathname, location.search),
     [location.pathname, location.search],
   );
-  const initialSortModel = useMemo(
-    () => readUrlGridSort(new URLSearchParams(location.search)),
-    [location.search],
-  );
-  const columnFilterModel = useMemo(
-    () => readUrlAgGridColumnFilters(new URLSearchParams(location.search)),
-    [location.search],
-  );
-
-  useEffect(() => {
-    setRuntimeSortSerialized(serializeUrlGridSort(initialSortModel));
-  }, [initialSortModel]);
 
   useEffect(() => {
     const nextView = viewFromQuery === "codes" || viewFromQuery === "lines" ? "codes" : "journals";
     setView(nextView);
   }, [viewFromQuery]);
 
-  const createTarget = useMemo(() => {
-    if (!prefillItemId) return "/markdown-journal/new";
-    return `/markdown-journal/new?itemId=${encodeURIComponent(prefillItemId)}`;
-  }, [prefillItemId]);
+  useEffect(() => {
+    setRowSelection({});
+  }, [view]);
+
+  useEffect(() => {
+    writePersistedColumnSizing(JOURNAL_COLUMN_SIZING_STORAGE_KEY, journalColumnSizing);
+  }, [journalColumnSizing]);
+
+  useEffect(() => {
+    writePersistedColumnSizing(CODE_COLUMN_SIZING_STORAGE_KEY, codeColumnSizing);
+  }, [codeColumnSizing]);
 
   const setQueryValue = useCallback(
     (key: string, value: string, defaultValue = "") => {
@@ -173,47 +225,150 @@ export function MarkdownJournalPage() {
     [searchParams, setSearchParams],
   );
 
-  const handleSortChanged = useCallback(() => {
-    const api = gridRef.current?.api;
-    if (!api) return;
-    const serialized = serializeUrlGridSort(getCurrentGridSort(api, ["selection", "lineNo"]));
-    setRuntimeSortSerialized(serialized);
-    replaceQueryParam(searchParams, setSearchParams, "sort", serialized);
-  }, [searchParams, setSearchParams]);
+  const columnFilterModel = useMemo(
+    () => readUrlAgGridColumnFilters(new URLSearchParams(location.search)),
+    [location.search],
+  );
 
-  const journalRows = useMemo<JournalRow[]>(() => {
-    return markdownJournalRepository
-      .list()
-      .map((journal) => {
-        const lines = markdownJournalLineRepository.listByJournalId(journal.id);
-        return {
-          id: journal.id,
-          number: journal.number,
-          status: journal.status,
-          sourceWarehouseLabel: warehouseLabelFor(journal.sourceWarehouseId),
-          targetWarehouseLabel: warehouseLabelFor(journal.targetWarehouseId),
-          lineCount: lines.length,
-          totalQty: lines.reduce((sum, line) => sum + line.quantity, 0),
-          createdAt: journal.createdAt,
-          postedAt: journal.postedAt ?? t("domain.audit.summary.emDash"),
-          comment: journal.comment ?? "",
-        };
-      })
-      .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
-  }, [appRevision, t]);
+  const journalRows = useMemo(() => buildJournalRows(t), [appRevision, t]);
+  const codeRows = useMemo(() => buildMarkdownCodeRows(t), [appRevision, t]);
+
+  const journalsTableSchema = useMemo(() => buildMarkdownJournalsTableSchema({ t }), [t, locale]);
+  const codesTableSchema = useMemo(() => buildMarkdownCodesTableSchema({ t }), [t, locale]);
+
+  useEffect(() => {
+    setJournalColumnSizing((current) => {
+      const next = sanitizeColumnSizing(current, journalsTableSchema);
+      if (
+        Object.keys(current).length === Object.keys(next).length &&
+        Object.keys(current).every((key) => current[key] === next[key])
+      ) {
+        return current;
+      }
+      return next;
+    });
+  }, [journalsTableSchema]);
+
+  useEffect(() => {
+    setCodeColumnSizing((current) => {
+      const next = sanitizeColumnSizing(current, codesTableSchema);
+      if (
+        Object.keys(current).length === Object.keys(next).length &&
+        Object.keys(current).every((key) => current[key] === next[key])
+      ) {
+        return current;
+      }
+      return next;
+    });
+  }, [codesTableSchema]);
+
+  const journalsListViewCatalog = useMemo(
+    () => buildMarkdownJournalsListViewCatalog({ t, journalRows }),
+    [t, journalRows],
+  );
+  const codesListViewCatalog = useMemo(() => buildMarkdownCodesListViewCatalog({ t, codeRows }), [t, codeRows]);
+
+  const journalColumnFilterConfigs = journalsListViewCatalog.filterConfigs;
+  const codeColumnFilterConfigs = codesListViewCatalog.filterConfigs;
+
+  const {
+    draftItems: journalDraftItems,
+    draftDeepFilters: journalDraftDeepFilters,
+    draftDeepSorts: journalDraftDeepSorts,
+    settingsOpen: journalSettingsOpen,
+    openSettings: openJournalSettings,
+    setDraftItems: setJournalDraftItems,
+    setDraftDeepFilters: setJournalDraftDeepFilters,
+    setDraftDeepSorts: setJournalDraftDeepSorts,
+    applyDraft: applyJournalDraft,
+    resetDraftToDefaults: resetJournalDraftToDefaults,
+    cancelDraft: cancelJournalDraft,
+    deepFilterModel: journalDeepFilterModel,
+    deepSortModel: journalDeepSortModel,
+    definition: journalDefinition,
+    registry: journalRegistry,
+    personalViews: journalPersonalViews,
+    activeViewId: journalActiveViewId,
+    activeViewName: journalActiveViewName,
+    hasUnsavedChanges: journalHasUnsavedChanges,
+    activatePersonalView: activateJournalPersonalView,
+    createPersonalViewFromCurrent: createJournalPersonalViewFromCurrent,
+    saveActivePersonalViewFromCurrent: saveJournalActivePersonalViewFromCurrent,
+    renameActivePersonalView: renameJournalActivePersonalView,
+    deleteActivePersonalView: deleteJournalActivePersonalView,
+    setActivePersonalViewAsDefault: setJournalActivePersonalViewAsDefault,
+  } = useAgGridColumnSettings<JournalRow>({
+    pageKey: "markdown-journal:journals",
+    entityType: "markdown-journal-journals",
+    baseColumnDefs: journalsListViewCatalog.columnDefs,
+    fieldRegistry: journalsListViewCatalog.fieldRegistry,
+    allowHiddenFilterSort: true,
+  });
+
+  const {
+    draftItems: codeDraftItems,
+    draftDeepFilters: codeDraftDeepFilters,
+    draftDeepSorts: codeDraftDeepSorts,
+    settingsOpen: codeSettingsOpen,
+    openSettings: openCodeSettings,
+    setDraftItems: setCodeDraftItems,
+    setDraftDeepFilters: setCodeDraftDeepFilters,
+    setDraftDeepSorts: setCodeDraftDeepSorts,
+    applyDraft: applyCodeDraft,
+    resetDraftToDefaults: resetCodeDraftToDefaults,
+    cancelDraft: cancelCodeDraft,
+    deepFilterModel: codeDeepFilterModel,
+    deepSortModel: codeDeepSortModel,
+    definition: codeDefinition,
+    registry: codeRegistry,
+    personalViews: codePersonalViews,
+    activeViewId: codeActiveViewId,
+    activeViewName: codeActiveViewName,
+    hasUnsavedChanges: codeHasUnsavedChanges,
+    activatePersonalView: activateCodePersonalView,
+    createPersonalViewFromCurrent: createCodePersonalViewFromCurrent,
+    saveActivePersonalViewFromCurrent: saveCodeActivePersonalViewFromCurrent,
+    renameActivePersonalView: renameCodeActivePersonalView,
+    deleteActivePersonalView: deleteCodeActivePersonalView,
+    setActivePersonalViewAsDefault: setCodeActivePersonalViewAsDefault,
+  } = useAgGridColumnSettings<MarkdownCodeRow>({
+    pageKey: "markdown-journal:codes",
+    entityType: "markdown-journal-codes",
+    baseColumnDefs: codesListViewCatalog.columnDefs,
+    fieldRegistry: codesListViewCatalog.fieldRegistry,
+    allowHiddenFilterSort: true,
+  });
+
+  const activeDeepSortModel = isJournalView ? journalDeepSortModel : codeDeepSortModel;
+
+  const effectiveSortModel = useMemo(() => {
+    if (pendingSortModel) return pendingSortModel;
+    const urlSort = readUrlGridSort(new URLSearchParams(searchParamsSort ? `sort=${searchParamsSort}` : ""));
+    const runtimeSort =
+      runtimeSortSerialized === "" ? [] : readUrlGridSort(new URLSearchParams(`sort=${runtimeSortSerialized}`));
+    if (runtimeSort.length > 0 && runtimeSortSerialized !== searchParamsSort) return runtimeSort;
+    if (urlSort.length > 0) return urlSort;
+    if (runtimeSort.length > 0) return runtimeSort;
+    return activeDeepSortModel;
+  }, [pendingSortModel, searchParamsSort, runtimeSortSerialized, activeDeepSortModel]);
+
+  useEffect(() => {
+    if (!pendingSortModel) return;
+    const pendingSerialized = serializeUrlGridSort(pendingSortModel);
+    if (pendingSerialized === searchParamsSort) {
+      setPendingSortModel(null);
+    }
+  }, [pendingSortModel, searchParamsSort]);
 
   const filteredJournalRows = useMemo(() => {
     let base = journalRows;
     if (prefillItemId) {
       const allowed = new Set(
-        markdownJournalLineRepository
-          .list()
-          .filter((line) => line.itemId === prefillItemId)
-          .map((line) => line.journalId),
+        markdownJournalLineRepository.list().filter((line) => line.itemId === prefillItemId).map((line) => line.journalId),
       );
       base = base.filter((row) => allowed.has(row.id));
     }
-    const q = search.trim().toLowerCase();
+    const q = searchQuery.trim().toLowerCase();
     if (q) {
       base = base.filter((row) => {
         if (row.number.toLowerCase().includes(q)) return true;
@@ -224,84 +379,14 @@ export function MarkdownJournalPage() {
       });
     }
     return base;
-  }, [journalRows, prefillItemId, search, appRevision]);
-
-  const journalColumnFilterConfigs = useMemo<Record<string, AgGridColumnFilterConfig<JournalRow>>>(
-    () => ({
-      number: { kind: "text" },
-      status: {
-        kind: "enum",
-        options: MARKDOWN_JOURNAL_STATUS_FILTERS
-          .filter((value): value is MarkdownJournalStatus => value !== "all")
-          .map((value) => ({ value, label: journalStatusLabel(value, t) })),
-      },
-      sourceWarehouseLabel: {
-        kind: "enum",
-        options: Array.from(new Set(journalRows.map((row) => row.sourceWarehouseLabel)))
-          .filter(Boolean)
-          .sort((a, b) => a.localeCompare(b))
-          .map((value) => ({ value, label: value })),
-      },
-      targetWarehouseLabel: {
-        kind: "enum",
-        options: Array.from(new Set(journalRows.map((row) => row.targetWarehouseLabel)))
-          .filter(Boolean)
-          .sort((a, b) => a.localeCompare(b))
-          .map((value) => ({ value, label: value })),
-      },
-      lineCount: { kind: "number" },
-      totalQty: { kind: "number" },
-      createdAt: { kind: "datetime" },
-      postedAt: { kind: "datetime" },
-    }),
-    [journalRows, t],
-  );
-
-  const displayJournalRowsWithQueryFilters = useMemo(
-    () => applyAgGridColumnFilters(filteredJournalRows, columnFilterModel, journalColumnFilterConfigs),
-    [filteredJournalRows, columnFilterModel, journalColumnFilterConfigs],
-  );
-
-  const codeRows = useMemo<MarkdownCodeRow[]>(() => {
-    return markdownJournalRepository
-      .list()
-      .filter((journal) => journal.status === "posted")
-      .flatMap((journal) => {
-        return markdownRepository.list()
-          .filter((record) => {
-            if (record.journalId === journal.id) return true;
-            if (!journal.legacySourceIds || journal.legacySourceIds.length === 0) return false;
-            const batchId = record.batchId?.trim();
-            return journal.legacySourceIds.includes(record.id) || (!!batchId && journal.legacySourceIds.includes(batchId));
-          })
-          .map((record) => {
-            const item = itemRepository.getById(record.itemId);
-            return {
-              id: record.id,
-              journalId: journal.id,
-              journalNumber: record.journalNumber ?? journal.number,
-              itemId: record.itemId,
-              markdownCode: record.markdownCode,
-              itemCode: item?.code ?? record.itemId,
-              itemName: item?.name ?? record.itemId,
-              quantity: 1,
-              markdownPrice: record.markdownPrice,
-              warehouseLabel: warehouseLabelFor(record.warehouseId),
-              statusLabel: t(`markdown.status.${record.status}`),
-              reasonLabel: t(`markdown.reason.${record.reasonCode}`),
-              postedAt: journal.postedAt ?? record.createdAt,
-            };
-          });
-      })
-      .sort((a, b) => b.postedAt.localeCompare(a.postedAt) || b.journalNumber.localeCompare(a.journalNumber));
-  }, [appRevision, t]);
+  }, [journalRows, prefillItemId, searchQuery, appRevision]);
 
   const filteredCodeRows = useMemo(() => {
     let base = codeRows;
     if (prefillItemId) {
       base = base.filter((row) => row.itemId === prefillItemId);
     }
-    const q = search.trim().toLowerCase();
+    const q = searchQuery.trim().toLowerCase();
     if (q) {
       base = base.filter((row) => {
         if (row.journalNumber.toLowerCase().includes(q)) return true;
@@ -315,196 +400,17 @@ export function MarkdownJournalPage() {
       });
     }
     return base;
-  }, [codeRows, prefillItemId, search]);
+  }, [codeRows, prefillItemId, searchQuery]);
 
-  const codeColumnFilterConfigs = useMemo<Record<string, AgGridColumnFilterConfig<MarkdownCodeRow>>>(
-    () => ({
-      markdownCode: { kind: "text" },
-      journalNumber: { kind: "text" },
-      itemCode: { kind: "text" },
-      itemName: { kind: "text" },
-      quantity: { kind: "number" },
-      markdownPrice: { kind: "number" },
-      warehouseLabel: {
-        kind: "enum",
-        options: Array.from(new Set(codeRows.map((row) => row.warehouseLabel)))
-          .filter(Boolean)
-          .sort((a, b) => a.localeCompare(b))
-          .map((value) => ({ value, label: value })),
-      },
-      statusLabel: {
-        kind: "enum",
-        options: Array.from(new Set(codeRows.map((row) => row.statusLabel)))
-          .filter(Boolean)
-          .sort((a, b) => a.localeCompare(b))
-          .map((value) => ({ value, label: value })),
-      },
-      reasonLabel: {
-        kind: "enum",
-        options: Array.from(new Set(codeRows.map((row) => row.reasonLabel)))
-          .filter(Boolean)
-          .sort((a, b) => a.localeCompare(b))
-          .map((value) => ({ value, label: value })),
-      },
-      postedAt: { kind: "datetime" },
-    }),
-    [codeRows],
+  const displayJournalRowsWithQueryFilters = useMemo(
+    () => applyAgGridColumnFilters(filteredJournalRows, columnFilterModel, journalColumnFilterConfigs),
+    [filteredJournalRows, columnFilterModel, journalColumnFilterConfigs],
   );
 
   const displayCodeRowsWithQueryFilters = useMemo(
     () => applyAgGridColumnFilters(filteredCodeRows, columnFilterModel, codeColumnFilterConfigs),
     [filteredCodeRows, columnFilterModel, codeColumnFilterConfigs],
   );
-
-  const baseJournalColumnDefs = useMemo<ColDef<JournalRow>[]>(
-    () => [
-      getAgGridRowNumberColDef(t),
-      {
-        field: "number",
-        headerName: t("doc.columns.number"),
-        minWidth: 150,
-        width: 170,
-      },
-      {
-        field: "status",
-        headerName: t("common.status"),
-        minWidth: 120,
-        width: 130,
-        valueFormatter: (params) => (params.value ? journalStatusLabel(params.value, t) : ""),
-      },
-      {
-        field: "sourceWarehouseLabel",
-        headerName: t("markdown.fields.sourceWarehouse"),
-        minWidth: 180,
-        width: 190,
-      },
-      {
-        field: "targetWarehouseLabel",
-        headerName: t("markdown.fields.targetWarehouse"),
-        minWidth: 180,
-        flex: 1,
-      },
-      {
-        field: "lineCount",
-        headerName: t("markdown.fields.lineCount"),
-        width: 100,
-        minWidth: 90,
-      },
-      {
-        field: "totalQty",
-        headerName: t("markdown.fields.totalQty"),
-        width: 120,
-        minWidth: 110,
-      },
-      {
-        field: "createdAt",
-        headerName: t("markdown.fields.createdAt"),
-        minWidth: 180,
-        width: 200,
-      },
-      {
-        field: "postedAt",
-        headerName: t("markdown.fields.postedAt"),
-        minWidth: 180,
-        width: 200,
-      },
-    ],
-    [t],
-  );
-
-  const baseCodeColumnDefs = useMemo<ColDef<MarkdownCodeRow>[]>(
-    () => [
-      getAgGridRowNumberColDef(t),
-      {
-        field: "markdownCode",
-        headerName: t("markdown.fields.markdownCode"),
-        width: 150,
-        minWidth: 140,
-      },
-      {
-        field: "journalNumber",
-        headerName: t("markdown.fields.journalNumber"),
-        width: 150,
-        minWidth: 140,
-      },
-      {
-        field: "itemCode",
-        headerName: t("doc.columns.itemCode"),
-        width: 120,
-        minWidth: 110,
-      },
-      {
-        field: "itemName",
-        headerName: t("doc.columns.itemName"),
-        minWidth: 220,
-        flex: 1,
-      },
-      {
-        field: "quantity",
-        headerName: t("doc.columns.qty"),
-        width: 90,
-        minWidth: 80,
-      },
-      {
-        field: "markdownPrice",
-        headerName: t("markdown.fields.markdownPrice"),
-        width: 140,
-        minWidth: 130,
-        valueFormatter: (params) =>
-          typeof params.value === "number" ? formatMoney(params.value, 2, "") : "",
-      },
-      {
-        field: "warehouseLabel",
-        headerName: t("markdown.fields.targetWarehouse"),
-        minWidth: 160,
-        width: 180,
-      },
-      {
-        field: "statusLabel",
-        headerName: t("common.status"),
-        minWidth: 120,
-        width: 130,
-      },
-      {
-        field: "reasonLabel",
-        headerName: t("markdown.fields.reason"),
-        minWidth: 180,
-        width: 220,
-      },
-      {
-        field: "postedAt",
-        headerName: t("markdown.fields.postedAt"),
-        minWidth: 180,
-        width: 200,
-      },
-    ],
-    [t, formatMoney],
-  );
-
-  const journalSettings = useAgGridColumnSettings<JournalRow>({
-    pageKey: "markdown-journal:journals",
-    entityType: "markdown-journal-journals",
-    baseColumnDefs: baseJournalColumnDefs,
-  });
-  const codeSettings = useAgGridColumnSettings<MarkdownCodeRow>({
-    pageKey: "markdown-journal:codes",
-    entityType: "markdown-journal-codes",
-    baseColumnDefs: baseCodeColumnDefs,
-  });
-
-  const journalEffectiveSortModel = useMemo(() => {
-    const params = new URLSearchParams();
-    if (runtimeSortSerialized !== "") params.set("sort", runtimeSortSerialized);
-    const runtime = readUrlGridSort(params);
-    return runtime.length > 0 ? runtime : journalSettings.deepSortModel;
-  }, [runtimeSortSerialized, journalSettings.deepSortModel]);
-
-  const codeEffectiveSortModel = useMemo(() => {
-    const params = new URLSearchParams();
-    if (runtimeSortSerialized !== "") params.set("sort", runtimeSortSerialized);
-    const runtime = readUrlGridSort(params);
-    return runtime.length > 0 ? runtime : codeSettings.deepSortModel;
-  }, [runtimeSortSerialized, codeSettings.deepSortModel]);
 
   const resolveJournalSortValue = useCallback(
     (row: JournalRow, fieldKey: string): unknown => {
@@ -514,6 +420,7 @@ export function MarkdownJournalPage() {
     },
     [journalColumnFilterConfigs],
   );
+
   const resolveCodeSortValue = useCallback(
     (row: MarkdownCodeRow, fieldKey: string): unknown => {
       const config = codeColumnFilterConfigs[fieldKey];
@@ -528,17 +435,17 @@ export function MarkdownJournalPage() {
       applyDeepSortModel({
         rows: applyAgGridColumnFilters(
           displayJournalRowsWithQueryFilters,
-          journalSettings.deepFilterModel,
+          journalDeepFilterModel,
           journalColumnFilterConfigs,
         ),
-        sortModel: journalEffectiveSortModel,
+        sortModel: effectiveSortModel,
         getFieldValue: resolveJournalSortValue,
       }),
     [
       displayJournalRowsWithQueryFilters,
-      journalSettings.deepFilterModel,
+      journalDeepFilterModel,
       journalColumnFilterConfigs,
-      journalEffectiveSortModel,
+      effectiveSortModel,
       resolveJournalSortValue,
     ],
   );
@@ -548,122 +455,373 @@ export function MarkdownJournalPage() {
       applyDeepSortModel({
         rows: applyAgGridColumnFilters(
           displayCodeRowsWithQueryFilters,
-          codeSettings.deepFilterModel,
+          codeDeepFilterModel,
           codeColumnFilterConfigs,
         ),
-        sortModel: codeEffectiveSortModel,
+        sortModel: effectiveSortModel,
         getFieldValue: resolveCodeSortValue,
       }),
     [
       displayCodeRowsWithQueryFilters,
-      codeSettings.deepFilterModel,
+      codeDeepFilterModel,
       codeColumnFilterConfigs,
-      codeEffectiveSortModel,
+      effectiveSortModel,
       resolveCodeSortValue,
     ],
   );
 
-  const isJournalView = view === "journals";
-  const activeRows = isJournalView ? displayJournalRows : displayCodeRows;
-  const activeSettings = isJournalView ? journalSettings : codeSettings;
-  const activeFilterConfigs = isJournalView ? journalColumnFilterConfigs : codeColumnFilterConfigs;
-  const activeEntityType = isJournalView ? "markdown-journal-journals" : "markdown-journal-codes";
-  const activeSortModel = isJournalView ? journalEffectiveSortModel : codeEffectiveSortModel;
-
-  const searchActive = search.trim() !== "";
-  const filtersActive =
-    prefillItemId !== "" ||
-    hasActiveAgGridColumnFilters(columnFilterModel);
-
-  const baseRowsCount = isJournalView ? journalRows.length : codeRows.length;
-  const noRowsOverlayTemplate = useMemo(
+  const neutralJournalListViewState = useMemo(
     () =>
-      buildAgGridNoRowsOverlayTemplate(
-        getAgGridNoRowsOverlayContent(
-          {
-            baseRowCount: baseRowsCount,
-            visibleRowCount: activeRows.length,
-            searchActive,
-            filtersActive,
-          },
-          t,
-        ),
-      ),
-    [baseRowsCount, activeRows.length, searchActive, filtersActive, t],
+      buildMarkdownJournalTableListViewState({
+        definition: journalDefinition,
+        columnFilterModel,
+        sortModel: effectiveSortModel,
+        personalViews: journalPersonalViews,
+        activeViewId: journalActiveViewId,
+      }),
+    [journalDefinition, columnFilterModel, effectiveSortModel, journalPersonalViews, journalActiveViewId],
   );
 
-  useAgGridNoRowsOverlayLifecycle(gridRef, noRowsOverlayTemplate, activeRows.length);
-
-  const handleApplyColumnFilter = useCallback(
-    (colId: string, clause: AgGridColumnFilterClause) => {
-      replaceUrlAgGridColumnFilters(searchParams, setSearchParams, {
-        ...columnFilterModel,
-        [colId]: clause,
-      });
-    },
-    [columnFilterModel, searchParams, setSearchParams],
-  );
-
-  const handleResetColumnFilter = useCallback(
-    (colId: string) => {
-      const nextModel = { ...columnFilterModel };
-      delete nextModel[colId];
-      replaceUrlAgGridColumnFilters(searchParams, setSearchParams, nextModel);
-    },
-    [columnFilterModel, searchParams, setSearchParams],
-  );
-  const columnFilterBridge = useAgGridColumnFilterBridge(
-    columnFilterModel,
-    handleApplyColumnFilter,
-    handleResetColumnFilter,
-  );
-
-  const columnDefs = useMemo(
+  const neutralCodeListViewState = useMemo(
     () =>
-      decorateAgGridColumnDefsWithFilters(
-        (activeSettings.columnDefs as ColDef<ActiveRow>[]),
-        activeFilterConfigs as Record<string, AgGridColumnFilterConfig<ActiveRow>>,
-        columnFilterBridge,
-      ),
-    [activeSettings.columnDefs, activeFilterConfigs, columnFilterBridge],
+      buildMarkdownJournalTableListViewState({
+        definition: codeDefinition,
+        columnFilterModel,
+        sortModel: effectiveSortModel,
+        personalViews: codePersonalViews,
+        activeViewId: codeActiveViewId,
+      }),
+    [codeDefinition, columnFilterModel, effectiveSortModel, codePersonalViews, codeActiveViewId],
   );
+
+  const fallbackJournalColumnVisibility = useMemo<Record<string, boolean>>(
+    () =>
+      Object.fromEntries(
+        journalsTableSchema.map((column) => [column.id, column.lockedVisible ? true : column.defaultVisible]),
+      ),
+    [journalsTableSchema],
+  );
+  const fallbackJournalColumnOrder = useMemo(() => journalsTableSchema.map((column) => column.id), [journalsTableSchema]);
+
+  const fallbackCodeColumnVisibility = useMemo<Record<string, boolean>>(
+    () =>
+      Object.fromEntries(
+        codesTableSchema.map((column) => [column.id, column.lockedVisible ? true : column.defaultVisible]),
+      ),
+    [codesTableSchema],
+  );
+  const fallbackCodeColumnOrder = useMemo(() => codesTableSchema.map((column) => column.id), [codesTableSchema]);
+
+  const journalTableColumnVisibility = useMemo(() => {
+    const visibility = neutralJournalListViewState.columnVisibility;
+    return Object.keys(visibility).length > 0 ? visibility : fallbackJournalColumnVisibility;
+  }, [neutralJournalListViewState.columnVisibility, fallbackJournalColumnVisibility]);
+
+  const journalTableColumnOrder = useMemo(
+    () =>
+      neutralJournalListViewState.columnOrder.length > 0 ? neutralJournalListViewState.columnOrder : fallbackJournalColumnOrder,
+    [neutralJournalListViewState.columnOrder, fallbackJournalColumnOrder],
+  );
+
+  const codeTableColumnVisibility = useMemo(() => {
+    const visibility = neutralCodeListViewState.columnVisibility;
+    return Object.keys(visibility).length > 0 ? visibility : fallbackCodeColumnVisibility;
+  }, [neutralCodeListViewState.columnVisibility, fallbackCodeColumnVisibility]);
+
+  const codeTableColumnOrder = useMemo(
+    () => (neutralCodeListViewState.columnOrder.length > 0 ? neutralCodeListViewState.columnOrder : fallbackCodeColumnOrder),
+    [neutralCodeListViewState.columnOrder, fallbackCodeColumnOrder],
+  );
+
+  const journalTanstackSorting = useMemo<SortingState>(
+    () => neutralJournalListViewState.sorting.map((entry) => ({ id: entry.id, desc: entry.direction === "desc" })),
+    [neutralJournalListViewState.sorting],
+  );
+
+  const codeTanstackSorting = useMemo<SortingState>(
+    () => neutralCodeListViewState.sorting.map((entry) => ({ id: entry.id, desc: entry.direction === "desc" })),
+    [neutralCodeListViewState.sorting],
+  );
+
+  const handleJournalColumnSizingChange = useCallback<OnChangeFn<ColumnSizingState>>((updater) => {
+    setJournalColumnSizing((current) => sanitizeColumnSizing(functionalUpdate(updater, current), journalsTableSchema));
+  }, [journalsTableSchema]);
+
+  const handleCodeColumnSizingChange = useCallback<OnChangeFn<ColumnSizingState>>((updater) => {
+    setCodeColumnSizing((current) => sanitizeColumnSizing(functionalUpdate(updater, current), codesTableSchema));
+  }, [codesTableSchema]);
+
+  const handleTanstackSortingChange = useCallback(
+    (updater: SortingState | ((old: SortingState) => SortingState)) => {
+      const base = isJournalView ? journalTanstackSorting : codeTanstackSorting;
+      const nextSorting = functionalUpdate(updater, base);
+      const nextSortModel = nextSorting.map((entry) => ({
+        colId: entry.id,
+        sort: entry.desc ? ("desc" as const) : ("asc" as const),
+      })) as UrlGridSort[];
+      const nextValue = serializeUrlGridSort(nextSortModel);
+      setPendingSortModel(nextSortModel);
+      setRuntimeSortSerialized(nextValue);
+      replaceQueryParam(searchParams, setSearchParams, "sort", nextValue);
+    },
+    [isJournalView, journalTanstackSorting, codeTanstackSorting, searchParams, setSearchParams],
+  );
+
+  const registryByFieldKey = useMemo(() => {
+    const reg = isJournalView ? journalRegistry : codeRegistry;
+    return new Map(reg.map((entry) => [entry.fieldKey, entry]));
+  }, [isJournalView, journalRegistry, codeRegistry]);
+
+  const activeDefinition = isJournalView ? journalDefinition : codeDefinition;
+  const activeDeepFilterFieldState = useMemo(() => {
+    const activeFieldMap: Record<string, boolean> = {};
+    for (const rule of activeDefinition?.deepFilters ?? []) {
+      if (rule.enabled !== true) continue;
+      activeFieldMap[rule.fieldKey] = true;
+    }
+    return activeFieldMap;
+  }, [activeDefinition]);
+
+  const appliedRuleByFieldKey = useMemo(() => {
+    const map = new Map<string, ListViewDeepFilterRule>();
+    for (const rule of activeDefinition?.deepFilters ?? []) {
+      if (!map.has(rule.fieldKey)) map.set(rule.fieldKey, rule);
+    }
+    return map;
+  }, [activeDefinition]);
+
+  const activeHeaderFilterField = headerFilterAnchor?.fieldId ?? null;
+  const activeHeaderFilterRegistryField = activeHeaderFilterField
+    ? registryByFieldKey.get(activeHeaderFilterField) ?? null
+    : null;
+  const activeHeaderFilterConfig =
+    activeHeaderFilterField != null
+      ? (isJournalView ? journalColumnFilterConfigs[activeHeaderFilterField] : codeColumnFilterConfigs[activeHeaderFilterField])
+      : undefined;
+  const activeHeaderFilterRule =
+    activeHeaderFilterField != null ? appliedRuleByFieldKey.get(activeHeaderFilterField) ?? null : null;
+
+  const journalDataColumns = useMemo(
+    () => buildMarkdownJournalsTanstackColumns({ schema: journalsTableSchema, t }),
+    [journalsTableSchema, t],
+  );
+
+  const codeDataColumns = useMemo(
+    () => buildMarkdownCodesTanstackColumns({ schema: codesTableSchema, t, formatMoney }),
+    [codesTableSchema, t, formatMoney],
+  );
+
+  const buildApplyColumnSettingsHandler = useCallback(
+    (params: {
+      applyDraft: () => { hiddenIds: string[] };
+      draftDeepSorts: typeof journalDraftDeepSorts;
+      deepSortModel: UrlGridSort[];
+      effectiveSort: UrlGridSort[];
+    }) => {
+      const { hiddenIds } = params.applyDraft();
+      const prunedDraftDeepSorts = pruneDeepSortRulesByHiddenFields(params.draftDeepSorts, hiddenIds);
+      const nextDeepSortModel = buildUrlGridSortFromDeepSortRules(prunedDraftDeepSorts);
+      const nextDeepSortSerialized = serializeUrlGridSort(nextDeepSortModel);
+      const currentDeepSortSerialized = serializeUrlGridSort(params.deepSortModel);
+      const currentRuntimeSortSerialized = searchParamsSort;
+      const deepSortsChanged = nextDeepSortSerialized !== currentDeepSortSerialized;
+      const shouldSyncToDeepSort =
+        nextDeepSortModel.length > 0 && currentRuntimeSortSerialized !== nextDeepSortSerialized;
+      const runtimeUsesDeepSort =
+        (currentRuntimeSortSerialized === "" && params.deepSortModel.length > 0) ||
+        currentRuntimeSortSerialized === currentDeepSortSerialized;
+
+      let nextSortModel = params.effectiveSort;
+      if (deepSortsChanged || shouldSyncToDeepSort) {
+        if (nextDeepSortModel.length > 0) {
+          nextSortModel = nextDeepSortModel;
+        } else if (runtimeUsesDeepSort) {
+          nextSortModel = [];
+        }
+      } else if (hiddenIds.length > 0) {
+        nextSortModel = params.effectiveSort.filter((entry) => !hiddenIds.includes(entry.colId));
+      }
+
+      let nextParams = new URLSearchParams(searchParams);
+      if (hiddenIds.length > 0) {
+        const nextColumnFilterModel = { ...columnFilterModel };
+        for (const colId of hiddenIds) delete nextColumnFilterModel[colId];
+        nextParams = withUrlAgGridColumnFilters(nextParams, nextColumnFilterModel);
+      }
+
+      const nextSortSerialized = serializeUrlGridSort(nextSortModel);
+      if (nextSortSerialized === "") nextParams.delete("sort");
+      else nextParams.set("sort", nextSortSerialized);
+
+      setPendingSortModel(nextSortModel);
+      setSearchParams(nextParams, { replace: true });
+      setRuntimeSortSerialized(nextSortSerialized);
+    },
+    [columnFilterModel, searchParams, searchParamsSort, setSearchParams],
+  );
+
+  const handleApplyJournalColumnSettings = useCallback(() => {
+    buildApplyColumnSettingsHandler({
+      applyDraft: applyJournalDraft,
+      draftDeepSorts: journalDraftDeepSorts,
+      deepSortModel: journalDeepSortModel,
+      effectiveSort: effectiveSortModel,
+    });
+  }, [buildApplyColumnSettingsHandler, applyJournalDraft, journalDraftDeepSorts, journalDeepSortModel, effectiveSortModel]);
+
+  const handleApplyCodeColumnSettings = useCallback(() => {
+    buildApplyColumnSettingsHandler({
+      applyDraft: applyCodeDraft,
+      draftDeepSorts: codeDraftDeepSorts,
+      deepSortModel: codeDeepSortModel,
+      effectiveSort: effectiveSortModel,
+    });
+  }, [buildApplyColumnSettingsHandler, applyCodeDraft, codeDraftDeepSorts, codeDeepSortModel, effectiveSortModel]);
+
+  const handleHeaderFilterApply = useCallback(
+    (nextRule: ListViewDeepFilterRule) => {
+      headerFilterCommitViewRef.current = isJournalView ? "journals" : "codes";
+      if (isJournalView) {
+        setJournalDraftDeepFilters((prev) => {
+          const others = prev.filter((rule) => rule.fieldKey !== nextRule.fieldKey);
+          return [...others, { ...nextRule, priority: others.length }];
+        });
+      } else {
+        setCodeDraftDeepFilters((prev) => {
+          const others = prev.filter((rule) => rule.fieldKey !== nextRule.fieldKey);
+          return [...others, { ...nextRule, priority: others.length }];
+        });
+      }
+      setHeaderFilterAnchor(null);
+      setPendingHeaderFilterCommit({ type: "apply", rule: nextRule });
+    },
+    [isJournalView, setJournalDraftDeepFilters, setCodeDraftDeepFilters],
+  );
+
+  const handleHeaderFilterReset = useCallback(() => {
+    if (!activeHeaderFilterField) return;
+    headerFilterCommitViewRef.current = isJournalView ? "journals" : "codes";
+    if (isJournalView) {
+      setJournalDraftDeepFilters((prev) => prev.filter((rule) => rule.fieldKey !== activeHeaderFilterField));
+    } else {
+      setCodeDraftDeepFilters((prev) => prev.filter((rule) => rule.fieldKey !== activeHeaderFilterField));
+    }
+    setHeaderFilterAnchor(null);
+    setPendingHeaderFilterCommit({ type: "reset", fieldKey: activeHeaderFilterField });
+  }, [
+    activeHeaderFilterField,
+    isJournalView,
+    setJournalDraftDeepFilters,
+    setCodeDraftDeepFilters,
+  ]);
 
   useEffect(() => {
-    const api = gridRef.current?.api;
-    if (!api) return;
-    applyUrlGridSort(api, activeSortModel);
-  }, [columnDefs, activeSortModel]);
+    if (!pendingHeaderFilterCommit) return;
+    if (headerFilterCommitViewRef.current === "journals") {
+      handleApplyJournalColumnSettings();
+    } else {
+      handleApplyCodeColumnSettings();
+    }
+    setPendingHeaderFilterCommit(null);
+  }, [pendingHeaderFilterCommit, handleApplyJournalColumnSettings, handleApplyCodeColumnSettings]);
 
-  const buildExportPayload = useCallback(
-    (mode: "current" | "selected"): { headers: string[]; rows: Array<Array<string | number>> } => {
-      const api = gridRef.current?.api;
-      if (!api) return { headers: [], rows: [] };
-      const columns = getVisibleAgGridExportColumns(api, { entityType: activeEntityType });
-      const rowNodes =
-        mode === "selected"
-          ? api.getSelectedNodes()
-          : collectFilteredSortedRowNodes(api);
+  const visibleJournalSchemaColumns = useMemo(() => {
+    const schemaById = new Map(journalsTableSchema.map((column) => [column.id, column]));
+    return journalTableColumnOrder
+      .map((id) => schemaById.get(id))
+      .filter((column): column is MarkdownJournalTanstackColumnSchema => Boolean(column))
+      .filter((column) => journalTableColumnVisibility[column.id] !== false);
+  }, [journalsTableSchema, journalTableColumnOrder, journalTableColumnVisibility]);
+
+  const visibleCodeSchemaColumns = useMemo(() => {
+    const schemaById = new Map(codesTableSchema.map((column) => [column.id, column]));
+    return codeTableColumnOrder
+      .map((id) => schemaById.get(id))
+      .filter((column): column is MarkdownJournalTanstackColumnSchema => Boolean(column))
+      .filter((column) => codeTableColumnVisibility[column.id] !== false);
+  }, [codesTableSchema, codeTableColumnOrder, codeTableColumnVisibility]);
+
+  const buildExportPayloadForJournalRows = useCallback(
+    (rows: JournalRow[]): { headers: string[]; rows: Array<Array<string | number>> } => {
+      const rowsOut = rows.map((row, index) =>
+        visibleJournalSchemaColumns.map((column) =>
+          formatMarkdownJournalTableValue({
+            column,
+            value:
+              column.id === "lineNo"
+                ? index + 1
+                : row[(column.accessorKey ?? column.id) as keyof JournalRow],
+            t,
+            rowIndex: index,
+          }),
+        ),
+      );
       return {
-        headers: columns.map((x) => x.headerName),
-        rows: buildExportMatrixFromRowNodes(api, columns, rowNodes),
+        headers: visibleJournalSchemaColumns.map((column) => column.label),
+        rows: rowsOut,
       };
     },
-    [activeEntityType],
+    [visibleJournalSchemaColumns, t],
+  );
+
+  const buildExportPayloadForCodeRows = useCallback(
+    (rows: MarkdownCodeRow[]): { headers: string[]; rows: Array<Array<string | number>> } => {
+      const rowsOut = rows.map((row, index) =>
+        visibleCodeSchemaColumns.map((column) =>
+          formatMarkdownCodeTableValue({
+            column,
+            value:
+              column.id === "lineNo"
+                ? index + 1
+                : row[(column.accessorKey ?? column.id) as keyof MarkdownCodeRow],
+            t,
+            formatMoney,
+            rowIndex: index,
+          }),
+        ),
+      );
+      return {
+        headers: visibleCodeSchemaColumns.map((column) => column.label),
+        rows: rowsOut,
+      };
+    },
+    [visibleCodeSchemaColumns, t, formatMoney],
   );
 
   const runExportWithSaveAs = useCallback(
-    async (defaultFilename: string, buildBuffer: () => Promise<ArrayBuffer>) => {
+    async (defaultFilename: string, buildBuffer: () => Promise<ArrayBuffer | Uint8Array>) => {
+      const extension = defaultFilename.toLowerCase().endsWith(".pdf") ? "pdf" : "xlsx";
+      const base = defaultFilename.replace(/\.[^.]+$/, "");
+      const generatedFilename = buildReadableUniqueFilename({ base, extension });
+      const fallbackMime = extension === "pdf" ? "application/pdf" : XLSX_MIME;
+      const tauri = isTauriRuntime();
+
+      if (!tauri) {
+        try {
+          const raw = await buildBuffer();
+          const buffer = coerceWriteBufferResult(raw);
+          downloadBufferInBrowser(buffer, generatedFilename, fallbackMime);
+        } catch (err) {
+          console.error("Export failed", err);
+        }
+        return;
+      }
+
       try {
-        const base = defaultFilename.replace(/\.[^.]+$/, "");
-        const generatedFilename = buildReadableUniqueFilename({ base, extension: "xlsx" });
         const path = await save({
           defaultPath: generatedFilename,
           filters: [{ name: t("ops.importModal.excelFileFilterName"), extensions: ["xlsx"] }],
         });
-        if (path == null) return;
-        const safePath = await ensureUniqueExportPath(path);
+        if (path == null) {
+          const raw = await buildBuffer();
+          const buffer = coerceWriteBufferResult(raw);
+          downloadBufferInBrowser(buffer, generatedFilename, fallbackMime);
+          return;
+        }
 
-        const buffer = await buildBuffer();
+        const safePath = await ensureUniqueExportPath(path);
+        const raw = await buildBuffer();
+        const buffer = coerceWriteBufferResult(raw);
         const bytes = new Uint8Array(buffer);
         let binary = "";
         for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
@@ -673,112 +831,274 @@ export function MarkdownJournalPage() {
         const filename = safePath.replace(/^.*[/\\]/, "") || generatedFilename;
         setExportSuccess({ path: safePath, filename });
       } catch (err) {
-        void err;
-        const buffer = await buildBuffer();
-        const blob = new Blob([buffer], {
-          type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement("a");
-        a.href = url;
-        a.download = defaultFilename;
-        a.click();
-        URL.revokeObjectURL(url);
+        console.error("Export failed", err);
+        try {
+          const raw = await buildBuffer();
+          const buffer = coerceWriteBufferResult(raw);
+          downloadBufferInBrowser(buffer, generatedFilename, fallbackMime);
+        } catch (fallbackErr) {
+          console.error("Export browser fallback failed", fallbackErr);
+        }
       }
     },
     [t],
   );
 
-  const handleExportCurrentView = useCallback(() => {
-    const payload = buildExportPayload("current");
+  const handleExportCurrentView = useCallback(async () => {
+    const payload = isJournalView
+      ? buildExportPayloadForJournalRows(displayJournalRows)
+      : buildExportPayloadForCodeRows(displayCodeRows);
     const sheetName = isJournalView ? t("markdown.journal.journalsTab") : t("markdown.journal.markdownCodesTab");
     const tableNameBase = isJournalView ? "MarkdownJournalsListView" : "MarkdownCodesListView";
-    runExportWithSaveAs(
-      isJournalView ? "markdown-journals.xlsx" : "markdown-codes.xlsx",
-      () =>
+    const defaultFilename = isJournalView ? "markdown-journals.xlsx" : "markdown-codes.xlsx";
+
+    if (payload.headers.length === 0) {
+      await runExportWithSaveAs(defaultFilename, () =>
         buildListViewXlsxBuffer({
           sheetName,
-          headers: payload.headers,
-          rows: payload.rows,
+          headers: ["—"],
+          rows: [["No visible columns. Use View settings to show at least one column, then export again."]],
           tableNameBase,
         }),
+      );
+      return;
+    }
+    await runExportWithSaveAs(defaultFilename, async () =>
+      buildListViewXlsxBuffer({
+        sheetName,
+        headers: payload.headers,
+        rows: payload.rows,
+        tableNameBase,
+      }),
     );
-  }, [buildExportPayload, isJournalView, runExportWithSaveAs, t]);
+  }, [
+    isJournalView,
+    buildExportPayloadForJournalRows,
+    buildExportPayloadForCodeRows,
+    displayJournalRows,
+    displayCodeRows,
+    runExportWithSaveAs,
+    t,
+  ]);
 
-  const handleExportSelected = useCallback(() => {
-    const payload = buildExportPayload("selected");
+  const handleExportSelectedRows = useCallback(async () => {
+    const selectedJournal = displayJournalRows.filter((row) => rowSelection[row.id] === true);
+    const selectedCode = displayCodeRows.filter((row) => rowSelection[row.id] === true);
+    const payload = isJournalView
+      ? buildExportPayloadForJournalRows(selectedJournal)
+      : buildExportPayloadForCodeRows(selectedCode);
     if (payload.rows.length === 0) return;
+
     const sheetName = isJournalView ? t("markdown.journal.journalsTab") : t("markdown.journal.markdownCodesTab");
     const tableNameBase = isJournalView ? "MarkdownJournalsListViewSelected" : "MarkdownCodesListViewSelected";
-    runExportWithSaveAs(
-      isJournalView ? "markdown-journals-selected.xlsx" : "markdown-codes-selected.xlsx",
-      () =>
+    const defaultFilename = isJournalView ? "markdown-journals-selected.xlsx" : "markdown-codes-selected.xlsx";
+
+    if (payload.headers.length === 0) {
+      await runExportWithSaveAs(defaultFilename, () =>
         buildListViewXlsxBuffer({
           sheetName,
-          headers: payload.headers,
-          rows: payload.rows,
+          headers: ["—"],
+          rows: [["No visible columns. Use View settings to show at least one column, then export again."]],
           tableNameBase,
         }),
+      );
+      return;
+    }
+    await runExportWithSaveAs(defaultFilename, async () =>
+      buildListViewXlsxBuffer({
+        sheetName,
+        headers: payload.headers,
+        rows: payload.rows,
+        tableNameBase,
+      }),
     );
-  }, [buildExportPayload, isJournalView, runExportWithSaveAs, t]);
-
-  const handleApplyJournalColumnSettings = useCallback(() => {
-    const api = gridRef.current?.api;
-    const { hiddenIds, nextItems } = journalSettings.applyDraft();
-    if (api) {
-      api.applyColumnState({
-        state: nextItems.map((item) => ({ colId: item.id, hide: item.visible ? false : true })),
-        applyOrder: true,
-      });
-    }
-    if (hiddenIds.length === 0) return;
-
-    const nextColumnFilterModel = { ...columnFilterModel };
-    for (const colId of hiddenIds) delete nextColumnFilterModel[colId];
-    const nextSortModel = journalEffectiveSortModel.filter((entry) => !hiddenIds.includes(entry.colId));
-    const nextParams = withUrlAgGridColumnFilters(searchParams, nextColumnFilterModel);
-    const nextSortSerialized = serializeUrlGridSort(nextSortModel);
-    if (nextSortSerialized === "") nextParams.delete("sort");
-    else nextParams.set("sort", nextSortSerialized);
-    setSearchParams(nextParams, { replace: true });
-    setRuntimeSortSerialized(nextSortSerialized);
-    if (api) applyUrlGridSort(api, nextSortModel);
   }, [
-    journalSettings,
-    columnFilterModel,
-    journalEffectiveSortModel,
-    searchParams,
-    setSearchParams,
+    isJournalView,
+    buildExportPayloadForJournalRows,
+    buildExportPayloadForCodeRows,
+    displayJournalRows,
+    displayCodeRows,
+    rowSelection,
+    runExportWithSaveAs,
+    t,
   ]);
 
-  const handleApplyCodeColumnSettings = useCallback(() => {
-    const api = gridRef.current?.api;
-    const { hiddenIds, nextItems } = codeSettings.applyDraft();
-    if (api) {
-      api.applyColumnState({
-        state: nextItems.map((item) => ({ colId: item.id, hide: item.visible ? false : true })),
-        applyOrder: true,
-      });
-    }
-    if (hiddenIds.length === 0) return;
+  const handleRowSelectionChange = useCallback<OnChangeFn<RowSelectionState>>((updater) => {
+    setRowSelection((prev) => functionalUpdate(updater, prev));
+  }, []);
 
-    const nextColumnFilterModel = { ...columnFilterModel };
-    for (const colId of hiddenIds) delete nextColumnFilterModel[colId];
-    const nextSortModel = codeEffectiveSortModel.filter((entry) => !hiddenIds.includes(entry.colId));
-    const nextParams = withUrlAgGridColumnFilters(searchParams, nextColumnFilterModel);
-    const nextSortSerialized = serializeUrlGridSort(nextSortModel);
-    if (nextSortSerialized === "") nextParams.delete("sort");
-    else nextParams.set("sort", nextSortSerialized);
-    setSearchParams(nextParams, { replace: true });
-    setRuntimeSortSerialized(nextSortSerialized);
-    if (api) applyUrlGridSort(api, nextSortModel);
-  }, [
-    codeSettings,
-    columnFilterModel,
-    codeEffectiveSortModel,
-    searchParams,
-    setSearchParams,
-  ]);
+  const exportSelectedDisabled = useMemo(
+    () => !Object.values(rowSelection).some(Boolean),
+    [rowSelection],
+  );
+
+  const searchActive = searchQuery.trim() !== "";
+  const filtersActive = prefillItemId !== "" || hasActiveAgGridColumnFilters(columnFilterModel);
+  const baseRowsCount = isJournalView ? journalRows.length : codeRows.length;
+  const activeRows = isJournalView ? displayJournalRows : displayCodeRows;
+
+  const noRowsOverlay = useMemo(
+    () =>
+      getAgGridNoRowsOverlayContent(
+        {
+          baseRowCount: baseRowsCount,
+          visibleRowCount: activeRows.length,
+          searchActive,
+          filtersActive,
+        },
+        t,
+      ),
+    [baseRowsCount, activeRows.length, searchActive, filtersActive, t, locale],
+  );
+
+  const createTarget = useMemo(() => {
+    if (!prefillItemId) return "/markdown-journal/new";
+    return `/markdown-journal/new?itemId=${encodeURIComponent(prefillItemId)}`;
+  }, [prefillItemId]);
+
+  const handleRowNavigate = useCallback(
+    (row: JournalRow | MarkdownCodeRow) => {
+      if (hasMeaningfulTextSelection()) return;
+      if (isJournalView) {
+        navigate(appendReturnTo(`/markdown-journal/journals/${row.id}`, currentReturnTo));
+      } else {
+        navigate(appendReturnTo(`/markdown-journal/journals/${(row as MarkdownCodeRow).journalId}`, currentReturnTo));
+      }
+    },
+    [isJournalView, navigate, currentReturnTo],
+  );
+
+  const listContent = (
+    <>
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+        {isJournalView ? (
+          <MarkdownJournalTanstackTable<JournalRow>
+            rows={displayJournalRows}
+            schema={journalsTableSchema}
+            dataColumns={journalDataColumns}
+            selectRowAriaCode={(row) => row.number}
+            sorting={journalTanstackSorting}
+            columnVisibility={journalTableColumnVisibility}
+            columnOrder={journalTableColumnOrder}
+            columnSizing={journalColumnSizing}
+            rowSelection={rowSelection}
+            onRowSelectionChange={handleRowSelectionChange}
+            onSortingChange={handleTanstackSortingChange}
+            onColumnSizingChange={handleJournalColumnSizingChange}
+            onHeaderFilterClick={(fieldId, anchorRect) => setHeaderFilterAnchor({ fieldId, ...anchorRect })}
+            headerFilterState={activeDeepFilterFieldState}
+            openHeaderFilterFieldId={activeHeaderFilterField}
+            t={t}
+            scrollContainerRef={gridContainerRef}
+            emptyState={noRowsOverlay}
+            onRowClick={handleRowNavigate}
+          />
+        ) : (
+          <MarkdownJournalTanstackTable<MarkdownCodeRow>
+            rows={displayCodeRows}
+            schema={codesTableSchema}
+            dataColumns={codeDataColumns}
+            selectRowAriaCode={(row) => row.markdownCode}
+            sorting={codeTanstackSorting}
+            columnVisibility={codeTableColumnVisibility}
+            columnOrder={codeTableColumnOrder}
+            columnSizing={codeColumnSizing}
+            rowSelection={rowSelection}
+            onRowSelectionChange={handleRowSelectionChange}
+            onSortingChange={handleTanstackSortingChange}
+            onColumnSizingChange={handleCodeColumnSizingChange}
+            onHeaderFilterClick={(fieldId, anchorRect) => setHeaderFilterAnchor({ fieldId, ...anchorRect })}
+            headerFilterState={activeDeepFilterFieldState}
+            openHeaderFilterFieldId={activeHeaderFilterField}
+            t={t}
+            scrollContainerRef={gridContainerRef}
+            emptyState={noRowsOverlay}
+            onRowClick={handleRowNavigate}
+          />
+        )}
+        <ItemsHeaderFilterPanel
+          open={headerFilterAnchor != null}
+          anchorRect={headerFilterAnchor}
+          field={activeHeaderFilterRegistryField}
+          filterConfig={activeHeaderFilterConfig as AgGridColumnFilterConfig<unknown> | undefined}
+          rule={activeHeaderFilterRule}
+          onOpenChange={(open) => {
+            if (!open) setHeaderFilterAnchor(null);
+          }}
+          onApply={handleHeaderFilterApply}
+          onReset={handleHeaderFilterReset}
+        />
+      </div>
+
+      {isJournalView ? (
+        <AgGridColumnSettingsModal
+          open={journalSettingsOpen}
+          onOpenChange={(nextOpen) => {
+            if (nextOpen) {
+              openJournalSettings();
+              return;
+            }
+            cancelJournalDraft();
+          }}
+          items={journalDraftItems}
+          onItemsChange={(nextItems) => setJournalDraftItems(() => nextItems)}
+          filterRules={journalDraftDeepFilters}
+          onFilterRulesChange={(nextRules) => setJournalDraftDeepFilters(() => nextRules)}
+          sortRules={journalDraftDeepSorts}
+          onSortRulesChange={(nextRules) => setJournalDraftDeepSorts(() => nextRules)}
+          registry={journalRegistry}
+          filterConfigs={journalColumnFilterConfigs as Record<string, AgGridColumnFilterConfig<unknown>>}
+          includeHiddenInFilterSort
+          personalViews={journalPersonalViews}
+          activeViewId={journalActiveViewId}
+          activeViewName={journalActiveViewName}
+          hasUnsavedChanges={journalHasUnsavedChanges}
+          onActivateView={activateJournalPersonalView}
+          onCreateView={createJournalPersonalViewFromCurrent}
+          onSaveChangesToActiveView={saveJournalActivePersonalViewFromCurrent}
+          onRenameActiveView={renameJournalActivePersonalView}
+          onDeleteActiveView={deleteJournalActivePersonalView}
+          onSetActiveAsDefault={setJournalActivePersonalViewAsDefault}
+          onApply={handleApplyJournalColumnSettings}
+          onCancel={cancelJournalDraft}
+          onReset={resetJournalDraftToDefaults}
+        />
+      ) : (
+        <AgGridColumnSettingsModal
+          open={codeSettingsOpen}
+          onOpenChange={(nextOpen) => {
+            if (nextOpen) {
+              openCodeSettings();
+              return;
+            }
+            cancelCodeDraft();
+          }}
+          items={codeDraftItems}
+          onItemsChange={(nextItems) => setCodeDraftItems(() => nextItems)}
+          filterRules={codeDraftDeepFilters}
+          onFilterRulesChange={(nextRules) => setCodeDraftDeepFilters(() => nextRules)}
+          sortRules={codeDraftDeepSorts}
+          onSortRulesChange={(nextRules) => setCodeDraftDeepSorts(() => nextRules)}
+          registry={codeRegistry}
+          filterConfigs={codeColumnFilterConfigs as Record<string, AgGridColumnFilterConfig<unknown>>}
+          includeHiddenInFilterSort
+          personalViews={codePersonalViews}
+          activeViewId={codeActiveViewId}
+          activeViewName={codeActiveViewName}
+          hasUnsavedChanges={codeHasUnsavedChanges}
+          onActivateView={activateCodePersonalView}
+          onCreateView={createCodePersonalViewFromCurrent}
+          onSaveChangesToActiveView={saveCodeActivePersonalViewFromCurrent}
+          onRenameActiveView={renameCodeActivePersonalView}
+          onDeleteActiveView={deleteCodeActivePersonalView}
+          onSetActiveAsDefault={setCodeActivePersonalViewAsDefault}
+          onApply={handleApplyCodeColumnSettings}
+          onCancel={cancelCodeDraft}
+          onReset={resetCodeDraftToDefaults}
+        />
+      )}
+    </>
+  );
 
   return (
     <ListPageLayout
@@ -815,7 +1135,7 @@ export function MarkdownJournalPage() {
                   ? t("markdown.journal.searchJournals")
                   : t("markdown.journal.searchMarkdownCodes")
               }
-              value={search}
+              value={searchQuery}
               onChange={(value) => setQueryValue("q", value)}
               debounceMs={220}
               aria-label={
@@ -828,7 +1148,9 @@ export function MarkdownJournalPage() {
             {exportSuccess && (
               <div className="h-8 w-max flex items-center gap-1.5 rounded-md border border-input bg-background px-2 text-sm shrink-0">
                 <span className="text-muted-foreground text-xs">{t("doc.list.exportCompleted")}</span>
-                <span className="font-medium text-xs truncate max-w-[12rem]" title={exportSuccess.filename}>{exportSuccess.filename}</span>
+                <span className="font-medium text-xs truncate max-w-[12rem]" title={exportSuccess.filename}>
+                  {exportSuccess.filename}
+                </span>
                 <Button
                   type="button"
                   variant="ghost"
@@ -882,7 +1204,13 @@ export function MarkdownJournalPage() {
                   variant="outline"
                   size="sm"
                   className="h-[1.625rem] rounded-r-none border-0 border-r border-input !px-1 !py-0 !gap-0.5"
-                  onClick={handleExportCurrentView}
+                  onClick={async () => {
+                    try {
+                      await handleExportCurrentView();
+                    } catch (err) {
+                      console.error("Export failed", err);
+                    }
+                  }}
                 >
                   <FileSpreadsheet className="h-4 w-4 shrink-0" />
                   {t("doc.list.export")}
@@ -903,12 +1231,18 @@ export function MarkdownJournalPage() {
                     <div className="flex flex-col gap-0.5">
                       <button
                         type="button"
-                        disabled={selectedCount === 0}
+                        disabled={exportSelectedDisabled}
                         className="w-full rounded-sm px-1.5 py-1 text-left text-sm hover:bg-accent disabled:cursor-not-allowed disabled:opacity-50"
-                        title={selectedCount === 0 ? t("doc.list.selectRowsForExport") : undefined}
-                        onClick={() => {
-                          setExportOpen(false);
-                          if (selectedCount > 0) handleExportSelected();
+                        title={exportSelectedDisabled ? t("doc.list.selectRowsForExport") : undefined}
+                        onClick={async () => {
+                          if (exportSelectedDisabled) return;
+                          try {
+                            await handleExportSelectedRows();
+                          } catch (err) {
+                            console.error("Export failed", err);
+                          } finally {
+                            setExportOpen(false);
+                          }
                         }}
                       >
                         {t("doc.list.exportSelectedRows")}
@@ -921,12 +1255,14 @@ export function MarkdownJournalPage() {
                 type="button"
                 variant="outline"
                 size="sm"
-                className="h-[1.625rem] shrink-0"
+                data-icon="inline-start"
+                className="h-[1.625rem] shrink-0 !gap-0.5"
                 onClick={() => {
-                  if (isJournalView) journalSettings.openSettings();
-                  else codeSettings.openSettings();
+                  if (isJournalView) openJournalSettings();
+                  else openCodeSettings();
                 }}
               >
+                <SlidersHorizontal className="h-4 w-4 shrink-0" aria-hidden />
                 {t("doc.list.viewSettings")}
               </Button>
               <Button
@@ -956,100 +1292,7 @@ export function MarkdownJournalPage() {
         </div>
       }
     >
-      <AgGridContainer ref={gridContainerRef} themeClass="markdown-journal-grid" gridRef={gridRef}>
-        <AgGridReact<ActiveRow>
-          {...agGridDefaultGridOptions}
-          ref={gridRef}
-          rowData={activeRows}
-          columnDefs={columnDefs}
-          defaultColDef={agGridDefaultColDef}
-          overlayNoRowsTemplate={noRowsOverlayTemplate}
-          onGridReady={(event) => {
-            applyUrlGridSort(event.api, activeSortModel);
-          }}
-          onSortChanged={handleSortChanged}
-          rowSelection={{ mode: "multiRow", checkboxes: true, headerCheckbox: true, enableClickSelection: true }}
-          selectionColumnDef={agGridSelectionColumnDef}
-          getRowId={(params) => params.data.id}
-          onSelectionChanged={(event) => setSelectedCount(event.api.getSelectedRows().length)}
-          onRowClicked={(event) => {
-            if (hasMeaningfulTextSelection()) return;
-            if (event.data) {
-              if (isJournalView) {
-                navigate(appendReturnTo(`/markdown-journal/journals/${event.data.id}`, currentReturnTo));
-              } else {
-                const row = event.data as MarkdownCodeRow;
-                navigate(appendReturnTo(`/markdown-journal/journals/${row.journalId}`, currentReturnTo));
-              }
-            }
-          }}
-        />
-      </AgGridContainer>
-      {isJournalView ? (
-        <AgGridColumnSettingsModal
-          open={journalSettings.settingsOpen}
-          onOpenChange={(nextOpen) => {
-            if (nextOpen) {
-              journalSettings.openSettings();
-              return;
-            }
-            journalSettings.cancelDraft();
-          }}
-          items={journalSettings.draftItems}
-          onItemsChange={(nextItems) => journalSettings.setDraftItems(() => nextItems)}
-          filterRules={journalSettings.draftDeepFilters}
-          onFilterRulesChange={(nextRules) => journalSettings.setDraftDeepFilters(() => nextRules)}
-          sortRules={journalSettings.draftDeepSorts}
-          onSortRulesChange={(nextRules) => journalSettings.setDraftDeepSorts(() => nextRules)}
-          registry={journalSettings.registry}
-          filterConfigs={journalColumnFilterConfigs as Record<string, AgGridColumnFilterConfig<unknown>>}
-          personalViews={journalSettings.personalViews}
-          activeViewId={journalSettings.activeViewId}
-          activeViewName={journalSettings.activeViewName}
-          hasUnsavedChanges={journalSettings.hasUnsavedChanges}
-          onActivateView={journalSettings.activatePersonalView}
-          onCreateView={journalSettings.createPersonalViewFromCurrent}
-          onSaveChangesToActiveView={journalSettings.saveActivePersonalViewFromCurrent}
-          onRenameActiveView={journalSettings.renameActivePersonalView}
-          onDeleteActiveView={journalSettings.deleteActivePersonalView}
-          onSetActiveAsDefault={journalSettings.setActivePersonalViewAsDefault}
-          onApply={handleApplyJournalColumnSettings}
-          onCancel={journalSettings.cancelDraft}
-          onReset={journalSettings.resetDraftToDefaults}
-        />
-      ) : (
-        <AgGridColumnSettingsModal
-          open={codeSettings.settingsOpen}
-          onOpenChange={(nextOpen) => {
-            if (nextOpen) {
-              codeSettings.openSettings();
-              return;
-            }
-            codeSettings.cancelDraft();
-          }}
-          items={codeSettings.draftItems}
-          onItemsChange={(nextItems) => codeSettings.setDraftItems(() => nextItems)}
-          filterRules={codeSettings.draftDeepFilters}
-          onFilterRulesChange={(nextRules) => codeSettings.setDraftDeepFilters(() => nextRules)}
-          sortRules={codeSettings.draftDeepSorts}
-          onSortRulesChange={(nextRules) => codeSettings.setDraftDeepSorts(() => nextRules)}
-          registry={codeSettings.registry}
-          filterConfigs={codeColumnFilterConfigs as Record<string, AgGridColumnFilterConfig<unknown>>}
-          personalViews={codeSettings.personalViews}
-          activeViewId={codeSettings.activeViewId}
-          activeViewName={codeSettings.activeViewName}
-          hasUnsavedChanges={codeSettings.hasUnsavedChanges}
-          onActivateView={codeSettings.activatePersonalView}
-          onCreateView={codeSettings.createPersonalViewFromCurrent}
-          onSaveChangesToActiveView={codeSettings.saveActivePersonalViewFromCurrent}
-          onRenameActiveView={codeSettings.renameActivePersonalView}
-          onDeleteActiveView={codeSettings.deleteActivePersonalView}
-          onSetActiveAsDefault={codeSettings.setActivePersonalViewAsDefault}
-          onApply={handleApplyCodeColumnSettings}
-          onCancel={codeSettings.cancelDraft}
-          onReset={codeSettings.resetDraftToDefaults}
-        />
-      )}
+      {listContent}
     </ListPageLayout>
   );
 }

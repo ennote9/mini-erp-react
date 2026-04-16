@@ -764,6 +764,7 @@ summary,
 
 /* Clickable list grids: row pointer cursor */
 .list-page__content > .items-grid.erp-ag-grid .ag-row,
+.list-page__content > .markdown-journal-tanstack-list tbody tr.cursor-pointer,
 .list-page__content > .markdown-journal-grid.erp-ag-grid .ag-row,
 .list-page__content > .customers-grid.erp-ag-grid .ag-row,
 .list-page__content > .suppliers-grid.erp-ag-grid .ag-row,
