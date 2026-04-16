@@ -776,13 +776,13 @@ summary,
   cursor: pointer;
 }
 
-/* Stock balances: net shortage (uncovered demand) */
-.list-page__content > .stock-balances-grid.erp-ag-grid .ag-row.stock-balances-row--tight-availability .ag-cell:first-child {
+/* Stock balances: net shortage (uncovered demand) — TanStack list */
+.list-page__content .stock-balances-tanstack-list tr.stock-balances-row--tight-availability td:first-child {
   box-shadow: inset 2px 0 0 0 hsl(32 50% 44% / 0.5);
 }
 
 /* Stock balances: at risk — gap covered by expected incoming only (lighter cue) */
-.list-page__content > .stock-balances-grid.erp-ag-grid .ag-row.stock-balances-row--at-risk .ag-cell:first-child {
+.list-page__content .stock-balances-tanstack-list tr.stock-balances-row--at-risk td:first-child {
   box-shadow: inset 2px 0 0 0 hsl(210 35% 42% / 0.28);
 }
 
