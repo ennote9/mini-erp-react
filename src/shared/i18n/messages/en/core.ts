@@ -14,6 +14,7 @@ export const coreEn = {
     back: "Back",
     search: "Search",
     loading: "Loading…",
+    noData: "No data",
     noResults: "No results",
     select: "Select",
     close: "Close",

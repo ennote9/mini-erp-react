@@ -1,14 +1,17 @@
 import {
   flexRender,
   getCoreRowModel,
+  getSortedRowModel,
   useReactTable,
   type ColumnDef,
   type ColumnSizingState,
   type OnChangeFn,
   type RowSelectionState,
+  type SortingState,
   type Table,
 } from "@tanstack/react-table";
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
+import { ChevronDown, ChevronsUpDown, ChevronUp } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { cn } from "@/lib/utils";
 import type { TFunction } from "@/shared/i18n/resolve";
@@ -74,6 +77,8 @@ export function PurchaseOrderLinesTanstackTable<TData>(props: PurchaseOrderLines
     t,
     className,
   } = props;
+
+  const [sorting, setSorting] = useState<SortingState>([]);
 
   const columns = useMemo(() => {
     if (!enableRowSelection) return dataColumns;
@@ -143,16 +148,21 @@ export function PurchaseOrderLinesTanstackTable<TData>(props: PurchaseOrderLines
     data: rows,
     columns,
     getCoreRowModel: getCoreRowModel(),
+    getSortedRowModel: getSortedRowModel(),
     getRowId,
     enableColumnResizing: true,
     columnResizeMode: "onEnd",
     enableRowSelection,
     enableMultiRowSelection: enableRowSelection,
+    enableMultiSort: true,
+    manualSorting: false,
     state: {
       columnSizing,
+      sorting,
       ...(enableRowSelection ? { rowSelection: rowSelection ?? {} } : {}),
     },
     onColumnSizingChange,
+    onSortingChange: setSorting,
     ...(enableRowSelection && onRowSelectionChange ? { onRowSelectionChange } : {}),
   });
 
@@ -163,7 +173,7 @@ export function PurchaseOrderLinesTanstackTable<TData>(props: PurchaseOrderLines
   return (
     <div
       className={cn(
-        "flex min-h-0 min-w-0 flex-col rounded-md border border-border bg-background text-[12px] leading-tight",
+        "flex min-h-0 min-w-0 flex-col rounded-md border border-border bg-background",
         className,
       )}
     >
@@ -176,7 +186,10 @@ export function PurchaseOrderLinesTanstackTable<TData>(props: PurchaseOrderLines
               style={{ left: resizeGuideLeftPx }}
             />
           ) : null}
-          <table className="w-full border-collapse table-fixed" style={{ width: totalWidth }}>
+          <table
+            className="w-full border-collapse table-fixed text-[12px] leading-tight"
+            style={{ width: totalWidth }}
+          >
             <colgroup>
               {visibleLeafColumns.map((column) => (
                 <col key={column.id} style={{ width: column.getSize() }} />
@@ -189,6 +202,8 @@ export function PurchaseOrderLinesTanstackTable<TData>(props: PurchaseOrderLines
                     const meta = header.column.columnDef.meta as { align?: "left" | "right" | "center" } | undefined;
                     const isLastHeaderCell = header.index === headerGroup.headers.length - 1;
                     const isSelectHeader = header.column.id === PO_LINES_TANSTACK_SELECT_COLUMN_ID;
+                    const canSort = header.column.getCanSort();
+                    const sortState = header.column.getIsSorted();
                     return (
                       <th
                         key={header.id}
@@ -217,17 +232,52 @@ export function PurchaseOrderLinesTanstackTable<TData>(props: PurchaseOrderLines
                             {flexRender(header.column.columnDef.header, header.getContext())}
                           </div>
                         ) : (
-                          <div
-                            className={cn(
-                              "flex min-w-0 flex-1 items-center px-1 py-px leading-none",
-                              meta?.align === "right" && "justify-end",
-                              meta?.align === "center" && "justify-center",
+                          <div className="flex min-w-0 items-center gap-0.5">
+                            {canSort ? (
+                              <button
+                                type="button"
+                                className={cn(
+                                  "flex min-w-0 flex-1 items-center gap-0.5 rounded-sm px-1 py-px leading-none text-left text-inherit transition-colors hover:bg-muted/60 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring",
+                                  meta?.align === "right" && "justify-end",
+                                  meta?.align === "center" && "justify-center",
+                                )}
+                                title={String(header.column.columnDef.header ?? "")}
+                                onClick={header.column.getToggleSortingHandler()}
+                              >
+                                <span className="min-w-0 flex-1 truncate">
+                                  {flexRender(header.column.columnDef.header, header.getContext())}
+                                </span>
+                                <span
+                                  className={cn(
+                                    "flex h-3 w-3 shrink-0 items-center justify-center transition-opacity",
+                                    sortState
+                                      ? "opacity-100"
+                                      : "opacity-0 group-hover:opacity-100 group-focus-within:opacity-100",
+                                  )}
+                                >
+                                  {sortState === "asc" ? (
+                                    <ChevronUp className="h-3 w-3 shrink-0" />
+                                  ) : sortState === "desc" ? (
+                                    <ChevronDown className="h-3 w-3 shrink-0" />
+                                  ) : (
+                                    <ChevronsUpDown className="h-3 w-3 shrink-0 opacity-45" />
+                                  )}
+                                </span>
+                              </button>
+                            ) : (
+                              <div
+                                className={cn(
+                                  "flex min-w-0 flex-1 items-center px-1 py-px leading-none",
+                                  meta?.align === "right" && "justify-end",
+                                  meta?.align === "center" && "justify-center",
+                                )}
+                                title={String(header.column.columnDef.header ?? "")}
+                              >
+                                <span className="min-w-0 flex-1 truncate">
+                                  {flexRender(header.column.columnDef.header, header.getContext())}
+                                </span>
+                              </div>
                             )}
-                            title={String(header.column.columnDef.header ?? "")}
-                          >
-                            <span className="min-w-0 flex-1 truncate">
-                              {flexRender(header.column.columnDef.header, header.getContext())}
-                            </span>
                           </div>
                         )}
                         {header.column.getCanResize() ? (
@@ -262,7 +312,7 @@ export function PurchaseOrderLinesTanstackTable<TData>(props: PurchaseOrderLines
                     className="px-4 py-8 text-center text-[12px] text-muted-foreground"
                     colSpan={visibleLeafColumns.length || 1}
                   >
-                    {t("common.noData")}
+                    {t("doc.page.noLines")}
                   </td>
                 </tr>
               ) : (

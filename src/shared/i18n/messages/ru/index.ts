@@ -22,6 +22,7 @@ export const ruMessages: MessageTree = {
     back: "Назад",
     search: "Поиск",
     loading: "Загрузка…",
+    noData: "Нет данных",
     noResults: "Нет данных",
     select: "Выбрать",
     close: "Закрыть",

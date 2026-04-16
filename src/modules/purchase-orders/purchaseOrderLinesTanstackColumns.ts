@@ -14,7 +14,7 @@ export const PO_LINES_TANSTACK_SELECT_COLUMN_ID = "__rowSelect__";
 
 type MoneyFmt = (value: number | null | undefined, fractionDigits?: number, empty?: string) => string;
 
-function lineNoColumn<T>(t: TFunction): ColumnDef<T, unknown> {
+function lineNoColumn<T extends object>(t: TFunction): ColumnDef<T, unknown> {
   return {
     id: "lineNo",
     size: 52,
@@ -24,7 +24,11 @@ function lineNoColumn<T>(t: TFunction): ColumnDef<T, unknown> {
     enableResizing: true,
     meta: { align: "center" as const },
     header: t("doc.columns.lineNo"),
-    cell: ({ row }) => String(row.index + 1),
+    cell: ({ row, table }) => {
+      const data = table.options.data as T[];
+      const docIdx = data.indexOf(row.original);
+      return String((docIdx >= 0 ? docIdx : row.index) + 1);
+    },
   };
 }
 
@@ -38,72 +42,73 @@ export function buildPurchaseOrderEditableLinesTanstackColumns(
     lineNoColumn<LineFormRow>(t),
     {
       id: "itemCode",
-      size: 130,
-      minSize: 120,
-      maxSize: 140,
-      enableSorting: false,
-      enableResizing: true,
-      meta: { align: "center" as const },
-      header: t("doc.columns.itemCode"),
-      cell: ({ row }) => {
-        const itemId = row.original.itemId;
+      accessorFn: (row) => {
+        const itemId = row.itemId;
         if (!itemId) return "";
         const item = itemRepository.getById(itemId);
         return item?.code ?? itemId;
       },
-    },
-    {
-      id: "itemName",
-      accessorFn: (row) => row.itemId,
-      size: 220,
-      minSize: 180,
-      maxSize: 520,
-      enableSorting: false,
-      enableResizing: true,
-      meta: { align: "left" as const },
-      header: t("doc.columns.itemName"),
-      cell: ({ getValue }) => {
-        const itemId = getValue() as string;
-        if (!itemId) return "";
-        const item = itemRepository.getById(itemId);
-        return item?.name ?? itemId;
-      },
-    },
-    {
-      id: "brand",
       size: 130,
       minSize: 120,
       maxSize: 140,
-      enableSorting: false,
+      enableSorting: true,
       enableResizing: true,
       meta: { align: "center" as const },
-      header: t("doc.columns.brand"),
-      cell: ({ row }) => {
-        const itemId = row.original.itemId;
+      header: t("doc.columns.itemCode"),
+      cell: ({ getValue }) => String(getValue() ?? ""),
+    },
+    {
+      id: "itemName",
+      accessorFn: (row) => {
+        const item = itemRepository.getById(row.itemId);
+        return item?.name ?? row.itemId ?? "";
+      },
+      size: 220,
+      minSize: 180,
+      maxSize: 520,
+      enableSorting: true,
+      enableResizing: true,
+      meta: { align: "left" as const },
+      header: t("doc.columns.itemName"),
+      cell: ({ getValue }) => String(getValue() ?? ""),
+    },
+    {
+      id: "brand",
+      accessorFn: (row) => {
+        const itemId = row.itemId;
         if (!itemId) return "";
         const item = itemRepository.getById(itemId);
         if (!item?.brandId) return "";
         const brand = brandRepository.getById(item.brandId);
         return brand?.code ?? "";
       },
-    },
-    {
-      id: "category",
       size: 130,
       minSize: 120,
       maxSize: 140,
-      enableSorting: false,
+      enableSorting: true,
       enableResizing: true,
       meta: { align: "center" as const },
-      header: t("doc.columns.category"),
-      cell: ({ row }) => {
-        const itemId = row.original.itemId;
+      header: t("doc.columns.brand"),
+      cell: ({ getValue }) => String(getValue() ?? ""),
+    },
+    {
+      id: "category",
+      accessorFn: (row) => {
+        const itemId = row.itemId;
         if (!itemId) return "";
         const item = itemRepository.getById(itemId);
         if (!item?.categoryId) return "";
         const category = categoryRepository.getById(item.categoryId);
         return category?.code ?? "";
       },
+      size: 130,
+      minSize: 120,
+      maxSize: 140,
+      enableSorting: true,
+      enableResizing: true,
+      meta: { align: "center" as const },
+      header: t("doc.columns.category"),
+      cell: ({ getValue }) => String(getValue() ?? ""),
     },
     {
       id: "qty",
@@ -111,7 +116,7 @@ export function buildPurchaseOrderEditableLinesTanstackColumns(
       size: 80,
       minSize: 70,
       maxSize: 90,
-      enableSorting: false,
+      enableSorting: true,
       enableResizing: true,
       meta: { align: "center" as const },
       header: t("doc.columns.qty"),
@@ -122,13 +127,18 @@ export function buildPurchaseOrderEditableLinesTanstackColumns(
     },
     {
       id: "received",
+      accessorFn: (row) => {
+        const f = fulfillmentByItemId.get(row.itemId);
+        return f ? f.receivedQty : Number.NEGATIVE_INFINITY;
+      },
       size: 86,
       minSize: 78,
       maxSize: 96,
-      enableSorting: false,
+      enableSorting: true,
       enableResizing: true,
       meta: { align: "center" as const },
       header: t("doc.columns.received"),
+      sortingFn: "basic",
       cell: ({ row }) => {
         const itemId = row.original.itemId;
         if (!itemId) return dash;
@@ -139,13 +149,18 @@ export function buildPurchaseOrderEditableLinesTanstackColumns(
     },
     {
       id: "remaining",
+      accessorFn: (row) => {
+        const f = fulfillmentByItemId.get(row.itemId);
+        return f ? f.remainingQty : Number.NEGATIVE_INFINITY;
+      },
       size: 100,
       minSize: 88,
       maxSize: 112,
-      enableSorting: false,
+      enableSorting: true,
       enableResizing: true,
       meta: { align: "center" as const },
       header: t("doc.columns.remaining"),
+      sortingFn: "basic",
       cell: ({ row }) => {
         const itemId = row.original.itemId;
         if (!itemId) return dash;
@@ -161,7 +176,7 @@ export function buildPurchaseOrderEditableLinesTanstackColumns(
       size: 110,
       minSize: 100,
       maxSize: 120,
-      enableSorting: false,
+      enableSorting: true,
       enableResizing: true,
       meta: { align: "center" as const },
       header: t("doc.columns.unitPrice"),
@@ -172,13 +187,21 @@ export function buildPurchaseOrderEditableLinesTanstackColumns(
     },
     {
       id: "lineAmount",
+      accessorFn: (row) => {
+        const qty = row.qty;
+        const unitPrice = row.unitPrice;
+        if (typeof qty !== "number" || typeof unitPrice !== "number") return 0;
+        const amount = lineAmountMoney(qty, unitPrice);
+        return Number.isNaN(amount) ? 0 : amount;
+      },
       size: 120,
       minSize: 110,
       maxSize: 130,
-      enableSorting: false,
+      enableSorting: true,
       enableResizing: true,
       meta: { align: "center" as const },
       header: t("doc.columns.lineAmount"),
+      sortingFn: "basic",
       cell: ({ row }) => {
         const qty = row.original.qty;
         const unitPrice = row.original.unitPrice;
@@ -189,20 +212,21 @@ export function buildPurchaseOrderEditableLinesTanstackColumns(
     },
     {
       id: "zeroPriceReason",
-      size: 150,
-      minSize: 130,
-      maxSize: 180,
-      enableSorting: false,
-      enableResizing: true,
-      meta: { align: "center" as const },
-      header: t("doc.columns.zeroPriceReason"),
-      cell: ({ row }) => {
-        const up = row.original.unitPrice;
+      accessorFn: (row) => {
+        const up = row.unitPrice;
         if (typeof up !== "number" || roundMoney(up) !== 0) return "";
-        const c = row.original.zeroPriceReasonCode;
+        const c = row.zeroPriceReasonCode;
         if (typeof c !== "string" || c === "") return "";
         return translateZeroPriceReason(t, c as ZeroPriceLineReasonCode);
       },
+      size: 150,
+      minSize: 130,
+      maxSize: 180,
+      enableSorting: true,
+      enableResizing: true,
+      meta: { align: "center" as const },
+      header: t("doc.columns.zeroPriceReason"),
+      cell: ({ getValue }) => String(getValue() ?? ""),
     },
   ];
 }
@@ -217,19 +241,20 @@ export function buildPurchaseOrderReadonlyLinesTanstackColumns(
     lineNoColumn<LineWithItem>(t),
     {
       id: "itemCode",
-      size: 130,
-      minSize: 120,
-      maxSize: 140,
-      enableSorting: false,
-      enableResizing: true,
-      meta: { align: "center" as const },
-      header: t("doc.columns.itemCode"),
-      cell: ({ row }) => {
-        const itemId = row.original.itemId;
+      accessorFn: (row) => {
+        const itemId = row.itemId;
         if (!itemId) return "";
         const item = itemRepository.getById(itemId);
         return item?.code ?? itemId;
       },
+      size: 130,
+      minSize: 120,
+      maxSize: 140,
+      enableSorting: true,
+      enableResizing: true,
+      meta: { align: "center" as const },
+      header: t("doc.columns.itemCode"),
+      cell: ({ getValue }) => String(getValue() ?? ""),
     },
     {
       id: "itemName",
@@ -237,46 +262,48 @@ export function buildPurchaseOrderReadonlyLinesTanstackColumns(
       size: 220,
       minSize: 180,
       maxSize: 520,
-      enableSorting: false,
+      enableSorting: true,
       enableResizing: true,
       meta: { align: "left" as const },
       header: t("doc.columns.itemName"),
     },
     {
       id: "brand",
-      size: 130,
-      minSize: 120,
-      maxSize: 140,
-      enableSorting: false,
-      enableResizing: true,
-      meta: { align: "center" as const },
-      header: t("doc.columns.brand"),
-      cell: ({ row }) => {
-        const itemId = row.original.itemId;
+      accessorFn: (row) => {
+        const itemId = row.itemId;
         if (!itemId) return "";
         const item = itemRepository.getById(itemId);
         if (!item?.brandId) return "";
         const brand = brandRepository.getById(item.brandId);
         return brand?.code ?? "";
       },
-    },
-    {
-      id: "category",
       size: 130,
       minSize: 120,
       maxSize: 140,
-      enableSorting: false,
+      enableSorting: true,
       enableResizing: true,
       meta: { align: "center" as const },
-      header: t("doc.columns.category"),
-      cell: ({ row }) => {
-        const itemId = row.original.itemId;
+      header: t("doc.columns.brand"),
+      cell: ({ getValue }) => String(getValue() ?? ""),
+    },
+    {
+      id: "category",
+      accessorFn: (row) => {
+        const itemId = row.itemId;
         if (!itemId) return "";
         const item = itemRepository.getById(itemId);
         if (!item?.categoryId) return "";
         const category = categoryRepository.getById(item.categoryId);
         return category?.code ?? "";
       },
+      size: 130,
+      minSize: 120,
+      maxSize: 140,
+      enableSorting: true,
+      enableResizing: true,
+      meta: { align: "center" as const },
+      header: t("doc.columns.category"),
+      cell: ({ getValue }) => String(getValue() ?? ""),
     },
     {
       id: "qty",
@@ -284,7 +311,7 @@ export function buildPurchaseOrderReadonlyLinesTanstackColumns(
       size: 80,
       minSize: 70,
       maxSize: 90,
-      enableSorting: false,
+      enableSorting: true,
       enableResizing: true,
       meta: { align: "center" as const },
       header: t("doc.columns.qty"),
@@ -295,13 +322,20 @@ export function buildPurchaseOrderReadonlyLinesTanstackColumns(
     },
     {
       id: "received",
+      accessorFn: (row) => {
+        const lineId = row.id;
+        if (!lineId || !fulfillment) return Number.NEGATIVE_INFINITY;
+        const fl = fulfillment.lines.find((l) => l.lineId === lineId);
+        return fl ? fl.receivedQty : Number.NEGATIVE_INFINITY;
+      },
       size: 86,
       minSize: 78,
       maxSize: 96,
-      enableSorting: false,
+      enableSorting: true,
       enableResizing: true,
       meta: { align: "center" as const },
       header: t("doc.columns.received"),
+      sortingFn: "basic",
       cell: ({ row }) => {
         const lineId = row.original.id;
         if (!lineId || !fulfillment) return dash;
@@ -312,13 +346,20 @@ export function buildPurchaseOrderReadonlyLinesTanstackColumns(
     },
     {
       id: "remaining",
+      accessorFn: (row) => {
+        const lineId = row.id;
+        if (!lineId || !fulfillment) return Number.NEGATIVE_INFINITY;
+        const fl = fulfillment.lines.find((l) => l.lineId === lineId);
+        return fl ? fl.remainingQty : Number.NEGATIVE_INFINITY;
+      },
       size: 100,
       minSize: 88,
       maxSize: 112,
-      enableSorting: false,
+      enableSorting: true,
       enableResizing: true,
       meta: { align: "center" as const },
       header: t("doc.columns.remaining"),
+      sortingFn: "basic",
       cell: ({ row }) => {
         const lineId = row.original.id;
         if (!lineId || !fulfillment) return dash;
@@ -334,7 +375,7 @@ export function buildPurchaseOrderReadonlyLinesTanstackColumns(
       size: 110,
       minSize: 100,
       maxSize: 120,
-      enableSorting: false,
+      enableSorting: true,
       enableResizing: true,
       meta: { align: "center" as const },
       header: t("doc.columns.unitPrice"),
@@ -345,13 +386,21 @@ export function buildPurchaseOrderReadonlyLinesTanstackColumns(
     },
     {
       id: "lineAmount",
+      accessorFn: (row) => {
+        const qty = row.qty;
+        const unitPrice = row.unitPrice;
+        if (typeof qty !== "number" || typeof unitPrice !== "number") return 0;
+        const amount = lineAmountMoney(qty, unitPrice);
+        return Number.isNaN(amount) ? 0 : amount;
+      },
       size: 120,
       minSize: 110,
       maxSize: 130,
-      enableSorting: false,
+      enableSorting: true,
       enableResizing: true,
       meta: { align: "center" as const },
       header: t("doc.columns.lineAmount"),
+      sortingFn: "basic",
       cell: ({ row }) => {
         const qty = row.original.qty;
         const unitPrice = row.original.unitPrice;
@@ -362,20 +411,21 @@ export function buildPurchaseOrderReadonlyLinesTanstackColumns(
     },
     {
       id: "zeroPriceReason",
-      size: 150,
-      minSize: 130,
-      maxSize: 180,
-      enableSorting: false,
-      enableResizing: true,
-      meta: { align: "center" as const },
-      header: t("doc.columns.zeroPriceReason"),
-      cell: ({ row }) => {
-        const up = row.original.unitPrice;
+      accessorFn: (row) => {
+        const up = row.unitPrice;
         if (typeof up !== "number" || roundMoney(up) !== 0) return "";
-        const c = row.original.zeroPriceReasonCode;
+        const c = row.zeroPriceReasonCode;
         if (typeof c !== "string" || c === "") return "";
         return translateZeroPriceReason(t, c as ZeroPriceLineReasonCode);
       },
+      size: 150,
+      minSize: 130,
+      maxSize: 180,
+      enableSorting: true,
+      enableResizing: true,
+      meta: { align: "center" as const },
+      header: t("doc.columns.zeroPriceReason"),
+      cell: ({ getValue }) => String(getValue() ?? ""),
     },
   ];
 }

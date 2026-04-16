@@ -22,6 +22,7 @@ export const kkMessages: MessageTree = {
     back: "Артқа",
     search: "Іздеу",
     loading: "Жүктелуде…",
+    noData: "Дерек жоқ",
     noResults: "Нәтиже жоқ",
     select: "Таңдау",
     close: "Жабу",
