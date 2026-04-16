@@ -1,8 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
-import { AgGridReact } from "ag-grid-react";
+import type { ColumnSizingState, RowSelectionState } from "@tanstack/react-table";
 import { Dialog } from "radix-ui";
-import type { ColDef, SelectionChangedEvent } from "ag-grid-community";
 import { CheckSquare, ClipboardList, File, List, Printer, Save, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -17,12 +16,13 @@ import { useAppDisplayFormatters } from "@/shared/formatting";
 import { itemRepository } from "@/modules/items/repository";
 import { warehouseRepository } from "@/modules/warehouses/repository";
 import { useAppReadModelRevision } from "@/shared/inventoryMasterPageBlocks/useAppReadModelRevision";
+import { MarkdownCreateLinesTanstackTable } from "../components/MarkdownCreateLinesTanstackTable";
 import {
-  AgGridContainer,
-  agGridDefaultColDef,
-  agGridDefaultGridOptions,
-  agGridSelectionColumnDef,
-} from "@/shared/ui/ag-grid";
+  buildMarkdownCreateCodeGridColumns,
+  buildMarkdownCreateLineGridColumns,
+  type MarkdownCreateCodeGridRow,
+  type MarkdownCreateLineGridRow,
+} from "../markdownCreateLinesTanstackColumns";
 import type { Item } from "@/modules/items/model";
 import type { MarkdownJournal, MarkdownReasonCode } from "../model";
 import { markdownJournalRepository } from "../journalRepository";
@@ -45,36 +45,37 @@ import { useUrlTabState } from "@/shared/navigation/useUrlTabState";
 const DEFAULT_WAREHOUSE_ID = "1";
 const LOCAL_ACTOR = "local-operator";
 
+const MARKDOWN_CREATE_LINES_COL_SIZING_KEY = "mini-erp:markdown-create:lines:tanstack:columnSizing:v1";
+const MARKDOWN_CREATE_CODES_COL_SIZING_KEY = "mini-erp:markdown-create:codes:tanstack:columnSizing:v1";
+
+function readPersistedColumnSizing(key: string): ColumnSizingState {
+  if (typeof window === "undefined") return {};
+  try {
+    const raw = window.localStorage.getItem(key);
+    if (!raw) return {};
+    const parsed = JSON.parse(raw) as unknown;
+    if (!parsed || typeof parsed !== "object") return {};
+    return parsed as ColumnSizingState;
+  } catch {
+    return {};
+  }
+}
+
+function writePersistedColumnSizing(key: string, value: ColumnSizingState) {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(key, JSON.stringify(value));
+  } catch {
+    // ignore
+  }
+}
+
 type LineFormRow = {
   _lineId: string;
   itemId: string;
   markdownPrice: number;
   quantity: number;
   reasonCode: MarkdownReasonCode;
-};
-
-type GridRow = {
-  id: string;
-  itemCode: string;
-  itemName: string;
-  quantity: number;
-  markdownPrice: number;
-  reason: string;
-};
-
-type MarkdownCodeRow = {
-  id: string;
-  markdownCode: string;
-  itemCode: string;
-  itemName: string;
-  quantity: number;
-  markdownPrice: number;
-  reason: string;
-  warehouse: string;
-  status: string;
-  postedAt: string;
-  printCount: number;
-  printedAt: string;
 };
 
 type PrintMode = "all" | "selected";
@@ -107,7 +108,7 @@ function journalToGridRows(
   lines: LineFormRow[],
   t: (key: string) => string,
   appRevision: number,
-): GridRow[] {
+): MarkdownCreateLineGridRow[] {
   void appRevision;
   return lines.map((line) => {
     const item = itemRepository.getById(line.itemId);
@@ -126,7 +127,7 @@ function journalUnitsToCodeRows(
   journalId: string,
   t: (key: string) => string,
   appRevision: number,
-): MarkdownCodeRow[] {
+): MarkdownCreateCodeGridRow[] {
   void appRevision;
   return listMarkdownUnitsForJournal(journalId).map((record) => {
     const item = itemRepository.getById(record.itemId);
@@ -245,7 +246,7 @@ function buildCode39BarcodeSvg(value: string): string {
 
 function buildMarkdownPrintSheetHtml(params: {
   journalNumber: string;
-  rows: MarkdownCodeRow[];
+  rows: MarkdownCreateCodeGridRow[];
   t: (key: string) => string;
   formatMoney: (value: number | null | undefined, fractionDigits?: number, empty?: string) => string;
 }): string {
@@ -379,7 +380,13 @@ export function MarkdownCreatePage() {
     defaultValue: "lines",
   });
   const [printDialogOpen, setPrintDialogOpen] = useState(false);
-  const [selectedCodeIds, setSelectedCodeIds] = useState<string[]>([]);
+  const [codeRowSelection, setCodeRowSelection] = useState<RowSelectionState>({});
+  const [markdownLineGridColumnSizing, setMarkdownLineGridColumnSizing] = useState<ColumnSizingState>(() =>
+    readPersistedColumnSizing(MARKDOWN_CREATE_LINES_COL_SIZING_KEY),
+  );
+  const [markdownCodeGridColumnSizing, setMarkdownCodeGridColumnSizing] = useState<ColumnSizingState>(() =>
+    readPersistedColumnSizing(MARKDOWN_CREATE_CODES_COL_SIZING_KEY),
+  );
   const lineEntryItemPickerRef = useRef<{ focus: () => void } | null>(null);
   const lineEntryDropdownRightEdgeRef = useRef<HTMLDivElement | null>(null);
 
@@ -568,137 +575,13 @@ export function MarkdownCreatePage() {
     setPrintDialogOpen(true);
   }, []);
 
-  const handleCodeSelectionChanged = useCallback((event: SelectionChangedEvent<MarkdownCodeRow>) => {
-    setSelectedCodeIds(event.api.getSelectedRows().map((row) => row.id));
-  }, []);
-
-  const lineColumnDefs = useMemo<ColDef<GridRow>[]>(
-    () => [
-      {
-        headerName: t("doc.columns.lineNo"),
-        valueGetter: (params) =>
-          params.node?.rowIndex != null ? String(params.node.rowIndex + 1) : "",
-        width: 56,
-        minWidth: 56,
-        maxWidth: 56,
-        sortable: false,
-      },
-      {
-        field: "itemCode",
-        headerName: t("doc.columns.itemCode"),
-        width: 130,
-        minWidth: 120,
-      },
-      {
-        field: "itemName",
-        headerName: t("doc.columns.itemName"),
-        minWidth: 220,
-        flex: 1,
-      },
-      {
-        field: "quantity",
-        headerName: t("doc.columns.qty"),
-        width: 90,
-        minWidth: 80,
-      },
-      {
-        field: "markdownPrice",
-        headerName: t("markdown.fields.markdownPrice"),
-        width: 140,
-        minWidth: 130,
-        valueFormatter: (params) =>
-          typeof params.value === "number" ? formatMoney(params.value, 2, "") : "",
-      },
-      {
-        field: "reason",
-        headerName: t("markdown.fields.reason"),
-        minWidth: 180,
-        width: 220,
-      },
-    ],
+  const lineGridTanstackColumns = useMemo(
+    () => buildMarkdownCreateLineGridColumns(t, formatMoney),
     [t, formatMoney],
   );
 
-  const codeColumnDefs = useMemo<ColDef<MarkdownCodeRow>[]>(
-    () => [
-      {
-        headerName: t("doc.columns.lineNo"),
-        valueGetter: (params) =>
-          params.node?.rowIndex != null ? String(params.node.rowIndex + 1) : "",
-        width: 56,
-        minWidth: 56,
-        maxWidth: 56,
-        sortable: false,
-      },
-      {
-        field: "markdownCode",
-        headerName: t("markdown.fields.markdownCode"),
-        width: 150,
-        minWidth: 140,
-      },
-      {
-        field: "itemCode",
-        headerName: t("doc.columns.itemCode"),
-        width: 130,
-        minWidth: 120,
-      },
-      {
-        field: "itemName",
-        headerName: t("doc.columns.itemName"),
-        minWidth: 220,
-        flex: 1,
-      },
-      {
-        field: "quantity",
-        headerName: t("doc.columns.qty"),
-        width: 90,
-        minWidth: 80,
-      },
-      {
-        field: "markdownPrice",
-        headerName: t("markdown.fields.markdownPrice"),
-        width: 140,
-        minWidth: 130,
-        valueFormatter: (params) =>
-          typeof params.value === "number" ? formatMoney(params.value, 2, "") : "",
-      },
-      {
-        field: "reason",
-        headerName: t("markdown.fields.reason"),
-        minWidth: 180,
-        width: 220,
-      },
-      {
-        field: "warehouse",
-        headerName: t("markdown.fields.targetWarehouse"),
-        minWidth: 150,
-        width: 170,
-      },
-      {
-        field: "status",
-        headerName: t("common.status"),
-        minWidth: 120,
-        width: 130,
-      },
-      {
-        field: "postedAt",
-        headerName: t("markdown.fields.postedAt"),
-        minWidth: 180,
-        width: 200,
-      },
-      {
-        field: "printCount",
-        headerName: t("markdown.fields.printCount"),
-        width: 100,
-        minWidth: 90,
-      },
-      {
-        field: "printedAt",
-        headerName: t("markdown.fields.printedAt"),
-        minWidth: 180,
-        width: 200,
-      },
-    ],
+  const codeGridTanstackColumns = useMemo(
+    () => buildMarkdownCreateCodeGridColumns(t, formatMoney),
     [t, formatMoney],
   );
 
@@ -712,6 +595,43 @@ export function MarkdownCreatePage() {
     () => (journal ? journalUnitsToCodeRows(journal.id, t, appRevision) : []),
     [journal, t, appRevision],
   );
+
+  useEffect(() => {
+    writePersistedColumnSizing(MARKDOWN_CREATE_LINES_COL_SIZING_KEY, markdownLineGridColumnSizing);
+  }, [markdownLineGridColumnSizing]);
+
+  useEffect(() => {
+    writePersistedColumnSizing(MARKDOWN_CREATE_CODES_COL_SIZING_KEY, markdownCodeGridColumnSizing);
+  }, [markdownCodeGridColumnSizing]);
+
+  useEffect(() => {
+    const valid = new Set(codeRows.map((r) => r.id));
+    setCodeRowSelection((prev) => {
+      const next = { ...prev };
+      let changed = false;
+      for (const k of Object.keys(next)) {
+        if (!valid.has(k)) {
+          delete next[k];
+          changed = true;
+        }
+      }
+      return changed ? next : prev;
+    });
+  }, [codeRows]);
+
+  const selectedCodeIds = useMemo(
+    () => Object.keys(codeRowSelection).filter((k) => codeRowSelection[k]),
+    [codeRowSelection],
+  );
+
+  const getMarkdownLineGridRowClassName = useCallback(
+    (row: MarkdownCreateLineGridRow) =>
+      !isReadOnly && editingLineId === row.id ? "doc-lines__row--editing" : undefined,
+    [isReadOnly, editingLineId],
+  );
+
+  const resolveMarkdownCodeRowSelectLabel = useCallback((row: MarkdownCreateCodeGridRow) => row.markdownCode, []);
+
   const unitsCount = useMemo(
     () => (journal ? listMarkdownUnitsForJournal(journal.id).length : 0),
     [journal, appRevision],
@@ -759,7 +679,7 @@ export function MarkdownCreatePage() {
           postedAt: record.createdAt,
           printCount: record.printCount,
           printedAt: record.printedAt ?? t("domain.audit.summary.emDash"),
-        } satisfies MarkdownCodeRow;
+        } satisfies MarkdownCreateCodeGridRow;
       });
 
       popup.document.open();
@@ -1197,40 +1117,36 @@ export function MarkdownCreatePage() {
                 <p className="doc-lines__empty">{t("doc.page.noLines")}</p>
               ) : (
                 <div className="doc-lines__grid doc-lines__grid--fixed-h h-[18rem] min-h-[18rem]">
-                  <AgGridContainer themeClass="doc-lines-grid">
-                    <AgGridReact<GridRow>
-                      {...agGridDefaultGridOptions}
-                      rowData={gridRows}
-                      columnDefs={lineColumnDefs}
-                      defaultColDef={agGridDefaultColDef}
-                      getRowId={(params) => params.data.id}
-                      onRowClicked={
-                        isReadOnly
-                          ? undefined
-                          : (event) => {
-                              if (event.data) handleEditLine(event.data.id);
-                            }
-                      }
-                    />
-                  </AgGridContainer>
+                  <MarkdownCreateLinesTanstackTable<MarkdownCreateLineGridRow>
+                    className="doc-lines-grid doc-lines-grid--markdown-create"
+                    rows={gridRows}
+                    dataColumns={lineGridTanstackColumns}
+                    getRowId={(row) => row.id}
+                    columnSizing={markdownLineGridColumnSizing}
+                    onColumnSizingChange={setMarkdownLineGridColumnSizing}
+                    onDataRowClick={isReadOnly ? undefined : (row) => handleEditLine(row.id)}
+                    getRowClassName={getMarkdownLineGridRowClassName}
+                    t={t}
+                  />
                 </div>
               )
             ) : codeRows.length === 0 ? (
               <p className="doc-lines__empty">{t("doc.page.noLines")}</p>
             ) : (
               <div className="doc-lines__grid doc-lines__grid--fixed-h h-[18rem] min-h-[18rem]">
-                <AgGridContainer themeClass="doc-lines-grid">
-                  <AgGridReact<MarkdownCodeRow>
-                    {...agGridDefaultGridOptions}
-                    rowData={codeRows}
-                    columnDefs={codeColumnDefs}
-                    defaultColDef={agGridDefaultColDef}
-                    rowSelection={{ mode: "multiRow", checkboxes: true, headerCheckbox: true, enableClickSelection: true }}
-                    selectionColumnDef={agGridSelectionColumnDef}
-                    getRowId={(params) => params.data.id}
-                    onSelectionChanged={handleCodeSelectionChanged}
-                  />
-                </AgGridContainer>
+                <MarkdownCreateLinesTanstackTable<MarkdownCreateCodeGridRow>
+                  className="doc-lines-grid doc-lines-grid--markdown-create"
+                  rows={codeRows}
+                  dataColumns={codeGridTanstackColumns}
+                  getRowId={(row) => row.id}
+                  columnSizing={markdownCodeGridColumnSizing}
+                  onColumnSizingChange={setMarkdownCodeGridColumnSizing}
+                  enableRowSelection
+                  rowSelection={codeRowSelection}
+                  onRowSelectionChange={setCodeRowSelection}
+                  resolveRowSelectLabel={resolveMarkdownCodeRowSelectLabel}
+                  t={t}
+                />
               </div>
             )}
           </div>

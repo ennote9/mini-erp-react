@@ -1520,6 +1520,14 @@ summary,
   border-left: 3px solid var(--app-grid-focus);
 }
 
+/* Markdown create (TanStack): single-row edit accent on journal lines grid */
+.doc-page .doc-lines__grid .doc-lines-grid--markdown-create table tbody tr.doc-lines__row--editing td {
+  background-color: var(--app-surface-subtle);
+}
+.doc-page .doc-lines__grid .doc-lines-grid--markdown-create table tbody tr.doc-lines__row--editing td:first-child {
+  border-left: 3px solid var(--app-grid-focus);
+}
+
 /* Row-status column: compact dot + tooltip */
 .doc-lines__status {
   display: inline-block;
