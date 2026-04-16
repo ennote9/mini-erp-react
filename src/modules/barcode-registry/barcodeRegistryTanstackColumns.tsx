@@ -1,8 +1,6 @@
 import { createColumnHelper, type ColumnDef } from "@tanstack/react-table";
-import { ScanBarcode, TicketPercent } from "lucide-react";
 import type { TFunction } from "@/shared/i18n";
 import type { ItemBarcodeSymbology } from "@/modules/items";
-import { GridOutlinePillBadge } from "@/shared/ui/ag-grid/GridOutlinePillBadge";
 import type { BarcodeRegistryEntryType, BarcodeRegistryRow, BarcodeRegistrySource } from "./barcodeRegistryReadModel";
 import type { BarcodeRegistryTableColumnSchema } from "./barcodeRegistryTableSchema";
 
@@ -113,36 +111,6 @@ export function buildBarcodeRegistryTanstackColumns(
           }),
         enableSorting: false,
         enableHiding: false,
-        size: column.defaultSize,
-        minSize: column.minSize,
-        maxSize: column.maxSize,
-        meta,
-      });
-    }
-
-    if (column.id === "entryType") {
-      return columnHelper.display({
-        id: column.id,
-        header: column.label,
-        cell: (ctx) => {
-          const v = ctx.row.original.entryType;
-          if (v === "MARKDOWN_CODE") {
-            return (
-              <GridOutlinePillBadge tone="warning">
-                <TicketPercent className="mr-1 h-3 w-3" />
-                {entryTypeLabel(v)}
-              </GridOutlinePillBadge>
-            );
-          }
-          return (
-            <GridOutlinePillBadge tone="muted">
-              <ScanBarcode className="mr-1 h-3 w-3" />
-              {entryTypeLabel(v ?? "ITEM_BARCODE")}
-            </GridOutlinePillBadge>
-          );
-        },
-        enableSorting: column.sortable,
-        enableHiding: !column.lockedVisible,
         size: column.defaultSize,
         minSize: column.minSize,
         maxSize: column.maxSize,
