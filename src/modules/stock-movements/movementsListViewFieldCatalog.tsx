@@ -1,4 +1,4 @@
-import type { ColDef } from "ag-grid-community";
+import type { ListColumnDef } from "@/shared/ui/list-view/listColumnDef";
 import type { TFunction } from "@/shared/i18n";
 import type {
   AgGridColumnFilterConfig,
@@ -11,7 +11,7 @@ import { buildMovementsTableSchema, type MovementsTableColumnSchema } from "./mo
 
 type MovementsFieldCatalogEntry = {
   registry: ListViewFieldRegistryEntry;
-  colDef: ColDef<StockMovementListRow>;
+  colDef: ListColumnDef<StockMovementListRow>;
   filterConfig?: AgGridColumnFilterConfig<StockMovementListRow>;
 };
 
@@ -85,14 +85,14 @@ function mapSchemaToFilterConfig(
 function buildColDefFromSchema(
   column: MovementsTableColumnSchema,
   input: BuildMovementsListViewCatalogInput,
-): ColDef<StockMovementListRow> {
+): ListColumnDef<StockMovementListRow> {
   if (column.id === "lineNo") {
     return getAgGridRowNumberColDef(input.t);
   }
 
   const fieldKey = (column.accessorKey ?? column.id) as keyof StockMovementListRow & string;
 
-  const colDef: ColDef<StockMovementListRow> = {
+  const colDef: ListColumnDef<StockMovementListRow> = {
     colId: column.id,
     headerName: column.label,
     sortable: column.sortable,
@@ -124,7 +124,7 @@ function createMovementsFieldCatalog(input: BuildMovementsListViewCatalogInput):
 
 export function buildMovementsListViewCatalog(input: BuildMovementsListViewCatalogInput): {
   fieldRegistry: ListViewFieldRegistryEntry[];
-  columnDefs: ColDef<StockMovementListRow>[];
+  columnDefs: ListColumnDef<StockMovementListRow>[];
   filterConfigs: Record<string, AgGridColumnFilterConfig<StockMovementListRow>>;
 } {
   const entries = createMovementsFieldCatalog(input);

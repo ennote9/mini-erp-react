@@ -1,4 +1,4 @@
-import type { ColDef } from "ag-grid-community";
+import type { ListColumnDef } from "@/shared/ui/list-view/listColumnDef";
 import type { TFunction } from "@/shared/i18n";
 import type {
   AgGridColumnFilterConfig,
@@ -15,7 +15,7 @@ import {
 
 type PurchaseOrdersFieldCatalogEntry = {
   registry: ListViewFieldRegistryEntry;
-  colDef: ColDef<PurchaseOrderListRow>;
+  colDef: ListColumnDef<PurchaseOrderListRow>;
   filterConfig?: AgGridColumnFilterConfig<PurchaseOrderListRow>;
 };
 
@@ -89,14 +89,14 @@ function mapSchemaToFilterConfig(
 function buildColDefFromSchema(
   column: PurchaseOrdersTableColumnSchema,
   input: BuildPurchaseOrdersListViewCatalogInput,
-): ColDef<PurchaseOrderListRow> {
+): ListColumnDef<PurchaseOrderListRow> {
   const { t, formatDate } = input;
 
   if (column.id === "lineNo") {
     return getAgGridRowNumberColDef(t);
   }
 
-  const colDef: ColDef<PurchaseOrderListRow> = {
+  const colDef: ListColumnDef<PurchaseOrderListRow> = {
     colId: column.id,
     headerName: column.label,
     sortable: column.sortable,
@@ -141,7 +141,7 @@ function createPurchaseOrdersFieldCatalog(
 
 export function buildPurchaseOrdersListViewCatalog(input: BuildPurchaseOrdersListViewCatalogInput): {
   fieldRegistry: ListViewFieldRegistryEntry[];
-  columnDefs: ColDef<PurchaseOrderListRow>[];
+  columnDefs: ListColumnDef<PurchaseOrderListRow>[];
   filterConfigs: Record<string, AgGridColumnFilterConfig<PurchaseOrderListRow>>;
 } {
   const entries = createPurchaseOrdersFieldCatalog(input);

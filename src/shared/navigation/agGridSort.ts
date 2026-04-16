@@ -1,5 +1,3 @@
-import type { GridApi } from "ag-grid-community";
-
 export type UrlGridSort = {
   colId: string;
   sort: "asc" | "desc";
@@ -36,32 +34,4 @@ export function readUrlGridSortValue(
 ): string | null {
   const serialized = serializeUrlGridSort(readUrlGridSort(searchParams, key));
   return serialized === "" ? null : serialized;
-}
-
-export function getCurrentGridSort(api: GridApi, skipColIds: string[] = []): UrlGridSort[] {
-  return api
-    .getColumnState()
-    .filter(
-      (column) =>
-        !!column.sort &&
-        (column.sort === "asc" || column.sort === "desc") &&
-        !!column.colId &&
-        !skipColIds.includes(column.colId),
-    )
-    .sort((a, b) => (a.sortIndex ?? 0) - (b.sortIndex ?? 0))
-    .map((column) => ({
-      colId: column.colId!,
-      sort: column.sort as "asc" | "desc",
-    }));
-}
-
-export function applyUrlGridSort(api: GridApi, sortModel: UrlGridSort[]): void {
-  api.applyColumnState({
-    defaultState: { sort: null },
-    state: sortModel.map((entry, index) => ({
-      colId: entry.colId,
-      sort: entry.sort,
-      sortIndex: index,
-    })),
-  });
 }

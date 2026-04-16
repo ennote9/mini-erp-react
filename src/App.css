@@ -39,9 +39,7 @@ button:not(:disabled),
 [role="menuitemcheckbox"],
 [role="menuitemradio"],
 [role="slider"],
-summary,
-.ag-checkbox-input-wrapper,
-.ag-header-cell-menu-button {
+summary {
   user-select: none;
   -webkit-user-select: none;
 }
@@ -515,37 +513,135 @@ summary,
   border-radius: 0.5rem;
 }
 
-/* AG Grid body viewport scrollbar — premium dark feel (vertical + horizontal); does not change overflow */
-.list-page__content .erp-ag-grid .ag-body-viewport {
+/* TanStack list tables: scroll regions (data-* on module table wrappers) */
+.list-page__content [data-items-table-scroll],
+.list-page__content [data-stock-movements-table-scroll],
+.list-page__content [data-stock-balances-table-scroll],
+.list-page__content [data-barcode-registry-table-scroll],
+.list-page__content [data-receipts-table-scroll],
+.list-page__content [data-suppliers-table-scroll],
+.list-page__content [data-brands-table-scroll],
+.list-page__content [data-purchase-orders-table-scroll],
+.list-page__content [data-sales-orders-table-scroll],
+.list-page__content [data-shipments-table-scroll],
+.list-page__content [data-warehouses-table-scroll],
+.list-page__content [data-customers-table-scroll],
+.list-page__content [data-markdown-journal-table-scroll],
+.list-page__content [data-carriers-table-scroll],
+.list-page__content [data-categories-table-scroll] {
   scrollbar-width: thin;
   scrollbar-gutter: stable;
   scrollbar-color: var(--app-line-strong) var(--app-surface);
 }
 
-.list-page__content .erp-ag-grid .ag-body-viewport:hover {
+.list-page__content [data-items-table-scroll]:hover,
+.list-page__content [data-stock-movements-table-scroll]:hover,
+.list-page__content [data-stock-balances-table-scroll]:hover,
+.list-page__content [data-barcode-registry-table-scroll]:hover,
+.list-page__content [data-receipts-table-scroll]:hover,
+.list-page__content [data-suppliers-table-scroll]:hover,
+.list-page__content [data-brands-table-scroll]:hover,
+.list-page__content [data-purchase-orders-table-scroll]:hover,
+.list-page__content [data-sales-orders-table-scroll]:hover,
+.list-page__content [data-shipments-table-scroll]:hover,
+.list-page__content [data-warehouses-table-scroll]:hover,
+.list-page__content [data-customers-table-scroll]:hover,
+.list-page__content [data-markdown-journal-table-scroll]:hover,
+.list-page__content [data-carriers-table-scroll]:hover,
+.list-page__content [data-categories-table-scroll]:hover {
   scrollbar-color: var(--app-text-muted) var(--app-surface);
 }
 
-.list-page__content .erp-ag-grid .ag-body-viewport::-webkit-scrollbar {
+.list-page__content [data-items-table-scroll]::-webkit-scrollbar,
+.list-page__content [data-stock-movements-table-scroll]::-webkit-scrollbar,
+.list-page__content [data-stock-balances-table-scroll]::-webkit-scrollbar,
+.list-page__content [data-barcode-registry-table-scroll]::-webkit-scrollbar,
+.list-page__content [data-receipts-table-scroll]::-webkit-scrollbar,
+.list-page__content [data-suppliers-table-scroll]::-webkit-scrollbar,
+.list-page__content [data-brands-table-scroll]::-webkit-scrollbar,
+.list-page__content [data-purchase-orders-table-scroll]::-webkit-scrollbar,
+.list-page__content [data-sales-orders-table-scroll]::-webkit-scrollbar,
+.list-page__content [data-shipments-table-scroll]::-webkit-scrollbar,
+.list-page__content [data-warehouses-table-scroll]::-webkit-scrollbar,
+.list-page__content [data-customers-table-scroll]::-webkit-scrollbar,
+.list-page__content [data-markdown-journal-table-scroll]::-webkit-scrollbar,
+.list-page__content [data-carriers-table-scroll]::-webkit-scrollbar,
+.list-page__content [data-categories-table-scroll]::-webkit-scrollbar {
   width: 8px;
   height: 8px;
 }
 
-.list-page__content .erp-ag-grid .ag-body-viewport::-webkit-scrollbar-track {
+.list-page__content [data-items-table-scroll]::-webkit-scrollbar-track,
+.list-page__content [data-stock-movements-table-scroll]::-webkit-scrollbar-track,
+.list-page__content [data-stock-balances-table-scroll]::-webkit-scrollbar-track,
+.list-page__content [data-barcode-registry-table-scroll]::-webkit-scrollbar-track,
+.list-page__content [data-receipts-table-scroll]::-webkit-scrollbar-track,
+.list-page__content [data-suppliers-table-scroll]::-webkit-scrollbar-track,
+.list-page__content [data-brands-table-scroll]::-webkit-scrollbar-track,
+.list-page__content [data-purchase-orders-table-scroll]::-webkit-scrollbar-track,
+.list-page__content [data-sales-orders-table-scroll]::-webkit-scrollbar-track,
+.list-page__content [data-shipments-table-scroll]::-webkit-scrollbar-track,
+.list-page__content [data-warehouses-table-scroll]::-webkit-scrollbar-track,
+.list-page__content [data-customers-table-scroll]::-webkit-scrollbar-track,
+.list-page__content [data-markdown-journal-table-scroll]::-webkit-scrollbar-track,
+.list-page__content [data-carriers-table-scroll]::-webkit-scrollbar-track,
+.list-page__content [data-categories-table-scroll]::-webkit-scrollbar-track {
   background: var(--app-surface);
   border-radius: 4px;
 }
 
-.list-page__content .erp-ag-grid .ag-body-viewport::-webkit-scrollbar-thumb {
+.list-page__content [data-items-table-scroll]::-webkit-scrollbar-thumb,
+.list-page__content [data-stock-movements-table-scroll]::-webkit-scrollbar-thumb,
+.list-page__content [data-stock-balances-table-scroll]::-webkit-scrollbar-thumb,
+.list-page__content [data-barcode-registry-table-scroll]::-webkit-scrollbar-thumb,
+.list-page__content [data-receipts-table-scroll]::-webkit-scrollbar-thumb,
+.list-page__content [data-suppliers-table-scroll]::-webkit-scrollbar-thumb,
+.list-page__content [data-brands-table-scroll]::-webkit-scrollbar-thumb,
+.list-page__content [data-purchase-orders-table-scroll]::-webkit-scrollbar-thumb,
+.list-page__content [data-sales-orders-table-scroll]::-webkit-scrollbar-thumb,
+.list-page__content [data-shipments-table-scroll]::-webkit-scrollbar-thumb,
+.list-page__content [data-warehouses-table-scroll]::-webkit-scrollbar-thumb,
+.list-page__content [data-customers-table-scroll]::-webkit-scrollbar-thumb,
+.list-page__content [data-markdown-journal-table-scroll]::-webkit-scrollbar-thumb,
+.list-page__content [data-carriers-table-scroll]::-webkit-scrollbar-thumb,
+.list-page__content [data-categories-table-scroll]::-webkit-scrollbar-thumb {
   background: var(--app-line-strong);
   border-radius: 4px;
 }
 
-.list-page__content .erp-ag-grid .ag-body-viewport::-webkit-scrollbar-thumb:hover {
+.list-page__content [data-items-table-scroll]::-webkit-scrollbar-thumb:hover,
+.list-page__content [data-stock-movements-table-scroll]::-webkit-scrollbar-thumb:hover,
+.list-page__content [data-stock-balances-table-scroll]::-webkit-scrollbar-thumb:hover,
+.list-page__content [data-barcode-registry-table-scroll]::-webkit-scrollbar-thumb:hover,
+.list-page__content [data-receipts-table-scroll]::-webkit-scrollbar-thumb:hover,
+.list-page__content [data-suppliers-table-scroll]::-webkit-scrollbar-thumb:hover,
+.list-page__content [data-brands-table-scroll]::-webkit-scrollbar-thumb:hover,
+.list-page__content [data-purchase-orders-table-scroll]::-webkit-scrollbar-thumb:hover,
+.list-page__content [data-sales-orders-table-scroll]::-webkit-scrollbar-thumb:hover,
+.list-page__content [data-shipments-table-scroll]::-webkit-scrollbar-thumb:hover,
+.list-page__content [data-warehouses-table-scroll]::-webkit-scrollbar-thumb:hover,
+.list-page__content [data-customers-table-scroll]::-webkit-scrollbar-thumb:hover,
+.list-page__content [data-markdown-journal-table-scroll]::-webkit-scrollbar-thumb:hover,
+.list-page__content [data-carriers-table-scroll]::-webkit-scrollbar-thumb:hover,
+.list-page__content [data-categories-table-scroll]::-webkit-scrollbar-thumb:hover {
   background: var(--app-text-muted);
 }
 
-.list-page__content .erp-ag-grid .ag-body-viewport::-webkit-scrollbar-corner {
+.list-page__content [data-items-table-scroll]::-webkit-scrollbar-corner,
+.list-page__content [data-stock-movements-table-scroll]::-webkit-scrollbar-corner,
+.list-page__content [data-stock-balances-table-scroll]::-webkit-scrollbar-corner,
+.list-page__content [data-barcode-registry-table-scroll]::-webkit-scrollbar-corner,
+.list-page__content [data-receipts-table-scroll]::-webkit-scrollbar-corner,
+.list-page__content [data-suppliers-table-scroll]::-webkit-scrollbar-corner,
+.list-page__content [data-brands-table-scroll]::-webkit-scrollbar-corner,
+.list-page__content [data-purchase-orders-table-scroll]::-webkit-scrollbar-corner,
+.list-page__content [data-sales-orders-table-scroll]::-webkit-scrollbar-corner,
+.list-page__content [data-shipments-table-scroll]::-webkit-scrollbar-corner,
+.list-page__content [data-warehouses-table-scroll]::-webkit-scrollbar-corner,
+.list-page__content [data-customers-table-scroll]::-webkit-scrollbar-corner,
+.list-page__content [data-markdown-journal-table-scroll]::-webkit-scrollbar-corner,
+.list-page__content [data-carriers-table-scroll]::-webkit-scrollbar-corner,
+.list-page__content [data-categories-table-scroll]::-webkit-scrollbar-corner {
   background: var(--app-surface);
   border-radius: 0 0 4px 0;
 }
@@ -613,167 +709,8 @@ summary,
   background: var(--app-shell-bg);
 }
 
-/* AG Grid — premium dark data grid (aligned with reference: shell, header, rows, lines) */
-.list-page__content > .erp-ag-grid {
-  --ag-background-color: var(--app-grid-row);
-  --ag-header-background-color: var(--app-grid-header);
-  --ag-foreground-color: var(--foreground);
-  --ag-border-color: var(--app-line);
-  --ag-row-height: 24px;
-  --ag-header-height: 30px;
-  --ag-row-hover-color: var(--app-grid-row-hover);
-  --ag-selected-row-background-color: var(--app-grid-row-selected);
-  --ag-range-selection-background-color: rgba(79, 126, 247, 0.12);
-  --ag-data-background-color: var(--app-grid-row);
-  --ag-icon-font-color: var(--app-text-muted);
-}
-
-.list-page__content > .erp-ag-grid .ag-root-wrapper {
-  background-color: var(--app-grid-row) !important;
-  border-radius: 0.5rem;
-  overflow: hidden;
-}
-
-.list-page__content > .erp-ag-grid .ag-header-viewport,
-.list-page__content > .erp-ag-grid .ag-header-row,
-.list-page__content > .erp-ag-grid .ag-header-cell {
-  background-color: var(--app-grid-header) !important;
-  color: var(--app-text-soft) !important;
-  border-bottom: 1px solid var(--app-line) !important;
-}
-
-.list-page__content > .erp-ag-grid .ag-header-row {
-  height: 30px !important;
-  min-height: 30px !important;
-}
-
-.list-page__content > .erp-ag-grid .ag-header-cell {
-  padding-left: 12px !important;
-  padding-right: 12px !important;
-  padding-top: 0 !important;
-  padding-bottom: 0 !important;
-  height: 100% !important;
-  min-height: 30px !important;
-  display: flex !important;
-  align-items: center !important;
-  border-right: 1px solid var(--app-line) !important;
-}
-
-/* Центрирование содержимого заголовка по вертикали (переопределение тем AG Grid) */
-.list-page__content > .erp-ag-grid .ag-header-cell > * {
-  align-self: center !important;
-  display: flex !important;
-  align-items: center !important;
-}
-.list-page__content > .erp-ag-grid .ag-header-cell .ag-header-cell-comp-wrapper {
-  align-self: center !important;
-  display: flex !important;
-  align-items: center !important;
-}
-
-.list-page__content > .erp-ag-grid .ag-header-cell:last-child {
-  border-right: none !important;
-}
-
-.list-page__content > .erp-ag-grid .ag-body-viewport,
-.list-page__content > .erp-ag-grid .ag-center-cols-viewport,
-.list-page__content > .erp-ag-grid .ag-row,
-.list-page__content > .erp-ag-grid .ag-cell {
-  background-color: var(--app-grid-row) !important;
-  color: var(--foreground) !important;
-}
-
-.list-page__content > .erp-ag-grid .ag-cell {
-  padding-top: 0 !important;
-  padding-bottom: 0 !important;
-  padding-left: 12px !important;
-  padding-right: 12px !important;
-  display: flex !important;
-  align-items: center !important;
-  line-height: 1.1 !important;
-}
-
-.list-page__content > .erp-ag-grid .ag-header-cell-text,
-.list-page__content > .erp-ag-grid .ag-cell-wrapper {
-  color: var(--foreground) !important;
-}
-
-.list-page__content > .erp-ag-grid .ag-cell .ag-cell-wrapper {
-  align-self: center;
-}
-
-.list-page__content > .erp-ag-grid .ag-header-cell-text {
-  color: var(--app-text-soft) !important;
-  font-weight: 600;
-  font-size: 0.765rem;
-  letter-spacing: 0.01em;
-  line-height: 1;
-}
-
-.list-page__content > .erp-ag-grid .ag-row-border {
-  border-color: var(--app-line) !important;
-}
-
-.list-page__content > .erp-ag-grid .ag-icon {
-  color: var(--app-text-muted) !important;
-}
-
-/* Row hover — clear but refined (reference-style) */
-.list-page__content > .erp-ag-grid .ag-row:hover .ag-cell {
-  background-color: var(--app-grid-row-hover) !important;
-}
-
-/* Selected row — clear but refined */
-.list-page__content > .erp-ag-grid .ag-row.ag-row-selected .ag-cell {
-  background-color: var(--app-grid-row-selected) !important;
-}
-
-.list-page__content > .erp-ag-grid .ag-overlay-no-rows-center {
-  display: flex;
-  min-height: 100%;
-  width: min(32rem, calc(100% - 2rem));
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 0.35rem;
-  margin: 0 auto;
-  text-align: center;
-  pointer-events: none;
-}
-
-.list-page__content > .erp-ag-grid .ag-overlay-no-rows-center__title {
-  color: var(--foreground);
-  font-size: 0.95rem;
-  font-weight: 600;
-  line-height: 1.35;
-}
-
-.list-page__content > .erp-ag-grid .ag-overlay-no-rows-center__hint {
-  color: var(--app-text-muted);
-  font-size: 0.8rem;
-  line-height: 1.3;
-}
-
-/* Focused cell — light gray outline (not blue), subtle */
-.list-page__content > .erp-ag-grid .ag-cell-focus,
-.list-page__content > .erp-ag-grid .ag-cell:focus {
-  outline: none !important;
-  box-shadow: 0 0 0 1px var(--app-grid-focus) !important;
-  border-color: var(--app-grid-focus) !important;
-}
-
-/* Clickable list grids: row pointer cursor */
-.list-page__content > .items-grid.erp-ag-grid .ag-row,
-.list-page__content > .markdown-journal-tanstack-list tbody tr.cursor-pointer,
-.list-page__content > .markdown-journal-grid.erp-ag-grid .ag-row,
-.list-page__content > .customers-grid.erp-ag-grid .ag-row,
-.list-page__content > .suppliers-grid.erp-ag-grid .ag-row,
-.list-page__content > .warehouses-grid.erp-ag-grid .ag-row,
-.list-page__content > .carriers-grid.erp-ag-grid .ag-row,
-.list-page__content > .purchase-orders-grid.erp-ag-grid .ag-row,
-.list-page__content > .sales-orders-grid.erp-ag-grid .ag-row,
-.list-page__content > .receipts-grid.erp-ag-grid .ag-row,
-.list-page__content > .shipments-grid.erp-ag-grid .ag-row {
+/* Clickable list table rows (Markdown journal list) */
+.list-page__content .markdown-journal-tanstack-list tbody tr.cursor-pointer {
   cursor: pointer;
 }
 
@@ -787,56 +724,8 @@ summary,
   box-shadow: inset 2px 0 0 0 hsl(210 35% 42% / 0.28);
 }
 
-/* Active/Inactive as plain text only (no pill) — scoped to grid cells */
-.list-page__content .erp-ag-grid .ag-cell .status-plain-text {
-  font-size: inherit;
-  font-weight: 500;
-}
-
-.list-page__content .erp-ag-grid .ag-cell .status-plain-text--active {
-  color: var(--foreground);
-}
-
-.list-page__content .erp-ag-grid .ag-cell .status-plain-text--inactive {
-  color: var(--app-text-muted);
-}
-
-/* Checkbox: white when checked (no blue), no visible outline/ring */
-.list-page__content .erp-ag-grid .ag-checkbox-input-wrapper,
-.doc-page .erp-ag-grid .ag-checkbox-input-wrapper {
-  width: 13px !important;
-  height: 13px !important;
-  min-width: 13px !important;
-  min-height: 13px !important;
-}
-
-.list-page__content .erp-ag-grid .ag-checkbox-input-wrapper.ag-checked {
-  background-color: var(--primary) !important;
-  border-color: var(--primary) !important;
-}
-.list-page__content .erp-ag-grid .ag-checkbox-input-wrapper.ag-checked:focus,
-.list-page__content .erp-ag-grid .ag-checkbox-input-wrapper.ag-checked:focus-within {
-  background-color: var(--primary) !important;
-  border-color: var(--primary) !important;
-  outline: none !important;
-  box-shadow: none !important;
-}
-.list-page__content .erp-ag-grid .ag-checkbox-input-wrapper.ag-checked::after,
-.list-page__content .erp-ag-grid .ag-checkbox-input-wrapper.ag-checked .ag-icon {
-  color: var(--primary-foreground) !important;
-}
-.list-page__content .erp-ag-grid .ag-checkbox-input-wrapper:not(.ag-checked) {
-  border-color: var(--app-line-strong) !important;
-}
-.list-page__content .erp-ag-grid .ag-checkbox-input-wrapper:focus,
-.list-page__content .erp-ag-grid .ag-checkbox-input-wrapper:focus-within {
-  outline: none !important;
-  box-shadow: none !important;
-  border-color: var(--app-line-strong) !important;
-}
-
-.list-page__content .erp-ag-grid .ag-cell .grid-outline-pill,
-.doc-page .erp-ag-grid .ag-cell .grid-outline-pill {
+.list-page__content table .grid-outline-pill,
+.doc-page table .grid-outline-pill {
   padding-top: 0 !important;
   padding-bottom: 0 !important;
   line-height: 1.05 !important;
@@ -1362,112 +1251,16 @@ summary,
   min-height: 120px;
 }
 
-/* Document lines: explicit height (e.g. h-[22rem]) must win over flex:1 or AG Grid root collapses (~2px). */
+/* Document lines: explicit height (e.g. h-[22rem]) must win over flex:1 or the table wrapper collapses (~2px). */
 .doc-page .doc-lines__grid.doc-lines__grid--fixed-h {
   flex: 0 0 auto;
 }
 
-.doc-lines__grid .erp-ag-grid {
-  height: 100%;
+.doc-lines__grid > .doc-lines-grid {
+  flex: 1;
   min-height: 0;
-}
-
-/* AG Grid inside doc pages — same dark theme as list pages */
-.doc-page .erp-ag-grid {
-  --ag-background-color: var(--app-grid-row);
-  --ag-header-background-color: var(--app-grid-header);
-  --ag-foreground-color: var(--foreground);
-  --ag-border-color: var(--app-line);
-  --ag-row-height: 24px;
-  --ag-header-height: 30px;
-  --ag-row-hover-color: var(--app-grid-row-hover);
-  --ag-selected-row-background-color: var(--app-grid-row-selected);
-}
-.doc-page .erp-ag-grid .ag-root-wrapper {
-  background-color: var(--app-grid-row) !important;
-  border-radius: 0.5rem;
-  overflow: hidden;
-}
-.doc-page .erp-ag-grid .ag-header-viewport,
-.doc-page .erp-ag-grid .ag-header-row,
-.doc-page .erp-ag-grid .ag-header-cell {
-  background-color: var(--app-grid-header) !important;
-  color: var(--app-text-soft) !important;
-  border-bottom: 1px solid var(--app-line) !important;
-}
-.doc-page .erp-ag-grid .ag-header-cell {
-  padding-left: 12px !important;
-  padding-right: 12px !important;
-  min-height: 30px !important;
-}
-.doc-page .erp-ag-grid .ag-header-row {
-  height: 30px !important;
-  min-height: 30px !important;
-}
-.doc-page .doc-lines-grid--po .ag-header-cell.po-grid-header--center .ag-header-cell-label {
-  justify-content: center;
-}
-.doc-page .erp-ag-grid .ag-cell {
-  padding-left: 12px !important;
-  padding-right: 12px !important;
-  padding-top: 0 !important;
-  padding-bottom: 0 !important;
-  line-height: 1.1 !important;
-}
-.doc-page .doc-lines-grid--po .ag-cell.po-grid-cell--center {
-  text-align: center;
-}
-.doc-page .erp-ag-grid .ag-row:hover .ag-cell {
-  background-color: var(--app-grid-row-hover) !important;
-}
-.doc-page .erp-ag-grid .ag-cell-focus,
-.doc-page .erp-ag-grid .ag-cell:focus {
-  outline: none !important;
-  box-shadow: 0 0 0 1px var(--app-grid-focus) !important;
-  border-color: var(--app-grid-focus) !important;
-}
-
-/* Doc-page grid: selected row — subtler background only; same vertical grid as other rows (consistent look) */
-.doc-page .erp-ag-grid .ag-row.ag-row-selected .ag-cell,
-.doc-page .doc-lines__grid .erp-ag-grid .ag-row.ag-row-selected .ag-cell {
-  background-color: var(--app-grid-row-selected) !important;
-}
-
-/* Single-row edit mode: distinct from bulk selection (editingLineId row) — left accent on first cell only */
-.doc-page .erp-ag-grid .ag-row.ag-row-selected.doc-lines__row--editing .ag-cell {
-  background-color: var(--app-surface-subtle) !important;
-}
-.doc-page .erp-ag-grid .ag-row.ag-row-selected.doc-lines__row--editing .ag-cell:first-child {
-  border-left: 3px solid var(--app-grid-focus) !important;
-}
-.doc-page .erp-ag-grid .ag-row.ag-row-selected.doc-lines__row--editing:hover .ag-cell {
-  background-color: var(--app-grid-row-hover) !important;
-}
-
-/* Doc-page grid: checkboxes — white when checked, no blue outline/ring */
-.doc-page .erp-ag-grid .ag-checkbox-input-wrapper.ag-checked {
-  background-color: var(--primary) !important;
-  border-color: var(--primary) !important;
-}
-.doc-page .erp-ag-grid .ag-checkbox-input-wrapper.ag-checked:focus,
-.doc-page .erp-ag-grid .ag-checkbox-input-wrapper.ag-checked:focus-within {
-  background-color: var(--primary) !important;
-  border-color: var(--primary) !important;
-  outline: none !important;
-  box-shadow: none !important;
-}
-.doc-page .erp-ag-grid .ag-checkbox-input-wrapper.ag-checked::after,
-.doc-page .erp-ag-grid .ag-checkbox-input-wrapper.ag-checked .ag-icon {
-  color: var(--primary-foreground) !important;
-}
-.doc-page .erp-ag-grid .ag-checkbox-input-wrapper:not(.ag-checked) {
-  border-color: var(--app-line-strong) !important;
-}
-.doc-page .erp-ag-grid .ag-checkbox-input-wrapper:focus,
-.doc-page .erp-ag-grid .ag-checkbox-input-wrapper:focus-within {
-  outline: none !important;
-  box-shadow: none !important;
-  border-color: var(--app-line-strong) !important;
+  display: flex;
+  flex-direction: column;
 }
 
 /* Document health summary (errors / warnings) */
@@ -1481,14 +1274,6 @@ summary,
   color: #f87171;
 }
 .doc-health__warnings {
-  color: #fbbf24;
-}
-
-/* Line-level feedback in document lines grid: text color only, no background/border */
-.doc-page .erp-ag-grid .doc-lines__row--error .ag-cell {
-  color: #f87171;
-}
-.doc-page .erp-ag-grid .doc-lines__row--warning .ag-cell {
   color: #fbbf24;
 }
 

@@ -1,4 +1,4 @@
-import type { ColDef } from "ag-grid-community";
+import type { ListColumnDef } from "@/shared/ui/list-view/listColumnDef";
 import type { TFunction } from "@/shared/i18n";
 import type {
   AgGridColumnFilterConfig,
@@ -15,7 +15,7 @@ import { translateCarrierType } from "./carrierLabels";
 
 type CarrierFieldCatalogEntry = {
   registry: ListViewFieldRegistryEntry;
-  colDef: ColDef<CarrierListRow>;
+  colDef: ListColumnDef<CarrierListRow>;
   filterConfig?: AgGridColumnFilterConfig<CarrierListRow>;
 };
 
@@ -76,7 +76,7 @@ function mapSchemaToFilterConfig(
 function buildColDefFromSchema(
   column: CarriersTableColumnSchema,
   input: BuildCarriersFieldCatalogInput,
-): ColDef<CarrierListRow> {
+): ListColumnDef<CarrierListRow> {
   const { t, formatMoney } = input;
   const emDash = t("domain.audit.summary.emDash");
 
@@ -84,7 +84,7 @@ function buildColDefFromSchema(
     return getAgGridRowNumberColDef(t);
   }
 
-  const colDef: ColDef<CarrierListRow> = {
+  const colDef: ListColumnDef<CarrierListRow> = {
     colId: column.id,
     headerName: column.label,
     sortable: column.sortable,
@@ -131,7 +131,7 @@ function createCarriersFieldCatalog(input: BuildCarriersFieldCatalogInput): Carr
 
 export function buildCarriersListViewCatalog(input: BuildCarriersFieldCatalogInput): {
   fieldRegistry: ListViewFieldRegistryEntry[];
-  columnDefs: ColDef<CarrierListRow>[];
+  columnDefs: ListColumnDef<CarrierListRow>[];
   filterConfigs: Record<string, AgGridColumnFilterConfig<CarrierListRow>>;
 } {
   const entries = createCarriersFieldCatalog(input);

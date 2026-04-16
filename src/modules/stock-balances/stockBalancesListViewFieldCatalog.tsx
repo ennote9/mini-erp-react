@@ -1,4 +1,4 @@
-import type { ColDef } from "ag-grid-community";
+import type { ListColumnDef } from "@/shared/ui/list-view/listColumnDef";
 import type { TFunction } from "@/shared/i18n";
 import type {
   AgGridColumnFilterConfig,
@@ -13,7 +13,7 @@ import { buildStockBalancesTableSchema, type StockBalancesTableColumnSchema } fr
 
 type StockBalancesFieldCatalogEntry = {
   registry: ListViewFieldRegistryEntry;
-  colDef: ColDef<StockBalanceListRow>;
+  colDef: ListColumnDef<StockBalanceListRow>;
   filterConfig?: AgGridColumnFilterConfig<StockBalanceListRow>;
 };
 
@@ -89,14 +89,14 @@ function mapSchemaToFilterConfig(
 function buildColDefFromSchema(
   column: StockBalancesTableColumnSchema,
   input: BuildStockBalancesListViewCatalogInput,
-): ColDef<StockBalanceListRow> {
+): ListColumnDef<StockBalanceListRow> {
   const { styleLabel } = input;
 
   if (column.id === "lineNo") {
     return getAgGridRowNumberColDef(input.t);
   }
 
-  const colDef: ColDef<StockBalanceListRow> = {
+  const colDef: ListColumnDef<StockBalanceListRow> = {
     colId: column.id,
     headerName: column.label,
     sortable: column.sortable,
@@ -157,7 +157,7 @@ function buildExtendedFilterConfigs(
 
 export function buildStockBalancesListViewCatalog(input: BuildStockBalancesListViewCatalogInput): {
   fieldRegistry: ListViewFieldRegistryEntry[];
-  columnDefs: ColDef<StockBalanceListRow>[];
+  columnDefs: ListColumnDef<StockBalanceListRow>[];
   filterConfigs: Record<string, AgGridColumnFilterConfig<StockBalanceListRow>>;
 } {
   const entries = createStockBalancesFieldCatalog(input);

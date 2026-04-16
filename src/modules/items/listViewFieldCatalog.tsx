@@ -1,4 +1,4 @@
-import type { ColDef } from "ag-grid-community";
+import type { ListColumnDef } from "@/shared/ui/list-view/listColumnDef";
 import type { TFunction } from "@/shared/i18n";
 import type { AgGridColumnFilterConfig, ListViewFieldRegistryEntry } from "@/shared/ui/ag-grid";
 import { getAgGridRowNumberColDef } from "@/shared/ui/ag-grid/agGridDefaults";
@@ -11,7 +11,7 @@ import {
 
 type ItemFieldCatalogEntry = {
   registry: ListViewFieldRegistryEntry;
-  colDef: ColDef<ItemListRow>;
+  colDef: ListColumnDef<ItemListRow>;
   filterConfig?: AgGridColumnFilterConfig<ItemListRow>;
 };
 
@@ -67,13 +67,13 @@ function mapSchemaToFilterConfig(column: ItemsTableColumnSchema): AgGridColumnFi
 function buildColDefFromSchema(
   column: ItemsTableColumnSchema,
   input: BuildItemsFieldCatalogInput,
-): ColDef<ItemListRow> {
+): ListColumnDef<ItemListRow> {
   const { t, formatMoney } = input;
   if (column.id === "lineNo") {
     return getAgGridRowNumberColDef(t);
   }
 
-  const colDef: ColDef<ItemListRow> = {
+  const colDef: ListColumnDef<ItemListRow> = {
     colId: column.id,
     headerName: column.label,
     sortable: column.sortable,
@@ -117,7 +117,7 @@ function createItemsFieldCatalog(input: BuildItemsFieldCatalogInput): ItemFieldC
 
 export function buildItemsListViewCatalog(input: BuildItemsFieldCatalogInput): {
   fieldRegistry: ListViewFieldRegistryEntry[];
-  columnDefs: ColDef<ItemListRow>[];
+  columnDefs: ListColumnDef<ItemListRow>[];
   filterConfigs: Record<string, AgGridColumnFilterConfig<ItemListRow>>;
 } {
   const entries = createItemsFieldCatalog(input);

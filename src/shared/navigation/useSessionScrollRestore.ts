@@ -40,11 +40,7 @@ function writeSnapshot(key: string, snapshot: ScrollSnapshot): void {
 
 function resolveScrollTarget(root: HTMLElement | null): HTMLElement | null {
   if (!root) return null;
-  return (
-    root.querySelector<HTMLElement>(".ag-body-viewport") ??
-    root.querySelector<HTMLElement>(".ag-center-cols-viewport") ??
-    root
-  );
+  return root;
 }
 
 export function useSessionScrollRestore(

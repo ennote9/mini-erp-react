@@ -1,4 +1,4 @@
-import type { ColDef } from "ag-grid-community";
+import type { ListColumnDef } from "@/shared/ui/list-view/listColumnDef";
 import type { TFunction } from "@/shared/i18n";
 import type { ItemBarcodeSymbology } from "@/modules/items";
 import type {
@@ -19,7 +19,7 @@ import {
 
 type BarcodeRegistryFieldCatalogEntry = {
   registry: ListViewFieldRegistryEntry;
-  colDef: ColDef<BarcodeRegistryRow>;
+  colDef: ListColumnDef<BarcodeRegistryRow>;
   filterConfig?: AgGridColumnFilterConfig<BarcodeRegistryRow>;
 };
 
@@ -102,7 +102,7 @@ function mapSchemaToFilterConfig(
 function buildColDefFromSchema(
   column: BarcodeRegistryTableColumnSchema,
   input: BuildBarcodeRegistryFieldCatalogInput,
-): ColDef<BarcodeRegistryRow> {
+): ListColumnDef<BarcodeRegistryRow> {
   const { t, entryTypeLabel, sourceLabel, symbologyLabel, markdownStatusLabel } = input;
   const emDash = t("domain.audit.summary.emDash");
 
@@ -110,7 +110,7 @@ function buildColDefFromSchema(
     return getAgGridRowNumberColDef(t);
   }
 
-  const colDef: ColDef<BarcodeRegistryRow> = {
+  const colDef: ListColumnDef<BarcodeRegistryRow> = {
     colId: column.id,
     headerName: column.label,
     sortable: column.sortable,
@@ -130,7 +130,8 @@ function buildColDefFromSchema(
     colDef.valueFormatter = (params) => markdownStatusLabel(params.value as string | undefined);
   }
   if (column.id === "createdAt") {
-    colDef.valueFormatter = (params) => params.value || emDash;
+    colDef.valueFormatter = (params) =>
+      params.value != null && params.value !== "" ? String(params.value) : emDash;
   }
 
   if (column.defaultSize != null) colDef.initialWidth = column.defaultSize;
@@ -170,7 +171,7 @@ function createBarcodeRegistryFieldCatalog(
 
 export function buildBarcodeRegistryListViewCatalog(input: BuildBarcodeRegistryFieldCatalogInput): {
   fieldRegistry: ListViewFieldRegistryEntry[];
-  columnDefs: ColDef<BarcodeRegistryRow>[];
+  columnDefs: ListColumnDef<BarcodeRegistryRow>[];
   filterConfigs: Record<string, AgGridColumnFilterConfig<BarcodeRegistryRow>>;
 } {
   const entries = createBarcodeRegistryFieldCatalog(input);

@@ -1,4 +1,4 @@
-import type { ColDef } from "ag-grid-community";
+import type { ListColumnDef } from "@/shared/ui/list-view/listColumnDef";
 import type { TFunction } from "@/shared/i18n";
 import type {
   AgGridColumnFilterConfig,
@@ -30,13 +30,13 @@ function journalStatusLabel(status: MarkdownJournalStatus, t: TFunction): string
 
 type JournalsFieldCatalogEntry = {
   registry: ListViewFieldRegistryEntry;
-  colDef: ColDef<JournalRow>;
+  colDef: ListColumnDef<JournalRow>;
   filterConfig?: AgGridColumnFilterConfig<JournalRow>;
 };
 
 type CodesFieldCatalogEntry = {
   registry: ListViewFieldRegistryEntry;
-  colDef: ColDef<MarkdownCodeRow>;
+  colDef: ListColumnDef<MarkdownCodeRow>;
   filterConfig?: AgGridColumnFilterConfig<MarkdownCodeRow>;
 };
 
@@ -186,12 +186,12 @@ function mapCodesFilterConfig(
 function buildJournalsColDefFromSchema(
   column: MarkdownJournalTanstackColumnSchema,
   input: BuildMarkdownJournalsListViewCatalogInput,
-): ColDef<JournalRow> {
+): ListColumnDef<JournalRow> {
   if (column.id === "lineNo") {
     return getAgGridRowNumberColDef(input.t);
   }
   const fieldKey = (column.accessorKey ?? column.id) as keyof JournalRow & string;
-  const colDef: ColDef<JournalRow> = {
+  const colDef: ListColumnDef<JournalRow> = {
     colId: column.id,
     headerName: column.label,
     sortable: column.sortable,
@@ -205,12 +205,12 @@ function buildJournalsColDefFromSchema(
   return colDef;
 }
 
-function buildCodesColDefFromSchema(column: MarkdownJournalTanstackColumnSchema, input: BuildMarkdownCodesListViewCatalogInput): ColDef<MarkdownCodeRow> {
+function buildCodesColDefFromSchema(column: MarkdownJournalTanstackColumnSchema, input: BuildMarkdownCodesListViewCatalogInput): ListColumnDef<MarkdownCodeRow> {
   if (column.id === "lineNo") {
     return getAgGridRowNumberColDef(input.t);
   }
   const fieldKey = (column.accessorKey ?? column.id) as keyof MarkdownCodeRow & string;
-  const colDef: ColDef<MarkdownCodeRow> = {
+  const colDef: ListColumnDef<MarkdownCodeRow> = {
     colId: column.id,
     headerName: column.label,
     sortable: column.sortable,
@@ -244,7 +244,7 @@ function createCodesFieldCatalog(input: BuildMarkdownCodesListViewCatalogInput):
 
 export function buildMarkdownJournalsListViewCatalog(input: BuildMarkdownJournalsListViewCatalogInput): {
   fieldRegistry: ListViewFieldRegistryEntry[];
-  columnDefs: ColDef<JournalRow>[];
+  columnDefs: ListColumnDef<JournalRow>[];
   filterConfigs: Record<string, AgGridColumnFilterConfig<JournalRow>>;
 } {
   const entries = createJournalsFieldCatalog(input);
@@ -265,7 +265,7 @@ export function buildMarkdownJournalsListViewCatalog(input: BuildMarkdownJournal
 
 export function buildMarkdownCodesListViewCatalog(input: BuildMarkdownCodesListViewCatalogInput): {
   fieldRegistry: ListViewFieldRegistryEntry[];
-  columnDefs: ColDef<MarkdownCodeRow>[];
+  columnDefs: ListColumnDef<MarkdownCodeRow>[];
   filterConfigs: Record<string, AgGridColumnFilterConfig<MarkdownCodeRow>>;
 } {
   const entries = createCodesFieldCatalog(input);

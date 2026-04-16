@@ -1,4 +1,4 @@
-import type { ColDef } from "ag-grid-community";
+import type { ListColumnDef } from "@/shared/ui/list-view/listColumnDef";
 import type { TFunction } from "@/shared/i18n";
 import type {
   AgGridColumnFilterConfig,
@@ -11,7 +11,7 @@ import { buildShipmentsTableSchema, type ShipmentsTableColumnSchema } from "./sh
 
 type ShipmentsFieldCatalogEntry = {
   registry: ListViewFieldRegistryEntry;
-  colDef: ColDef<ShipmentListRow>;
+  colDef: ListColumnDef<ShipmentListRow>;
   filterConfig?: AgGridColumnFilterConfig<ShipmentListRow>;
 };
 
@@ -80,14 +80,14 @@ function mapSchemaToFilterConfig(
 function buildColDefFromSchema(
   column: ShipmentsTableColumnSchema,
   input: BuildShipmentsListViewCatalogInput,
-): ColDef<ShipmentListRow> {
+): ListColumnDef<ShipmentListRow> {
   const { t, formatDate } = input;
 
   if (column.id === "lineNo") {
     return getAgGridRowNumberColDef(t);
   }
 
-  const colDef: ColDef<ShipmentListRow> = {
+  const colDef: ListColumnDef<ShipmentListRow> = {
     colId: column.id,
     headerName: column.label,
     sortable: column.sortable,
@@ -144,7 +144,7 @@ function createShipmentsFieldCatalog(input: BuildShipmentsListViewCatalogInput):
 
 export function buildShipmentsListViewCatalog(input: BuildShipmentsListViewCatalogInput): {
   fieldRegistry: ListViewFieldRegistryEntry[];
-  columnDefs: ColDef<ShipmentListRow>[];
+  columnDefs: ListColumnDef<ShipmentListRow>[];
   filterConfigs: Record<string, AgGridColumnFilterConfig<ShipmentListRow>>;
 } {
   const entries = createShipmentsFieldCatalog(input);

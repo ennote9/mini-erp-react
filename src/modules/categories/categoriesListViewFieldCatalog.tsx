@@ -1,4 +1,4 @@
-import type { ColDef } from "ag-grid-community";
+import type { ListColumnDef } from "@/shared/ui/list-view/listColumnDef";
 import type { TFunction } from "@/shared/i18n";
 import type { AgGridColumnFilterConfig, ListViewFieldRegistryEntry } from "@/shared/ui/ag-grid";
 import { getAgGridRowNumberColDef } from "@/shared/ui/ag-grid/agGridDefaults";
@@ -10,7 +10,7 @@ import {
 
 type CategoryFieldCatalogEntry = {
   registry: ListViewFieldRegistryEntry;
-  colDef: ColDef<CategoryListRow>;
+  colDef: ListColumnDef<CategoryListRow>;
   filterConfig?: AgGridColumnFilterConfig<CategoryListRow>;
 };
 
@@ -57,13 +57,13 @@ function mapSchemaToFilterConfig(
 function buildColDefFromSchema(
   column: CategoriesTableColumnSchema,
   input: BuildCategoriesFieldCatalogInput,
-): ColDef<CategoryListRow> {
+): ListColumnDef<CategoryListRow> {
   const { t, formatMoney } = input;
   if (column.id === "lineNo") {
     return getAgGridRowNumberColDef(t);
   }
 
-  const colDef: ColDef<CategoryListRow> = {
+  const colDef: ListColumnDef<CategoryListRow> = {
     colId: column.id,
     headerName: column.label,
     sortable: column.sortable,
@@ -106,7 +106,7 @@ function createCategoriesFieldCatalog(input: BuildCategoriesFieldCatalogInput): 
 
 export function buildCategoriesListViewCatalog(input: BuildCategoriesFieldCatalogInput): {
   fieldRegistry: ListViewFieldRegistryEntry[];
-  columnDefs: ColDef<CategoryListRow>[];
+  columnDefs: ListColumnDef<CategoryListRow>[];
   filterConfigs: Record<string, AgGridColumnFilterConfig<CategoryListRow>>;
 } {
   const entries = createCategoriesFieldCatalog(input);

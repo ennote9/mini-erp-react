@@ -1,4 +1,4 @@
-import type { ColDef } from "ag-grid-community";
+import type { ListColumnDef } from "@/shared/ui/list-view/listColumnDef";
 import type { TFunction } from "@/shared/i18n";
 import type { AgGridColumnFilterConfig, ListViewFieldRegistryEntry } from "@/shared/ui/ag-grid";
 import { getAgGridRowNumberColDef } from "@/shared/ui/ag-grid/agGridDefaults";
@@ -10,7 +10,7 @@ import {
 
 type BrandFieldCatalogEntry = {
   registry: ListViewFieldRegistryEntry;
-  colDef: ColDef<BrandListRow>;
+  colDef: ListColumnDef<BrandListRow>;
   filterConfig?: AgGridColumnFilterConfig<BrandListRow>;
 };
 
@@ -57,13 +57,13 @@ function mapSchemaToFilterConfig(
 function buildColDefFromSchema(
   column: BrandsTableColumnSchema,
   input: BuildBrandsFieldCatalogInput,
-): ColDef<BrandListRow> {
+): ListColumnDef<BrandListRow> {
   const { t, formatMoney } = input;
   if (column.id === "lineNo") {
     return getAgGridRowNumberColDef(t);
   }
 
-  const colDef: ColDef<BrandListRow> = {
+  const colDef: ListColumnDef<BrandListRow> = {
     colId: column.id,
     headerName: column.label,
     sortable: column.sortable,
@@ -106,7 +106,7 @@ function createBrandsFieldCatalog(input: BuildBrandsFieldCatalogInput): BrandFie
 
 export function buildBrandsListViewCatalog(input: BuildBrandsFieldCatalogInput): {
   fieldRegistry: ListViewFieldRegistryEntry[];
-  columnDefs: ColDef<BrandListRow>[];
+  columnDefs: ListColumnDef<BrandListRow>[];
   filterConfigs: Record<string, AgGridColumnFilterConfig<BrandListRow>>;
 } {
   const entries = createBrandsFieldCatalog(input);

@@ -1,4 +1,4 @@
-import type { ColDef } from "ag-grid-community";
+import type { ListColumnDef } from "@/shared/ui/list-view/listColumnDef";
 import type { TFunction } from "@/shared/i18n";
 import type { AgGridColumnFilterConfig, ListViewFieldRegistryEntry } from "@/shared/ui/ag-grid";
 import { getAgGridRowNumberColDef } from "@/shared/ui/ag-grid/agGridDefaults";
@@ -10,7 +10,7 @@ import {
 
 type SupplierFieldCatalogEntry = {
   registry: ListViewFieldRegistryEntry;
-  colDef: ColDef<SupplierListRow>;
+  colDef: ListColumnDef<SupplierListRow>;
   filterConfig?: AgGridColumnFilterConfig<SupplierListRow>;
 };
 
@@ -59,7 +59,7 @@ function mapSchemaToFilterConfig(
 function buildColDefFromSchema(
   column: SuppliersTableColumnSchema,
   input: BuildSuppliersFieldCatalogInput,
-): ColDef<SupplierListRow> {
+): ListColumnDef<SupplierListRow> {
   const { t, formatMoney } = input;
   const emDash = t("domain.audit.summary.emDash");
 
@@ -67,7 +67,7 @@ function buildColDefFromSchema(
     return getAgGridRowNumberColDef(t);
   }
 
-  const colDef: ColDef<SupplierListRow> = {
+  const colDef: ListColumnDef<SupplierListRow> = {
     colId: column.id,
     headerName: column.label,
     sortable: column.sortable,
@@ -117,7 +117,7 @@ function createSuppliersFieldCatalog(input: BuildSuppliersFieldCatalogInput): Su
 
 export function buildSuppliersListViewCatalog(input: BuildSuppliersFieldCatalogInput): {
   fieldRegistry: ListViewFieldRegistryEntry[];
-  columnDefs: ColDef<SupplierListRow>[];
+  columnDefs: ListColumnDef<SupplierListRow>[];
   filterConfigs: Record<string, AgGridColumnFilterConfig<SupplierListRow>>;
 } {
   const entries = createSuppliersFieldCatalog(input);

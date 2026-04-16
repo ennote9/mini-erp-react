@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import type { ColDef } from "ag-grid-community";
+import type { ListColumnDef } from "@/shared/ui/list-view/listColumnDef";
 import type { AgGridColumnFilterModel } from "@/shared/navigation/agGridColumnFilters";
 import type { UrlGridSort } from "@/shared/navigation/agGridSort";
 import {
@@ -74,7 +74,7 @@ type InternalColumnMeta<T> = {
   defaultVisible: boolean;
   lockedVisible: boolean;
   lockedOrder: boolean;
-  colDef: ColDef<T>;
+  colDef: ListColumnDef<T>;
   originalIndex: number;
 };
 
@@ -102,7 +102,7 @@ function writePersisted(pageKey: string, value: PersistedPersonalViewState): voi
   }
 }
 
-function normalizeColDefsWithStableIds<T>(defs: ColDef<T>[]): ColDef<T>[] {
+function normalizeColDefsWithStableIds<T>(defs: ListColumnDef<T>[]): ListColumnDef<T>[] {
   return defs.map((colDef, index) => {
     const existingId =
       typeof colDef.colId === "string" && colDef.colId.trim() !== ""
@@ -115,7 +115,7 @@ function normalizeColDefsWithStableIds<T>(defs: ColDef<T>[]): ColDef<T>[] {
   });
 }
 
-function buildColumnMeta<T>(defs: ColDef<T>[]): InternalColumnMeta<T>[] {
+function buildColumnMeta<T>(defs: ListColumnDef<T>[]): InternalColumnMeta<T>[] {
   return defs.map((colDef, index) => {
     const id = colDef.colId ?? colDef.field ?? `__col_${index}`;
     const headerName = typeof colDef.headerName === "string" ? colDef.headerName.trim() : "";
@@ -207,10 +207,10 @@ function visibleFieldKeysFromColumns(columns: Array<{ fieldKey: string; visible:
   return new Set(columns.filter((column) => column.visible).map((column) => column.fieldKey));
 }
 
-function applySettingsToDefs<T>(meta: InternalColumnMeta<T>[], items: AgGridColumnSettingsItem[]): ColDef<T>[] {
+function applySettingsToDefs<T>(meta: InternalColumnMeta<T>[], items: AgGridColumnSettingsItem[]): ListColumnDef<T>[] {
   const byId = new Map(meta.map((entry) => [entry.id, entry.colDef]));
   const seen = new Set<string>();
-  const ordered: ColDef<T>[] = [];
+  const ordered: ListColumnDef<T>[] = [];
   for (const item of items) {
     const source = byId.get(item.id);
     if (!source || seen.has(item.id)) continue;
@@ -365,13 +365,13 @@ function definitionSignature(definition: ListViewDefinition | null): string {
 type UseAgGridColumnSettingsParams<T> = {
   pageKey: string;
   entityType: ListViewEntityType;
-  baseColumnDefs: ColDef<T>[];
+  baseColumnDefs: ListColumnDef<T>[];
   fieldRegistry?: ListViewFieldRegistryEntry[];
   allowHiddenFilterSort?: boolean;
 };
 
 export type UseAgGridColumnSettingsResult<T> = {
-  columnDefs: ColDef<T>[];
+  columnDefs: ListColumnDef<T>[];
   committedItems: AgGridColumnSettingsItem[];
   draftItems: AgGridColumnSettingsItem[];
   setDraftItems: (updater: (prev: AgGridColumnSettingsItem[]) => AgGridColumnSettingsItem[]) => void;

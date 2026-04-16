@@ -1,31 +1,13 @@
-import type { ColDef, GridOptions } from "ag-grid-community";
 import type { TFunction } from "@/shared/i18n/resolve";
+import type { ListColumnDef } from "@/shared/ui/list-view/listColumnDef";
 
-/**
- * Grid options applied across ERP grids so visible cell values can be selected/copied.
- * (AG root defaults to .ag-unselectable; this toggles selectable cell value behavior.)
- */
-export const agGridDefaultGridOptions = {
-  enableCellTextSelection: true,
-  suppressMaintainUnsortedOrder: true,
-} as const satisfies Pick<GridOptions, "enableCellTextSelection" | "suppressMaintainUnsortedOrder">;
-
-/**
- * Shared default column definition for list-page AG Grids.
- * Used by Stock Movements and Stock Balances; override per column as needed.
- */
-export const agGridDefaultColDef: ColDef = {
-  sortable: true,
-  resizable: true,
-};
-
-/** Column with row index (1-based). Always first. */
-export const agGridRowNumberColDef: ColDef = {
+/** Column with row index (1-based). Always first. Used by list view field catalogs. */
+export const listViewRowNumberColumnDef: ListColumnDef = {
   colId: "lineNo",
   headerName: "№",
   valueGetter: (params) =>
     params.node?.rowIndex != null ? String(params.node.rowIndex + 1) : "",
-  width: 56,
+  initialWidth: 56,
   minWidth: 56,
   maxWidth: 56,
   lockPosition: "left",
@@ -35,20 +17,15 @@ export const agGridRowNumberColDef: ColDef = {
 };
 
 /** Localized № header; use inside `useMemo` with `[t, locale]` so headers refresh on language change. */
-export function getAgGridRowNumberColDef(t: TFunction): ColDef {
+export function getListViewRowNumberColumnDef(t: TFunction): ListColumnDef {
   return {
-    ...agGridRowNumberColDef,
+    ...listViewRowNumberColumnDef,
     headerName: t("doc.columns.lineNo"),
   };
 }
 
-/** Selection column (checkboxes) - use as selectionColumnDef when rowSelection is set. AG Grid 32.2+ */
-export const agGridSelectionColumnDef: ColDef = {
-  width: 52,
-  minWidth: 52,
-  maxWidth: 52,
-  lockPosition: "left",
-  suppressMovable: true,
-  sortable: false,
-  resizable: false,
-};
+/** @deprecated Use {@link getListViewRowNumberColumnDef} */
+export const getAgGridRowNumberColDef = getListViewRowNumberColumnDef;
+
+/** @deprecated Use {@link listViewRowNumberColumnDef} */
+export const agGridRowNumberColDef = listViewRowNumberColumnDef;

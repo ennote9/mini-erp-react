@@ -1,4 +1,4 @@
-import type { ColDef } from "ag-grid-community";
+import type { ListColumnDef } from "@/shared/ui/list-view/listColumnDef";
 import type { TFunction } from "@/shared/i18n";
 import type { AgGridColumnFilterConfig, ListViewFieldRegistryEntry } from "@/shared/ui/ag-grid";
 import { getAgGridRowNumberColDef } from "@/shared/ui/ag-grid/agGridDefaults";
@@ -10,7 +10,7 @@ import {
 
 type CustomerFieldCatalogEntry = {
   registry: ListViewFieldRegistryEntry;
-  colDef: ColDef<CustomerListRow>;
+  colDef: ListColumnDef<CustomerListRow>;
   filterConfig?: AgGridColumnFilterConfig<CustomerListRow>;
 };
 
@@ -59,7 +59,7 @@ function mapSchemaToFilterConfig(
 function buildColDefFromSchema(
   column: CustomersTableColumnSchema,
   input: BuildCustomersFieldCatalogInput,
-): ColDef<CustomerListRow> {
+): ListColumnDef<CustomerListRow> {
   const { t, formatMoney } = input;
   const emDash = t("domain.audit.summary.emDash");
 
@@ -67,7 +67,7 @@ function buildColDefFromSchema(
     return getAgGridRowNumberColDef(t);
   }
 
-  const colDef: ColDef<CustomerListRow> = {
+  const colDef: ListColumnDef<CustomerListRow> = {
     colId: column.id,
     headerName: column.label,
     sortable: column.sortable,
@@ -117,7 +117,7 @@ function createCustomersFieldCatalog(input: BuildCustomersFieldCatalogInput): Cu
 
 export function buildCustomersListViewCatalog(input: BuildCustomersFieldCatalogInput): {
   fieldRegistry: ListViewFieldRegistryEntry[];
-  columnDefs: ColDef<CustomerListRow>[];
+  columnDefs: ListColumnDef<CustomerListRow>[];
   filterConfigs: Record<string, AgGridColumnFilterConfig<CustomerListRow>>;
 } {
   const entries = createCustomersFieldCatalog(input);

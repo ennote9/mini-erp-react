@@ -1,4 +1,4 @@
-import type { ColDef } from "ag-grid-community";
+import type { ListColumnDef } from "@/shared/ui/list-view/listColumnDef";
 import type { TFunction } from "@/shared/i18n";
 import type {
   AgGridColumnFilterConfig,
@@ -11,7 +11,7 @@ import { buildReceiptsTableSchema, type ReceiptsTableColumnSchema } from "./rece
 
 type ReceiptsFieldCatalogEntry = {
   registry: ListViewFieldRegistryEntry;
-  colDef: ColDef<ReceiptListRow>;
+  colDef: ListColumnDef<ReceiptListRow>;
   filterConfig?: AgGridColumnFilterConfig<ReceiptListRow>;
 };
 
@@ -77,14 +77,14 @@ function mapSchemaToFilterConfig(
 function buildColDefFromSchema(
   column: ReceiptsTableColumnSchema,
   input: BuildReceiptsListViewCatalogInput,
-): ColDef<ReceiptListRow> {
+): ListColumnDef<ReceiptListRow> {
   const { t, formatDate } = input;
 
   if (column.id === "lineNo") {
     return getAgGridRowNumberColDef(t);
   }
 
-  const colDef: ColDef<ReceiptListRow> = {
+  const colDef: ListColumnDef<ReceiptListRow> = {
     colId: column.id,
     headerName: column.label,
     sortable: column.sortable,
@@ -125,7 +125,7 @@ function createReceiptsFieldCatalog(input: BuildReceiptsListViewCatalogInput): R
 
 export function buildReceiptsListViewCatalog(input: BuildReceiptsListViewCatalogInput): {
   fieldRegistry: ListViewFieldRegistryEntry[];
-  columnDefs: ColDef<ReceiptListRow>[];
+  columnDefs: ListColumnDef<ReceiptListRow>[];
   filterConfigs: Record<string, AgGridColumnFilterConfig<ReceiptListRow>>;
 } {
   const entries = createReceiptsFieldCatalog(input);

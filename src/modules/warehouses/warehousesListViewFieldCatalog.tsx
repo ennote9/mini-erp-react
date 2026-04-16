@@ -1,4 +1,4 @@
-import type { ColDef } from "ag-grid-community";
+import type { ListColumnDef } from "@/shared/ui/list-view/listColumnDef";
 import type { TFunction } from "@/shared/i18n";
 import type {
   AgGridColumnFilterConfig,
@@ -14,7 +14,7 @@ import {
 
 type WarehouseFieldCatalogEntry = {
   registry: ListViewFieldRegistryEntry;
-  colDef: ColDef<WarehouseListRow>;
+  colDef: ListColumnDef<WarehouseListRow>;
   filterConfig?: AgGridColumnFilterConfig<WarehouseListRow>;
 };
 
@@ -68,7 +68,7 @@ function mapSchemaToFilterConfig(
 function buildColDefFromSchema(
   column: WarehousesTableColumnSchema,
   input: BuildWarehousesFieldCatalogInput,
-): ColDef<WarehouseListRow> {
+): ListColumnDef<WarehouseListRow> {
   const { t, formatMoney } = input;
   const emDash = t("domain.audit.summary.emDash");
 
@@ -76,7 +76,7 @@ function buildColDefFromSchema(
     return getAgGridRowNumberColDef(t);
   }
 
-  const colDef: ColDef<WarehouseListRow> = {
+  const colDef: ListColumnDef<WarehouseListRow> = {
     colId: column.id,
     headerName: column.label,
     sortable: column.sortable,
@@ -119,7 +119,7 @@ function createWarehousesFieldCatalog(input: BuildWarehousesFieldCatalogInput): 
 
 export function buildWarehousesListViewCatalog(input: BuildWarehousesFieldCatalogInput): {
   fieldRegistry: ListViewFieldRegistryEntry[];
-  columnDefs: ColDef<WarehouseListRow>[];
+  columnDefs: ListColumnDef<WarehouseListRow>[];
   filterConfigs: Record<string, AgGridColumnFilterConfig<WarehouseListRow>>;
 } {
   const entries = createWarehousesFieldCatalog(input);
