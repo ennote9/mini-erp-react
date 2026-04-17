@@ -6,7 +6,6 @@ import { employeeRepository, flushPendingEmployeePersist } from "../repository";
 import { createBlankEmployee, normalizeEmployeeForSave, buildAuditEventsForSave } from "../service";
 import type { Employee } from "../model";
 import { DocumentPageLayout } from "@/shared/ui/object/DocumentPageLayout";
-import { BackButton } from "@/shared/ui/list/BackButton";
 import { Button } from "@/components/ui/button";
 import { DocumentIssueStrip } from "@/shared/ui/feedback/DocumentIssueStrip";
 import {
@@ -27,30 +26,6 @@ import { cn } from "@/lib/utils";
 
 function cloneEmployee(e: Employee): Employee {
   return JSON.parse(JSON.stringify(e)) as Employee;
-}
-
-function HeaderStatusGroup({
-  label,
-  value,
-  tone,
-}: {
-  label: string;
-  value: string;
-  tone: "neutral" | "danger" | "warn";
-}) {
-  return (
-    <div
-      className={cn(
-        "inline-flex min-w-0 max-w-full items-center gap-2 rounded-md border px-2 py-1 text-xs",
-        tone === "neutral" && "border-border bg-muted/30",
-        tone === "danger" && "border-destructive/40 bg-destructive/10",
-        tone === "warn" && "border-amber-500/35 bg-amber-500/5",
-      )}
-    >
-      <span className="shrink-0 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">{label}</span>
-      <span className="min-w-0 truncate font-medium text-foreground">{value}</span>
-    </div>
-  );
 }
 
 export function EmployeePage() {
@@ -177,22 +152,11 @@ export function EmployeePage() {
     ? t("employees.page.titleNew")
     : t("employees.page.titleEdit", { code: draft.identity.employeeCode });
 
-  const summaryChips = (
-    <div className="flex flex-wrap items-center gap-2">
-      <HeaderStatusGroup
-        label={t("employees.header.record")}
-        value={t(`employees.enums.recordStatus.${draft.identity.status}`)}
-        tone="neutral"
-      />
-    </div>
-  );
-
   const header = (
     <div className="flex flex-col gap-3">
       <div className="flex flex-wrap items-start justify-between gap-3">
-        <div className="min-w-0 space-y-1">
+        <div className="min-w-0">
           <h2 className="truncate text-lg font-semibold leading-tight">{title}</h2>
-          {summaryChips}
         </div>
         <div className="flex shrink-0 items-center gap-2">
           <Button type="button" variant="outline" size="sm" className="h-8 gap-1" onClick={handleCancel}>
@@ -213,11 +177,7 @@ export function EmployeePage() {
 
   return (
     <DocumentPageLayout
-      breadcrumbItems={[
-        { label: t("routes.employees"), to: "/employees" },
-        { label: isNew ? t("common.new") : draft.identity.employeeCode },
-      ]}
-      breadcrumbPrefix={<BackButton to={appendReturnTo("/employees", returnTo)} />}
+      breadcrumbItems={[]}
       header={header}
       summary={false}
     >
