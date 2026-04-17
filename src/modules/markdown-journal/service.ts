@@ -54,10 +54,6 @@ export type TransitionMarkdownInput = {
   actorId: string;
 };
 
-export type ResolveMarkdownJournalPrintInput = {
-  recordIds?: string[];
-};
-
 function validateJournalLine(
   line: MarkdownJournalDraftLineInput,
 ): { success: true; line: MarkdownJournalDraftLineInput } | { success: false; error: string } {
@@ -349,58 +345,6 @@ export function postMarkdownJournal(
   });
   if (!updated) return { success: false, error: "Failed to post markdown journal." };
   return { success: true, journal: updated, records };
-}
-
-export function resolveMarkdownJournalPrintRecords(
-  journalId: string,
-  input?: ResolveMarkdownJournalPrintInput,
-): { success: true; journal: MarkdownJournal; records: MarkdownRecord[] } | { success: false; error: string } {
-  const journal = markdownJournalRepository.getById(journalId);
-  if (!journal) return { success: false, error: "Markdown journal not found." };
-  if (journal.status !== "posted") return { success: false, error: "Print is available only for posted journals." };
-  const records = listMarkdownUnitsForJournal(journalId);
-  if (records.length === 0) {
-    return { success: false, error: "No generated markdown units available for printing." };
-  }
-  const selectedIds = input?.recordIds?.map((value) => value.trim()).filter(Boolean) ?? [];
-  if (!input?.recordIds) {
-    return { success: true, journal, records };
-  }
-  if (selectedIds.length === 0) {
-    return { success: false, error: "Select at least one generated markdown code to print." };
-  }
-  const recordMap = new Map(records.map((record) => [record.id, record]));
-  const selectedRecords: MarkdownRecord[] = [];
-  for (const recordId of selectedIds) {
-    const record = recordMap.get(recordId);
-    if (!record) {
-      return { success: false, error: "Selected markdown codes must belong to the current journal." };
-    }
-    selectedRecords.push(record);
-  }
-  return { success: true, journal, records: selectedRecords };
-}
-
-export function recordMarkdownPrintAudit(
-  recordIds: string[],
-): { success: true; records: MarkdownRecord[] } | { success: false; error: string } {
-  const normalizedIds = recordIds.map((value) => value.trim()).filter(Boolean);
-  if (normalizedIds.length === 0) {
-    return { success: false, error: "Select at least one generated markdown code to print." };
-  }
-  const printedAt = new Date().toISOString();
-  const updatedRecords: MarkdownRecord[] = [];
-  for (const recordId of normalizedIds) {
-    const record = markdownRepository.getById(recordId);
-    if (!record) return { success: false, error: "Selected markdown codes could not be resolved." };
-    const updated = markdownRepository.update(recordId, {
-      printCount: record.printCount + 1,
-      printedAt,
-    });
-    if (!updated) return { success: false, error: "Failed to save markdown print audit." };
-    updatedRecords.push(updated);
-  }
-  return { success: true, records: updatedRecords };
 }
 
 export function transitionMarkdownRecord(

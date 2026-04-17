@@ -15,8 +15,6 @@ export {
   createMarkdownJournalDraft,
   updateMarkdownJournalDraft,
   postMarkdownJournal,
-  resolveMarkdownJournalPrintRecords,
-  recordMarkdownPrintAudit,
   listMarkdownLinesForJournal,
   listMarkdownUnitsForJournal,
   transitionMarkdownRecord,

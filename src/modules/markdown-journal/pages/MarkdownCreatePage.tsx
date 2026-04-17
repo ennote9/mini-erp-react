@@ -1,8 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
-import type { ColumnSizingState, RowSelectionState } from "@tanstack/react-table";
-import { Dialog } from "radix-ui";
-import { CheckSquare, ClipboardList, File, List, Printer, Save, X } from "lucide-react";
+import type { ColumnSizingState } from "@tanstack/react-table";
+import { ClipboardList, File, List, Save, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -32,8 +31,6 @@ import {
   listMarkdownLinesForJournal,
   listMarkdownUnitsForJournal,
   postMarkdownJournal,
-  recordMarkdownPrintAudit,
-  resolveMarkdownJournalPrintRecords,
   updateMarkdownJournalDraft,
   type MarkdownJournalDraftLineInput,
 } from "../service";
@@ -77,8 +74,6 @@ type LineFormRow = {
   quantity: number;
   reasonCode: MarkdownReasonCode;
 };
-
-type PrintMode = "all" | "selected";
 
 function buildCancelTarget(itemId: string): string {
   if (!itemId) return "/markdown-journal";
@@ -153,187 +148,6 @@ function warehouseLabelFor(id: string): string {
   return warehouse ? `${warehouse.code} — ${warehouse.name}` : id;
 }
 
-function escapeHtml(value: string): string {
-  return value
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#39;");
-}
-
-const CODE39_PATTERNS: Record<string, string> = {
-  "0": "nnnwwnwnn",
-  "1": "wnnwnnnnw",
-  "2": "nnwwnnnnw",
-  "3": "wnwwnnnnn",
-  "4": "nnnwwnnnw",
-  "5": "wnnwwnnnn",
-  "6": "nnwwwnnnn",
-  "7": "nnnwnnwnw",
-  "8": "wnnwnnwnn",
-  "9": "nnwwnnwnn",
-  A: "wnnnnwnnw",
-  B: "nnwnnwnnw",
-  C: "wnwnnwnnn",
-  D: "nnnnwwnnw",
-  E: "wnnnwwnnn",
-  F: "nnwnwwnnn",
-  G: "nnnnnwwnw",
-  H: "wnnnnwwnn",
-  I: "nnwnnwwnn",
-  J: "nnnnwwwnn",
-  K: "wnnnnnnww",
-  L: "nnwnnnnww",
-  M: "wnwnnnnwn",
-  N: "nnnnwnnww",
-  O: "wnnnwnnwn",
-  P: "nnwnwnnwn",
-  Q: "nnnnnnwww",
-  R: "wnnnnnwwn",
-  S: "nnwnnnwwn",
-  T: "nnnnwnwwn",
-  U: "wwnnnnnnw",
-  V: "nwwnnnnnw",
-  W: "wwwnnnnnn",
-  X: "nwnnwnnnw",
-  Y: "wwnnwnnnn",
-  Z: "nwwnwnnnn",
-  "-": "nwnnnnwnw",
-  ".": "wwnnnnwnn",
-  " ": "nwwnnnwnn",
-  $: "nwnwnwnnn",
-  "/": "nwnwnnnwn",
-  "+": "nwnnnwnwn",
-  "%": "nnnwnwnwn",
-  "*": "nwnnwnwnn",
-};
-
-function buildCode39BarcodeSvg(value: string): string {
-  const encoded = value.trim().toUpperCase();
-  if (!encoded) return "";
-  if ([...encoded].some((char) => !CODE39_PATTERNS[char] || char === "*")) {
-    return "";
-  }
-
-  const narrow = 2;
-  const wide = 6;
-  const interCharacterGap = 2;
-  const quietZone = 12;
-  const height = 56;
-  let x = quietZone;
-  const rects: string[] = [];
-  const fullValue = ["*", ...encoded.split(""), "*"];
-
-  for (const char of fullValue) {
-    const pattern = CODE39_PATTERNS[char];
-    for (let i = 0; i < pattern.length; i += 1) {
-      const width = pattern[i] === "w" ? wide : narrow;
-      if (i % 2 === 0) {
-        rects.push(`<rect x="${x}" y="0" width="${width}" height="${height}" fill="#111111" />`);
-      }
-      x += width;
-    }
-    x += interCharacterGap;
-  }
-
-  const width = x + quietZone - interCharacterGap;
-  return `<svg class="sticker__barcode-svg" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${width} ${height}" preserveAspectRatio="none" role="img" aria-label="${escapeHtml(`Barcode ${value}`)}" shape-rendering="crispEdges">
-    <rect width="${width}" height="${height}" fill="#ffffff" />
-    ${rects.join("")}
-  </svg>`;
-}
-
-function buildMarkdownPrintSheetHtml(params: {
-  journalNumber: string;
-  rows: MarkdownCreateCodeGridRow[];
-  t: (key: string) => string;
-  formatMoney: (value: number | null | undefined, fractionDigits?: number, empty?: string) => string;
-}): string {
-  const { journalNumber, rows, t, formatMoney } = params;
-  const html = rows
-    .map((row) => {
-      const barcodeSvg = buildCode39BarcodeSvg(row.markdownCode);
-      return `
-        <article class="sticker">
-          <div class="sticker__barcode">${barcodeSvg}</div>
-          <div class="sticker__code">${escapeHtml(row.markdownCode)}</div>
-          <div class="sticker__item">${escapeHtml(`${row.itemCode} — ${row.itemName}`)}</div>
-          <div class="sticker__meta">${escapeHtml(`${t("markdown.fields.markdownPrice")}: ${formatMoney(row.markdownPrice, 2, "0")}`)}</div>
-        </article>
-      `;
-    })
-    .join("");
-
-  return `<!doctype html>
-    <html>
-      <head>
-        <title>${escapeHtml(journalNumber)}</title>
-        <style>
-          body { font-family: Arial, sans-serif; margin: 16px; color: #111; }
-          .sheet { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
-          .sticker { border: 1px solid #111; padding: 12px; page-break-inside: avoid; }
-          .sticker__barcode { margin-bottom: 10px; }
-          .sticker__barcode-svg { display: block; width: 100%; height: 56px; }
-          .sticker__code { font-size: 20px; font-weight: 700; margin-bottom: 8px; letter-spacing: 0.04em; }
-          .sticker__item { font-size: 14px; margin-bottom: 6px; }
-          .sticker__meta { font-size: 12px; margin-bottom: 2px; }
-        </style>
-        <script>
-          window.addEventListener("load", () => {
-            window.setTimeout(() => {
-              window.focus();
-              window.print();
-            }, 50);
-          });
-        </script>
-      </head>
-      <body>
-        <div class="sheet">${html}</div>
-      </body>
-    </html>`;
-}
-
-function openMarkdownPrintPopupShell(title: string, loadingText: string): Window | null {
-  const popup = window.open("", "_blank", "width=960,height=720");
-  if (!popup) return null;
-  popup.document.write(`<!doctype html>
-    <html>
-      <head>
-        <title>${escapeHtml(title)}</title>
-        <style>
-          body {
-            font-family: Arial, sans-serif;
-            margin: 24px;
-            color: #111;
-          }
-          .print-loading {
-            border: 1px solid #d4d4d8;
-            border-radius: 8px;
-            padding: 16px;
-            max-width: 32rem;
-          }
-          .print-loading__title {
-            font-size: 16px;
-            font-weight: 600;
-            margin-bottom: 8px;
-          }
-          .print-loading__body {
-            font-size: 14px;
-          }
-        </style>
-      </head>
-      <body>
-        <section class="print-loading">
-          <div class="print-loading__title">${escapeHtml(title)}</div>
-          <div class="print-loading__body">${escapeHtml(loadingText)}</div>
-        </section>
-      </body>
-    </html>`);
-  popup.document.close();
-  return popup;
-}
-
 function journalStatusLabel(
   status: MarkdownJournal["status"],
   t: (key: string) => string,
@@ -379,8 +193,6 @@ export function MarkdownCreatePage() {
     allowedValues: ["lines", "codes"] as const,
     defaultValue: "lines",
   });
-  const [printDialogOpen, setPrintDialogOpen] = useState(false);
-  const [codeRowSelection, setCodeRowSelection] = useState<RowSelectionState>({});
   const [markdownLineGridColumnSizing, setMarkdownLineGridColumnSizing] = useState<ColumnSizingState>(() =>
     readPersistedColumnSizing(MARKDOWN_CREATE_LINES_COL_SIZING_KEY),
   );
@@ -570,11 +382,6 @@ export function MarkdownCreatePage() {
     navigate(appendReturnTo(`/markdown-journal/journals/${result.journal.id}`, returnTo), { replace: true });
   }, [id, navigate, returnTo]);
 
-  const handlePrint = useCallback(() => {
-    setCreateError(null);
-    setPrintDialogOpen(true);
-  }, []);
-
   const lineGridTanstackColumns = useMemo(
     () => buildMarkdownCreateLineGridColumns(t, formatMoney),
     [t, formatMoney],
@@ -604,106 +411,15 @@ export function MarkdownCreatePage() {
     writePersistedColumnSizing(MARKDOWN_CREATE_CODES_COL_SIZING_KEY, markdownCodeGridColumnSizing);
   }, [markdownCodeGridColumnSizing]);
 
-  useEffect(() => {
-    const valid = new Set(codeRows.map((r) => r.id));
-    setCodeRowSelection((prev) => {
-      const next = { ...prev };
-      let changed = false;
-      for (const k of Object.keys(next)) {
-        if (!valid.has(k)) {
-          delete next[k];
-          changed = true;
-        }
-      }
-      return changed ? next : prev;
-    });
-  }, [codeRows]);
-
-  const selectedCodeIds = useMemo(
-    () => Object.keys(codeRowSelection).filter((k) => codeRowSelection[k]),
-    [codeRowSelection],
-  );
-
   const getMarkdownLineGridRowClassName = useCallback(
     (row: MarkdownCreateLineGridRow) =>
       !isReadOnly && editingLineId === row.id ? "doc-lines__row--editing" : undefined,
     [isReadOnly, editingLineId],
   );
 
-  const resolveMarkdownCodeRowSelectLabel = useCallback((row: MarkdownCreateCodeGridRow) => row.markdownCode, []);
-
   const unitsCount = useMemo(
     () => (journal ? listMarkdownUnitsForJournal(journal.id).length : 0),
     [journal, appRevision],
-  );
-  const selectedPrintableCount = useMemo(() => {
-    if (selectedCodeIds.length === 0) return 0;
-    const selectedSet = new Set(selectedCodeIds);
-    return codeRows.filter((row) => selectedSet.has(row.id)).length;
-  }, [codeRows, selectedCodeIds]);
-
-  const handlePrintMode = useCallback(
-    (mode: PrintMode) => {
-      if (!id || !journal) return;
-      setCreateError(null);
-      const popup = openMarkdownPrintPopupShell(
-        t("markdown.journal.printDialogTitle"),
-        t("markdown.journal.printPopupPreparing"),
-      );
-      if (!popup) {
-        setCreateError("Could not open print window.");
-        return;
-      }
-      const printResult = resolveMarkdownJournalPrintRecords(
-        id,
-        mode === "selected" ? { recordIds: selectedCodeIds } : undefined,
-      );
-      if (!printResult.success) {
-        popup.close();
-        setCreateError(printResult.error);
-        return;
-      }
-
-      const printableRows = printResult.records.map((record) => {
-        const item = itemRepository.getById(record.itemId);
-        return {
-          id: record.id,
-          markdownCode: record.markdownCode,
-          itemCode: item?.code ?? record.itemId,
-          itemName: item?.name ?? record.itemId,
-          quantity: 1,
-          markdownPrice: record.markdownPrice,
-          reason: t(`markdown.reason.${record.reasonCode}`),
-          warehouse: warehouseLabelFor(record.warehouseId),
-          status: t(`markdown.status.${record.status}`),
-          postedAt: record.createdAt,
-          printCount: record.printCount,
-          printedAt: record.printedAt ?? t("domain.audit.summary.emDash"),
-        } satisfies MarkdownCreateCodeGridRow;
-      });
-
-      popup.document.open();
-      popup.document.write(
-        buildMarkdownPrintSheetHtml({
-          journalNumber: printResult.journal.number,
-          rows: printableRows,
-          t,
-          formatMoney,
-        }),
-      );
-      popup.document.close();
-      popup.focus();
-      popup.print();
-
-      const auditResult = recordMarkdownPrintAudit(printResult.records.map((record) => record.id));
-      if (!auditResult.success) {
-        popup.close();
-        setCreateError(auditResult.error);
-        return;
-      }
-      setPrintDialogOpen(false);
-    },
-    [id, journal, selectedCodeIds, t, formatMoney],
   );
 
   const breadcrumbItems = useMemo(
@@ -761,12 +477,6 @@ export function MarkdownCreatePage() {
                   </Button>
                 </>
               ) : null}
-              {!isNew && journal?.status === "posted" && (
-                <Button type="button" onClick={handlePrint}>
-                  <Printer aria-hidden />
-                  {t("markdown.actions.printLabels")}
-                </Button>
-              )}
               <Button type="button" variant="outline" onClick={handleCancel}>
                 <X aria-hidden />
                 {t("common.cancel")}
@@ -947,10 +657,6 @@ export function MarkdownCreatePage() {
                       <div className="flex w-full max-w-[140px] min-w-0 flex-col gap-0.5">
                         <span className="text-xs leading-tight text-muted-foreground">{t("markdown.fields.totalQty")}</span>
                         <span className="text-sm leading-tight text-foreground">{unitsCount}</span>
-                      </div>
-                      <div className="flex w-full max-w-[140px] min-w-0 flex-col gap-0.5">
-                        <span className="text-xs leading-tight text-muted-foreground">{t("markdown.journal.selectedCodesCount")}</span>
-                        <span className="text-sm leading-tight text-foreground">{selectedPrintableCount}</span>
                       </div>
                     </div>
                   </section>
@@ -1141,10 +847,6 @@ export function MarkdownCreatePage() {
                   getRowId={(row) => row.id}
                   columnSizing={markdownCodeGridColumnSizing}
                   onColumnSizingChange={setMarkdownCodeGridColumnSizing}
-                  enableRowSelection
-                  rowSelection={codeRowSelection}
-                  onRowSelectionChange={setCodeRowSelection}
-                  resolveRowSelectLabel={resolveMarkdownCodeRowSelectLabel}
                   t={t}
                 />
               </div>
@@ -1152,48 +854,6 @@ export function MarkdownCreatePage() {
           </div>
         </div>
       </div>
-
-      <Dialog.Root open={printDialogOpen} onOpenChange={setPrintDialogOpen}>
-        <Dialog.Portal>
-          <Dialog.Overlay className="fixed inset-0 z-50 bg-black/50 backdrop-blur-[1px]" />
-          <Dialog.Content className="fixed left-1/2 top-1/2 z-50 w-[min(32rem,calc(100vw-2rem))] -translate-x-1/2 -translate-y-1/2 rounded-lg border bg-background p-5 shadow-lg focus:outline-none">
-            <Dialog.Title className="text-base font-semibold text-foreground">
-              {t("markdown.journal.printDialogTitle")}
-            </Dialog.Title>
-            <Dialog.Description className="mt-1 text-sm text-muted-foreground">
-              {t("markdown.journal.printDialogDescription")}
-            </Dialog.Description>
-
-            <div className="mt-4 space-y-2 text-sm">
-              <div className="rounded-md border border-border/60 bg-muted/20 px-3 py-2">
-                {t("markdown.journal.printAllSummary", { count: unitsCount })}
-              </div>
-              <div className="rounded-md border border-border/60 bg-muted/20 px-3 py-2">
-                {t("markdown.journal.printSelectedSummary", { count: selectedPrintableCount })}
-              </div>
-            </div>
-
-            <div className="mt-5 flex flex-wrap justify-end gap-2">
-              <Button type="button" variant="outline" onClick={() => setPrintDialogOpen(false)}>
-                {t("common.cancel")}
-              </Button>
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => handlePrintMode("selected")}
-                disabled={selectedPrintableCount === 0}
-              >
-                <CheckSquare aria-hidden />
-                {t("markdown.actions.printSelected")}
-              </Button>
-              <Button type="button" onClick={() => handlePrintMode("all")}>
-                <Printer aria-hidden />
-                {t("markdown.actions.printAll")}
-              </Button>
-            </div>
-          </Dialog.Content>
-        </Dialog.Portal>
-      </Dialog.Root>
     </DocumentPageLayout>
   );
 }
