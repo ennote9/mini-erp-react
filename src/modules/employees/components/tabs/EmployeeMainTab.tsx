@@ -15,7 +15,11 @@ const DOC_TYPES: EmployeeIdentityDocumentType[] = [
   "other",
 ];
 
-/** Compact Main tab: bounded width, dense ERP form rhythm. */
+/** Cards share one sizing rule; max width keeps forms readable in wide grid cells. */
+const cardClass =
+  "border-0 shadow-none ring-0 min-w-0 w-full max-w-[32rem] justify-self-stretch h-fit";
+
+/** Compact Main tab: dense ERP form rhythm; sections tile in a wrapping grid on wider viewports. */
 export function EmployeeMainTab({ draft, patch }: EmployeeTabProps) {
   const { t } = useTranslation();
   const idn = draft.identity;
@@ -23,12 +27,15 @@ export function EmployeeMainTab({ draft, patch }: EmployeeTabProps) {
 
   const control = "h-7 px-2 text-xs";
   const labelCls = "text-[10px] font-medium leading-none text-muted-foreground";
-  const wrap = "w-full max-w-[min(calc(27rem-1cm),calc(35%-1cm))] shrink-0";
 
   return (
-    <div className="flex w-full flex-col gap-3">
-      <div className={wrap}>
-        <Card className="border-0 shadow-none ring-0">
+    <div
+      className={
+        "grid w-full max-w-[min(100%,calc(32rem*2+0.25rem))] grid-cols-1 gap-3 " +
+        "sm:grid-cols-2 sm:items-start sm:justify-items-stretch sm:gap-x-1 sm:gap-y-3"
+      }
+    >
+      <Card className={cardClass}>
           <CardHeader className="p-4 pb-2">
             <CardTitle className="text-xs font-semibold leading-tight tracking-tight">
               {t("employees.tabs.main.identityTitle")}
@@ -117,10 +124,8 @@ export function EmployeeMainTab({ draft, patch }: EmployeeTabProps) {
             </div>
           </CardContent>
         </Card>
-      </div>
 
-      <div className={wrap}>
-        <Card className="border-0 shadow-none ring-0">
+      <Card className={cardClass}>
           <CardHeader className="p-4 pb-2">
             <CardTitle className="text-xs font-semibold leading-tight tracking-tight">
               {t("employees.tabs.main.personalTitle")}
@@ -208,10 +213,8 @@ export function EmployeeMainTab({ draft, patch }: EmployeeTabProps) {
             </div>
           </CardContent>
         </Card>
-      </div>
 
-      <div className={wrap}>
-        <Card className="border-0 shadow-none ring-0">
+      <Card className={cardClass}>
           <CardHeader className="p-4 pb-2">
             <CardTitle className="text-xs font-semibold leading-tight tracking-tight">
               {t("employees.tabs.main.documentTitle")}
@@ -314,10 +317,8 @@ export function EmployeeMainTab({ draft, patch }: EmployeeTabProps) {
             </div>
           </CardContent>
         </Card>
-      </div>
 
-      <div className={wrap}>
-        <Card className="border-0 shadow-none ring-0">
+      <Card className={cardClass}>
           <CardHeader className="p-4 pb-2">
             <CardTitle className="text-xs font-semibold leading-tight tracking-tight">
               {t("employees.tabs.main.addressTitle")}
@@ -397,10 +398,8 @@ export function EmployeeMainTab({ draft, patch }: EmployeeTabProps) {
             </div>
           </CardContent>
         </Card>
-      </div>
 
-      <div className={wrap}>
-        <Card className="border-0 shadow-none ring-0">
+      <Card className={cardClass}>
           <CardHeader className="p-4 pb-2">
             <CardTitle className="text-xs font-semibold leading-tight tracking-tight">
               {t("employees.tabs.main.additionalPersonalTitle")}
@@ -481,7 +480,6 @@ export function EmployeeMainTab({ draft, patch }: EmployeeTabProps) {
             </div>
           </CardContent>
         </Card>
-      </div>
     </div>
   );
 }
