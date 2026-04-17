@@ -188,7 +188,7 @@ afterEach(async () => {
 });
 
 describe.sequential("Receipt and Shipment durability failure paths", () => {
-  it("receipt post can partially apply when a later repository update throws", async () => {
+  it("receipt post rolls back fully when a later repository update throws", async () => {
     const modules = await loadReceiptWorkflow();
     const item = createActiveItem(modules);
     const po = await createConfirmedPurchaseOrder(modules, [{ itemId: item.id, qty: 10, unitPrice: 1 }]);
@@ -197,10 +197,18 @@ describe.sequential("Receipt and Shipment durability failure paths", () => {
     if (!createResult.success) return;
 
     const receiptId = createResult.receiptId;
+    const originalPoUpdate = modules.purchaseOrderRepository.update.bind(
+      modules.purchaseOrderRepository,
+    );
+    let isFirstPurchaseOrderUpdate = true;
     const poUpdateSpy = vi
       .spyOn(modules.purchaseOrderRepository, "update")
-      .mockImplementation(() => {
-        throw new Error("purchase order update exploded");
+      .mockImplementation((id, patch) => {
+        if (isFirstPurchaseOrderUpdate) {
+          isFirstPurchaseOrderUpdate = false;
+          throw new Error("purchase order update exploded");
+        }
+        return originalPoUpdate(id, patch);
       });
 
     const postResult = await modules.receiptService.post(receiptId);
@@ -215,27 +223,20 @@ describe.sequential("Receipt and Shipment durability failure paths", () => {
       ]),
     );
 
-    expect(modules.receiptRepository.getById(receiptId)?.status).toBe("posted");
+    expect(modules.receiptRepository.getById(receiptId)?.status).toBe("draft");
     expect(
       modules.stockBalanceRepository.getByItemWarehouseAndStyle(item.id, po.warehouseId, "GOOD")?.qtyOnHand ?? 0,
-    ).toBe(10);
+    ).toBe(0);
     expect(
       modules.stockMovementRepository.list().filter((row) => row.sourceDocumentId === receiptId),
-    ).toEqual([
-      expect.objectContaining({
-        movementType: "receipt",
-        itemId: item.id,
-        warehouseId: po.warehouseId,
-        qtyDelta: 10,
-      }),
-    ]);
+    ).toEqual([]);
     expect(modules.purchaseOrderRepository.getById(po.id)?.status).toBe("confirmed");
     expect(
       modules.listAuditEventsForEntity("receipt", receiptId).map((row) => row.eventType),
     ).not.toContain("document_posted");
   });
 
-  it("receipt reverse can partially apply when a compensating balance adjustment throws", async () => {
+  it("receipt reverse rolls back fully when a compensating balance adjustment throws", async () => {
     const modules = await loadReceiptWorkflow();
     const item = createActiveItem(modules);
     const po = await createConfirmedPurchaseOrder(modules, [{ itemId: item.id, qty: 10, unitPrice: 1 }]);
@@ -245,8 +246,16 @@ describe.sequential("Receipt and Shipment durability failure paths", () => {
     const receiptId = createResult.receiptId;
     expect(await modules.receiptService.post(receiptId)).toEqual({ success: true });
 
-    vi.spyOn(modules.stockBalanceRepository, "adjustQty").mockImplementation(() => {
-      throw new Error("stock balance reversal exploded");
+    const originalAdjustQty = modules.stockBalanceRepository.adjustQty.bind(
+      modules.stockBalanceRepository,
+    );
+    let isFirstBalanceAdjustForReverse = true;
+    vi.spyOn(modules.stockBalanceRepository, "adjustQty").mockImplementation((input) => {
+      if (isFirstBalanceAdjustForReverse) {
+        isFirstBalanceAdjustForReverse = false;
+        throw new Error("stock balance reversal exploded");
+      }
+      return originalAdjustQty(input);
     });
 
     expect(
@@ -262,12 +271,9 @@ describe.sequential("Receipt and Shipment durability failure paths", () => {
     ).toBe(10);
     expect(
       modules.stockMovementRepository.list().filter((row) => row.sourceDocumentId === receiptId),
-    ).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({ movementType: "receipt", qtyDelta: 10 }),
-        expect.objectContaining({ movementType: "receipt_reversal", qtyDelta: -10 }),
-      ]),
-    );
+    ).toEqual([
+      expect.objectContaining({ movementType: "receipt", qtyDelta: 10 }),
+    ]);
     expect(modules.purchaseOrderRepository.getById(po.id)?.status).toBe("closed");
     expect(
       modules.listAuditEventsForEntity("receipt", receiptId).map((row) => row.eventType),
@@ -375,7 +381,7 @@ describe.sequential("Receipt and Shipment durability failure paths", () => {
     ).not.toContain("document_reversed");
   });
 
-  it("receipt post returns success before async inventory persistence failure is surfaced", async () => {
+  it("receipt post fails and rolls back when inventory persistence fails during flush", async () => {
     const modules = await loadReceiptWorkflow();
     const item = createActiveItem(modules);
     const po = await createConfirmedPurchaseOrder(modules, [{ itemId: item.id, qty: 10, unitPrice: 1 }]);
@@ -398,10 +404,10 @@ describe.sequential("Receipt and Shipment durability failure paths", () => {
       ]),
     );
 
-    expect(modules.receiptRepository.getById(createResult.receiptId)?.status).toBe("posted");
+    expect(modules.receiptRepository.getById(createResult.receiptId)?.status).toBe("draft");
     expect(
       modules.stockMovementRepository.list().filter((row) => row.sourceDocumentId === createResult.receiptId),
-    ).toHaveLength(1);
+    ).toEqual([]);
     await expect(modules.flushAllPendingPersistence()).resolves.toBeUndefined();
   });
 

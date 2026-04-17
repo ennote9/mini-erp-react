@@ -100,9 +100,10 @@ function nextEventId(): string {
   return String(nextId++);
 }
 
-export function appendAuditEvent(input: AuditEventInput): void {
+export function appendAuditEvent(input: AuditEventInput): string {
+  const id = nextEventId();
   const rec: AuditEventRecord = {
-    id: nextEventId(),
+    id,
     entityType: input.entityType,
     entityId: input.entityId,
     eventType: input.eventType,
@@ -112,6 +113,16 @@ export function appendAuditEvent(input: AuditEventInput): void {
   };
   eventStore.push(rec);
   schedulePersist();
+  return id;
+}
+
+/** Removes a single event by id (e.g. rollback when a higher-level operation failed after append). */
+export function removeAuditEventById(id: string): boolean {
+  const i = eventStore.findIndex((e) => e.id === id);
+  if (i === -1) return false;
+  eventStore.splice(i, 1);
+  schedulePersist();
+  return true;
 }
 
 export function appendAuditEvents(inputs: AuditEventInput[]): void {

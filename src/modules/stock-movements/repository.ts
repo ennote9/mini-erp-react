@@ -161,6 +161,46 @@ export const stockMovementRepository = {
     schedulePersist();
     return movement;
   },
+
+  /**
+   * Removes all inbound `receipt` movements tied to a receipt document (used to roll back a failed post).
+   */
+  removeAllInboundForReceiptDocument(receiptId: string): void {
+    let removed = false;
+    for (let i = store.length - 1; i >= 0; i--) {
+      const m = store[i]!;
+      if (
+        m.sourceDocumentType === "receipt" &&
+        m.sourceDocumentId === receiptId &&
+        m.movementType === "receipt"
+      ) {
+        store.splice(i, 1);
+        removed = true;
+      }
+    }
+    if (removed) {
+      schedulePersist();
+    }
+  },
+
+  /** Removes compensating `receipt_reversal` movements for a receipt (failed reverse rollback). */
+  removeAllReversalMovementsForReceiptDocument(receiptId: string): void {
+    let removed = false;
+    for (let i = store.length - 1; i >= 0; i--) {
+      const m = store[i]!;
+      if (
+        m.sourceDocumentType === "receipt" &&
+        m.sourceDocumentId === receiptId &&
+        m.movementType === "receipt_reversal"
+      ) {
+        store.splice(i, 1);
+        removed = true;
+      }
+    }
+    if (removed) {
+      schedulePersist();
+    }
+  },
 };
 
 await bootstrapFromDisk();
