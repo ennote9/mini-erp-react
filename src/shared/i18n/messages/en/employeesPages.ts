@@ -124,7 +124,6 @@ export const employeesPagesEn = {
       org: {
         nav: "Org & responsibility",
         structureTitle: "Organizational placement",
-        structureHint: "Canonical org fields — kept separate from system access.",
         scopesTitle: "Assignment scopes",
         scopesHint: "Commercial or operational ownership areas. Prefer master records when the type supports it.",
         scopesEmpty: "No assignment scopes yet.",
@@ -132,7 +131,6 @@ export const employeesPagesEn = {
       contacts: {
         nav: "Contacts",
         title: "Work contacts",
-        hint: "Business contact channels only — not a personal HR directory.",
       },
       access: {
         nav: "Roles & access",

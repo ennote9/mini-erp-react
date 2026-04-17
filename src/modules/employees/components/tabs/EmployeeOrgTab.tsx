@@ -1,6 +1,6 @@
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useTranslation } from "@/shared/i18n/context";
 import { employeeRepository } from "../../repository";
 import { EMPLOYEE_DEPARTMENT_CODES, EMPLOYEE_POSITION_CODES } from "../../employeeReferenceOptions";
@@ -25,9 +25,6 @@ export function EmployeeOrgTab({ draft, patch, selfId }: EmployeeTabProps) {
           <CardTitle className="text-xs font-semibold leading-tight tracking-tight">
             {t("employees.tabs.org.structureTitle")}
           </CardTitle>
-          <CardDescription className="text-[11px] leading-snug text-muted-foreground">
-            {t("employees.tabs.org.structureHint")}
-          </CardDescription>
         </CardHeader>
         <CardContent className="grid gap-2 p-4 pt-0 md:grid-cols-2">
           <div className="space-y-1">
