@@ -9,12 +9,7 @@ export const employeesPagesKk = {
         status: "Жазба күйі",
         position: "Лауазымы",
         department: "Бөлім",
-        primaryRole: "Негізгі рөлі",
         manager: "Басшы",
-        erpUser: "ERP пайдаланушысы",
-        accessStatus: "Қолжетімділік",
-        availability: "Қолжетімділік күйі",
-        lastLogin: "Соңғы кіру",
       },
     },
     page: {

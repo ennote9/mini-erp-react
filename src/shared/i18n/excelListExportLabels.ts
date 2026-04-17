@@ -77,12 +77,7 @@ export function employeesListExcelLabels(t: TFunction): ExcelListSheetLabels {
       t("employees.list.columns.status"),
       t("employees.list.columns.position"),
       t("employees.list.columns.department"),
-      t("employees.list.columns.primaryRole"),
       t("employees.list.columns.manager"),
-      t("employees.list.columns.erpUser"),
-      t("employees.list.columns.accessStatus"),
-      t("employees.list.columns.availability"),
-      t("employees.list.columns.lastLogin"),
     ],
   };
 }

@@ -1,19 +1,12 @@
 import { createColumnHelper, type ColumnDef } from "@tanstack/react-table";
 import type { TFunction } from "@/shared/i18n";
-import type {
-  EmployeeAccessStatus,
-  EmployeeAvailabilityKind,
-  EmployeeRecordStatus,
-} from "./model";
+import type { EmployeeRecordStatus } from "./model";
 import type { EmployeeListRow } from "./employeeListRowModel";
 import type { EmployeesTableColumnSchema } from "./employeesTableSchema";
 import {
   translateDepartmentCode,
-  translateEmployeeAccessStatus,
-  translateEmployeeAvailabilityKind,
   translateEmployeeRecordStatus,
   translatePositionCode,
-  translateSystemRoleCode,
 } from "./employeeListLabels";
 
 type ColumnMeta = {
@@ -31,13 +24,6 @@ function emDashLabel(t: TFunction): string {
   return t("domain.audit.summary.emDash");
 }
 
-function formatLastLogin(value: unknown, t: TFunction): string {
-  const em = emDashLabel(t);
-  if (value == null || value === "") return em;
-  if (typeof value !== "string") return em;
-  return value.replace("T", " ").slice(0, 19);
-}
-
 export function formatEmployeesTableValue(input: {
   column: EmployeesTableColumnSchema;
   value: unknown;
@@ -52,23 +38,11 @@ export function formatEmployeesTableValue(input: {
   if (column.id === "status" && typeof value === "string") {
     return translateEmployeeRecordStatus(t, value as EmployeeRecordStatus);
   }
-  if (column.id === "accessStatus" && typeof value === "string") {
-    return translateEmployeeAccessStatus(t, value as EmployeeAccessStatus);
-  }
-  if (column.id === "availabilityKind" && typeof value === "string") {
-    return translateEmployeeAvailabilityKind(t, value as EmployeeAvailabilityKind);
-  }
-  if (column.id === "primaryRoleCode" && typeof value === "string") {
-    return translateSystemRoleCode(t, value);
-  }
   if (column.id === "positionCode" && typeof value === "string") {
     return translatePositionCode(t, value);
   }
   if (column.id === "departmentCode" && typeof value === "string") {
     return translateDepartmentCode(t, value);
-  }
-  if (column.id === "lastLoginAt") {
-    return formatLastLogin(value, t);
   }
   if (column.id === "managerDisplay") {
     if (value == null || value === "") return em;

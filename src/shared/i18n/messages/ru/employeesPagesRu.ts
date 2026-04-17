@@ -9,12 +9,7 @@ export const employeesPagesRu = {
         status: "Статус записи",
         position: "Должность",
         department: "Подразделение",
-        primaryRole: "Основная роль",
         manager: "Руководитель",
-        erpUser: "Пользователь ERP",
-        accessStatus: "Доступ",
-        availability: "Доступность",
-        lastLogin: "Последний вход",
       },
     },
     page: {

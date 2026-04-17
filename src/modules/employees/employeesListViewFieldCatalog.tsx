@@ -7,20 +7,8 @@ import type {
 } from "@/shared/ui/list-view";
 import { getListViewRowNumberColumnDef } from "@/shared/ui/list-view/listViewColumnDefaults";
 import type { EmployeeListRow } from "./employeeListRowModel";
-import {
-  translateDepartmentCode,
-  translateEmployeeAccessStatus,
-  translateEmployeeAvailabilityKind,
-  translateEmployeeRecordStatus,
-  translatePositionCode,
-  translateSystemRoleCode,
-} from "./employeeListLabels";
-import {
-  EMPLOYEE_ACCESS_STATUSES,
-  EMPLOYEE_AVAILABILITY_KINDS,
-  EMPLOYEE_PRIMARY_ROLE_CODES,
-  EMPLOYEE_RECORD_STATUSES,
-} from "./employeeListConstants";
+import { translateDepartmentCode, translateEmployeeRecordStatus, translatePositionCode } from "./employeeListLabels";
+import { EMPLOYEE_RECORD_STATUSES } from "./employeeListConstants";
 import { buildEmployeesTableSchema, type EmployeesTableColumnSchema } from "./employeesTableSchema";
 
 type EmployeeFieldCatalogEntry = {
@@ -84,34 +72,6 @@ function mapSchemaToFilterConfig(
           getValue: (row) => translateEmployeeRecordStatus(t, row.status),
         };
       }
-      if (column.id === "accessStatus") {
-        const options = buildEnumOptions(t, EMPLOYEE_ACCESS_STATUSES, (tf, v) =>
-          translateEmployeeAccessStatus(tf, v as (typeof EMPLOYEE_ACCESS_STATUSES)[number]),
-        );
-        return {
-          kind: "enum",
-          options,
-          getValue: (row) => translateEmployeeAccessStatus(t, row.accessStatus),
-        };
-      }
-      if (column.id === "availabilityKind") {
-        const options = buildEnumOptions(t, EMPLOYEE_AVAILABILITY_KINDS, (tf, v) =>
-          translateEmployeeAvailabilityKind(tf, v as (typeof EMPLOYEE_AVAILABILITY_KINDS)[number]),
-        );
-        return {
-          kind: "enum",
-          options,
-          getValue: (row) => translateEmployeeAvailabilityKind(t, row.availabilityKind),
-        };
-      }
-      if (column.id === "primaryRoleCode") {
-        const options = buildEnumOptions(t, EMPLOYEE_PRIMARY_ROLE_CODES, (tf, v) => translateSystemRoleCode(tf, v));
-        return {
-          kind: "enum",
-          options,
-          getValue: (row) => translateSystemRoleCode(t, row.primaryRoleCode),
-        };
-      }
       return { kind: "enum", options: [] };
     case "none":
     default:
@@ -143,23 +103,14 @@ function buildColDefFromSchema(
   if (column.id === "departmentCode") {
     colDef.valueGetter = (p) => (p.data ? translateDepartmentCode(t, p.data.departmentCode) : "");
   }
-  if (column.id === "primaryRoleCode") {
-    colDef.valueGetter = (p) => (p.data ? translateSystemRoleCode(t, p.data.primaryRoleCode) : "");
-  }
   if (column.id === "status") {
     colDef.valueGetter = (p) => (p.data ? translateEmployeeRecordStatus(t, p.data.status) : "");
   }
-  if (column.id === "accessStatus") {
-    colDef.valueGetter = (p) => (p.data ? translateEmployeeAccessStatus(t, p.data.accessStatus) : "");
-  }
-  if (column.id === "availabilityKind") {
-    colDef.valueGetter = (p) => (p.data ? translateEmployeeAvailabilityKind(t, p.data.availabilityKind) : "");
-  }
-  if (column.id === "lastLoginAt") {
+  if (column.id === "managerDisplay") {
     colDef.valueGetter = (p) => {
-      const v = p.data?.lastLoginAt;
+      const v = p.data?.managerDisplay;
       if (v == null || v === "") return emDash;
-      return String(v).replace("T", " ").slice(0, 19);
+      return String(v);
     };
   }
 

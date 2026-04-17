@@ -1,4 +1,4 @@
-import type { Employee, EmployeeAccessStatus, EmployeeAvailabilityKind, EmployeeRecordStatus } from "./model";
+import type { Employee, EmployeeRecordStatus } from "./model";
 import { employeeRepository } from "./repository";
 
 export type EmployeeListRow = {
@@ -9,12 +9,7 @@ export type EmployeeListRow = {
   status: EmployeeRecordStatus;
   positionCode: string;
   departmentCode: string;
-  primaryRoleCode: string;
   managerDisplay: string;
-  isErpUser: boolean;
-  accessStatus: EmployeeAccessStatus;
-  availabilityKind: EmployeeAvailabilityKind;
-  lastLoginAt: string | null;
 };
 
 function managerDisplayForEmployee(e: Employee): string {
@@ -33,11 +28,6 @@ export function buildEmployeeListRows(employees: Employee[]): EmployeeListRow[] 
     status: e.identity.status,
     positionCode: e.identity.positionCode,
     departmentCode: e.identity.departmentCode,
-    primaryRoleCode: e.access.primaryRoleCode,
     managerDisplay: managerDisplayForEmployee(e),
-    isErpUser: e.access.isErpUser,
-    accessStatus: e.access.accessStatus,
-    availabilityKind: e.availability.kind,
-    lastLoginAt: e.access.lastLoginAt,
   }));
 }

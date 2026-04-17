@@ -9,12 +9,7 @@ export const employeesPagesEn = {
         status: "Status",
         position: "Position",
         department: "Department",
-        primaryRole: "Primary role",
         manager: "Manager",
-        erpUser: "ERP user",
-        accessStatus: "Access status",
-        availability: "Availability",
-        lastLogin: "Last login",
       },
     },
     page: {

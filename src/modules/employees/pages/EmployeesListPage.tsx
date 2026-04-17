@@ -50,13 +50,18 @@ import {
 } from "@/shared/ui/list-view/listViewConfig";
 import { buildEmployeesListViewCatalog } from "../employeesListViewFieldCatalog";
 import { buildEmployeeListRows, type EmployeeListRow } from "../employeeListRowModel";
+import {
+  employeeListAllowedColumnIdSet,
+  sanitizeEmployeesColumnFilterModel,
+  sanitizeEmployeesUrlSort,
+} from "../employeesListPipelineSanitize";
 import { buildEmployeesTableSchema, type EmployeesTableColumnSchema } from "../employeesTableSchema";
 import { buildEmployeesTableListViewState } from "../employeesListViewState";
 import { formatEmployeesTableValue } from "../employeesTanstackColumns";
 import { EmployeesTanstackTable } from "../EmployeesTanstackTable";
 import { ItemsHeaderFilterPanel } from "@/modules/items/ItemsHeaderFilterPanel";
 
-const COLUMN_SIZING_STORAGE_KEY = "mini-erp:employees:tanstack:columnSizing:v1";
+const COLUMN_SIZING_STORAGE_KEY = "mini-erp:employees:tanstack:columnSizing:v2";
 const MAX_REASONABLE_COLUMN_SIZE = 1200;
 
 type HeaderFilterAnchor = {
@@ -228,6 +233,16 @@ export function EmployeesListPage() {
   );
   const employeesTableSchema = useMemo(() => buildEmployeesTableSchema({ t }), [t, locale, appReadRevision]);
 
+  const allowedEmployeeColumnIds = useMemo(
+    () => employeeListAllowedColumnIdSet(employeesTableSchema),
+    [employeesTableSchema],
+  );
+
+  const columnFilterModelEffective = useMemo(
+    () => sanitizeEmployeesColumnFilterModel(columnFilterModel, allowedEmployeeColumnIds),
+    [columnFilterModel, allowedEmployeeColumnIds],
+  );
+
   useEffect(() => {
     setColumnSizing((current) => {
       const next = sanitizeColumnSizing(current, employeesTableSchema);
@@ -248,12 +263,12 @@ export function EmployeesListPage() {
   const employeeColumnFilterConfigs = employeesListViewCatalog.filterConfigs;
 
   const displayRowsWithQueryFilters = useMemo(
-    () => applyListViewColumnFilters(listRows, columnFilterModel, employeeColumnFilterConfigs),
-    [listRows, columnFilterModel, employeeColumnFilterConfigs],
+    () => applyListViewColumnFilters(listRows, columnFilterModelEffective, employeeColumnFilterConfigs),
+    [listRows, columnFilterModelEffective, employeeColumnFilterConfigs],
   );
 
   const searchActive = searchQuery.trim() !== "";
-  const filtersActive = hasActiveListViewColumnFilters(columnFilterModel);
+  const filtersActive = hasActiveListViewColumnFilters(columnFilterModelEffective);
 
   const {
     draftItems: columnSettingsDraftItems,
@@ -290,17 +305,20 @@ export function EmployeesListPage() {
   });
 
   const effectiveSortModel = useMemo(() => {
-    if (pendingSortModel) return pendingSortModel;
-    const urlSort = readListViewUrlSort(new URLSearchParams(searchParamsSort ? `sort=${searchParamsSort}` : ""));
-    const runtimeSort =
-      runtimeSortSerialized === ""
-        ? []
-        : readListViewUrlSort(new URLSearchParams(`sort=${runtimeSortSerialized}`));
-    if (runtimeSort.length > 0 && runtimeSortSerialized !== searchParamsSort) return runtimeSort;
-    if (urlSort.length > 0) return urlSort;
-    if (runtimeSort.length > 0) return runtimeSort;
-    return deepSortModel;
-  }, [pendingSortModel, searchParamsSort, runtimeSortSerialized, deepSortModel]);
+    const raw = (() => {
+      if (pendingSortModel) return pendingSortModel;
+      const urlSort = readListViewUrlSort(new URLSearchParams(searchParamsSort ? `sort=${searchParamsSort}` : ""));
+      const runtimeSort =
+        runtimeSortSerialized === ""
+          ? []
+          : readListViewUrlSort(new URLSearchParams(`sort=${runtimeSortSerialized}`));
+      if (runtimeSort.length > 0 && runtimeSortSerialized !== searchParamsSort) return runtimeSort;
+      if (urlSort.length > 0) return urlSort;
+      if (runtimeSort.length > 0) return runtimeSort;
+      return deepSortModel;
+    })();
+    return sanitizeEmployeesUrlSort(raw, allowedEmployeeColumnIds);
+  }, [pendingSortModel, searchParamsSort, runtimeSortSerialized, deepSortModel, allowedEmployeeColumnIds]);
 
   const resolveDeepSortValue = useCallback(
     (row: EmployeeListRow, fieldKey: string): unknown => {
@@ -348,14 +366,14 @@ export function EmployeesListPage() {
     () =>
       buildEmployeesTableListViewState({
         definition: columnSettingsDefinition,
-        columnFilterModel,
+        columnFilterModel: columnFilterModelEffective,
         sortModel: effectiveSortModel,
         personalViews: columnSettingsPersonalViews,
         activeViewId: columnSettingsActiveViewId,
       }),
     [
       columnSettingsDefinition,
-      columnFilterModel,
+      columnFilterModelEffective,
       effectiveSortModel,
       columnSettingsPersonalViews,
       columnSettingsActiveViewId,
