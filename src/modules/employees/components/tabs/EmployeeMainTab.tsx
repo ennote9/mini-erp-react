@@ -15,9 +15,12 @@ const DOC_TYPES: EmployeeIdentityDocumentType[] = [
   "other",
 ];
 
-/** Cards share one sizing rule; max width keeps forms readable in wide grid cells. */
+/**
+ * Same per-card band as Org (`EmployeeOrgTab` MAIN_FORM_MAX_W); full literals for Tailwind JIT.
+ * Outer grid uses two bands + sm:gap-x-1 — keep `min(calc(27rem-1cm),calc(35%-1cm))` in sync with Org.
+ */
 const cardClass =
-  "border-0 shadow-none ring-0 min-w-0 w-full max-w-[32rem] justify-self-stretch h-fit";
+  "border-0 shadow-none ring-0 min-w-0 w-full max-w-[min(calc(27rem-1cm),calc(35%-1cm))] justify-self-stretch h-fit";
 
 /** Compact Main tab: dense ERP form rhythm; sections tile in a wrapping grid on wider viewports. */
 export function EmployeeMainTab({ draft, patch }: EmployeeTabProps) {
@@ -31,7 +34,7 @@ export function EmployeeMainTab({ draft, patch }: EmployeeTabProps) {
   return (
     <div
       className={
-        "grid w-full max-w-[min(100%,calc(32rem*2+0.25rem))] grid-cols-1 gap-3 " +
+        "grid w-full max-w-[min(100%,calc(2*min(calc(27rem-1cm),calc(35%-1cm))+0.25rem))] grid-cols-1 gap-3 " +
         "sm:grid-cols-2 sm:items-start sm:justify-items-stretch sm:gap-x-1 sm:gap-y-3"
       }
     >
