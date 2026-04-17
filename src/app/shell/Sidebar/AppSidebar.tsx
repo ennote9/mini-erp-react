@@ -13,7 +13,6 @@ import {
   Tag,
   Truck,
   Route,
-  User,
   UserCog,
   Users,
   Warehouse,
@@ -23,7 +22,6 @@ import { NavLink, useLocation } from "react-router-dom";
 import {
   Sidebar,
   SidebarContent,
-  SidebarFooter,
   SidebarGroup,
   SidebarGroupContent,
   SidebarGroupLabel,
@@ -116,8 +114,7 @@ function SidebarNavLink({
 }
 
 /**
- * App sidebar using shadcn Sidebar primitives. Refined to match official docs:
- * workspace-style header, nav with icons, footer block, inset-ready shell.
+ * App sidebar using shadcn Sidebar primitives: workspace-style header, nav groups, inset-ready shell.
  */
 function workspaceModeLabel(t: (k: string) => string, mode: WorkspaceModeId): string {
   return t(`workspace.mode.${mode}.label`);
@@ -198,29 +195,6 @@ export function AppSidebar() {
           );
         })}
       </SidebarContent>
-      <SidebarFooter>
-        <SidebarMenu>
-          <SidebarMenuItem>
-            <SidebarMenuButton
-              size="lg"
-              tooltip={t("shell.account")}
-              className="rounded-lg border border-sidebar-border/60 bg-sidebar-accent/20 hover:bg-sidebar-accent/55 data-[state=open]:bg-sidebar-accent/70 data-[state=open]:text-sidebar-accent-foreground"
-            >
-              <div className="flex aspect-square size-7 items-center justify-center rounded-lg border border-sidebar-border/70 bg-sidebar/75 text-sidebar-foreground group-data-[state=collapsed]:size-8">
-                <User className="size-4" />
-              </div>
-              <div className="grid min-w-0 flex-1 gap-px text-left group-data-[collapsible=icon]:hidden">
-                <span className="truncate text-[0.8125rem] font-medium leading-tight text-sidebar-foreground">
-                  {t("shell.account")}
-                </span>
-                <span className="truncate text-[0.6875rem] leading-tight text-sidebar-foreground/60">
-                  {t("shell.signedIn")}
-                </span>
-              </div>
-            </SidebarMenuButton>
-          </SidebarMenuItem>
-        </SidebarMenu>
-      </SidebarFooter>
     </Sidebar>
   );
 }
