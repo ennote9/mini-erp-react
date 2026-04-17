@@ -9,6 +9,7 @@ import type {
   EmployeeIdentity,
   EmployeeLinkedEntitySummary,
   EmployeeOrgResponsibility,
+  EmployeePersonProfile,
   EmployeeWorkContacts,
 } from "./model";
 
@@ -109,9 +110,41 @@ export function defaultIdentity(): EmployeeIdentity {
   };
 }
 
+export function defaultPersonProfile(): EmployeePersonProfile {
+  return {
+    personal: {
+      dateOfBirth: "",
+      gender: "unspecified",
+      citizenship: "",
+      iin: "",
+      placeOfBirth: "",
+      maritalStatus: "",
+      personalPhone: "",
+      personalEmail: "",
+      emergencyContactName: "",
+      emergencyContactPhone: "",
+    },
+    identityDocument: {
+      documentType: "id_card_kz",
+      documentNumber: "",
+      issuingAuthority: "",
+      issueDate: "",
+      expiryDate: null,
+    },
+    address: {
+      country: "",
+      region: "",
+      city: "",
+      residentialAddress: "",
+      registrationAddress: "",
+    },
+  };
+}
+
 export function emptyEmployeeShell(): Omit<Employee, "id"> {
   return {
     identity: defaultIdentity(),
+    personProfile: defaultPersonProfile(),
     contacts: defaultContacts(),
     org: defaultOrg(),
     access: defaultAccessProfile(),

@@ -1,4 +1,4 @@
-/** Employees — ERP identity, responsibility, access, and participation (work data only). */
+/** Employees — identity, person profile (onboarding), org, contacts, and persisted access slices. */
 
 export type EmployeeRecordStatus = "active" | "inactive" | "terminated";
 
@@ -25,6 +25,54 @@ export interface EmployeeAssignmentScope {
   kind: EmployeeScopeEntityKind;
   entityId: string;
   label: string;
+}
+
+/** Person-level data for Main tab / onboarding (Kazakhstan-oriented). */
+export type EmployeeGender = "female" | "male" | "unspecified";
+
+/** Identity document type for Kazakhstan hiring workflows. */
+export type EmployeeIdentityDocumentType =
+  | "id_card_kz"
+  | "passport_kz"
+  | "passport_foreign"
+  | "residence_permit"
+  | "other";
+
+export interface EmployeePersonalData {
+  dateOfBirth: string;
+  gender: EmployeeGender;
+  citizenship: string;
+  /** Individual Identification Number (ЖСН / ИИН), 12 digits when known */
+  iin: string;
+  placeOfBirth: string;
+  maritalStatus: string;
+  personalPhone: string;
+  personalEmail: string;
+  emergencyContactName: string;
+  emergencyContactPhone: string;
+}
+
+export interface EmployeeIdentityDocument {
+  documentType: EmployeeIdentityDocumentType;
+  documentNumber: string;
+  issuingAuthority: string;
+  issueDate: string;
+  expiryDate: string | null;
+}
+
+export interface EmployeePersonAddress {
+  country: string;
+  region: string;
+  city: string;
+  residentialAddress: string;
+  registrationAddress: string;
+}
+
+/** Canonical person / onboarding profile; not duplicated under org or contacts. */
+export interface EmployeePersonProfile {
+  personal: EmployeePersonalData;
+  identityDocument: EmployeeIdentityDocument;
+  address: EmployeePersonAddress;
 }
 
 export interface EmployeeIdentity {
@@ -175,6 +223,8 @@ export interface EmployeeAuditEvent {
 export interface Employee {
   id: string;
   identity: EmployeeIdentity;
+  /** Person, document, and residential data entered at hiring; separate from org/contacts. */
+  personProfile: EmployeePersonProfile;
   contacts: EmployeeWorkContacts;
   org: EmployeeOrgResponsibility;
   access: EmployeeAccessProfile;

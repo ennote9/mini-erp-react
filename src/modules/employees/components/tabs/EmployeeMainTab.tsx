@@ -3,19 +3,31 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useTranslation } from "@/shared/i18n/context";
+import type { EmployeeGender, EmployeeIdentityDocumentType } from "../../model";
 import type { EmployeeTabProps } from "./types";
 
-/** Compact identity column: max width min(27rem,35%) minus 1cm on each cap + dense ERP form rhythm. */
+const GENDERS: EmployeeGender[] = ["unspecified", "female", "male"];
+const DOC_TYPES: EmployeeIdentityDocumentType[] = [
+  "id_card_kz",
+  "passport_kz",
+  "passport_foreign",
+  "residence_permit",
+  "other",
+];
+
+/** Compact Main tab: bounded width, dense ERP form rhythm. */
 export function EmployeeMainTab({ draft, patch }: EmployeeTabProps) {
   const { t } = useTranslation();
   const idn = draft.identity;
+  const pp = draft.personProfile;
 
   const control = "h-7 px-2 text-xs";
   const labelCls = "text-[10px] font-medium leading-none text-muted-foreground";
+  const wrap = "w-full max-w-[min(calc(27rem-1cm),calc(35%-1cm))] shrink-0";
 
   return (
     <div className="flex w-full flex-col gap-3">
-      <div className="w-full max-w-[min(calc(27rem-1cm),calc(35%-1cm))] shrink-0">
+      <div className={wrap}>
         <Card className="border-0 shadow-none ring-0">
           <CardHeader className="p-4 pb-2">
             <CardTitle className="text-xs font-semibold leading-tight tracking-tight">
@@ -101,6 +113,370 @@ export function EmployeeMainTab({ draft, patch }: EmployeeTabProps) {
                 className="min-h-[64px] resize-y text-xs leading-snug"
                 value={idn.comment}
                 onChange={(e) => patch((p) => ({ ...p, identity: { ...p.identity, comment: e.target.value } }))}
+              />
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      <div className={wrap}>
+        <Card className="border-0 shadow-none ring-0">
+          <CardHeader className="p-4 pb-2">
+            <CardTitle className="text-xs font-semibold leading-tight tracking-tight">
+              {t("employees.tabs.main.personalTitle")}
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="grid gap-2 p-4 pt-0 md:grid-cols-2">
+            <div className="space-y-1">
+              <Label className={labelCls}>{t("employees.fields.dateOfBirth")}</Label>
+              <Input
+                type="date"
+                className={control}
+                value={pp.personal.dateOfBirth}
+                onChange={(e) =>
+                  patch((p) => ({
+                    ...p,
+                    personProfile: { ...p.personProfile, personal: { ...p.personProfile.personal, dateOfBirth: e.target.value } },
+                  }))
+                }
+              />
+            </div>
+            <div className="space-y-1">
+              <Label className={labelCls}>{t("employees.fields.gender")}</Label>
+              <select
+                className={`flex w-full rounded-md border border-input bg-background ${control}`}
+                value={pp.personal.gender}
+                onChange={(e) =>
+                  patch((p) => ({
+                    ...p,
+                    personProfile: {
+                      ...p.personProfile,
+                      personal: { ...p.personProfile.personal, gender: e.target.value as EmployeeGender },
+                    },
+                  }))
+                }
+              >
+                {GENDERS.map((g) => (
+                  <option key={g} value={g}>
+                    {t(`employees.enums.gender.${g}`)}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="space-y-1">
+              <Label className={labelCls}>{t("employees.fields.citizenship")}</Label>
+              <Input
+                className={control}
+                value={pp.personal.citizenship}
+                placeholder={t("employees.placeholders.citizenship")}
+                onChange={(e) =>
+                  patch((p) => ({
+                    ...p,
+                    personProfile: { ...p.personProfile, personal: { ...p.personProfile.personal, citizenship: e.target.value } },
+                  }))
+                }
+              />
+            </div>
+            <div className="space-y-1">
+              <Label className={labelCls}>{t("employees.fields.iin")}</Label>
+              <Input
+                className={control}
+                inputMode="numeric"
+                maxLength={12}
+                autoComplete="off"
+                value={pp.personal.iin}
+                onChange={(e) =>
+                  patch((p) => ({
+                    ...p,
+                    personProfile: { ...p.personProfile, personal: { ...p.personProfile.personal, iin: e.target.value } },
+                  }))
+                }
+              />
+            </div>
+            <div className="space-y-1 md:col-span-2">
+              <Label className={labelCls}>{t("employees.fields.placeOfBirth")}</Label>
+              <Input
+                className={control}
+                value={pp.personal.placeOfBirth}
+                onChange={(e) =>
+                  patch((p) => ({
+                    ...p,
+                    personProfile: { ...p.personProfile, personal: { ...p.personProfile.personal, placeOfBirth: e.target.value } },
+                  }))
+                }
+              />
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      <div className={wrap}>
+        <Card className="border-0 shadow-none ring-0">
+          <CardHeader className="p-4 pb-2">
+            <CardTitle className="text-xs font-semibold leading-tight tracking-tight">
+              {t("employees.tabs.main.documentTitle")}
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="grid gap-2 p-4 pt-0 md:grid-cols-2">
+            <div className="space-y-1 md:col-span-2">
+              <Label className={labelCls}>{t("employees.fields.documentType")}</Label>
+              <select
+                className={`flex w-full rounded-md border border-input bg-background ${control}`}
+                value={pp.identityDocument.documentType}
+                onChange={(e) =>
+                  patch((p) => ({
+                    ...p,
+                    personProfile: {
+                      ...p.personProfile,
+                      identityDocument: {
+                        ...p.personProfile.identityDocument,
+                        documentType: e.target.value as EmployeeIdentityDocumentType,
+                      },
+                    },
+                  }))
+                }
+              >
+                {DOC_TYPES.map((d) => (
+                  <option key={d} value={d}>
+                    {t(`employees.enums.identityDocumentType.${d}`)}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="space-y-1 md:col-span-2">
+              <Label className={labelCls}>{t("employees.fields.documentNumber")}</Label>
+              <Input
+                className={control}
+                value={pp.identityDocument.documentNumber}
+                onChange={(e) =>
+                  patch((p) => ({
+                    ...p,
+                    personProfile: {
+                      ...p.personProfile,
+                      identityDocument: { ...p.personProfile.identityDocument, documentNumber: e.target.value },
+                    },
+                  }))
+                }
+              />
+            </div>
+            <div className="space-y-1 md:col-span-2">
+              <Label className={labelCls}>{t("employees.fields.issuingAuthority")}</Label>
+              <Input
+                className={control}
+                value={pp.identityDocument.issuingAuthority}
+                onChange={(e) =>
+                  patch((p) => ({
+                    ...p,
+                    personProfile: {
+                      ...p.personProfile,
+                      identityDocument: { ...p.personProfile.identityDocument, issuingAuthority: e.target.value },
+                    },
+                  }))
+                }
+              />
+            </div>
+            <div className="space-y-1">
+              <Label className={labelCls}>{t("employees.fields.issueDate")}</Label>
+              <Input
+                type="date"
+                className={control}
+                value={pp.identityDocument.issueDate}
+                onChange={(e) =>
+                  patch((p) => ({
+                    ...p,
+                    personProfile: {
+                      ...p.personProfile,
+                      identityDocument: { ...p.personProfile.identityDocument, issueDate: e.target.value },
+                    },
+                  }))
+                }
+              />
+            </div>
+            <div className="space-y-1">
+              <Label className={labelCls}>{t("employees.fields.expiryDate")}</Label>
+              <Input
+                type="date"
+                className={control}
+                value={pp.identityDocument.expiryDate ?? ""}
+                onChange={(e) =>
+                  patch((p) => ({
+                    ...p,
+                    personProfile: {
+                      ...p.personProfile,
+                      identityDocument: {
+                        ...p.personProfile.identityDocument,
+                        expiryDate: e.target.value || null,
+                      },
+                    },
+                  }))
+                }
+              />
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      <div className={wrap}>
+        <Card className="border-0 shadow-none ring-0">
+          <CardHeader className="p-4 pb-2">
+            <CardTitle className="text-xs font-semibold leading-tight tracking-tight">
+              {t("employees.tabs.main.addressTitle")}
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="grid gap-2 p-4 pt-0 md:grid-cols-2">
+            <div className="space-y-1">
+              <Label className={labelCls}>{t("employees.fields.country")}</Label>
+              <Input
+                className={control}
+                value={pp.address.country}
+                onChange={(e) =>
+                  patch((p) => ({
+                    ...p,
+                    personProfile: { ...p.personProfile, address: { ...p.personProfile.address, country: e.target.value } },
+                  }))
+                }
+              />
+            </div>
+            <div className="space-y-1">
+              <Label className={labelCls}>{t("employees.fields.region")}</Label>
+              <Input
+                className={control}
+                value={pp.address.region}
+                onChange={(e) =>
+                  patch((p) => ({
+                    ...p,
+                    personProfile: { ...p.personProfile, address: { ...p.personProfile.address, region: e.target.value } },
+                  }))
+                }
+              />
+            </div>
+            <div className="space-y-1 md:col-span-2">
+              <Label className={labelCls}>{t("employees.fields.city")}</Label>
+              <Input
+                className={control}
+                value={pp.address.city}
+                onChange={(e) =>
+                  patch((p) => ({
+                    ...p,
+                    personProfile: { ...p.personProfile, address: { ...p.personProfile.address, city: e.target.value } },
+                  }))
+                }
+              />
+            </div>
+            <div className="space-y-1 md:col-span-2">
+              <Label className={labelCls}>{t("employees.fields.residentialAddress")}</Label>
+              <Textarea
+                className="min-h-[56px] resize-y text-xs leading-snug"
+                value={pp.address.residentialAddress}
+                onChange={(e) =>
+                  patch((p) => ({
+                    ...p,
+                    personProfile: {
+                      ...p.personProfile,
+                      address: { ...p.personProfile.address, residentialAddress: e.target.value },
+                    },
+                  }))
+                }
+              />
+            </div>
+            <div className="space-y-1 md:col-span-2">
+              <Label className={labelCls}>{t("employees.fields.registrationAddress")}</Label>
+              <Textarea
+                className="min-h-[56px] resize-y text-xs leading-snug"
+                value={pp.address.registrationAddress}
+                onChange={(e) =>
+                  patch((p) => ({
+                    ...p,
+                    personProfile: {
+                      ...p.personProfile,
+                      address: { ...p.personProfile.address, registrationAddress: e.target.value },
+                    },
+                  }))
+                }
+              />
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      <div className={wrap}>
+        <Card className="border-0 shadow-none ring-0">
+          <CardHeader className="p-4 pb-2">
+            <CardTitle className="text-xs font-semibold leading-tight tracking-tight">
+              {t("employees.tabs.main.additionalPersonalTitle")}
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="grid gap-2 p-4 pt-0 md:grid-cols-2">
+            <div className="space-y-1 md:col-span-2">
+              <Label className={labelCls}>{t("employees.fields.maritalStatus")}</Label>
+              <Input
+                className={control}
+                value={pp.personal.maritalStatus}
+                onChange={(e) =>
+                  patch((p) => ({
+                    ...p,
+                    personProfile: { ...p.personProfile, personal: { ...p.personProfile.personal, maritalStatus: e.target.value } },
+                  }))
+                }
+              />
+            </div>
+            <div className="space-y-1">
+              <Label className={labelCls}>{t("employees.fields.personalPhone")}</Label>
+              <Input
+                className={control}
+                value={pp.personal.personalPhone}
+                onChange={(e) =>
+                  patch((p) => ({
+                    ...p,
+                    personProfile: { ...p.personProfile, personal: { ...p.personProfile.personal, personalPhone: e.target.value } },
+                  }))
+                }
+              />
+            </div>
+            <div className="space-y-1">
+              <Label className={labelCls}>{t("employees.fields.personalEmail")}</Label>
+              <Input
+                type="email"
+                className={control}
+                value={pp.personal.personalEmail}
+                onChange={(e) =>
+                  patch((p) => ({
+                    ...p,
+                    personProfile: { ...p.personProfile, personal: { ...p.personProfile.personal, personalEmail: e.target.value } },
+                  }))
+                }
+              />
+            </div>
+            <div className="space-y-1">
+              <Label className={labelCls}>{t("employees.fields.emergencyContactName")}</Label>
+              <Input
+                className={control}
+                value={pp.personal.emergencyContactName}
+                onChange={(e) =>
+                  patch((p) => ({
+                    ...p,
+                    personProfile: {
+                      ...p.personProfile,
+                      personal: { ...p.personProfile.personal, emergencyContactName: e.target.value },
+                    },
+                  }))
+                }
+              />
+            </div>
+            <div className="space-y-1">
+              <Label className={labelCls}>{t("employees.fields.emergencyContactPhone")}</Label>
+              <Input
+                className={control}
+                value={pp.personal.emergencyContactPhone}
+                onChange={(e) =>
+                  patch((p) => ({
+                    ...p,
+                    personProfile: {
+                      ...p.personProfile,
+                      personal: { ...p.personProfile.personal, emergencyContactPhone: e.target.value },
+                    },
+                  }))
+                }
               />
             </div>
           </CardContent>

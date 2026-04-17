@@ -7,6 +7,7 @@ import {
   defaultIdentity,
   defaultLinkedSummaries,
   defaultOrg,
+  defaultPersonProfile,
   normalizeAssignmentScope,
   normalizeAuditEvent,
   normalizeBusinessFile,
@@ -69,6 +70,64 @@ function normalizeLinkedSummaries(raw: unknown): Employee["linkedSummaries"] {
     createdObjectsPreview: normalizeLinkedRefs(r.createdObjectsPreview),
     approvedObjectsPreview: normalizeLinkedRefs(r.approvedObjectsPreview),
     inWorkObjectsPreview: normalizeLinkedRefs(r.inWorkObjectsPreview),
+  };
+}
+
+const IDENTITY_DOC_TYPES: Employee["personProfile"]["identityDocument"]["documentType"][] = [
+  "id_card_kz",
+  "passport_kz",
+  "passport_foreign",
+  "residence_permit",
+  "other",
+];
+
+function normalizePersonProfile(raw: unknown): Employee["personProfile"] {
+  const base = defaultPersonProfile();
+  if (!raw || typeof raw !== "object") return base;
+  const r = raw as Record<string, unknown>;
+  const pr = (r.personal && typeof r.personal === "object" ? r.personal : {}) as Record<string, unknown>;
+  const doc = (r.identityDocument && typeof r.identityDocument === "object" ? r.identityDocument : {}) as Record<
+    string,
+    unknown
+  >;
+  const addr = (r.address && typeof r.address === "object" ? r.address : {}) as Record<string, unknown>;
+
+  const genderRaw = asStr(pr.gender, base.personal.gender);
+  const gender =
+    genderRaw === "female" || genderRaw === "male" || genderRaw === "unspecified" ? genderRaw : base.personal.gender;
+
+  const docTypeRaw = asStr(doc.documentType, base.identityDocument.documentType);
+  const documentType = IDENTITY_DOC_TYPES.includes(docTypeRaw as (typeof IDENTITY_DOC_TYPES)[number])
+    ? (docTypeRaw as Employee["personProfile"]["identityDocument"]["documentType"])
+    : base.identityDocument.documentType;
+
+  return {
+    personal: {
+      dateOfBirth: asStr(pr.dateOfBirth, base.personal.dateOfBirth),
+      gender,
+      citizenship: asStr(pr.citizenship, base.personal.citizenship),
+      iin: asStr(pr.iin, base.personal.iin),
+      placeOfBirth: asStr(pr.placeOfBirth, base.personal.placeOfBirth),
+      maritalStatus: asStr(pr.maritalStatus, base.personal.maritalStatus),
+      personalPhone: asStr(pr.personalPhone, base.personal.personalPhone),
+      personalEmail: asStr(pr.personalEmail, base.personal.personalEmail),
+      emergencyContactName: asStr(pr.emergencyContactName, base.personal.emergencyContactName),
+      emergencyContactPhone: asStr(pr.emergencyContactPhone, base.personal.emergencyContactPhone),
+    },
+    identityDocument: {
+      documentType,
+      documentNumber: asStr(doc.documentNumber, base.identityDocument.documentNumber),
+      issuingAuthority: asStr(doc.issuingAuthority, base.identityDocument.issuingAuthority),
+      issueDate: asStr(doc.issueDate, base.identityDocument.issueDate),
+      expiryDate: typeof doc.expiryDate === "string" || doc.expiryDate === null ? (doc.expiryDate as string | null) : base.identityDocument.expiryDate,
+    },
+    address: {
+      country: asStr(addr.country, base.address.country),
+      region: asStr(addr.region, base.address.region),
+      city: asStr(addr.city, base.address.city),
+      residentialAddress: asStr(addr.residentialAddress, base.address.residentialAddress),
+      registrationAddress: asStr(addr.registrationAddress, base.address.registrationAddress),
+    },
   };
 }
 
@@ -244,6 +303,7 @@ function normalizeEmployee(raw: unknown): Employee | null {
   const entity: Employee = {
     id: rec.id,
     identity: normalizeIdentity(rec.identity),
+    personProfile: normalizePersonProfile(rec.personProfile),
     contacts: normalizeContacts(rec.contacts),
     org: normalizeOrg(rec.org),
     access: normalizeAccess(rec.access),
@@ -290,6 +350,72 @@ function nextIdStr(): string {
   return String(nextId++);
 }
 
+function seedKzProfileEmp1(): Employee["personProfile"] {
+  const b = defaultPersonProfile();
+  return {
+    ...b,
+    personal: {
+      ...b.personal,
+      dateOfBirth: "1989-03-15",
+      gender: "female",
+      citizenship: "KZ",
+      iin: "890315401234",
+      placeOfBirth: "Almaty",
+      personalPhone: "+7 701 500 1234",
+    },
+    identityDocument: {
+      ...b.identityDocument,
+      documentType: "id_card_kz",
+      documentNumber: "039456789",
+      issuingAuthority: "МВД РК",
+      issueDate: "2018-06-01",
+      expiryDate: "2028-06-01",
+    },
+    address: {
+      ...b.address,
+      country: "KZ",
+      region: "Almaty region",
+      city: "Almaty",
+      residentialAddress: "Microdistrict 8, st. Abay 12, apt. 45",
+      registrationAddress: "Same as residential address",
+    },
+  };
+}
+
+function seedKzProfileEmp2(): Employee["personProfile"] {
+  const b = defaultPersonProfile();
+  return {
+    ...b,
+    personal: {
+      ...b.personal,
+      dateOfBirth: "1992-11-02",
+      gender: "male",
+      citizenship: "KZ",
+      iin: "921102350987",
+      placeOfBirth: "Astana",
+      maritalStatus: "married",
+      emergencyContactName: "Chen Li",
+      emergencyContactPhone: "+7 702 000 8899",
+    },
+    identityDocument: {
+      ...b.identityDocument,
+      documentType: "passport_kz",
+      documentNumber: "N12345678",
+      issuingAuthority: "МВД РК",
+      issueDate: "2020-01-20",
+      expiryDate: "2030-01-20",
+    },
+    address: {
+      ...b.address,
+      country: "KZ",
+      region: "Akmola region",
+      city: "Astana",
+      residentialAddress: "Left bank, example residential complex, block B",
+      registrationAddress: "Registered at employer service address (DC-01)",
+    },
+  };
+}
+
 function buildSeedEmployees(): CreateEmployeeInput[] {
   const t0 = "2024-01-15T09:00:00.000Z";
   const t1 = "2024-06-01T14:22:00.000Z";
@@ -310,6 +436,7 @@ function buildSeedEmployees(): CreateEmployeeInput[] {
         primarySystemRoleCode: "FINANCE",
         directManagerId: null,
       },
+      personProfile: seedKzProfileEmp1(),
       contacts: {
         workEmail: "a.morgan@company.example",
         workPhone: "+1 555 0101",
@@ -421,6 +548,7 @@ function buildSeedEmployees(): CreateEmployeeInput[] {
         primarySystemRoleCode: "OPERATIONS",
         directManagerId: "1",
       },
+      personProfile: seedKzProfileEmp2(),
       contacts: {
         workEmail: "r.chen@company.example",
         workPhone: "+1 555 0102",
@@ -516,6 +644,7 @@ function buildSeedEmployees(): CreateEmployeeInput[] {
         primarySystemRoleCode: "VIEWER",
         directManagerId: null,
       },
+      personProfile: defaultPersonProfile(),
       contacts: {
         workEmail: "s.okonkwo@company.example",
         workPhone: "",
@@ -614,6 +743,7 @@ function buildSeedEmployees(): CreateEmployeeInput[] {
         primarySystemRoleCode: "MERCH",
         directManagerId: "1",
       },
+      personProfile: defaultPersonProfile(),
       contacts: {
         workEmail: "j.lee@company.example",
         workPhone: "+1 555 0104",
@@ -729,6 +859,18 @@ export const employeeRepository = {
       ...prev,
       ...patch,
       identity: patch.identity ? { ...prev.identity, ...patch.identity } : prev.identity,
+      personProfile: patch.personProfile
+        ? {
+            ...prev.personProfile,
+            ...patch.personProfile,
+            personal: { ...prev.personProfile.personal, ...patch.personProfile.personal },
+            identityDocument: {
+              ...prev.personProfile.identityDocument,
+              ...patch.personProfile.identityDocument,
+            },
+            address: { ...prev.personProfile.address, ...patch.personProfile.address },
+          }
+        : prev.personProfile,
       contacts: patch.contacts ? { ...prev.contacts, ...patch.contacts } : prev.contacts,
       org: patch.org ? { ...prev.org, ...patch.org, assignmentScopes: patch.org.assignmentScopes ?? prev.org.assignmentScopes } : prev.org,
       access: patch.access ? { ...prev.access, ...patch.access } : prev.access,
@@ -760,12 +902,17 @@ export const employeeRepository = {
     if (!q) return [...store];
     return store.filter((x) => {
       const idn = x.identity;
+      const pp = x.personProfile;
       return (
         idn.employeeCode.toLowerCase().includes(q) ||
         idn.fullName.toLowerCase().includes(q) ||
         idn.displayName.toLowerCase().includes(q) ||
         idn.personnelNumber.toLowerCase().includes(q) ||
-        x.access.login.toLowerCase().includes(q)
+        x.access.login.toLowerCase().includes(q) ||
+        pp.personal.iin.toLowerCase().includes(q) ||
+        pp.identityDocument.documentNumber.toLowerCase().includes(q) ||
+        pp.address.city.toLowerCase().includes(q) ||
+        pp.address.region.toLowerCase().includes(q)
       );
     });
   },
