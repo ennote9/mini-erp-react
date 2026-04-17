@@ -1,5 +1,11 @@
 import type { TFunction } from "@/shared/i18n";
-import type { EmployeeEmploymentType, EmployeeRecordStatus, EmployeeWorkSchedule } from "./model";
+import type {
+  EmployeeEmploymentType,
+  EmployeeGender,
+  EmployeeIdentityDocumentType,
+  EmployeeRecordStatus,
+  EmployeeWorkSchedule,
+} from "./model";
 
 export function translateEmployeeRecordStatus(t: TFunction, v: EmployeeRecordStatus): string {
   return t(`employees.enums.recordStatus.${v}`);
@@ -23,4 +29,12 @@ export function translateEmploymentType(t: TFunction, v: EmployeeEmploymentType)
 
 export function translateWorkSchedule(t: TFunction, v: EmployeeWorkSchedule): string {
   return t(`employees.enums.workSchedule.${v}`);
+}
+
+export function translateEmployeeGender(t: TFunction, v: EmployeeGender): string {
+  return t(`employees.enums.gender.${v}`);
+}
+
+export function translateEmployeeIdentityDocumentType(t: TFunction, v: EmployeeIdentityDocumentType): string {
+  return t(`employees.enums.identityDocumentType.${v}`);
 }

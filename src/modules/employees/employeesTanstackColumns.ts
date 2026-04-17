@@ -1,12 +1,22 @@
 import { createColumnHelper, type ColumnDef } from "@tanstack/react-table";
 import type { TFunction } from "@/shared/i18n";
-import type { EmployeeRecordStatus } from "./model";
+import type {
+  EmployeeEmploymentType,
+  EmployeeGender,
+  EmployeeIdentityDocumentType,
+  EmployeeRecordStatus,
+  EmployeeWorkSchedule,
+} from "./model";
 import type { EmployeeListRow } from "./employeeListRowModel";
 import type { EmployeesTableColumnSchema } from "./employeesTableSchema";
 import {
   translateDepartmentCode,
+  translateEmployeeGender,
+  translateEmployeeIdentityDocumentType,
   translateEmployeeRecordStatus,
+  translateEmploymentType,
   translatePositionCode,
+  translateWorkSchedule,
 } from "./employeeListLabels";
 
 type ColumnMeta = {
@@ -44,7 +54,24 @@ export function formatEmployeesTableValue(input: {
   if (column.id === "departmentCode" && typeof value === "string") {
     return translateDepartmentCode(t, value);
   }
-  if (column.id === "managerDisplay") {
+  if (column.id === "employmentType" && typeof value === "string") {
+    return translateEmploymentType(t, value as EmployeeEmploymentType);
+  }
+  if (column.id === "workSchedule" && typeof value === "string") {
+    return translateWorkSchedule(t, value as EmployeeWorkSchedule);
+  }
+  if (column.id === "gender" && typeof value === "string") {
+    return translateEmployeeGender(t, value as EmployeeGender);
+  }
+  if (column.id === "documentType" && typeof value === "string") {
+    return translateEmployeeIdentityDocumentType(t, value as EmployeeIdentityDocumentType);
+  }
+  if (column.id === "managerDisplay" || column.id === "functionalManagerDisplay") {
+    if (value == null || value === "") return em;
+    return String(value);
+  }
+
+  if (column.filterKind === "date" || column.dataType === "date") {
     if (value == null || value === "") return em;
     return String(value);
   }

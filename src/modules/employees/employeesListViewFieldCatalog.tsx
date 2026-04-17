@@ -7,9 +7,24 @@ import type {
 } from "@/shared/ui/list-view";
 import { getListViewRowNumberColumnDef } from "@/shared/ui/list-view/listViewColumnDefaults";
 import type { EmployeeListRow } from "./employeeListRowModel";
-import { translateDepartmentCode, translateEmployeeRecordStatus, translatePositionCode } from "./employeeListLabels";
-import { EMPLOYEE_RECORD_STATUSES } from "./employeeListConstants";
+import {
+  translateDepartmentCode,
+  translateEmployeeGender,
+  translateEmployeeIdentityDocumentType,
+  translateEmployeeRecordStatus,
+  translateEmploymentType,
+  translatePositionCode,
+  translateWorkSchedule,
+} from "./employeeListLabels";
+import {
+  EMPLOYEE_GENDERS,
+  EMPLOYEE_IDENTITY_DOCUMENT_TYPES,
+  EMPLOYEE_LIST_EMPLOYMENT_TYPES,
+  EMPLOYEE_LIST_WORK_SCHEDULES,
+  EMPLOYEE_RECORD_STATUSES,
+} from "./employeeListConstants";
 import { buildEmployeesTableSchema, type EmployeesTableColumnSchema } from "./employeesTableSchema";
+import type { EmployeeEmploymentType, EmployeeGender, EmployeeIdentityDocumentType, EmployeeWorkSchedule } from "./model";
 
 type EmployeeFieldCatalogEntry = {
   registry: ListViewFieldRegistryEntry;
@@ -61,18 +76,52 @@ function mapSchemaToFilterConfig(
       return { kind: "text" };
     case "boolean":
       return { kind: "boolean" };
-    case "enum":
-      if (column.id === "status") {
-        const options = buildEnumOptions(t, EMPLOYEE_RECORD_STATUSES, (tf, v) =>
-          translateEmployeeRecordStatus(tf, v as (typeof EMPLOYEE_RECORD_STATUSES)[number]),
-        );
+    case "date":
+      return { kind: "date" };
+    case "enum": {
+      const ef = column.enumField;
+      if (ef === "status") {
         return {
           kind: "enum",
-          options,
-          getValue: (row) => translateEmployeeRecordStatus(t, row.status),
+          options: buildEnumOptions(t, EMPLOYEE_RECORD_STATUSES, (tf, v) =>
+            translateEmployeeRecordStatus(tf, v as (typeof EMPLOYEE_RECORD_STATUSES)[number]),
+          ),
+        };
+      }
+      if (ef === "gender") {
+        return {
+          kind: "enum",
+          options: buildEnumOptions(t, EMPLOYEE_GENDERS, (tf, v) =>
+            translateEmployeeGender(tf, v as EmployeeGender),
+          ),
+        };
+      }
+      if (ef === "documentType") {
+        return {
+          kind: "enum",
+          options: buildEnumOptions(t, EMPLOYEE_IDENTITY_DOCUMENT_TYPES, (tf, v) =>
+            translateEmployeeIdentityDocumentType(tf, v as EmployeeIdentityDocumentType),
+          ),
+        };
+      }
+      if (ef === "employmentType") {
+        return {
+          kind: "enum",
+          options: buildEnumOptions(t, EMPLOYEE_LIST_EMPLOYMENT_TYPES, (tf, v) =>
+            translateEmploymentType(tf, v as EmployeeEmploymentType),
+          ),
+        };
+      }
+      if (ef === "workSchedule") {
+        return {
+          kind: "enum",
+          options: buildEnumOptions(t, EMPLOYEE_LIST_WORK_SCHEDULES, (tf, v) =>
+            translateWorkSchedule(tf, v as EmployeeWorkSchedule),
+          ),
         };
       }
       return { kind: "enum", options: [] };
+    }
     case "none":
     default:
       return undefined;
@@ -106,9 +155,22 @@ function buildColDefFromSchema(
   if (column.id === "status") {
     colDef.valueGetter = (p) => (p.data ? translateEmployeeRecordStatus(t, p.data.status) : "");
   }
-  if (column.id === "managerDisplay") {
+  if (column.id === "employmentType") {
+    colDef.valueGetter = (p) => (p.data ? translateEmploymentType(t, p.data.employmentType) : "");
+  }
+  if (column.id === "workSchedule") {
+    colDef.valueGetter = (p) => (p.data ? translateWorkSchedule(t, p.data.workSchedule) : "");
+  }
+  if (column.id === "gender") {
+    colDef.valueGetter = (p) => (p.data ? translateEmployeeGender(t, p.data.gender) : "");
+  }
+  if (column.id === "documentType") {
+    colDef.valueGetter = (p) =>
+      p.data ? translateEmployeeIdentityDocumentType(t, p.data.documentType) : "";
+  }
+  if (column.id === "managerDisplay" || column.id === "functionalManagerDisplay") {
     colDef.valueGetter = (p) => {
-      const v = p.data?.managerDisplay;
+      const v = column.id === "managerDisplay" ? p.data?.managerDisplay : p.data?.functionalManagerDisplay;
       if (v == null || v === "") return emDash;
       return String(v);
     };
