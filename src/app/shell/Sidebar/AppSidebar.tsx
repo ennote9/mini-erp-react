@@ -82,6 +82,10 @@ const nav: ReadonlyArray<{ groupKey: string; links: readonly NavLinkItem[] }> = 
       { labelKey: "shell.nav.markdownJournal", to: "/markdown-journal", icon: ScanBarcode },
     ],
   },
+  {
+    groupKey: "shell.application",
+    links: [{ labelKey: "shell.settings", to: "/settings", icon: Settings }],
+  },
 ];
 
 function SidebarNavLink({
@@ -140,15 +144,15 @@ export function AppSidebar() {
               onClick={toggleSidebar}
               className="cursor-pointer rounded-lg border border-transparent bg-sidebar-accent/20 hover:border-sidebar-border/70 hover:bg-sidebar-accent/65 focus-visible:ring-2 focus-visible:ring-sidebar-ring active:bg-sidebar-accent/85 active:scale-[0.99] data-[state=open]:bg-sidebar-accent/70 data-[state=open]:text-sidebar-accent-foreground group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-2"
             >
-              <div className="flex aspect-square size-9 items-center justify-center rounded-lg bg-sidebar-primary text-sidebar-primary-foreground shadow-sm ring-1 ring-sidebar-border/45 transition-transform duration-200 group-hover/menu-button:scale-[1.02] group-active/menu-button:scale-[0.99]">
+              <div className="flex aspect-square size-7 items-center justify-center rounded-lg bg-sidebar-primary text-sidebar-primary-foreground shadow-sm ring-1 ring-sidebar-border/45 transition-transform duration-200 group-hover/menu-button:scale-[1.02] group-active/menu-button:scale-[0.99] group-data-[state=collapsed]:size-8">
                 <LayoutDashboard className="size-4" />
               </div>
-              <div className="grid min-w-0 flex-1 gap-0.5 text-left group-data-[collapsible=icon]:hidden">
-                <span className="truncate text-sm font-semibold leading-tight text-sidebar-foreground">
+              <div className="grid min-w-0 flex-1 gap-px text-left group-data-[collapsible=icon]:hidden">
+                <span className="truncate text-[0.8125rem] font-semibold leading-tight text-sidebar-foreground">
                   {t("app.name")}
                 </span>
                 <span
-                  className="truncate text-xs leading-tight text-sidebar-foreground/70"
+                  className="truncate text-[0.6875rem] leading-tight text-sidebar-foreground/70"
                   title={t("workspace.mode.advanced.hint")}
                 >
                   {modeLabel} {t("shell.workspaceSuffix")}
@@ -197,22 +201,19 @@ export function AppSidebar() {
       <SidebarFooter>
         <SidebarMenu>
           <SidebarMenuItem>
-            <SidebarNavLink to="/settings" label={t("shell.settings")} icon={Settings} />
-          </SidebarMenuItem>
-          <SidebarMenuItem>
             <SidebarMenuButton
               size="lg"
               tooltip={t("shell.account")}
               className="rounded-lg border border-sidebar-border/60 bg-sidebar-accent/20 hover:bg-sidebar-accent/55 data-[state=open]:bg-sidebar-accent/70 data-[state=open]:text-sidebar-accent-foreground"
             >
-              <div className="flex aspect-square size-9 items-center justify-center rounded-lg border border-sidebar-border/70 bg-sidebar/75 text-sidebar-foreground">
+              <div className="flex aspect-square size-7 items-center justify-center rounded-lg border border-sidebar-border/70 bg-sidebar/75 text-sidebar-foreground group-data-[state=collapsed]:size-8">
                 <User className="size-4" />
               </div>
-              <div className="grid min-w-0 flex-1 gap-0.5 text-left group-data-[collapsible=icon]:hidden">
-                <span className="truncate text-sm font-medium leading-tight text-sidebar-foreground">
+              <div className="grid min-w-0 flex-1 gap-px text-left group-data-[collapsible=icon]:hidden">
+                <span className="truncate text-[0.8125rem] font-medium leading-tight text-sidebar-foreground">
                   {t("shell.account")}
                 </span>
-                <span className="truncate text-xs leading-tight text-sidebar-foreground/60">
+                <span className="truncate text-[0.6875rem] leading-tight text-sidebar-foreground/60">
                   {t("shell.signedIn")}
                 </span>
               </div>

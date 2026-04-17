@@ -56,6 +56,7 @@ export const kkMessages: MessageTree = {
     purchasing: "Сатып алу",
     sales: "Сату",
     inventory: "Қойма",
+    application: "Қолданба",
     settings: "Баптаулар",
     account: "Есептік жазба",
     signedIn: "Кірді",

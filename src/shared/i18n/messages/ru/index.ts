@@ -56,6 +56,7 @@ export const ruMessages: MessageTree = {
     purchasing: "Закупки",
     sales: "Продажи",
     inventory: "Склад",
+    application: "Приложение",
     settings: "Настройки",
     account: "Учётная запись",
     signedIn: "Вход выполнен",

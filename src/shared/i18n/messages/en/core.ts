@@ -46,6 +46,7 @@ export const coreEn = {
     purchasing: "Purchasing",
     sales: "Sales",
     inventory: "Inventory",
+    application: "Application",
     settings: "Settings",
     account: "Account",
     signedIn: "Signed in",
