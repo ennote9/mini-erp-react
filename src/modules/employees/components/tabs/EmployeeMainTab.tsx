@@ -1,7 +1,7 @@
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useTranslation } from "@/shared/i18n/context";
 import type { EmployeeTabProps } from "./types";
 
@@ -16,14 +16,11 @@ export function EmployeeMainTab({ draft, patch }: EmployeeTabProps) {
   return (
     <div className="flex w-full flex-col gap-3">
       <div className="w-full max-w-[min(44rem,55%)] shrink-0">
-        <Card>
-          <CardHeader className="space-y-1 p-4 pb-1.5">
+        <Card className="border-0 shadow-none ring-0">
+          <CardHeader className="p-4 pb-2">
             <CardTitle className="text-xs font-semibold leading-tight tracking-tight">
               {t("employees.tabs.main.identityTitle")}
             </CardTitle>
-            <CardDescription className="text-[11px] leading-snug text-muted-foreground">
-              {t("employees.tabs.main.identityHint")}
-            </CardDescription>
           </CardHeader>
           <CardContent className="grid gap-2 p-4 pt-0 md:grid-cols-2">
             <div className="space-y-1">
