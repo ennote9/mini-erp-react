@@ -47,7 +47,6 @@ export const employeesPagesKk = {
     placeholders: {
       none: "— Таңдалмаған —",
       selectRecord: "Жазбаны таңдаңыз…",
-      photoDataUrl: "Міндетті емес badge фото үшін data URL (тек жергілікті)",
     },
     fields: {
       employeeCode: "Қызметкер коды",
@@ -61,7 +60,6 @@ export const employeesPagesKk = {
       directManager: "Тікелей басшы",
       employmentStart: "Жұмысқа кіру күні",
       employmentEnd: "Жұмыстан шығу күні",
-      photoDataUrl: "Фото (data URL)",
       comment: "Ескерту",
       workEmail: "Жұмыс e-mail",
       workPhone: "Жұмыс телефоны",
@@ -122,9 +120,6 @@ export const employeesPagesKk = {
       main: {
         nav: "Негізгі",
         identityTitle: "Негізгі сәйкестендіру",
-        identityHint:
-          "Кодтар, аты-жөні, жазба күйі, жұмыс күндері, міндетті емес жұмыс фотосы және ескертулер. Ұйым, жүйелік қолжетімділік және қолжетімділік өз бөлімдерінде өзгертіледі.",
-        photoPreviewHint: "Міндетті емес жұмыс фотосының алдын ала көрінісі.",
       },
       org: {
         nav: "Ұйым және жауапкершілік",

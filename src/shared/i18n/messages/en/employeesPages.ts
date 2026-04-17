@@ -47,7 +47,6 @@ export const employeesPagesEn = {
     placeholders: {
       none: "— None —",
       selectRecord: "Select a record…",
-      photoDataUrl: "Optional data URL for a work badge photo (local only)",
     },
     fields: {
       employeeCode: "Employee code",
@@ -61,7 +60,6 @@ export const employeesPagesEn = {
       directManager: "Direct manager",
       employmentStart: "Employment start",
       employmentEnd: "Employment end",
-      photoDataUrl: "Photo (data URL)",
       comment: "Comment",
       workEmail: "Work email",
       workPhone: "Work phone",
@@ -122,9 +120,6 @@ export const employeesPagesEn = {
       main: {
         nav: "Main",
         identityTitle: "Core identity",
-        identityHint:
-          "Codes, names, record status, employment dates, optional work photo, and notes. Org placement, system access, and availability are edited on their own tabs.",
-        photoPreviewHint: "Preview of the optional work photo.",
       },
       org: {
         nav: "Org & responsibility",

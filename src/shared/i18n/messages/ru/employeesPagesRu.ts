@@ -47,7 +47,6 @@ export const employeesPagesRu = {
     placeholders: {
       none: "— Не выбрано —",
       selectRecord: "Выберите запись…",
-      photoDataUrl: "Необязательный data URL фото бейджа (только локально)",
     },
     fields: {
       employeeCode: "Код сотрудника",
@@ -61,7 +60,6 @@ export const employeesPagesRu = {
       directManager: "Непосредственный руководитель",
       employmentStart: "Дата начала работы",
       employmentEnd: "Дата окончания работы",
-      photoDataUrl: "Фото (data URL)",
       comment: "Комментарий",
       workEmail: "Рабочий e-mail",
       workPhone: "Рабочий телефон",
@@ -122,9 +120,6 @@ export const employeesPagesRu = {
       main: {
         nav: "Основное",
         identityTitle: "Основные реквизиты",
-        identityHint:
-          "Коды, ФИО, статус записи, даты трудоустройства, опциональное фото бейджа и комментарий. Оргструктура, доступ и доступность редактируются на отдельных вкладках.",
-        photoPreviewHint: "Предпросмотр опционального фото бейджа.",
       },
       org: {
         nav: "Орг. и ответственность",

@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useTranslation } from "@/shared/i18n/context";
 import type { EmployeeTabProps } from "./types";
 
-/** Compact identity column: capped width (~620px / ~47% max) + dense ERP form rhythm. */
+/** Compact identity column: max width min(27rem,35%) minus 1cm on each cap + dense ERP form rhythm. */
 export function EmployeeMainTab({ draft, patch }: EmployeeTabProps) {
   const { t } = useTranslation();
   const idn = draft.identity;
@@ -15,7 +15,7 @@ export function EmployeeMainTab({ draft, patch }: EmployeeTabProps) {
 
   return (
     <div className="flex w-full flex-col gap-3">
-      <div className="w-full max-w-[min(38.75rem,47%)] shrink-0">
+      <div className="w-full max-w-[min(calc(27rem-1cm),calc(35%-1cm))] shrink-0">
         <Card className="border-0 shadow-none ring-0">
           <CardHeader className="p-4 pb-2">
             <CardTitle className="text-xs font-semibold leading-tight tracking-tight">
@@ -95,26 +95,6 @@ export function EmployeeMainTab({ draft, patch }: EmployeeTabProps) {
                 }
               />
             </div>
-            <div className="space-y-1 md:col-span-2">
-              <Label className={labelCls}>{t("employees.fields.photoDataUrl")}</Label>
-              <Textarea
-                className="min-h-[52px] resize-y text-xs leading-snug"
-                placeholder={t("employees.placeholders.photoDataUrl")}
-                value={idn.photoDataUrl ?? ""}
-                onChange={(e) =>
-                  patch((p) => ({
-                    ...p,
-                    identity: { ...p.identity, photoDataUrl: e.target.value || null },
-                  }))
-                }
-              />
-            </div>
-            {idn.photoDataUrl?.startsWith("data:") ? (
-              <div className="md:col-span-2">
-                <p className="mb-1 text-[10px] leading-snug text-muted-foreground">{t("employees.tabs.main.photoPreviewHint")}</p>
-                <img src={idn.photoDataUrl} alt="" className="max-h-20 rounded border border-border" />
-              </div>
-            ) : null}
             <div className="space-y-1 md:col-span-2">
               <Label className={labelCls}>{t("employees.fields.comment")}</Label>
               <Textarea
