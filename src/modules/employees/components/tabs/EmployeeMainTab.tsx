@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useTranslation } from "@/shared/i18n/context";
 import type { EmployeeTabProps } from "./types";
 
-/** Compact identity column: capped width (~half workspace) + dense ERP form rhythm. */
+/** Compact identity column: capped width (~620px / ~47% max) + dense ERP form rhythm. */
 export function EmployeeMainTab({ draft, patch }: EmployeeTabProps) {
   const { t } = useTranslation();
   const idn = draft.identity;
@@ -15,7 +15,7 @@ export function EmployeeMainTab({ draft, patch }: EmployeeTabProps) {
 
   return (
     <div className="flex w-full flex-col gap-3">
-      <div className="w-full max-w-[min(44rem,55%)] shrink-0">
+      <div className="w-full max-w-[min(38.75rem,47%)] shrink-0">
         <Card className="border-0 shadow-none ring-0">
           <CardHeader className="p-4 pb-2">
             <CardTitle className="text-xs font-semibold leading-tight tracking-tight">
