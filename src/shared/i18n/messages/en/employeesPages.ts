@@ -121,9 +121,10 @@ export const employeesPagesEn = {
     tabs: {
       main: {
         nav: "Main",
-        identityTitle: "Identity & assignment summary",
-        identityHint: "Who this person is, where they belong, and their primary system role (summary mirrors other tabs).",
-        photoPreviewHint: "Preview appears when a data URL is present.",
+        identityTitle: "Core identity",
+        identityHint:
+          "Codes, names, record status, employment dates, optional work photo, and notes. Org placement, system access, and availability are edited on their own tabs.",
+        photoPreviewHint: "Preview of the optional work photo.",
       },
       org: {
         nav: "Org & responsibility",
