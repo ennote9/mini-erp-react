@@ -34,6 +34,7 @@ export const employeesPagesKk = {
     placeholders: {
       none: "— Таңдалмаған —",
       citizenship: "мысалы KZ",
+      shiftCrew: "Міндетті емес, мысалы түнгі ауысым Б",
     },
     fields: {
       employeeCode: "Қызметкер коды",
@@ -74,6 +75,9 @@ export const employeesPagesKk = {
       city: "Қала / елді мекен",
       residentialAddress: "Тұрғылықты мекенжайы",
       registrationAddress: "Тіркеу мекенжайы (прописка)",
+      employmentType: "Жұмысқа орналасу түрі",
+      workSchedule: "Жұмыс кестесі",
+      shiftCrew: "Ауысым / бригада",
     },
     tabs: {
       main: {
@@ -123,6 +127,22 @@ export const employeesPagesKk = {
         passport_foreign: "Шетелдік паспорт",
         residence_permit: "Тұруға рұқсат",
         other: "Басқа құжат",
+      },
+      employmentType: {
+        full_time: "Толық жұмыс",
+        part_time: "Іссағаттық жұмыс",
+        contractor: "Мердігер",
+        fixed_term: "Белгілі мерзімді шарт",
+        intern: "Стажёр",
+      },
+      workSchedule: {
+        "5_2": "5/2 (бес жұмыс, екі демалыс)",
+        "2_2": "2/2",
+        day: "Күндізгі ауысым",
+        night: "Түнгі ауысым",
+        flexible: "Икемді кесте",
+        remote: "Қашықтан",
+        hybrid: "Гибридті",
       },
     },
     dict: {

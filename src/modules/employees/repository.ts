@@ -1,4 +1,10 @@
-import type { CreateEmployeeInput, Employee, UpdateEmployeePatch } from "./model";
+import {
+  EMPLOYEE_EMPLOYMENT_TYPES,
+  EMPLOYEE_WORK_SCHEDULES,
+  type CreateEmployeeInput,
+  type Employee,
+  type UpdateEmployeePatch,
+} from "./model";
 import {
   defaultAccessProfile,
   defaultAvailability,
@@ -177,6 +183,16 @@ function normalizeOrg(raw: unknown): Employee["org"] {
       if (n) scopes.push(n);
     }
   }
+  const empRaw = asStr(o.employmentType, base.employmentType);
+  const employmentType = (EMPLOYEE_EMPLOYMENT_TYPES as readonly string[]).includes(empRaw)
+    ? (empRaw as Employee["org"]["employmentType"])
+    : base.employmentType;
+
+  const wsRaw = asStr(o.workSchedule, base.workSchedule);
+  const workSchedule = (EMPLOYEE_WORK_SCHEDULES as readonly string[]).includes(wsRaw)
+    ? (wsRaw as Employee["org"]["workSchedule"])
+    : base.workSchedule;
+
   return {
     departmentCode: asStr(o.departmentCode, base.departmentCode),
     positionCode: asStr(o.positionCode, base.positionCode),
@@ -189,6 +205,9 @@ function normalizeOrg(raw: unknown): Employee["org"] {
           : base.functionalManagerId,
     teamOrGroup: asStr(o.teamOrGroup, base.teamOrGroup),
     responsibilityZone: asStr(o.responsibilityZone, base.responsibilityZone),
+    employmentType,
+    workSchedule,
+    shiftLabel: asStr(o.shiftLabel, base.shiftLabel),
     assignmentScopes: scopes,
   };
 }
@@ -451,6 +470,9 @@ function buildSeedEmployees(): CreateEmployeeInput[] {
         functionalManagerId: null,
         teamOrGroup: "Finance Ops North",
         responsibilityZone: "North region — payables",
+        employmentType: "full_time",
+        workSchedule: "5_2",
+        shiftLabel: "",
         assignmentScopes: [
           { kind: "document_type", entityId: "PO", label: "Purchase orders" },
           { kind: "business_direction", entityId: "RETAIL", label: "Retail" },
@@ -563,6 +585,9 @@ function buildSeedEmployees(): CreateEmployeeInput[] {
         functionalManagerId: null,
         teamOrGroup: "Inbound crew A",
         responsibilityZone: "Receiving dock 1–4",
+        employmentType: "full_time",
+        workSchedule: "2_2",
+        shiftLabel: "Morning shift — dock 1",
         assignmentScopes: [
           { kind: "warehouse", entityId: "1", label: "Main DC" },
           { kind: "category", entityId: "2", label: "Fasteners" },
@@ -659,6 +684,9 @@ function buildSeedEmployees(): CreateEmployeeInput[] {
         functionalManagerId: null,
         teamOrGroup: "",
         responsibilityZone: "",
+        employmentType: "fixed_term",
+        workSchedule: "flexible",
+        shiftLabel: "",
         assignmentScopes: [{ kind: "supplier", entityId: "1", label: "Acme Supplies" }],
       },
       access: {
@@ -758,6 +786,9 @@ function buildSeedEmployees(): CreateEmployeeInput[] {
         functionalManagerId: null,
         teamOrGroup: "Assortment studio",
         responsibilityZone: "Private label accessories",
+        employmentType: "full_time",
+        workSchedule: "hybrid",
+        shiftLabel: "",
         assignmentScopes: [
           { kind: "brand", entityId: "1", label: "Acme" },
           { kind: "category", entityId: "1", label: "Electronics" },

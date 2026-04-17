@@ -34,6 +34,7 @@ export const employeesPagesRu = {
     placeholders: {
       none: "— Не выбрано —",
       citizenship: "напр. KZ",
+      shiftCrew: "Необязательно, напр. ночная смена Б",
     },
     fields: {
       employeeCode: "Код сотрудника",
@@ -74,6 +75,9 @@ export const employeesPagesRu = {
       city: "Населённый пункт",
       residentialAddress: "Адрес проживания",
       registrationAddress: "Адрес регистрации (прописка)",
+      employmentType: "Тип занятости",
+      workSchedule: "График работы",
+      shiftCrew: "Смена / бригада",
     },
     tabs: {
       main: {
@@ -123,6 +127,22 @@ export const employeesPagesRu = {
         passport_foreign: "Иностранный паспорт",
         residence_permit: "Вид на жительство",
         other: "Иной документ",
+      },
+      employmentType: {
+        full_time: "Полная занятость",
+        part_time: "Частичная занятость",
+        contractor: "Подрядчик",
+        fixed_term: "Срочный договор",
+        intern: "Стажёр",
+      },
+      workSchedule: {
+        "5_2": "5/2 (пятидневка)",
+        "2_2": "2/2",
+        day: "Дневная смена",
+        night: "Ночная смена",
+        flexible: "Гибкий график",
+        remote: "Удалённо",
+        hybrid: "Гибрид",
       },
     },
     dict: {

@@ -102,6 +102,22 @@ export interface EmployeeWorkContacts {
   officeLocation: string;
 }
 
+/** How the employee is engaged with the company (Org tab). */
+export const EMPLOYEE_EMPLOYMENT_TYPES = ["full_time", "part_time", "contractor", "fixed_term", "intern"] as const;
+export type EmployeeEmploymentType = (typeof EMPLOYEE_EMPLOYMENT_TYPES)[number];
+
+/** General working pattern (Org tab); separate from shift assignment. */
+export const EMPLOYEE_WORK_SCHEDULES = [
+  "5_2",
+  "2_2",
+  "day",
+  "night",
+  "flexible",
+  "remote",
+  "hybrid",
+] as const;
+export type EmployeeWorkSchedule = (typeof EMPLOYEE_WORK_SCHEDULES)[number];
+
 export interface EmployeeOrgResponsibility {
   departmentCode: string;
   positionCode: string;
@@ -109,6 +125,10 @@ export interface EmployeeOrgResponsibility {
   functionalManagerId: string | null;
   teamOrGroup: string;
   responsibilityZone: string;
+  employmentType: EmployeeEmploymentType;
+  workSchedule: EmployeeWorkSchedule;
+  /** e.g. warehouse shift name; optional, independent of work schedule. */
+  shiftLabel: string;
   assignmentScopes: EmployeeAssignmentScope[];
 }
 

@@ -78,6 +78,9 @@ export function defaultOrg(): EmployeeOrgResponsibility {
     functionalManagerId: null,
     teamOrGroup: "",
     responsibilityZone: "",
+    employmentType: "full_time",
+    workSchedule: "5_2",
+    shiftLabel: "",
     assignmentScopes: [],
   };
 }
