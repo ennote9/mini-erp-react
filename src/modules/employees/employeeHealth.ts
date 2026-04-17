@@ -39,16 +39,5 @@ export function getEmployeeDocumentHealth(employee: Employee): { issues: Issue[]
     });
   }
 
-  if (employee.access.isErpUser && !employee.access.login.trim()) {
-    issues.push({
-      severity: "warning",
-      scope: "field",
-      code: "employee.loginMissing",
-      message: "ERP user requires a login",
-      i18nKey: "employees.validation.loginMissing",
-      field: "access.login",
-    });
-  }
-
   return { issues };
 }

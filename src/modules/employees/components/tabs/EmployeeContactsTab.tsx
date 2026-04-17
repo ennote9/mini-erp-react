@@ -48,7 +48,7 @@ export function EmployeeContactsTab({ draft, patch }: EmployeeTabProps) {
             />
           </div>
           <div className="space-y-1">
-            <Label className={labelCls}>{t("employees.fields.corporateMessenger")}</Label>
+            <Label className={labelCls}>{t("employees.tabs.contacts.messengerLabel")}</Label>
             <Input
               className={control}
               value={c.corporateMessengerId}

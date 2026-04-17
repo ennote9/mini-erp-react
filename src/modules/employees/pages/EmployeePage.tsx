@@ -23,12 +23,6 @@ import { EMPLOYEE_TAB_IDS, type EmployeeTabId } from "../employeeTabIds";
 import { EmployeeMainTab } from "../components/tabs/EmployeeMainTab";
 import { EmployeeOrgTab } from "../components/tabs/EmployeeOrgTab";
 import { EmployeeContactsTab } from "../components/tabs/EmployeeContactsTab";
-import { EmployeeAccessTab } from "../components/tabs/EmployeeAccessTab";
-import { EmployeeBusinessRolesTab } from "../components/tabs/EmployeeBusinessRolesTab";
-import { EmployeeLinkedTab } from "../components/tabs/EmployeeLinkedTab";
-import { EmployeeFilesTab } from "../components/tabs/EmployeeFilesTab";
-import { EmployeeAvailabilityTab } from "../components/tabs/EmployeeAvailabilityTab";
-import { EmployeeHistoryTab } from "../components/tabs/EmployeeHistoryTab";
 import { cn } from "@/lib/utils";
 
 function cloneEmployee(e: Employee): Employee {
@@ -183,30 +177,12 @@ export function EmployeePage() {
     ? t("employees.page.titleNew")
     : t("employees.page.titleEdit", { code: draft.identity.employeeCode });
 
-  const accessTone =
-    draft.access.accessStatus === "blocked"
-      ? "danger"
-      : draft.access.accessStatus === "pending"
-        ? "warn"
-        : "neutral";
-  const availabilityTone = draft.availability.kind === "dismissed" ? "danger" : "neutral";
-
   const summaryChips = (
     <div className="flex flex-wrap items-center gap-2">
       <HeaderStatusGroup
         label={t("employees.header.record")}
         value={t(`employees.enums.recordStatus.${draft.identity.status}`)}
         tone="neutral"
-      />
-      <HeaderStatusGroup
-        label={t("employees.header.access")}
-        value={t(`employees.enums.accessStatus.${draft.access.accessStatus}`)}
-        tone={accessTone}
-      />
-      <HeaderStatusGroup
-        label={t("employees.header.availability")}
-        value={t(`employees.enums.availability.${draft.availability.kind}`)}
-        tone={availabilityTone}
       />
     </div>
   );
@@ -276,24 +252,6 @@ export function EmployeePage() {
         </Tabs.Content>
         <Tabs.Content value="contacts" className="min-h-0 flex-1 outline-none focus-visible:outline-none">
           <EmployeeContactsTab draft={draft} patch={patch} selfId={id} />
-        </Tabs.Content>
-        <Tabs.Content value="access" className="min-h-0 flex-1 outline-none focus-visible:outline-none">
-          <EmployeeAccessTab draft={draft} patch={patch} selfId={id} />
-        </Tabs.Content>
-        <Tabs.Content value="businessRoles" className="min-h-0 flex-1 outline-none focus-visible:outline-none">
-          <EmployeeBusinessRolesTab draft={draft} patch={patch} selfId={id} />
-        </Tabs.Content>
-        <Tabs.Content value="linked" className="min-h-0 flex-1 outline-none focus-visible:outline-none">
-          <EmployeeLinkedTab draft={draft} patch={patch} selfId={id} />
-        </Tabs.Content>
-        <Tabs.Content value="files" className="min-h-0 flex-1 outline-none focus-visible:outline-none">
-          <EmployeeFilesTab draft={draft} patch={patch} selfId={id} />
-        </Tabs.Content>
-        <Tabs.Content value="availability" className="min-h-0 flex-1 outline-none focus-visible:outline-none">
-          <EmployeeAvailabilityTab draft={draft} patch={patch} selfId={id} />
-        </Tabs.Content>
-        <Tabs.Content value="history" className="min-h-0 flex-1 outline-none focus-visible:outline-none">
-          <EmployeeHistoryTab draft={draft} patch={patch} selfId={id} />
         </Tabs.Content>
       </Tabs.Root>
     </DocumentPageLayout>
