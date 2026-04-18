@@ -16,6 +16,8 @@ type Props = {
   context: LabelPreviewBindingContext;
   /** When false, hide the demo-data caption (e.g. real item context uses workspace banner instead). */
   showDemoHint?: boolean;
+  /** Highlights this element id in the preview (e.g. template editor selection). */
+  selectedElementId?: string | null;
 };
 
 function resolveTextContent(el: LabelTextElement, ctx: LabelPreviewBindingContext): string {
@@ -26,7 +28,12 @@ function resolveTextContent(el: LabelTextElement, ctx: LabelPreviewBindingContex
   return el.text ?? "";
 }
 
-function renderElement(el: LabelElement, ctx: LabelPreviewBindingContext, key: string) {
+function renderElement(
+  el: LabelElement,
+  ctx: LabelPreviewBindingContext,
+  key: string,
+  isSelected: boolean,
+) {
   const left = el.xMm * LABEL_PREVIEW_PX_PER_MM;
   const top = el.yMm * LABEL_PREVIEW_PX_PER_MM;
   const w = el.widthMm * LABEL_PREVIEW_PX_PER_MM;
@@ -40,6 +47,9 @@ function renderElement(el: LabelElement, ctx: LabelPreviewBindingContext, key: s
     height: h,
     transform: rot !== 0 ? `rotate(${rot}deg)` : undefined,
     transformOrigin: "top left",
+    outline: isSelected ? "2px solid hsl(var(--primary))" : undefined,
+    outlineOffset: isSelected ? -1 : undefined,
+    zIndex: isSelected ? 5 : 1,
   };
 
   if (el.type === "text") {
@@ -146,7 +156,12 @@ function renderElement(el: LabelElement, ctx: LabelPreviewBindingContext, key: s
   return _never;
 }
 
-export function LabelTemplatePreview({ template, context, showDemoHint = true }: Props) {
+export function LabelTemplatePreview({
+  template,
+  context,
+  showDemoHint = true,
+  selectedElementId = null,
+}: Props) {
   const { t } = useTranslation();
   const w = template.sizeMm.width * LABEL_PREVIEW_PX_PER_MM;
   const h = template.sizeMm.height * LABEL_PREVIEW_PX_PER_MM;
@@ -160,7 +175,9 @@ export function LabelTemplatePreview({ template, context, showDemoHint = true }:
         className="relative overflow-hidden rounded border border-border bg-white text-black shadow-sm"
         style={{ width: w, height: h, maxWidth: "100%" }}
       >
-        {template.elements.map((el) => renderElement(el, context, el.id))}
+        {template.elements.map((el) =>
+          renderElement(el, context, el.id, selectedElementId !== null && el.id === selectedElementId),
+        )}
       </div>
     </div>
   );

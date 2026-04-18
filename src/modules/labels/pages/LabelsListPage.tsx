@@ -1,12 +1,20 @@
 import { useMemo, useSyncExternalStore } from "react";
+import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { useTranslation } from "@/shared/i18n";
 import { getAppReadModelRevision, subscribeAppReadModelRevision } from "@/shared/appReadModelRevision";
 import { listLabelTemplatesForDisplay } from "../service";
+import { LABELS_WORKSPACE_QUERY } from "../lib/workspaceQueryParams";
 import { LabelsSubnav } from "../components/LabelsSubnav";
 
 function formatSizeMm(width: number, height: number): string {
   return `${width}×${height}`;
+}
+
+function workspaceUrlForTemplate(templateId: string): string {
+  const q = new URLSearchParams();
+  q.set(LABELS_WORKSPACE_QUERY.templateId, templateId);
+  return `/labels/workspace?${q.toString()}`;
 }
 
 export function LabelsListPage() {
@@ -48,7 +56,7 @@ export function LabelsListPage() {
             <div>{t("labels.list.columnName")}</div>
             <div>{t("labels.list.columnKind")}</div>
             <div className="text-right">{t("labels.list.columnSize")}</div>
-            <div className="text-right" aria-hidden />
+            <div className="text-right">{t("labels.list.columnActions")}</div>
           </div>
           <ul className="divide-y divide-border/60">
             {templates.map((tpl) => (
@@ -65,6 +73,23 @@ export function LabelsListPage() {
                       {tpl.description}
                     </p>
                   ) : null}
+                  <div className="mt-1 flex flex-wrap gap-1">
+                    {tpl.isDefault ? (
+                      <span className="rounded border border-border bg-muted/50 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+                        {t("labels.list.badgeDefault")}
+                      </span>
+                    ) : null}
+                    {tpl.isArchived ? (
+                      <span className="rounded border border-border bg-muted/50 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+                        {t("labels.list.badgeArchived")}
+                      </span>
+                    ) : null}
+                    {tpl.isSystem ? (
+                      <span className="rounded border border-border bg-muted/50 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+                        {t("labels.list.badgeSystem")}
+                      </span>
+                    ) : null}
+                  </div>
                 </div>
                 <div className="min-w-0 text-muted-foreground">
                   {t(`labels.kind.${tpl.kind}`)}
@@ -74,21 +99,12 @@ export function LabelsListPage() {
                   <span className="text-xs text-muted-foreground/80">({t(`labels.paper.${tpl.paperType}`)})</span>
                 </div>
                 <div className="flex shrink-0 flex-wrap justify-end gap-1">
-                  {tpl.isDefault ? (
-                    <span className="rounded border border-border bg-muted/50 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
-                      {t("labels.list.badgeDefault")}
-                    </span>
-                  ) : null}
-                  {tpl.isArchived ? (
-                    <span className="rounded border border-border bg-muted/50 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
-                      {t("labels.list.badgeArchived")}
-                    </span>
-                  ) : null}
-                  {tpl.isSystem ? (
-                    <span className="rounded border border-border bg-muted/50 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
-                      {t("labels.list.badgeSystem")}
-                    </span>
-                  ) : null}
+                  <Button variant="outline" size="sm" className="h-7 px-2 text-xs" asChild>
+                    <Link to={`/labels/templates/${tpl.id}`}>{t("labels.list.editTemplate")}</Link>
+                  </Button>
+                  <Button variant="ghost" size="sm" className="h-7 px-2 text-xs" asChild>
+                    <Link to={workspaceUrlForTemplate(tpl.id)}>{t("labels.list.openWorkspace")}</Link>
+                  </Button>
                 </div>
               </li>
             ))}

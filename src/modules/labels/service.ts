@@ -54,3 +54,12 @@ export function ensureLabelsModuleLoaded(): Promise<void> {
 export async function flushPendingLabelWrites(): Promise<void> {
   await Promise.all([flushPendingLabelTemplatePersist(), flushPendingPrintJobPersist()]);
 }
+
+/** Persists a full template replacement; bumps `updatedAt` and revision. */
+export function persistLabelTemplate(template: LabelTemplate): LabelTemplate {
+  const next: LabelTemplate = {
+    ...template,
+    updatedAt: new Date().toISOString(),
+  };
+  return labelTemplateRepository.save(next);
+}

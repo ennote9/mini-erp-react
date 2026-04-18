@@ -1,7 +1,7 @@
 import { useCallback, useMemo, useState } from "react";
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 import { Link } from "react-router-dom";
-import { MoreVertical } from "lucide-react";
+import { MoreHorizontal } from "lucide-react";
 import type { Item, ItemResponsibleRoleCode } from "../model";
 import { itemRepository } from "../repository";
 import { employeeRepository } from "@/modules/employees/repository";
@@ -215,7 +215,7 @@ export function ItemResponsiblesTab({ itemId, isNew, revision, onResponsiblesCha
                   title={t("master.item.responsibles.rowActionsMenuTitle")}
                   aria-label={t("master.item.responsibles.rowActionsMenuTitle")}
                 >
-                  <MoreVertical className="h-3.5 w-3.5" aria-hidden />
+                  <MoreHorizontal className="h-3.5 w-3.5" aria-hidden />
                 </Button>
               </DropdownMenu.Trigger>
               <DropdownMenu.Portal>

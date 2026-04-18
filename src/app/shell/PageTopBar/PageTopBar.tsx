@@ -16,6 +16,7 @@ import {
   Users,
   Warehouse,
   Route,
+  Pencil,
   Printer,
   ScanBarcode,
   UserCog,
@@ -72,6 +73,7 @@ function getPageTitleKey(pathname: string): string {
   if (pathname.match(/^\/stock-balances\/[^/]+$/)) return "routes.stockBalance";
   if (pathname.match(/^\/markdown-journal\/new$/)) return "routes.markdownCreate";
   if (pathname.match(/^\/markdown-journal\/journals\/[^/]+$/)) return "routes.markdownJournalDocument";
+  if (pathname.match(/^\/labels\/templates\/[^/]+$/)) return "routes.labelTemplateEditor";
   return PAGE_TITLES[pathname] ?? "routes.fallback";
 }
 
@@ -81,6 +83,7 @@ function getPageIcon(
   if (pathname === "/") return LayoutDashboard;
   if (pathname === "/items" || pathname.match(/^\/items\/[^/]+$/)) return Package;
   if (pathname === "/barcodes") return ScanBarcode;
+  if (pathname.match(/^\/labels\/templates\/[^/]+$/)) return Pencil;
   if (pathname === "/labels" || pathname === "/labels/workspace" || pathname === "/labels/operations")
     return Printer;
   if (pathname === "/brands" || pathname.match(/^\/brands\/[^/]+$/)) return Tag;

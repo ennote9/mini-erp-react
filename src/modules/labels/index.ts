@@ -1,4 +1,5 @@
 export { LabelsListPage } from "./pages/LabelsListPage";
+export { LabelTemplateEditorPage } from "./pages/LabelTemplateEditorPage";
 export { LabelsWorkspacePage } from "./pages/LabelsWorkspacePage";
 export { LabelsOperationsPage } from "./pages/LabelsOperationsPage";
 export type {
@@ -21,4 +22,5 @@ export {
   getDefaultLabelTemplate,
   listActiveLabelTemplates,
   listLabelTemplatesForDisplay,
+  persistLabelTemplate,
 } from "./service";

@@ -7,7 +7,7 @@ import {
   type OnChangeFn,
   type SortingState,
 } from "@tanstack/react-table";
-import { useMemo } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { ChevronDown, ChevronsUpDown, ChevronUp, Funnel } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -76,6 +76,21 @@ export function ItemPriceHistoryTanstackTable(props: Props) {
   } = props;
 
   const schemaById = useMemo(() => new Map(schema.map((c) => [c.id, c])), [schema]);
+
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [containerWidth, setContainerWidth] = useState(0);
+
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el || typeof ResizeObserver === "undefined") return;
+    const ro = new ResizeObserver((entries) => {
+      const w = entries[0]?.contentRect.width ?? 0;
+      setContainerWidth(w);
+    });
+    ro.observe(el);
+    setContainerWidth(el.getBoundingClientRect().width);
+    return () => ro.disconnect();
+  }, []);
 
   const columns = useMemo(() => {
     const defs: ColumnDef<PriceHistoryRow, unknown>[] = [];
@@ -201,13 +216,14 @@ export function ItemPriceHistoryTanstackTable(props: Props) {
   const visibleLeafColumns = table.getVisibleLeafColumns();
   const dataLeafColumns = visibleLeafColumns.filter((c) => c.id !== ACTION_COLUMN_ID);
   /**
-   * Schema-driven columns share scaled width to reach (tableWidth − actions).
-   * The trailing actions column stays a fixed pixel width so it never absorbs table-fixed slack.
+   * Schema-driven columns share scaled width to reach (tableDisplayWidth − actions).
+   * `tableDisplayWidth` = max(natural, available): fills the card when there is room, scrolls when content is wider.
    */
   const MIN_TABLE_WIDTH_PX = 640;
   const dataRawSum = dataLeafColumns.reduce((s, c) => s + c.getSize(), 0);
   const naturalTableWidth = dataRawSum + ACTION_COLUMN_WIDTH_PX;
-  const tableDisplayWidth = Math.max(naturalTableWidth, MIN_TABLE_WIDTH_PX);
+  const availableWidth = containerWidth > 0 ? containerWidth : MIN_TABLE_WIDTH_PX;
+  const tableDisplayWidth = Math.max(naturalTableWidth, availableWidth);
   const dataTargetWidth = tableDisplayWidth - ACTION_COLUMN_WIDTH_PX;
 
   const columnWidthsById = new Map<string, number>();
@@ -236,7 +252,8 @@ export function ItemPriceHistoryTanstackTable(props: Props) {
 
   return (
     <div
-      className="overflow-x-auto rounded-lg border border-border/60 bg-card/20 shadow-sm"
+      ref={containerRef}
+      className="min-w-0 overflow-x-auto rounded-lg border border-border/60 bg-card/20 shadow-sm"
       data-testid="item-prices-history-table"
     >
       <div className="relative inline-block align-top" style={{ width: tableDisplayWidth }}>

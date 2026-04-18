@@ -19,7 +19,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { MoreVertical } from "lucide-react";
+import { MoreHorizontal } from "lucide-react";
 import { buildLabelsWorkspaceUrl } from "@/modules/labels/lib/workspaceQueryParams";
 
 type Props = {
@@ -207,7 +207,7 @@ export function ItemBarcodesCard({ isNew, itemId, barcodes, onBarcodesChanged }:
                               title={`${t("common.actions")} (${row.codeValue})`}
                               aria-label={`${t("common.actions")} (${row.codeValue})`}
                             >
-                              <MoreVertical className="h-3.5 w-3.5" aria-hidden />
+                              <MoreHorizontal className="h-3.5 w-3.5" aria-hidden />
                             </Button>
                           </DropdownMenu.Trigger>
                           <DropdownMenu.Portal>
