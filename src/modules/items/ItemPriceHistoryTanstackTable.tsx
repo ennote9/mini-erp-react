@@ -22,6 +22,11 @@ type ColumnMeta = {
 
 const columnHelper = createColumnHelper<PriceHistoryRow>();
 
+/** Trailing utility column — not part of schema-driven data columns. */
+const ACTION_COLUMN_ID = "actions";
+const ACTION_COLUMN_WIDTH_PX = 76;
+const ACTION_COLUMN_MIN_PX = 72;
+
 function statusBadgeClasses(status: PriceHistoryRow["status"]): string {
   switch (status) {
     case "active":
@@ -77,46 +82,6 @@ export function ItemPriceHistoryTanstackTable(props: Props) {
 
     for (const col of schema) {
       const meta: ColumnMeta = { align: col.align };
-
-      if (col.id === "actions") {
-        defs.push(
-          columnHelper.display({
-            id: "actions",
-            header: col.label,
-            enableSorting: false,
-            size: col.defaultSize,
-            minSize: col.minSize,
-            maxSize: col.maxSize,
-            meta,
-            cell: ({ row }) => {
-              const r = row.original;
-              return (
-                <div
-                  className="block w-full text-right leading-none"
-                  onClick={(e) => e.stopPropagation()}
-                >
-                  {r.status === "scheduled" && !r.cancelledAt ? (
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      className="inline-flex h-7 max-w-full px-2 text-[10px]"
-                      disabled={busy}
-                      data-testid="item-prices-row-cancel-scheduled"
-                      onClick={() => onCancelScheduled(r)}
-                    >
-                      {t("master.item.prices.actionCancel")}
-                    </Button>
-                  ) : (
-                    <span className="inline-block text-[10px] text-muted-foreground">—</span>
-                  )}
-                </div>
-              );
-            },
-          }),
-        );
-        continue;
-      }
 
       const key = col.id as keyof PriceHistoryRow;
       defs.push(
@@ -183,6 +148,43 @@ export function ItemPriceHistoryTanstackTable(props: Props) {
       );
     }
 
+    defs.push(
+      columnHelper.display({
+        id: ACTION_COLUMN_ID,
+        header: t("master.item.prices.colActions"),
+        enableSorting: false,
+        size: ACTION_COLUMN_WIDTH_PX,
+        minSize: ACTION_COLUMN_MIN_PX,
+        maxSize: ACTION_COLUMN_WIDTH_PX,
+        meta: { align: "right" } satisfies ColumnMeta,
+        cell: ({ row }) => {
+          const r = row.original;
+          return (
+            <div
+              className="block w-full text-right leading-none"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {r.status === "scheduled" && !r.cancelledAt ? (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="inline-flex h-7 max-w-full px-2 text-[10px]"
+                  disabled={busy}
+                  data-testid="item-prices-row-cancel-scheduled"
+                  onClick={() => onCancelScheduled(r)}
+                >
+                  {t("master.item.prices.actionCancel")}
+                </Button>
+              ) : (
+                <span className="inline-block text-[10px] text-muted-foreground">—</span>
+              )}
+            </div>
+          );
+        },
+      }),
+    );
+
     return defs;
   }, [schema, t, formatMoney, reasonLabel, statusLabel, busy, onCancelScheduled]);
 
@@ -197,16 +199,25 @@ export function ItemPriceHistoryTanstackTable(props: Props) {
   });
 
   const visibleLeafColumns = table.getVisibleLeafColumns();
-  const rawTotalWidth = table.getTotalSize();
-  /** When table min-width (640px) exceeds TanStack column sum, extra space must be split across all cols — otherwise `table-fixed` assigns the slack to one column (often last), which looks like a hollow «Действия» gutter. */
+  const dataLeafColumns = visibleLeafColumns.filter((c) => c.id !== ACTION_COLUMN_ID);
+  /**
+   * Schema-driven columns share scaled width to reach (tableWidth − actions).
+   * The trailing actions column stays a fixed pixel width so it never absorbs table-fixed slack.
+   */
   const MIN_TABLE_WIDTH_PX = 640;
-  const tableDisplayWidth = Math.max(rawTotalWidth, MIN_TABLE_WIDTH_PX);
+  const dataRawSum = dataLeafColumns.reduce((s, c) => s + c.getSize(), 0);
+  const naturalTableWidth = dataRawSum + ACTION_COLUMN_WIDTH_PX;
+  const tableDisplayWidth = Math.max(naturalTableWidth, MIN_TABLE_WIDTH_PX);
+  const dataTargetWidth = tableDisplayWidth - ACTION_COLUMN_WIDTH_PX;
+
   const columnWidthsById = new Map<string, number>();
-  if (visibleLeafColumns.length > 0 && rawTotalWidth > 0) {
-    const scale = tableDisplayWidth / rawTotalWidth;
-    const scaled = visibleLeafColumns.map((c) => c.getSize() * scale);
+  columnWidthsById.set(ACTION_COLUMN_ID, ACTION_COLUMN_WIDTH_PX);
+
+  if (dataLeafColumns.length > 0 && dataRawSum > 0) {
+    const scale = dataTargetWidth / dataRawSum;
+    const scaled = dataLeafColumns.map((c) => c.getSize() * scale);
     const floored = scaled.map((w) => Math.floor(w));
-    let remainder = tableDisplayWidth - floored.reduce((a, b) => a + b, 0);
+    let remainder = dataTargetWidth - floored.reduce((a, b) => a + b, 0);
     const distributed = [...floored];
     let i = 0;
     while (remainder > 0) {
@@ -214,11 +225,11 @@ export function ItemPriceHistoryTanstackTable(props: Props) {
       remainder -= 1;
       i += 1;
     }
-    visibleLeafColumns.forEach((c, idx) => {
+    dataLeafColumns.forEach((c, idx) => {
       columnWidthsById.set(c.id, distributed[idx]!);
     });
   } else {
-    visibleLeafColumns.forEach((c) => columnWidthsById.set(c.id, c.getSize()));
+    dataLeafColumns.forEach((c) => columnWidthsById.set(c.id, c.getSize()));
   }
 
   const cellWidth = (columnId: string, fallback: number) => columnWidthsById.get(columnId) ?? fallback;
@@ -250,7 +261,7 @@ export function ItemPriceHistoryTanstackTable(props: Props) {
                   const hasActiveFilter = headerFilterState?.[header.column.id] === true;
                   const isOpenFilterField = openHeaderFilterFieldId === header.column.id;
                   const isLastHeaderCell = header.index === headerGroup.headers.length - 1;
-                  const isActionsHeader = header.column.id === "actions";
+                  const isActionsHeader = header.column.id === ACTION_COLUMN_ID;
 
                   return (
                     <th
@@ -380,7 +391,7 @@ export function ItemPriceHistoryTanstackTable(props: Props) {
                     {visibleCells.map((cell, cellIndex) => {
                       const cmeta = cell.column.columnDef.meta as ColumnMeta | undefined;
                       const isLastBodyCell = cellIndex === visibleCells.length - 1;
-                      const isActions = cell.column.id === "actions";
+                      const isActions = cell.column.id === ACTION_COLUMN_ID;
                       return (
                         <td
                           key={cell.id}

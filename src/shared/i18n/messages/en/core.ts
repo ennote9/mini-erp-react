@@ -113,6 +113,9 @@ export const coreEn = {
       ROLL: "Roll",
       CUSTOM: "Custom",
     },
+    itemBarcodes: {
+      openInPrint: "Open in print workspace",
+    },
     workspace: {
       pageHeading: "Print workspace",
       intro: "Pick a template, preview the output, and set print options before sending to a printer.",
@@ -133,6 +136,19 @@ export const coreEn = {
         bindingEmpty: "No value",
         symbologyUnsupported: "Unsupported symbology",
         renderFailed: "Could not generate code",
+      },
+      contextBanner: {
+        title: "Catalog context",
+        sourceFromBarcodesTab: "Opened from item · Barcodes",
+        itemName: "Name",
+        itemCode: "Code",
+        selectedBarcode: "Selected barcode",
+        primaryBarcode: "Primary barcode",
+        sameAsPrimary: "same as primary",
+        itemNotFound: "Item not found. Showing demo preview until the link is valid.",
+        warningBarcodeNotFound: "Barcode not found — using primary barcode for preview.",
+        warningBarcodeInactive: "Barcode is inactive — using primary barcode for preview.",
+        warningNoActiveBarcodes: "No active barcodes — code bindings may be empty.",
       },
     },
     operations: {

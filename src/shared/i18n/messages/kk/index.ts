@@ -123,6 +123,9 @@ export const kkMessages: MessageTree = {
       ROLL: "Орама",
       CUSTOM: "Өз форматы",
     },
+    itemBarcodes: {
+      openInPrint: "Басып шығаруда ашу",
+    },
     workspace: {
       pageHeading: "Басып шығару жұмыс орны",
       intro: "Үлгіні таңдау, алдын ала қарау және басып шығару параметрлері.",
@@ -143,6 +146,19 @@ export const kkMessages: MessageTree = {
         bindingEmpty: "Мән жоқ",
         symbologyUnsupported: "Символика қолдау көрсетілмейді",
         renderFailed: "Код генерацияланбады",
+      },
+      contextBanner: {
+        title: "Контекст: тауар",
+        sourceFromBarcodesTab: "Карточкадан ашылды · Штрихкодтар",
+        itemName: "Атауы",
+        itemCode: "Коды",
+        selectedBarcode: "Таңдалған ШК",
+        primaryBarcode: "Негізгі ШК",
+        sameAsPrimary: "негізгімен бірдей",
+        itemNotFound: "Тауар табылмады. Сілтеме жарамды болғанша демо көрсетіледі.",
+        warningBarcodeNotFound: "Штрихкод табылмады — алдын ала қарауда негізгі қолданылады.",
+        warningBarcodeInactive: "Штрихкод белсенді емес — алдын ала қарауда негізгі қолданылады.",
+        warningNoActiveBarcodes: "Белсенді штрихкодтар жоқ — байламдар бос болуы мүмкін.",
       },
     },
     operations: {

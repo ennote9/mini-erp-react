@@ -113,18 +113,5 @@ export function buildItemPriceHistoryTableSchema(t: TFunction): ItemPriceHistory
       align: "left",
       rendererType: "date",
     },
-    {
-      id: "actions",
-      label: t("master.item.prices.colActions"),
-      dataType: "identifier",
-      sourceType: "system",
-      sortable: false,
-      filterable: false,
-      defaultSize: 76,
-      minSize: 72,
-      maxSize: 96,
-      align: "right",
-      rendererType: "text",
-    },
   ];
 }

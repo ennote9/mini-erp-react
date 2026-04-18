@@ -1,7 +1,7 @@
 import { useCallback, useMemo, useState } from "react";
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 import { Link } from "react-router-dom";
-import { MoreHorizontal } from "lucide-react";
+import { MoreVertical } from "lucide-react";
 import type { Item, ItemResponsibleRoleCode } from "../model";
 import { itemRepository } from "../repository";
 import { employeeRepository } from "@/modules/employees/repository";
@@ -203,60 +203,59 @@ export function ItemResponsiblesTab({ itemId, isNew, revision, onResponsiblesCha
         </td>
         <td className="px-2 py-1 align-top text-[11px]">
           <div className="flex flex-wrap gap-1">
-            {!a ? (
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                className="h-6 px-2 text-[10px]"
-                disabled={busy}
-                data-testid={`item-responsible-assign-${row.roleCode}`}
-                onClick={() => openAssign(row.roleCode)}
-              >
-                {t("master.item.responsibles.actionAssign")}
-              </Button>
-            ) : (
-              <DropdownMenu.Root>
-                <DropdownMenu.Trigger asChild>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    className="h-6 w-6 min-w-6 shrink-0 border-0 bg-transparent p-0 text-muted-foreground shadow-none hover:bg-muted/40 hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background data-[state=open]:bg-muted/40 [&_svg]:size-3.5"
-                    disabled={busy}
-                    data-testid={`item-responsible-menu-${row.roleCode}`}
-                    title={t("master.item.responsibles.rowActionsMenuTitle")}
-                    aria-label={t("master.item.responsibles.rowActionsMenuTitle")}
-                  >
-                    <MoreHorizontal className="h-3.5 w-3.5" aria-hidden />
-                  </Button>
-                </DropdownMenu.Trigger>
-                <DropdownMenu.Portal>
-                  <DropdownMenu.Content
-                    align="end"
-                    sideOffset={4}
-                    className="z-[120] min-w-[10rem] rounded-md border border-input bg-popover p-1 shadow-md"
-                  >
+            <DropdownMenu.Root>
+              <DropdownMenu.Trigger asChild>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="h-6 w-6 min-w-6 shrink-0 border-0 bg-transparent p-0 text-muted-foreground shadow-none hover:bg-muted/40 hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background data-[state=open]:bg-muted/40 [&_svg]:size-3.5"
+                  disabled={busy}
+                  data-testid={`item-responsible-menu-${row.roleCode}`}
+                  title={t("master.item.responsibles.rowActionsMenuTitle")}
+                  aria-label={t("master.item.responsibles.rowActionsMenuTitle")}
+                >
+                  <MoreVertical className="h-3.5 w-3.5" aria-hidden />
+                </Button>
+              </DropdownMenu.Trigger>
+              <DropdownMenu.Portal>
+                <DropdownMenu.Content
+                  align="end"
+                  sideOffset={4}
+                  className="z-[120] min-w-[10rem] rounded-md border border-input bg-popover p-1 shadow-md"
+                >
+                  {!filled ? (
                     <DropdownMenu.Item
-                      data-testid={`item-responsible-menu-replace-${row.roleCode}`}
+                      data-testid={`item-responsible-menu-assign-${row.roleCode}`}
                       className="cursor-pointer rounded-sm px-2 py-1.5 text-xs text-popover-foreground outline-none hover:bg-accent hover:text-accent-foreground data-[disabled]:pointer-events-none data-[disabled]:opacity-45"
                       disabled={busy}
                       onSelect={() => openAssign(row.roleCode)}
                     >
-                      {t("master.item.responsibles.actionReplace")}
+                      {t("master.item.responsibles.actionAssign")}
                     </DropdownMenu.Item>
-                    <DropdownMenu.Item
-                      data-testid={`item-responsible-menu-remove-${row.roleCode}`}
-                      className="cursor-pointer rounded-sm px-2 py-1.5 text-xs text-destructive outline-none hover:bg-destructive/10 data-[disabled]:pointer-events-none data-[disabled]:opacity-45"
-                      disabled={busy}
-                      onSelect={() => void handleRemove(row.roleCode)}
-                    >
-                      {t("master.item.responsibles.actionRemove")}
-                    </DropdownMenu.Item>
-                  </DropdownMenu.Content>
-                </DropdownMenu.Portal>
-              </DropdownMenu.Root>
-            )}
+                  ) : (
+                    <>
+                      <DropdownMenu.Item
+                        data-testid={`item-responsible-menu-replace-${row.roleCode}`}
+                        className="cursor-pointer rounded-sm px-2 py-1.5 text-xs text-popover-foreground outline-none hover:bg-accent hover:text-accent-foreground data-[disabled]:pointer-events-none data-[disabled]:opacity-45"
+                        disabled={busy}
+                        onSelect={() => openAssign(row.roleCode)}
+                      >
+                        {t("master.item.responsibles.actionReplace")}
+                      </DropdownMenu.Item>
+                      <DropdownMenu.Item
+                        data-testid={`item-responsible-menu-remove-${row.roleCode}`}
+                        className="cursor-pointer rounded-sm px-2 py-1.5 text-xs text-destructive outline-none hover:bg-destructive/10 data-[disabled]:pointer-events-none data-[disabled]:opacity-45"
+                        disabled={busy}
+                        onSelect={() => void handleRemove(row.roleCode)}
+                      >
+                        {t("master.item.responsibles.actionRemove")}
+                      </DropdownMenu.Item>
+                    </>
+                  )}
+                </DropdownMenu.Content>
+              </DropdownMenu.Portal>
+            </DropdownMenu.Root>
           </div>
         </td>
       </tr>

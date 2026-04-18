@@ -5,7 +5,7 @@ import type {
   LabelTemplate,
   LabelTextElement,
 } from "../../model";
-import type { LabelPreviewDemoContext } from "../../lib/previewContext";
+import type { LabelPreviewBindingContext } from "../../lib/previewContext";
 import { resolveLabelBindingValue } from "../../lib/previewContext";
 import { LABEL_PREVIEW_PX_PER_MM } from "./previewConstants";
 import { BarcodePreview } from "./BarcodePreview";
@@ -13,10 +13,12 @@ import { QrPreview } from "./QrPreview";
 
 type Props = {
   template: LabelTemplate;
-  context: LabelPreviewDemoContext;
+  context: LabelPreviewBindingContext;
+  /** When false, hide the demo-data caption (e.g. real item context uses workspace banner instead). */
+  showDemoHint?: boolean;
 };
 
-function resolveTextContent(el: LabelTextElement, ctx: LabelPreviewDemoContext): string {
+function resolveTextContent(el: LabelTextElement, ctx: LabelPreviewBindingContext): string {
   if (el.binding) {
     const v = resolveLabelBindingValue(el.binding, ctx);
     if (v !== null) return v;
@@ -24,7 +26,7 @@ function resolveTextContent(el: LabelTextElement, ctx: LabelPreviewDemoContext):
   return el.text ?? "";
 }
 
-function renderElement(el: LabelElement, ctx: LabelPreviewDemoContext, key: string) {
+function renderElement(el: LabelElement, ctx: LabelPreviewBindingContext, key: string) {
   const left = el.xMm * LABEL_PREVIEW_PX_PER_MM;
   const top = el.yMm * LABEL_PREVIEW_PX_PER_MM;
   const w = el.widthMm * LABEL_PREVIEW_PX_PER_MM;
@@ -144,14 +146,16 @@ function renderElement(el: LabelElement, ctx: LabelPreviewDemoContext, key: stri
   return _never;
 }
 
-export function LabelTemplatePreview({ template, context }: Props) {
+export function LabelTemplatePreview({ template, context, showDemoHint = true }: Props) {
   const { t } = useTranslation();
   const w = template.sizeMm.width * LABEL_PREVIEW_PX_PER_MM;
   const h = template.sizeMm.height * LABEL_PREVIEW_PX_PER_MM;
 
   return (
     <div className="flex flex-col gap-2">
-      <p className="text-[11px] text-muted-foreground">{t("labels.workspace.preview.demoHint")}</p>
+      {showDemoHint ? (
+        <p className="text-[11px] text-muted-foreground">{t("labels.workspace.preview.demoHint")}</p>
+      ) : null}
       <div
         className="relative overflow-hidden rounded border border-border bg-white text-black shadow-sm"
         style={{ width: w, height: h, maxWidth: "100%" }}

@@ -123,6 +123,9 @@ export const ruMessages: MessageTree = {
       ROLL: "Рулон",
       CUSTOM: "Свой формат",
     },
+    itemBarcodes: {
+      openInPrint: "Открыть в печати",
+    },
     workspace: {
       pageHeading: "Рабочее место печати",
       intro: "Выбор шаблона, предпросмотр и параметры перед отправкой на печать.",
@@ -143,6 +146,19 @@ export const ruMessages: MessageTree = {
         bindingEmpty: "Нет значения",
         symbologyUnsupported: "Симвология не поддерживается",
         renderFailed: "Не удалось сгенерировать код",
+      },
+      contextBanner: {
+        title: "Контекст: номенклатура",
+        sourceFromBarcodesTab: "Открыто из карточки · Штрихкоды",
+        itemName: "Наименование",
+        itemCode: "Код",
+        selectedBarcode: "Выбранный ШК",
+        primaryBarcode: "Основной ШК",
+        sameAsPrimary: "совпадает с основным",
+        itemNotFound: "Товар не найден. Показан демо-предпросмотр, пока ссылка недействительна.",
+        warningBarcodeNotFound: "Штрихкод не найден — для предпросмотра используется основной.",
+        warningBarcodeInactive: "Штрихкод неактивен — для предпросмотра используется основной.",
+        warningNoActiveBarcodes: "Нет активных штрихкодов — привязки кодов могут быть пустыми.",
       },
     },
     operations: {

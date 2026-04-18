@@ -108,10 +108,12 @@ test.describe("Item card — Responsibles tab (acceptance)", () => {
 
     await gotoReady(page, `/items/${encodeURIComponent(itemId!)}?tab=responsibles`);
     await waitItemTabsVisible(page);
-    await expect(page.getByTestId("item-responsible-assign-content_manager")).toBeVisible();
-    await expect(page.locator('[data-testid="item-responsible-menu-content_manager"]')).toHaveCount(0);
+    await expect(page.locator('[data-testid="item-responsible-assign-content_manager"]')).toHaveCount(0);
+    await expect(page.getByTestId("item-responsible-menu-content_manager")).toBeVisible();
 
-    await page.getByTestId("item-responsible-assign-content_manager").click();
+    await page.getByTestId("item-responsible-menu-content_manager").click();
+    await expect(page.getByTestId("item-responsible-menu-assign-content_manager")).toBeVisible();
+    await page.getByTestId("item-responsible-menu-assign-content_manager").click();
     await expect(page.getByTestId("item-responsible-edit-dialog")).toBeVisible({ timeout: 10_000 });
     await page.getByTestId("item-responsible-dialog-employee").selectOption("2");
     await page.getByTestId("item-responsible-dialog-submit").click();
@@ -134,6 +136,8 @@ test.describe("Item card — Responsibles tab (acceptance)", () => {
     await expect(page.getByTestId("item-responsible-menu-content_manager")).toBeVisible();
     await expect(page.locator('[data-testid="item-responsible-replace-content_manager"]')).toHaveCount(0);
     await page.getByTestId("item-responsible-menu-content_manager").click();
+    await expect(page.getByTestId("item-responsible-menu-replace-content_manager")).toBeVisible();
+    await expect(page.getByTestId("item-responsible-menu-remove-content_manager")).toBeVisible();
     await page.getByTestId("item-responsible-menu-replace-content_manager").click();
     await expect(page.getByTestId("item-responsible-edit-dialog")).toBeVisible({ timeout: 10_000 });
     await page.getByTestId("item-responsible-dialog-employee").selectOption("1");
@@ -167,8 +171,11 @@ test.describe("Item card — Responsibles tab (acceptance)", () => {
       return (it?.responsibleAssignments ?? []).filter((a: { roleCode: string }) => a.roleCode === "content_manager");
     }, itemId!);
     expect(assignments.length).toBe(0);
-    await expect(page.getByTestId("item-responsible-assign-content_manager")).toBeVisible();
-    await expect(page.locator('[data-testid="item-responsible-menu-content_manager"]')).toHaveCount(0);
+    await expect(page.locator('[data-testid="item-responsible-assign-content_manager"]')).toHaveCount(0);
+    await expect(page.getByTestId("item-responsible-menu-content_manager")).toBeVisible();
+    await page.getByTestId("item-responsible-menu-content_manager").click();
+    await expect(page.getByTestId("item-responsible-menu-assign-content_manager")).toBeVisible();
+    await expect(page.getByTestId("item-responsible-menu-replace-content_manager")).toHaveCount(0);
   });
 
   test("10.5 unsaved item: responsibles blocked until save", async ({ page }) => {
@@ -188,7 +195,8 @@ test.describe("Item card — Responsibles tab (acceptance)", () => {
     test.skip(!itemId, "Seed item ITEM-001 not found");
     await gotoReady(page, `/items/${encodeURIComponent(itemId!)}?tab=responsibles`);
     await waitItemTabsVisible(page);
-    await page.getByTestId("item-responsible-assign-buyer").click();
+    await page.getByTestId("item-responsible-menu-buyer").click();
+    await page.getByTestId("item-responsible-menu-assign-buyer").click();
     await expect(page.getByTestId("item-responsible-edit-dialog")).toBeVisible({ timeout: 10_000 });
     await page.getByTestId("item-responsible-dialog-employee").selectOption("4");
     await expect(page.getByTestId("item-responsible-dialog-employee-hint")).toBeVisible({ timeout: 5_000 });

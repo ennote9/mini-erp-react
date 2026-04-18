@@ -16,9 +16,7 @@ const REASON_CODES: ItemPriceReasonCode[] = [
 
 export function buildItemPriceHistoryFieldRegistry(t: TFunction): ListViewFieldRegistryEntry[] {
   const schema = buildItemPriceHistoryTableSchema(t);
-  return schema
-    .filter((col) => col.id !== "actions")
-    .map((column) => mapSchemaToRegistryEntry(column));
+  return schema.map((column) => mapSchemaToRegistryEntry(column));
 }
 
 function mapSchemaToRegistryEntry(column: ItemPriceHistoryColumnSchema): ListViewFieldRegistryEntry {

@@ -1,27 +1,42 @@
 /**
- * Typed demo data for label preview only. Replace with real item context when integrating item page.
+ * Binding preview context for label templates — demo data and real item-backed data share this shape.
  */
 import type { LabelBinding } from "../model";
 
+/** Minimal barcode row for binding resolution (no item repository coupling). */
+export type LabelPreviewBarcodeRow = {
+  codeValue: string;
+  packagingLevel: string;
+  barcodeRole: string;
+  isActive: boolean;
+};
+
 /** Dot-paths like `item.name` resolve against this tree. */
-export type LabelPreviewDemoContext = {
+export type LabelPreviewBindingContext = {
   item: {
     name: string;
     code: string;
-    /** Display string for price (already formatted for UI). */
+    /** Display string for sale price. */
     salePrice: string;
+    purchasePrice?: string;
+    brandId?: string;
+    categoryId?: string;
   };
-  /** Simulates UI-selected barcode value (e.g. from a picker). */
   selectedBarcode: string;
-  /** Simulates item primary unit barcode. */
   primaryBarcode: string;
+  /** When present, enables `barcode_by_packaging` / `barcode_by_role`. */
+  barcodes?: readonly LabelPreviewBarcodeRow[];
 };
 
-export const LABEL_PREVIEW_DEMO_CONTEXT: LabelPreviewDemoContext = {
+/** @deprecated Use {@link LabelPreviewBindingContext} */
+export type LabelPreviewDemoContext = LabelPreviewBindingContext;
+
+export const LABEL_PREVIEW_DEMO_CONTEXT: LabelPreviewBindingContext = {
   item: {
     name: "Demo brake pad set",
     code: "SKU-DEMO-1042",
     salePrice: "12 500 ₸",
+    purchasePrice: "8 900 ₸",
   },
   selectedBarcode: "5901234123457",
   primaryBarcode: "5901234123457",
@@ -46,11 +61,11 @@ function stringifyResolved(value: unknown): string | null {
 }
 
 /**
- * Resolves a binding to a string for preview. Unsupported kinds return `null` (show fallback).
+ * Resolves a binding to a string for preview. Unsupported / missing data returns `null` (show fallback).
  */
 export function resolveLabelBindingValue(
   binding: LabelBinding,
-  ctx: LabelPreviewDemoContext,
+  ctx: LabelPreviewBindingContext,
 ): string | null {
   switch (binding.kind) {
     case "field": {
@@ -61,9 +76,16 @@ export function resolveLabelBindingValue(
       return ctx.selectedBarcode.trim() || null;
     case "primary_barcode":
       return ctx.primaryBarcode.trim() || null;
-    case "barcode_by_packaging":
-    case "barcode_by_role":
-      return null;
+    case "barcode_by_packaging": {
+      const rows = ctx.barcodes?.filter((b) => b.isActive && b.packagingLevel === binding.packagingLevel) ?? [];
+      const v = rows[0]?.codeValue;
+      return v?.trim() || null;
+    }
+    case "barcode_by_role": {
+      const rows = ctx.barcodes?.filter((b) => b.isActive && b.barcodeRole === binding.role) ?? [];
+      const v = rows[0]?.codeValue;
+      return v?.trim() || null;
+    }
     default: {
       const _x: never = binding;
       return _x;
@@ -71,13 +93,11 @@ export function resolveLabelBindingValue(
   }
 }
 
-/**
- * Optional wrapper for future real contexts; demo is the default for workspace preview.
- */
-export function buildPreviewContext(overrides?: Partial<LabelPreviewDemoContext>): LabelPreviewDemoContext {
+export function buildPreviewContext(overrides?: Partial<LabelPreviewBindingContext>): LabelPreviewBindingContext {
   return {
     ...LABEL_PREVIEW_DEMO_CONTEXT,
     ...overrides,
     item: { ...LABEL_PREVIEW_DEMO_CONTEXT.item, ...overrides?.item },
+    barcodes: overrides?.barcodes ?? LABEL_PREVIEW_DEMO_CONTEXT.barcodes,
   };
 }
