@@ -146,6 +146,7 @@ async function bootstrapFromDisk(): Promise<void> {
       return Number.isFinite(n) ? Math.max(acc, n + 1) : acc;
     }, 1),
   );
+  bumpAppReadModelRevision();
 }
 
 export const markdownRepository = {

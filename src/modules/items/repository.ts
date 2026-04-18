@@ -108,6 +108,10 @@ async function bootstrapFromDisk(): Promise<void> {
   itemsReady = true;
   if (changed) {
     schedulePersist();
+  } else {
+    // `schedulePersist` bumps the read-model revision; without a write, subscribers still need
+    // a generation tick so memoized lists (e.g. document line item pickers) recompute after bootstrap.
+    bumpAppReadModelRevision();
   }
 }
 

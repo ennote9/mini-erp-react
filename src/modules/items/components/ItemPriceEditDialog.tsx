@@ -94,6 +94,7 @@ export function ItemPriceEditDialog({
       <Dialog.Portal>
         <Dialog.Overlay className="fixed inset-0 z-[130] bg-black/50 backdrop-blur-[1px]" />
         <Dialog.Content
+          data-testid="item-price-edit-dialog"
           className="fixed left-1/2 top-1/2 z-[131] w-[min(100vw-1.5rem,24rem)] -translate-x-1/2 -translate-y-1/2 rounded-md border border-input bg-background p-3 shadow-lg outline-none"
           onPointerDownOutside={(e) => busy && e.preventDefault()}
         >
@@ -117,6 +118,7 @@ export function ItemPriceEditDialog({
             <div className="space-y-0.5">
               <Label className="text-xs">{t("master.item.prices.dialogPrice")}</Label>
               <Input
+                data-testid="item-price-amount-input"
                 type="text"
                 inputMode="decimal"
                 value={amountStr}
@@ -128,6 +130,7 @@ export function ItemPriceEditDialog({
             <div className="space-y-0.5">
               <Label className="text-xs">{t("master.item.prices.dialogValidFrom")}</Label>
               <Input
+                data-testid="item-price-valid-from-input"
                 type="date"
                 value={validFrom}
                 onChange={(e) => setValidFrom(e.target.value)}
@@ -138,6 +141,7 @@ export function ItemPriceEditDialog({
             <div className="space-y-0.5">
               <Label className="text-xs">{t("master.item.prices.dialogReason")}</Label>
               <select
+                data-testid="item-price-reason-select"
                 value={reasonCode}
                 onChange={(e) => setReasonCode(e.target.value as ItemPriceReasonCode)}
                 disabled={!!busy}
@@ -160,13 +164,24 @@ export function ItemPriceEditDialog({
               />
             </div>
             <p className="text-[11px] leading-snug text-muted-foreground">{hint}</p>
-            {error && <p className="text-[11px] text-destructive">{error}</p>}
+            {error && (
+              <p data-testid="item-price-validation-error" className="text-[11px] text-destructive">
+                {error}
+              </p>
+            )}
           </div>
           <div className="mt-3 flex justify-end gap-1.5">
             <Button type="button" variant="outline" size="sm" className="h-7 text-xs" onClick={() => onOpenChange(false)} disabled={busy}>
               {t("master.item.prices.dialogClose")}
             </Button>
-            <Button type="button" size="sm" className="h-7 text-xs" onClick={handleSubmit} disabled={busy}>
+            <Button
+              type="button"
+              size="sm"
+              className="h-7 text-xs"
+              data-testid="item-price-dialog-submit"
+              onClick={handleSubmit}
+              disabled={busy}
+            >
               {t("master.item.prices.dialogSubmit")}
             </Button>
           </div>

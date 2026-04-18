@@ -9,6 +9,7 @@
     "test": "vitest run",
     "preview": "vite preview",
     "test:e2e:items-toolbar": "playwright test e2e/items-toolbar-create-visible.spec.ts",
+    "test:e2e:item-prices": "playwright test e2e/item-prices.spec.ts",
     "tauri": "tauri"
   },
   "dependencies": {

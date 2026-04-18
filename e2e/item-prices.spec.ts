@@ -1,38 +1,586 @@
-import { test, expect } from "@playwright/test";
+import { test, expect, type Page } from "@playwright/test";
 
 const BASE = process.env.PLAYWRIGHT_BASE_URL ?? "http://localhost:1420";
 
-test.describe("Item card — Prices tab & main form", () => {
-  test("new item: Prices tab shows save-first hint", async ({ page }) => {
-    const res = await page.goto(`${BASE}/items/new`, { waitUntil: "domcontentloaded", timeout: 60_000 });
-    test.skip(!res?.ok(), `Dev app not reachable at ${BASE} (start npm run dev on 1420)`);
+/** Dev-only browser API (`src/dev/e2eHarness.ts`). */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type E2eApi = any;
 
-    await page.getByTestId("item-tab-prices").click();
-    await expect(page.getByTestId("item-prices-unsaved-hint")).toBeVisible({ timeout: 15_000 });
+async function gotoOk(page: Page, url: string) {
+  const res = await page.goto(url, { waitUntil: "domcontentloaded", timeout: 60_000 });
+  test.skip(!res?.ok(), `Dev app not reachable at ${url} (start npm run dev on 1420)`);
+}
+
+async function waitE2e(page: Page) {
+  await page.waitForFunction(
+    () => Boolean((window as Window & { __MINI_ERP_E2E__?: unknown }).__MINI_ERP_E2E__),
+    undefined,
+    { timeout: 60_000 },
+  );
+}
+
+/** After full navigation the in-memory repository bootstraps async; wait until items are readable. */
+async function waitItemsRepositoryHydrated(page: Page) {
+  await waitE2e(page);
+  await page.waitForFunction(
+    () => {
+      const w = (window as Window & { __MINI_ERP_E2E__?: E2eApi }).__MINI_ERP_E2E__;
+      try {
+        return Boolean(w && w.itemRepository.list().length > 0);
+      } catch {
+        return false;
+      }
+    },
+    undefined,
+    { timeout: 60_000 },
+  );
+}
+
+async function gotoReady(page: Page, pathOrUrl: string) {
+  const url = pathOrUrl.startsWith("http") ? pathOrUrl : `${BASE.replace(/\/$/, "")}${pathOrUrl.startsWith("/") ? "" : "/"}${pathOrUrl}`;
+  await gotoOk(page, url);
+  await waitItemsRepositoryHydrated(page);
+}
+
+async function openApp(page: Page) {
+  await gotoReady(page, "/");
+}
+
+async function firstItemId(page: Page): Promise<string> {
+  return page.evaluate(() => {
+    const w = (window as Window & { __MINI_ERP_E2E__?: E2eApi }).__MINI_ERP_E2E__;
+    const rows = w.itemRepository.list();
+    if (rows.length === 0) throw new Error("No items in repository");
+    return rows[0].id;
   });
+}
 
-  test("existing item: has Prices tab and main tab has no legacy price fields", async ({ page }) => {
-    const res = await page.goto(`${BASE}/items/1`, { waitUntil: "domcontentloaded", timeout: 60_000 });
-    test.skip(!res?.ok(), `Dev app not reachable at ${BASE}`);
+/** Popover `SelectField` / `ul[role=listbox]` — NOT native `<select><option>`. */
+async function pickListboxFirstOption(page: Page, triggerSelector: string) {
+  await page.locator(triggerSelector).click();
+  const listbox = page.locator("ul[role='listbox']").first();
+  await listbox.waitFor({ state: "visible", timeout: 15_000 });
+  await listbox.getByRole("option").first().click();
+}
 
-    await expect(page.getByTestId("item-tab-main")).toBeVisible({ timeout: 30_000 });
+async function pickSelectFieldOption(page: Page, triggerSelector: string, name: string | RegExp) {
+  await page.locator(triggerSelector).click();
+  const listbox = page.locator("ul[role='listbox']").first();
+  await listbox.waitFor({ state: "visible", timeout: 15_000 });
+  await listbox.getByRole("option", { name }).first().click();
+}
+
+/** PO/SO line item combobox (`PurchaseOrderItemAutocomplete` / `SalesOrderItemAutocomplete`). */
+async function pickLineEntryItemOption(page: Page, nameMatch: RegExp) {
+  const listbox = page.locator("#line-entry-item-listbox");
+  await listbox.waitFor({ state: "visible", timeout: 15_000 });
+  const row = listbox.locator('li[role="option"]').filter({ hasText: nameMatch }).first();
+  await row.click({ timeout: 15_000 });
+}
+
+async function waitItemTabsVisible(page: Page) {
+  await page.getByTestId("item-tab-main").waitFor({ state: "visible", timeout: 60_000 });
+}
+
+async function waitNewItemFormVisible(page: Page) {
+  await page.locator("#item-name").waitFor({ state: "visible", timeout: 60_000 });
+}
+
+async function waitPoEditorVisible(page: Page) {
+  await page.locator("#po-supplier").waitFor({ state: "visible", timeout: 60_000 });
+}
+
+async function waitSoEditorVisible(page: Page) {
+  await page.locator("#so-customer").waitFor({ state: "visible", timeout: 60_000 });
+}
+
+function addDaysYmd(ymd: string, delta: number): string {
+  const d = new Date(`${ymd}T12:00:00`);
+  d.setDate(d.getDate() + delta);
+  return d.toISOString().slice(0, 10);
+}
+
+/** `DatePickerField`: visible text is dd.MM.yyyy; parent state updates on blur. */
+function ymdToDdMmYyyy(ymd: string): string {
+  const [y, m, d] = ymd.split("-");
+  return `${d.padStart(2, "0")}.${m.padStart(2, "0")}.${y}`;
+}
+
+async function setPoDateFromYmd(page: Page, ymd: string) {
+  await page.locator("#po-date").fill(ymdToDdMmYyyy(ymd));
+  await page.locator("#po-date").blur();
+}
+
+/** Single "add line" — distinct from "Add lines" (import). Title includes Alt+A in all locales. */
+async function clickAddSingleLineButton(page: Page) {
+  await page.locator('button[title*="Alt+A"]').first().click();
+}
+
+test.describe("Item card — Prices tab (acceptance)", () => {
+  test.describe.configure({ timeout: 90_000 });
+  test("6.1 tabs regression: Main / Prices / Images / Barcodes / Testers; main has no legacy price fields; utility buttons", async ({
+    page,
+  }) => {
+    await openApp(page);
+    const itemId = await firstItemId(page);
+    await gotoReady(page, `/items/${encodeURIComponent(itemId)}`);
+    await waitItemTabsVisible(page);
     await expect(page.getByTestId("item-tab-prices")).toBeVisible();
     await expect(page.getByTestId("item-tab-images")).toBeVisible();
     await expect(page.getByTestId("item-tab-barcodes")).toBeVisible();
+    await expect(page.getByTestId("item-tab-testers")).toBeVisible();
+
+    await expect(page.getByRole("button", { name: /stock balances|остатки|қалдықтар/i })).toBeVisible();
+    await expect(page.getByRole("button", { name: /stock movements|движения|жылжымалар/i })).toBeVisible();
+    await expect(page.getByRole("button", { name: /markdown|уценк|markdown/i })).toBeVisible();
 
     await page.getByTestId("item-tab-main").click();
     await expect(page.locator("#item-purchasePrice")).toHaveCount(0);
     await expect(page.locator("#item-salePrice")).toHaveCount(0);
-  });
-
-  test("existing item: Prices tab shows summary and table headers", async ({ page }) => {
-    const res = await page.goto(`${BASE}/items/1`, { waitUntil: "domcontentloaded", timeout: 60_000 });
-    test.skip(!res?.ok(), `Dev app not reachable at ${BASE}`);
 
     await page.getByTestId("item-tab-prices").click();
-    await expect(
-      page.getByText(/base purchase and base sale|базовая закупочная|базалық сатып алу/i),
-    ).toBeVisible({ timeout: 15_000 });
-    await expect(page.getByRole("button", { name: /Add purchase|Добавить закупочную|Сатып алу бағасын қосу/i })).toBeVisible();
+    await expect(page.getByTestId("item-prices-summary-grid")).toBeVisible({ timeout: 15_000 });
+  });
+
+  test("6.2 unsaved new item: Prices tab blocked", async ({ page }) => {
+    await openApp(page);
+    await gotoReady(page, "/items/new");
+    await waitNewItemFormVisible(page);
+    await page.getByTestId("item-tab-prices").click();
+    await expect(page.getByTestId("item-prices-unsaved-hint")).toBeVisible({ timeout: 15_000 });
+  });
+
+  test("6.3 first save: stays on /items/:id and Prices becomes usable", async ({ page }) => {
+    await openApp(page);
+    const code = `E2E-${Date.now()}`;
+    await gotoReady(page, "/items/new");
+    await waitNewItemFormVisible(page);
+    await page.locator("#item-name").fill(`Acceptance ${code}`);
+    await page.locator("#item-code").fill(code);
+    await page.locator("#item-uom").fill("EA");
+    await page.getByRole("button", { name: /^Save|Сохранить|Сақтау/i }).click();
+    await expect(page).toHaveURL(new RegExp(`${BASE.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}/items/\\d+`), {
+      timeout: 20_000,
+    });
+    await waitItemTabsVisible(page);
+    await page.getByTestId("item-tab-prices").click();
+    await expect(page.getByTestId("item-prices-summary-grid")).toBeVisible({ timeout: 15_000 });
+  });
+
+  test("6.4 current purchase price: summary, history, active, snapshot", async ({ page }) => {
+    await openApp(page);
+    const code = `E2E-P-${Date.now()}`;
+    await gotoReady(page, "/items/new");
+    await waitNewItemFormVisible(page);
+    await page.locator("#item-name").fill(`Price test ${code}`);
+    await page.locator("#item-code").fill(code);
+    await page.locator("#item-uom").fill("EA");
+    await page.getByRole("button", { name: /^Save|Сохранить|Сақтау/i }).click();
+    await expect(page).toHaveURL(/\/items\/\d+/, { timeout: 20_000 });
+    const url = page.url();
+    const itemId = url.match(/\/items\/([^/?#]+)/)?.[1];
+    expect(itemId).toBeTruthy();
+
+    await waitItemTabsVisible(page);
+    await page.getByTestId("item-tab-prices").click();
+    await page.getByTestId("item-prices-add-purchase").click();
+    await expect(page.getByTestId("item-price-edit-dialog")).toBeVisible({ timeout: 10_000 });
+    const today = new Date();
+    const todayYmd = today.toISOString().slice(0, 10);
+    await page.getByTestId("item-price-amount-input").fill("12.34");
+    await page.getByTestId("item-price-valid-from-input").fill(todayYmd);
+    await page.getByTestId("item-price-reason-select").selectOption("manual_update");
+    await page.getByTestId("item-price-dialog-submit").click();
+    await expect(page.getByTestId("item-prices-card-purchase-current")).toContainText("12.34");
+    await expect(page.getByTestId("item-prices-history-table")).toContainText(/Active|Активна|Белсенді/i);
+
+    const snap = await page.evaluate((id) => {
+      const w = (window as Window & { __MINI_ERP_E2E__?: { itemRepository: { getById: (x: string) => { purchasePrice?: number } } } })
+        .__MINI_ERP_E2E__;
+      return w?.itemRepository.getById(id)?.purchasePrice;
+    }, itemId!);
+    expect(snap).toBeCloseTo(12.34, 2);
+  });
+
+  test("6.5 scheduled sale: next summary, scheduled row, sale snapshot unchanged", async ({ page }) => {
+    await openApp(page);
+    const code = `E2E-SCH-${Date.now()}`;
+    await gotoReady(page, "/items/new");
+    await waitNewItemFormVisible(page);
+    await page.locator("#item-name").fill(`Sched ${code}`);
+    await page.locator("#item-code").fill(code);
+    await page.locator("#item-uom").fill("EA");
+    await page.getByRole("button", { name: /^Save|Сохранить|Сақтау/i }).click();
+    await expect(page).toHaveURL(/\/items\/\d+/, { timeout: 20_000 });
+    const url = page.url();
+    const itemId = url.match(/\/items\/([^/?#]+)/)?.[1]!;
+
+    await waitItemTabsVisible(page);
+
+    const saleBefore = await page.evaluate((id) => {
+      const w = (window as Window & { __MINI_ERP_E2E__?: { itemRepository: { getById: (x: string) => { salePrice?: number } } } })
+        .__MINI_ERP_E2E__;
+      return w?.itemRepository.getById(id)?.salePrice;
+    }, itemId);
+
+    await page.getByTestId("item-tab-prices").click();
+    const future = addDaysYmd(new Date().toISOString().slice(0, 10), 40);
+    await page.getByTestId("item-prices-add-sale").click();
+    await page.getByTestId("item-price-amount-input").fill("88.90");
+    await page.getByTestId("item-price-valid-from-input").fill(future);
+    await page.getByTestId("item-price-reason-select").selectOption("commercial_review");
+    await page.getByTestId("item-price-dialog-submit").click();
+
+    await expect(page.getByTestId("item-prices-card-sale-next")).toContainText("88.90");
+    await expect(page.getByTestId("item-prices-history-table")).toContainText(/Scheduled|Запланирована|Жоспарланған/i);
+
+    const saleAfter = await page.evaluate((id) => {
+      const w = (window as Window & { __MINI_ERP_E2E__?: { itemRepository: { getById: (x: string) => { salePrice?: number } } } })
+        .__MINI_ERP_E2E__;
+      return w?.itemRepository.getById(id)?.salePrice;
+    }, itemId);
+    expect(saleAfter).toEqual(saleBefore);
+  });
+
+  test("6.6 replace scheduled sale: confirm, old cancelled, new scheduled, both in history", async ({ page }) => {
+    await openApp(page);
+    const code = `E2E-REP-${Date.now()}`;
+    await gotoReady(page, "/items/new");
+    await waitNewItemFormVisible(page);
+    await page.locator("#item-name").fill(`Replace ${code}`);
+    await page.locator("#item-code").fill(code);
+    await page.locator("#item-uom").fill("EA");
+    await page.getByRole("button", { name: /^Save|Сохранить|Сақтау/i }).click();
+    await expect(page).toHaveURL(/\/items\/\d+/, { timeout: 20_000 });
+
+    await waitItemTabsVisible(page);
+    await page.getByTestId("item-tab-prices").click();
+    const future1 = addDaysYmd(new Date().toISOString().slice(0, 10), 50);
+    const future2 = addDaysYmd(new Date().toISOString().slice(0, 10), 60);
+
+    await page.getByTestId("item-prices-add-sale").click();
+    await page.getByTestId("item-price-amount-input").fill("50.00");
+    await page.getByTestId("item-price-valid-from-input").fill(future1);
+    await page.getByTestId("item-price-reason-select").selectOption("manual_update");
+    await page.getByTestId("item-price-dialog-submit").click();
+
+    await page.getByTestId("item-prices-add-sale").click();
+    await page.getByTestId("item-price-amount-input").fill("60.00");
+    await page.getByTestId("item-price-valid-from-input").fill(future2);
+    await page.getByTestId("item-price-reason-select").selectOption("manual_update");
+    await page.getByTestId("item-price-dialog-submit").click();
+
+    await expect(page.getByTestId("item-price-replace-dialog")).toBeVisible({ timeout: 10_000 });
+    await page.getByTestId("item-price-replace-confirm").click();
+
+    await expect(page.getByTestId("item-prices-card-sale-next")).toContainText("60.00");
+    const rows = page.locator('[data-testid="item-prices-history-row"]');
+    await expect(rows.filter({ hasText: /Cancelled|Отменена|Болдырылған/i })).toHaveCount(1);
+    await expect(rows.filter({ hasText: /Scheduled|Запланирована|Жоспарланған/i })).toHaveCount(1);
+  });
+
+  test("6.7 cancel scheduled purchase: toolbar cancel, summary clears, active unchanged", async ({ page }) => {
+    await openApp(page);
+    const code = `E2E-CAN-${Date.now()}`;
+    await gotoReady(page, "/items/new");
+    await waitNewItemFormVisible(page);
+    await page.locator("#item-name").fill(`Cancel ${code}`);
+    await page.locator("#item-code").fill(code);
+    await page.locator("#item-uom").fill("EA");
+    await page.getByRole("button", { name: /^Save|Сохранить|Сақтау/i }).click();
+    await expect(page).toHaveURL(/\/items\/\d+/, { timeout: 20_000 });
+    const url = page.url();
+    const itemId = url.match(/\/items\/([^/?#]+)/)?.[1]!;
+
+    await waitItemTabsVisible(page);
+    await page.getByTestId("item-tab-prices").click();
+    await page.getByTestId("item-prices-add-purchase").click();
+    await page.getByTestId("item-price-amount-input").fill("3.00");
+    await page.getByTestId("item-price-valid-from-input").fill(addDaysYmd(new Date().toISOString().slice(0, 10), 10));
+    await page.getByTestId("item-price-reason-select").selectOption("supplier_change");
+    await page.getByTestId("item-price-dialog-submit").click();
+
+    const purchaseBefore = await page.evaluate((id) => {
+      const w = (window as Window & { __MINI_ERP_E2E__?: { itemRepository: { getById: (x: string) => { purchasePrice?: number } } } })
+        .__MINI_ERP_E2E__;
+      return w?.itemRepository.getById(id)?.purchasePrice;
+    }, itemId);
+
+    await page.getByTestId("item-prices-cancel-scheduled-purchase").click();
+    await expect(page.getByTestId("item-price-cancel-dialog")).toBeVisible();
+    await page.getByTestId("item-price-cancel-confirm").click();
+
+    await expect(page.getByTestId("item-prices-card-purchase-next")).toContainText(
+      /Not scheduled|Не запланирована|Жоспарланбаған/i,
+    );
+    const purchaseAfter = await page.evaluate((id) => {
+      const w = (window as Window & { __MINI_ERP_E2E__?: { itemRepository: { getById: (x: string) => { purchasePrice?: number } } } })
+        .__MINI_ERP_E2E__;
+      return w?.itemRepository.getById(id)?.purchasePrice;
+    }, itemId);
+    expect(purchaseAfter).toEqual(purchaseBefore);
+  });
+
+  test("6.8 validation: negative, past date, reason; zero allowed", async ({ page }) => {
+    await openApp(page);
+    const itemId = await firstItemId(page);
+    await gotoReady(page, `/items/${encodeURIComponent(itemId)}`);
+    await waitItemTabsVisible(page);
+    await page.getByTestId("item-tab-prices").click();
+    await page.getByTestId("item-prices-add-purchase").click();
+    await page.getByTestId("item-price-amount-input").fill("-1");
+    await page.getByTestId("item-price-dialog-submit").click();
+    await expect(page.getByTestId("item-price-validation-error")).toBeVisible();
+
+    await page.getByTestId("item-price-amount-input").fill("10");
+    const past = addDaysYmd(new Date().toISOString().slice(0, 10), -3);
+    await page.getByTestId("item-price-valid-from-input").fill(past);
+    await page.getByTestId("item-price-dialog-submit").click();
+    await expect(page.getByTestId("item-price-validation-error")).toBeVisible();
+
+    const todayYmd = new Date().toISOString().slice(0, 10);
+    await page.getByTestId("item-price-valid-from-input").fill(todayYmd);
+    await page.getByTestId("item-price-reason-select").selectOption("manual_update");
+    await page.getByTestId("item-price-dialog-submit").click();
+    await expect(page.getByTestId("item-price-edit-dialog")).toBeHidden({ timeout: 15_000 });
+  });
+
+  test("6.9 PO: default line price from effective purchase by document date; not retroactive", async ({ page }) => {
+    await openApp(page);
+    const eff = await page.evaluate(async () => {
+      const w = (window as Window & { __MINI_ERP_E2E__?: E2eApi }).__MINI_ERP_E2E__;
+      const it = w.itemRepository.list().find((i: { code: string }) => i.code === "ITEM-001");
+      if (!it) throw new Error("ITEM-001 missing");
+      const docDate = new Date().toISOString().slice(0, 10);
+      await w.applyItemPriceAwaitPersist(it.id, "purchase", {
+        amount: 44.44,
+        validFromYmd: docDate,
+        reasonCode: "manual_update",
+      });
+      await w.flushAll();
+      return { itemId: it.id, expected: w.getEffectiveItemBasePriceOrZero(it.id, "purchase", docDate) };
+    });
+
+    await gotoReady(page, "/purchase-orders/new");
+    await waitPoEditorVisible(page);
+    await pickListboxFirstOption(page, "#po-supplier");
+    await pickListboxFirstOption(page, "#po-warehouse");
+    await page.locator("#line-entry-item").fill("ITEM-001");
+    await pickLineEntryItemOption(page, /ITEM-001/);
+    await expect(page.locator("#line-entry-unit-price")).toHaveValue(String(eff.expected));
+    await page.locator("#line-entry-qty").fill("1");
+    await clickAddSingleLineButton(page);
+
+    await page.getByRole("button", { name: /^Save|Сохранить|Сақтау/i }).click();
+    await expect(page).toHaveURL(/\/purchase-orders\/\d+/, { timeout: 20_000 });
+    const poId = page.url().match(/\/purchase-orders\/([^/?#]+)/)?.[1]!;
+
+    const linePriceBefore = await page.evaluate((id: string) => {
+      const w = (window as Window & { __MINI_ERP_E2E__?: E2eApi }).__MINI_ERP_E2E__;
+      return w.purchaseOrderRepository.listLines(id)[0]?.unitPrice;
+    }, poId);
+
+    await page.evaluate(
+      async ({ itemId, ymd }: { itemId: string; ymd: string }) => {
+        const w = (window as Window & { __MINI_ERP_E2E__?: E2eApi }).__MINI_ERP_E2E__;
+        await w.applyItemPriceAwaitPersist(itemId, "purchase", {
+          amount: 123.45,
+          validFromYmd: ymd,
+          reasonCode: "correction",
+        });
+        await w.flushAll();
+      },
+      { itemId: eff.itemId, ymd: new Date().toISOString().slice(0, 10) },
+    );
+
+    await page.reload({ waitUntil: "domcontentloaded" });
+    await waitItemsRepositoryHydrated(page);
+    const linePriceAfter = await page.evaluate((id: string) => {
+      const w = (window as Window & { __MINI_ERP_E2E__?: E2eApi }).__MINI_ERP_E2E__;
+      return w.purchaseOrderRepository.listLines(id)[0]?.unitPrice;
+    }, poId);
+    expect(linePriceAfter).toBe(linePriceBefore);
+  });
+
+  test("6.10 SO: agreement discount on effective base; line not retroactive", async ({ page }) => {
+    await openApp(page);
+    await page.evaluate(async () => {
+      const w = (window as Window & { __MINI_ERP_E2E__?: E2eApi }).__MINI_ERP_E2E__;
+      const c = w.customerRepository.list()[0];
+      if (!c) throw new Error("no customer");
+      w.customerAgreementRepository.create({
+        customerId: c.id,
+        agreementNo: `E2E-${Date.now()}`,
+        name: "E2E discount",
+        startDate: "2000-01-01",
+        isActive: true,
+        currency: "USD",
+        pricingType: "discount_percent",
+        discountPercent: 10,
+      });
+      await w.flushAll();
+    });
+
+    const { itemId, base } = await page.evaluate(async () => {
+      const w = (window as Window & { __MINI_ERP_E2E__?: E2eApi }).__MINI_ERP_E2E__;
+      const it = w.itemRepository.list().find((i: { code: string }) => i.code === "ITEM-002")!;
+      const d = new Date().toISOString().slice(0, 10);
+      await w.applyItemPriceAwaitPersist(it.id, "sale", {
+        amount: 100,
+        validFromYmd: d,
+        reasonCode: "manual_update",
+      });
+      await w.flushAll();
+      const b = w.getEffectiveItemBasePriceOrZero(it.id, "sale", d);
+      return { itemId: it.id, base: b };
+    });
+
+    const { customerLabel } = await page.evaluate(() => {
+      const w = (window as Window & { __MINI_ERP_E2E__?: E2eApi }).__MINI_ERP_E2E__;
+      const c = w.customerRepository.list()[0]!;
+      return { customerLabel: `${c.code} - ${c.name}` };
+    });
+
+    await gotoReady(page, "/sales-orders/new");
+    await waitSoEditorVisible(page);
+    await pickSelectFieldOption(page, "#so-customer", customerLabel);
+    await pickListboxFirstOption(page, "#so-warehouse");
+    await page.locator("#line-entry-item").fill("ITEM-002");
+    await pickLineEntryItemOption(page, /ITEM-002/);
+    const expected = Math.round(base * 0.9 * 100) / 100;
+    await expect(page.locator("#line-entry-unit-price")).toHaveValue(String(expected));
+
+    await page.locator("#line-entry-qty").fill("1");
+    await clickAddSingleLineButton(page);
+    await page.getByRole("button", { name: /^Save|Сохранить|Сақтау/i }).click();
+    await expect(page).toHaveURL(/\/sales-orders\/\d+/, { timeout: 20_000 });
+    const soId = page.url().match(/\/sales-orders\/([^/?#]+)/)?.[1]!;
+
+    const saved = await page.evaluate((id: string) => {
+      const w = (window as Window & { __MINI_ERP_E2E__?: E2eApi }).__MINI_ERP_E2E__;
+      return w.salesOrderRepository.listLines(id)[0]?.unitPrice;
+    }, soId);
+
+    await page.evaluate(
+      async ({ id }: { id: string }) => {
+        const w = (window as Window & { __MINI_ERP_E2E__?: E2eApi }).__MINI_ERP_E2E__;
+        const ymd = new Date().toISOString().slice(0, 10);
+        await w.applyItemPriceAwaitPersist(id, "sale", { amount: 3, validFromYmd: ymd, reasonCode: "correction" });
+        await w.flushAll();
+      },
+      { id: itemId },
+    );
+
+    await page.reload({ waitUntil: "domcontentloaded" });
+    await waitItemsRepositoryHydrated(page);
+    const after = await page.evaluate((id: string) => {
+      const w = (window as Window & { __MINI_ERP_E2E__?: E2eApi }).__MINI_ERP_E2E__;
+      return w.salesOrderRepository.listLines(id)[0]?.unitPrice;
+    }, soId);
+    expect(after).toBe(saved);
+  });
+
+  test("6.11 markdown overrides base sale on SO line", async ({ page }) => {
+    await openApp(page);
+    await gotoReady(page, "/sales-orders/new");
+    await waitSoEditorVisible(page);
+    const { md, customerLabel, warehouseLabel } = await page.evaluate(async () => {
+      const w = (window as Window & { __MINI_ERP_E2E__?: E2eApi }).__MINI_ERP_E2E__;
+      const wh = w!.warehouseRepository.list()[0]!;
+      const it = w!.itemRepository.list().find((i: { code: string }) => i.code === "ITEM-003")!;
+      const c = w!.customerRepository.list()[0]!;
+      const rec = w!.markdownRepository.create({
+        itemId: it.id,
+        markdownPrice: 2.5,
+        reasonCode: "OTHER",
+        status: "ACTIVE",
+        createdAt: new Date().toISOString(),
+        createdBy: "e2e",
+        warehouseId: wh.id,
+        style: "MARKDOWN",
+        printCount: 0,
+        quantity: 1,
+      });
+      await w!.flushAll();
+      return {
+        md: rec.markdownCode,
+        customerLabel: `${c.code} - ${c.name}`,
+        warehouseLabel: `${wh.code} - ${wh.name}`,
+      };
+    });
+
+    await pickSelectFieldOption(page, "#so-customer", customerLabel);
+    await pickSelectFieldOption(page, "#so-warehouse", warehouseLabel);
+    await page.locator("#line-entry-item").fill(md);
+    await page.locator("#line-entry-item-listbox").waitFor({ state: "visible", timeout: 15_000 });
+    await page.locator("#line-entry-item-option-md").click();
+    await expect(page.locator("#line-entry-unit-price")).toHaveValue(/2\.5/);
+  });
+
+  test("6.12 date-sensitive: effective purchase differs before and after future price start", async ({ page }) => {
+    await openApp(page);
+    const t = new Date().toISOString().slice(0, 10);
+    const future = addDaysYmd(t, 45);
+    const { code, pEarly, pLate } = await page.evaluate(
+      async ({ early, late }: { early: string; late: string }) => {
+        const w = (window as Window & { __MINI_ERP_E2E__?: E2eApi }).__MINI_ERP_E2E__;
+        const it = w.itemRepository.create({
+          code: `E2E-DATE-${Date.now()}`,
+          name: "Date pricing",
+          uom: "EA",
+          isActive: true,
+          images: [],
+          itemKind: "SELLABLE",
+        });
+        await w.applyItemPriceAwaitPersist(it.id, "purchase", { amount: 11, validFromYmd: early, reasonCode: "manual_update" });
+        await w.applyItemPriceAwaitPersist(it.id, "purchase", {
+          amount: 22,
+          validFromYmd: late,
+          reasonCode: "commercial_review",
+        });
+        await w.flushAll();
+        return {
+          itemId: it.id,
+          code: it.code,
+          pEarly: w.getEffectiveItemBasePriceOrZero(it.id, "purchase", early),
+          pLate: w.getEffectiveItemBasePriceOrZero(it.id, "purchase", late),
+        };
+      },
+      { early: t, late: future },
+    );
+
+    expect(pEarly).toBe(11);
+    expect(pLate).toBe(22);
+
+    await gotoReady(page, "/purchase-orders/new");
+    await waitPoEditorVisible(page);
+    await pickListboxFirstOption(page, "#po-supplier");
+    await pickListboxFirstOption(page, "#po-warehouse");
+    await setPoDateFromYmd(page, t);
+    await page.locator("#line-entry-item").fill(code);
+    await pickLineEntryItemOption(page, new RegExp(code.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
+    await expect(page.locator("#line-entry-unit-price")).toHaveValue("11");
+
+    await setPoDateFromYmd(page, future);
+    await page.locator("#line-entry-item").fill("");
+    await page.locator("#line-entry-item").fill(code);
+    await pickLineEntryItemOption(page, new RegExp(code.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
+    await expect(page.locator("#line-entry-unit-price")).toHaveValue("22");
+  });
+
+  test("6.13 persistence: reload keeps history and summaries", async ({ page }) => {
+    await openApp(page);
+    const itemId = await firstItemId(page);
+    await gotoReady(page, `/items/${encodeURIComponent(itemId)}`);
+    await waitItemTabsVisible(page);
+    await page.getByTestId("item-tab-prices").click();
+    const before = await page.getByTestId("item-prices-history-table").textContent();
+    await page.reload({ waitUntil: "domcontentloaded" });
+    await waitItemsRepositoryHydrated(page);
+    await waitItemTabsVisible(page);
+    await page.getByTestId("item-tab-prices").click();
+    const after = await page.getByTestId("item-prices-history-table").textContent();
+    expect(after?.length ?? 0).toBeGreaterThan(10);
+    expect(before).toEqual(after);
   });
 });

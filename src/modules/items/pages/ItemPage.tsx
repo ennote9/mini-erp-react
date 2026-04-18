@@ -140,11 +140,15 @@ export function ItemPage() {
     [health.issues, actionIssues],
   );
 
-  if (!itemsReady) {
-    return <div className="p-6 text-sm text-muted-foreground">{t("common.loading")}</div>;
-  }
+  const returnTo = readReturnToParam(searchParams);
+  const backHref = returnTo ?? "/items";
+  const currentReturnTo = useMemo(
+    () => buildReturnToValue(location.pathname, location.search),
+    [location.pathname, location.search],
+  );
 
   useEffect(() => {
+    if (!itemsReady) return;
     if (isNew) {
       if (createKind === "TESTER" && requestedBaseItemId) {
         const base = itemRepository.getById(requestedBaseItemId);
@@ -269,6 +273,46 @@ export function ItemPage() {
     return itemRepository.getById(bid);
   }, [isNew, form.baseItemId, requestedBaseItemId, item?.baseItemId, item?.id]);
 
+  const displayTitle = useMemo(() => {
+    if (isNew) {
+      return createKind === "TESTER"
+        ? t("master.item.titleNewTester")
+        : t("master.item.titleNewSellable");
+    }
+    if (!item) return "";
+    return t("master.item.titleWithCode", { code: item.code });
+  }, [isNew, createKind, item, t]);
+
+  const showTestersTab = useMemo(
+    () => (isNew ? createKind !== "TESTER" : item?.itemKind === "SELLABLE"),
+    [isNew, createKind, item?.itemKind],
+  );
+
+  const tabItems = useMemo(
+    () => [
+      { value: "main", label: t("master.item.tabMain") },
+      { value: "prices", label: t("master.item.tabPrices") },
+      { value: "images", label: t("master.item.tabImages") },
+      { value: "barcodes", label: t("master.item.tabBarcodes") },
+      ...(showTestersTab ? [{ value: "testers" as const, label: t("master.item.tabTesters") }] : []),
+    ],
+    [showTestersTab, t],
+  );
+
+  const availableTabValues = useMemo(() => tabItems.map((tab) => tab.value), [tabItems]);
+
+  const [activeTab, setActiveTab] = useUrlTabState({
+    allowedValues: availableTabValues as readonly string[],
+    defaultValue: "main",
+  });
+
+  const inactiveSuffix = t("master.item.inactiveSuffix");
+  const selectDash = t("master.common.selectEmpty");
+
+  if (!itemsReady) {
+    return <div className="p-6 text-sm text-muted-foreground">{t("common.loading")}</div>;
+  }
+
   if (!id) {
     return (
       <div className="doc-page doc-page--not-found">
@@ -284,35 +328,6 @@ export function ItemPage() {
       </div>
     );
   }
-
-  const displayTitle = isNew
-    ? createKind === "TESTER"
-      ? t("master.item.titleNewTester")
-      : t("master.item.titleNewSellable")
-    : t("master.item.titleWithCode", { code: item!.code });
-
-  const showTestersTab = isNew ? createKind !== "TESTER" : item!.itemKind === "SELLABLE";
-  const tabItems = [
-    { value: "main", label: t("master.item.tabMain") },
-    { value: "prices", label: t("master.item.tabPrices") },
-    { value: "images", label: t("master.item.tabImages") },
-    { value: "barcodes", label: t("master.item.tabBarcodes") },
-    ...(showTestersTab ? [{ value: "testers", label: t("master.item.tabTesters") }] : []),
-  ];
-  const availableTabValues = useMemo(() => tabItems.map((tab) => tab.value), [tabItems]);
-  const [activeTab, setActiveTab] = useUrlTabState({
-    allowedValues: availableTabValues as readonly string[],
-    defaultValue: "main",
-  });
-  const returnTo = readReturnToParam(searchParams);
-  const backHref = returnTo ?? "/items";
-  const currentReturnTo = useMemo(
-    () => buildReturnToValue(location.pathname, location.search),
-    [location.pathname, location.search],
-  );
-
-  const inactiveSuffix = t("master.item.inactiveSuffix");
-  const selectDash = t("master.common.selectEmpty");
 
   return (
     <div className="doc-page">
