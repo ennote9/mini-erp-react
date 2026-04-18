@@ -8,13 +8,24 @@ export type ItemPriceHistoryColumnSchema = {
   sourceType: ListViewFieldSourceType;
   sortable: boolean;
   filterable: boolean;
+  /** Baseline width for TanStack column sizing. */
   defaultSize: number;
+  /** Soft minimum used when fitting into the card; extra width goes to high flexWeight columns first. */
   minSize: number;
   maxSize?: number;
   align: "left" | "right" | "center";
   rendererType: ListViewRendererType;
+  /**
+   * Relative share of *additional* width after soft minimums (comment + reason absorb most).
+   * Not equal to pixel width — only ratios matter.
+   */
+  flexWeight: number;
 };
 
+/**
+ * Width model: compact type/price/dates/created, medium status, wider reason, most flexible comment.
+ * Table always fits the card width (no horizontal scroll); overflow is vertical with sticky header.
+ */
 export function buildItemPriceHistoryTableSchema(t: TFunction): ItemPriceHistoryColumnSchema[] {
   return [
     {
@@ -24,8 +35,9 @@ export function buildItemPriceHistoryTableSchema(t: TFunction): ItemPriceHistory
       sourceType: "document",
       sortable: true,
       filterable: true,
-      defaultSize: 100,
-      minSize: 80,
+      defaultSize: 88,
+      minSize: 76,
+      flexWeight: 1,
       align: "left",
       rendererType: "text",
     },
@@ -36,8 +48,9 @@ export function buildItemPriceHistoryTableSchema(t: TFunction): ItemPriceHistory
       sourceType: "document",
       sortable: true,
       filterable: true,
-      defaultSize: 110,
-      minSize: 88,
+      defaultSize: 88,
+      minSize: 76,
+      flexWeight: 1,
       align: "right",
       rendererType: "numeric",
     },
@@ -50,6 +63,7 @@ export function buildItemPriceHistoryTableSchema(t: TFunction): ItemPriceHistory
       filterable: true,
       defaultSize: 104,
       minSize: 88,
+      flexWeight: 1.15,
       align: "left",
       rendererType: "date",
     },
@@ -62,6 +76,7 @@ export function buildItemPriceHistoryTableSchema(t: TFunction): ItemPriceHistory
       filterable: true,
       defaultSize: 104,
       minSize: 88,
+      flexWeight: 1.15,
       align: "left",
       rendererType: "date",
     },
@@ -72,8 +87,9 @@ export function buildItemPriceHistoryTableSchema(t: TFunction): ItemPriceHistory
       sourceType: "derived",
       sortable: true,
       filterable: true,
-      defaultSize: 120,
-      minSize: 96,
+      defaultSize: 118,
+      minSize: 100,
+      flexWeight: 1.75,
       align: "left",
       rendererType: "status-badge",
     },
@@ -84,8 +100,9 @@ export function buildItemPriceHistoryTableSchema(t: TFunction): ItemPriceHistory
       sourceType: "document",
       sortable: true,
       filterable: true,
-      defaultSize: 140,
-      minSize: 100,
+      defaultSize: 200,
+      minSize: 120,
+      flexWeight: 3.5,
       align: "left",
       rendererType: "text",
     },
@@ -96,8 +113,9 @@ export function buildItemPriceHistoryTableSchema(t: TFunction): ItemPriceHistory
       sourceType: "document",
       sortable: true,
       filterable: true,
-      defaultSize: 180,
-      minSize: 120,
+      defaultSize: 280,
+      minSize: 100,
+      flexWeight: 6,
       align: "left",
       rendererType: "text",
     },
@@ -109,7 +127,8 @@ export function buildItemPriceHistoryTableSchema(t: TFunction): ItemPriceHistory
       sortable: true,
       filterable: true,
       defaultSize: 132,
-      minSize: 112,
+      minSize: 118,
+      flexWeight: 1.35,
       align: "left",
       rendererType: "date",
     },

@@ -16,7 +16,7 @@ export const kkMasterPages: MessageTree = {
   related: {
     itemsTitle: "Байланысты тауарлар",
     itemsHint:
-      "Байланысты номенклатура жазбалары. Тек оқу; толығы үшін жолды ашыңыз.",
+      "Байланысты тауар жазбалары. Тек оқу; толығы үшін жолды ашыңыз.",
     openAllItems: "Барлық тауарларды ашу",
     summaryAria: "Байланысты тауарлар қорытындысы",
     chipItems: "Тауарлар",
@@ -42,7 +42,7 @@ export const kkMasterPages: MessageTree = {
     titleWithCode: "Тауар {{code}}",
     backToListAria: "Тауарлар тізіміне оралу",
     listBreadcrumb: "Тауарлар",
-    detailsDescription: "Код, атауы, өлш. б. және күйі.",
+    detailsDescription: "Код, атауы, өлшем бірлігі және күйі.",
     accountingProfile: "Есептік профиль",
     tabMain: "Негізгі",
     tabPrices: "Бағалар",
@@ -50,17 +50,17 @@ export const kkMasterPages: MessageTree = {
     tabImages: "Суреттер",
     tabBarcodes: "Штрихкодтар",
     tabTesters: "Тестерлер",
-    tabMarkdown: "Уценка",
-    tabsAria: "Тауар карточкасының бөлімдері",
-    baseItem: "Негізгі номенклатура",
+    tabMarkdown: "Markdown",
+    tabsAria: "Тауар картасының бөлімдері",
+    baseItem: "Негізгі тауар",
     createChoice: {
       title: "Нені жасайсыз?",
       subtitle:
-        "Каталогтағы сатылатын позицияны немесе негізгі тауарға байланған тестерді таңдаңыз. Жаңа жазбалар үшін бұл қадам міндетті.",
-      item: "Номенклатура",
+        "Каталогтағы сатылатын тауарды немесе негізгі тауарға байланған тестерді таңдаңыз. Жаңа жазбалар үшін бұл қадам міндетті.",
+      item: "Тауар",
       tester: "Тестер",
     },
-    baseItemSectionTitle: "Байланысты негізгі тауар (тауар)",
+    baseItemSectionTitle: "Байланысты негізгі тауар",
     openBaseItem: "Негізгі тауарды ашу",
     kind: {
       sellable: "Тауар",
@@ -70,13 +70,13 @@ export const kkMasterPages: MessageTree = {
       kindColumn: "Түрі",
     },
     testers: {
-      tabHint: "Осы негізгі номенклатураға байланысқан тестерлер.",
+      tabHint: "Осы негізгі тауарға байланысқан тестерлер.",
       createTester: "Тестер жасау",
       empty: "Байланысқан тестерлер жоқ.",
     },
     markdown: {
-      tabHint: "Осы номенклатура бойынша уценка жазбалары.",
-      create: "Уценка жасау",
+      tabHint: "Осы тауар бойынша Markdown жазбалары.",
+      create: "Markdown жазбасын жасау",
       openAll: "Журналды ашу",
     },
     barcodeLabel: "Штрихкод",
@@ -85,7 +85,7 @@ export const kkMasterPages: MessageTree = {
     uomPlaceholder: "мысалы дана",
     inactiveSuffix: "(белсенді емес)",
     responsibles: {
-      unsavedHint: "Алдымен номенклатура карточкасын сақтаңыз, содан кейін жауапты қызметкерлерді тағайындауға болады.",
+      unsavedHint: "Алдымен тауар картасын сақтаңыз, содан кейін жауапты қызметкерлерді тағайындауға болады.",
       colRole: "Рөл",
       colEmployee: "Қызметкер",
       colPositionDept: "Лауазым / бөлім",
@@ -118,9 +118,9 @@ export const kkMasterPages: MessageTree = {
     },
     prices: {
       tabIntro:
-        "Мұнда базалық сатып алу және базалық сату бағалары басқарылады. Markdown бағалары мен клиент келісімдері енгізілмейді.",
+        "Мұнда базалық сатып алу және базалық сату бағалары басқарылады. Төмендетілген бағалар мен клиент келісімдері енгізілмейді.",
       unsavedHint:
-        "Алдымен номенклатураны сақтаңыз, содан кейін базалық бағалар мен тарихты басқаруға болады.",
+        "Алдымен тауарды сақтаңыз, содан кейін базалық бағалар мен тарихты басқаруға болады.",
       summaryPurchaseCurrent: "Ағымдағы сатып алу бағасы",
       summaryPurchaseNext: "Келесі сатып алу бағасы",
       summarySaleCurrent: "Ағымдағы сату бағасы",
@@ -182,7 +182,7 @@ export const kkMasterPages: MessageTree = {
       validationPastDate: "Басталу күні өткенде болмауы керек.",
       validationReason: "Себепті көрсетіңіз.",
       errorGeneric: "Бағаны сақтау мүмкін болмады.",
-      reason_initial_migration: "Legacy тегіс бағадан (миграция базалық жазбасы)",
+      reason_initial_migration: "Ескі жүйеден біркелкі баға (миграция базалық жазбасы)",
       reason_manual_update: "Қолмен өзгерту",
       reason_supplier_change: "Жеткізуші өзгерісі",
       reason_commercial_review: "Коммерциялық шолу",
@@ -193,7 +193,7 @@ export const kkMasterPages: MessageTree = {
       tabHint: "Тауар суреттерін осында жүктеп, ретін өзгертіңіз.",
       cardTitle: "Суреттер",
       cardDescription:
-        "Ең көбі {{max}} сурет (JPG, PNG, WebP, әрқайсысы 10 МБ). Бірнеше файл таңдауға болады. Ок таңдауды, миниатюраларды сүйреп реттейді. Жергілікті сақталады.",
+        "Ең көбі {{max}} сурет (JPG, PNG, WebP, әрқайсысы 10 МБ). Бірнеше файл таңдауға болады. Бағыттауыштар таңдауды өзгертеді; миниатюраларды сүйреп реттейді. Жергілікті сақталады.",
       uploadImage: "Сурет жүктеу",
       uploadImageShort: "Жүктеу",
       maxReached: "Ең көбі {{max}} сурет.",
@@ -262,7 +262,9 @@ export const kkMasterPages: MessageTree = {
       sourceType: "Көзі",
       summaryTitle: "Штрихкод қорытындысы",
       summaryNoPrimary: "Негізгі белсенді штрихкод жоқ",
-      summaryCount: "{{count}} жазба — толық басқару үшін «Штрихкодтар» қойындысын ашыңыз.",
+      summaryCountOne: "{{count}} штрихкод жазбасы",
+      summaryCountOther: "{{count}} штрихкод жазбасы",
+      summaryManageHint: "Толық басқару — «Штрихкодтар» қойындысы",
       packagingLevel: "Қаптама деңгейі",
       primary: "Негізгі",
       active: "Белсенді",
@@ -318,7 +320,7 @@ export const kkMasterPages: MessageTree = {
     emptyRelatedStockBalances: "Бұл тауар бойынша қалдық жоқ.",
     openStockBalancesListRowAria:
       "Осы тауар бойынша сүзілген қалдықтарды ашу, қойма {{warehouse}}",
-    openAllMarkdown: "Уценка жазбаларын ашу",
+    openAllMarkdown: "Markdown жазбаларын ашу",
     relatedStockMovementsTitle: "Соңғы қозғалыстар",
     relatedStockMovementsHint:
       "Тауар бойынша соңғы {{limit}} қозғалыс. Толық тарих үшін тізімді ашыңыз.",

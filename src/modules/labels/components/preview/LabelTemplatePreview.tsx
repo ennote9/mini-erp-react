@@ -1,4 +1,5 @@
 import type { CSSProperties } from "react";
+import { forwardRef } from "react";
 import { useTranslation } from "@/shared/i18n";
 import type {
   LabelElement,
@@ -11,7 +12,7 @@ import { LABEL_PREVIEW_PX_PER_MM } from "./previewConstants";
 import { BarcodePreview } from "./BarcodePreview";
 import { QrPreview } from "./QrPreview";
 
-type Props = {
+export type LabelTemplatePreviewProps = {
   template: LabelTemplate;
   context: LabelPreviewBindingContext;
   /** When false, hide the demo-data caption (e.g. real item context uses workspace banner instead). */
@@ -156,29 +157,34 @@ function renderElement(
   return _never;
 }
 
-export function LabelTemplatePreview({
-  template,
-  context,
-  showDemoHint = true,
-  selectedElementId = null,
-}: Props) {
-  const { t } = useTranslation();
-  const w = template.sizeMm.width * LABEL_PREVIEW_PX_PER_MM;
-  const h = template.sizeMm.height * LABEL_PREVIEW_PX_PER_MM;
+/**
+ * Live label preview. Ref attaches to the printable white surface (mm-scaled), not the demo hint.
+ */
+export const LabelTemplatePreview = forwardRef<HTMLDivElement, LabelTemplatePreviewProps>(
+  function LabelTemplatePreview(
+    { template, context, showDemoHint = true, selectedElementId = null },
+    ref,
+  ) {
+    const { t } = useTranslation();
+    const w = template.sizeMm.width * LABEL_PREVIEW_PX_PER_MM;
+    const h = template.sizeMm.height * LABEL_PREVIEW_PX_PER_MM;
 
-  return (
-    <div className="flex flex-col gap-2">
-      {showDemoHint ? (
-        <p className="text-[11px] text-muted-foreground">{t("labels.workspace.preview.demoHint")}</p>
-      ) : null}
-      <div
-        className="relative overflow-hidden rounded border border-border bg-white text-black shadow-sm"
-        style={{ width: w, height: h, maxWidth: "100%" }}
-      >
-        {template.elements.map((el) =>
-          renderElement(el, context, el.id, selectedElementId !== null && el.id === selectedElementId),
-        )}
+    return (
+      <div className="flex flex-col gap-2">
+        {showDemoHint ? (
+          <p className="text-[11px] text-muted-foreground">{t("labels.workspace.preview.demoHint")}</p>
+        ) : null}
+        <div
+          ref={ref}
+          data-label-print-surface="true"
+          className="relative overflow-hidden rounded border border-border bg-white text-black shadow-sm"
+          style={{ width: w, height: h, maxWidth: "100%" }}
+        >
+          {template.elements.map((el) =>
+            renderElement(el, context, el.id, selectedElementId !== null && el.id === selectedElementId),
+          )}
+        </div>
       </div>
-    </div>
-  );
-}
+    );
+  },
+);

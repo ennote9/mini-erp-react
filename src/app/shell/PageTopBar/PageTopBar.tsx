@@ -29,6 +29,7 @@ const PAGE_TITLES: Record<string, string> = {
   "/barcodes": "routes.barcodes",
   "/labels": "routes.labels",
   "/labels/workspace": "routes.labelsWorkspace",
+  "/labels/station": "routes.labelsStation",
   "/labels/operations": "routes.labelsOperations",
   "/brands": "routes.brands",
   "/categories": "routes.categories",
@@ -84,7 +85,12 @@ function getPageIcon(
   if (pathname === "/items" || pathname.match(/^\/items\/[^/]+$/)) return Package;
   if (pathname === "/barcodes") return ScanBarcode;
   if (pathname.match(/^\/labels\/templates\/[^/]+$/)) return Pencil;
-  if (pathname === "/labels" || pathname === "/labels/workspace" || pathname === "/labels/operations")
+  if (
+    pathname === "/labels" ||
+    pathname === "/labels/workspace" ||
+    pathname === "/labels/station" ||
+    pathname === "/labels/operations"
+  )
     return Printer;
   if (pathname === "/brands" || pathname.match(/^\/brands\/[^/]+$/)) return Tag;
   if (pathname === "/categories" || pathname.match(/^\/categories\/[^/]+$/))

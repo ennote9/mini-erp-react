@@ -36,6 +36,7 @@ import {
   LabelTemplateEditorPage,
   LabelsListPage,
   LabelsOperationsPage,
+  LabelsStationPage,
   LabelsWorkspacePage,
 } from "../modules/labels";
 
@@ -52,6 +53,7 @@ export function AppRoutes() {
         <Route path="barcodes" element={<BarcodeRegistryPage />} />
         <Route path="labels/templates/:id" element={<LabelTemplateEditorPage />} />
         <Route path="labels/workspace" element={<LabelsWorkspacePage />} />
+        <Route path="labels/station" element={<LabelsStationPage />} />
         <Route path="labels/operations" element={<LabelsOperationsPage />} />
         <Route path="labels" element={<LabelsListPage />} />
         <Route path="items/:id" element={<ItemPage />} />

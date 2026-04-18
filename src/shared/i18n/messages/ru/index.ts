@@ -92,6 +92,7 @@ export const ruMessages: MessageTree = {
     nav: {
       templates: "Шаблоны",
       workspace: "Рабочее место",
+      station: "Стикеровка",
       operations: "Операции",
     },
     list: {
@@ -128,6 +129,7 @@ export const ruMessages: MessageTree = {
     },
     itemBarcodes: {
       openInPrint: "Открыть в печати",
+      openInStation: "Открыть в стикеровке",
     },
     editor: {
       title: "Редактор шаблона",
@@ -220,6 +222,45 @@ export const ruMessages: MessageTree = {
       noTemplates: "Нет доступных активных шаблонов.",
       copiesLabel: "Копий",
       copiesHint: "Только предпросмотр — на принтер пока не отправляется.",
+      reprintHint:
+        "Контекст восстановлен из прошлой операции — при необходимости измените параметры и нажмите Печать или PDF.",
+      actions: {
+        sectionTitle: "Действия печати",
+        createJob: "Создать задание",
+        savePdf: "Сохранить PDF",
+        print: "Печать",
+        hint: "Черновое задание или экспорт PDF по текущему шаблону и предпросмотру. Демо-контекст помечается в списке операций.",
+        hintPrint:
+          "Открывается системный диалог печати. После закрытия диалога задание получает статус «диалог закрыт» — факт вывода на принтер не проверяется.",
+      },
+      feedback: {
+        jobCreated: "Задание на печать сохранено как черновик.",
+        pdfSaved: "PDF сохранён.",
+        pdfFailed: "Не удалось сохранить PDF.",
+        printDialogDone:
+          "Диалог печати закрыт. Запись помечена как «диалог закрыт» (факт печати не проверяется).",
+        printFailed: "Ошибка печати.",
+        genericError: "Не удалось создать задание.",
+      },
+      presets: {
+        paperLabel: "Пресет бумаги / носителя",
+        mediaLabel: "Пресет медиа",
+        storedHint: "Последние значения сохраняются в этом браузере.",
+        paper: {
+          AUTO: "Авто (по шаблону)",
+        },
+        media: {
+          DEFAULT: "По умолчанию",
+          THERMAL: "Термо / рулон",
+          SHEET: "Лист / офис",
+        },
+      },
+      validation: {
+        NO_TEMPLATE: "Выберите шаблон этикетки.",
+        TEMPLATE_NOT_FOUND: "Шаблон больше недоступен.",
+        TEMPLATE_ARCHIVED: "Этот шаблон в архиве и не может использоваться.",
+        COPIES_INVALID: "Количество копий должно быть от 1 до 999.",
+      },
       preview: {
         demoHint: "Демо-данные для предпросмотра. Интеграция с карточкой товара заменит этот контекст.",
         bindingEmpty: "Нет значения",
@@ -229,6 +270,7 @@ export const ruMessages: MessageTree = {
       contextBanner: {
         title: "Контекст: номенклатура",
         sourceFromBarcodesTab: "Открыто из карточки · Штрихкоды",
+        sourceFromStation: "Стикеровка",
         itemName: "Наименование",
         itemCode: "Код",
         selectedBarcode: "Выбранный ШК",
@@ -242,9 +284,60 @@ export const ruMessages: MessageTree = {
     },
     operations: {
       pageHeading: "Операции печати",
-      intro: "История заданий на печать этикеток: очередь, статус выполнения и контекст.",
+      intro: "Недавние экспорты PDF и задания, созданные из рабочего места печати.",
       emptyTitle: "Заданий на печать пока нет",
-      emptyHint: "После подключения печати здесь появятся задания и их статусы.",
+      emptyHint: "Создайте задание или сохраните PDF в рабочем месте — записи появятся здесь.",
+      columnWhen: "Обновлено",
+      columnMode: "Режим",
+      columnStatus: "Статус",
+      columnTemplate: "Шаблон",
+      columnCopies: "Копий",
+      columnItem: "Товар",
+      columnSource: "Источник",
+      openWorkspace: "Открыть в рабочем месте",
+      reprint: "Повторить в рабочем месте",
+      badgeDemo: "Демо",
+      status: {
+        draft: "Черновик",
+        queued: "В очереди",
+        submitted: "Диалог закрыт",
+        completed: "Готово",
+        failed: "Ошибка",
+      },
+      mode: {
+        preview: "Предпросмотр",
+        print: "Печать",
+        pdf: "PDF",
+      },
+    },
+    station: {
+      pageHeading: "Стикеровка",
+      intro: "Сканируйте или найдите товар, подтвердите штрихкод и печатайте, не уходя с экрана.",
+      columnItem: "Товар",
+      primaryBarcode: "Основной ШК",
+      selectedBarcode: "Выбранный ШК",
+      barcodesTitle: "Штрихкоды",
+      noItem: "Найдите товар, чтобы увидеть этикетку.",
+      noActiveBarcodes: "Нет активных штрихкодов — привязки могут быть пустыми.",
+      actionsTitle: "Действия",
+      search: {
+        label: "Код, название или штрихкод",
+        placeholder: "Сканируйте ШК или введите код / название…",
+        find: "Найти",
+        emptyQuery: "Введите код, название или штрихкод.",
+        notFound: "Товар не найден.",
+        pickPrompt: "Несколько вариантов — выберите ниже.",
+        pickTitle: "Выберите товар",
+      },
+      repeat: {
+        button: "Повторить последнюю",
+        none: "Пока нет подходящей операции печати/PDF.",
+        itemMissing: "Товар из последней операции недоступен в каталоге.",
+        restored: "Контекст восстановлен — можно печатать снова.",
+      },
+      validation: {
+        noItem: "Сначала найдите товар в каталоге.",
+      },
     },
   },
   routes: {
@@ -285,6 +378,7 @@ export const ruMessages: MessageTree = {
     markdownJournal: "Журнал уценки",
     labels: "Шаблоны этикеток",
     labelsWorkspace: "Рабочее место печати",
+    labelsStation: "Стикеровка",
     labelsOperations: "Операции печати",
     labelTemplateEditor: "Редактор шаблона этикетки",
     markdownCreate: "Создать операцию уценки",

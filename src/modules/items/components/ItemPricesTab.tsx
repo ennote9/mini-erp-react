@@ -255,8 +255,6 @@ export function ItemPricesTab({ itemId, isNew, revision, onPricesChanged }: Prop
 
   return (
     <div className="space-y-5">
-      <p className="max-w-3xl text-xs leading-relaxed text-muted-foreground">{t("master.item.prices.tabIntro")}</p>
-
       <div
         data-testid="item-prices-summary-grid"
         className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4"
@@ -361,7 +359,7 @@ export function ItemPricesTab({ itemId, isNew, revision, onPricesChanged }: Prop
           </h3>
         </div>
 
-        <div className="relative">
+        <div className="relative w-full min-w-0">
           <ItemPriceHistoryTanstackTable
             rows={displayHistoryRows}
             schema={priceHistorySchema}
@@ -374,8 +372,6 @@ export function ItemPricesTab({ itemId, isNew, revision, onPricesChanged }: Prop
             formatMoney={formatMoney}
             reasonLabel={reasonLabel}
             statusLabel={statusLabelForRow}
-            busy={busy}
-            onCancelScheduled={(row) => setCancelTarget({ recordId: row.id, priceType: row.priceType })}
           />
           <ItemsHeaderFilterPanel
             open={headerFilterAnchor != null}

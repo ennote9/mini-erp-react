@@ -1,7 +1,15 @@
 import type { PrintJob, PrintJobMode, PrintJobStatus } from "../model";
 
 const MODES = new Set<PrintJobMode>(["preview", "print", "pdf"]);
-const STATUSES = new Set<PrintJobStatus>(["draft", "queued", "completed", "failed"]);
+const STATUSES = new Set<PrintJobStatus>(["draft", "queued", "submitted", "completed", "failed"]);
+
+function optString(v: unknown): string | undefined {
+  return typeof v === "string" && v.length > 0 ? v : undefined;
+}
+
+function optBool(v: unknown): boolean | undefined {
+  return typeof v === "boolean" ? v : undefined;
+}
 
 export function normalizePrintJob(raw: unknown): PrintJob | null {
   if (!raw || typeof raw !== "object") return null;
@@ -26,10 +34,21 @@ export function normalizePrintJob(raw: unknown): PrintJob | null {
   return {
     id,
     templateId,
+    templateNameSnapshot: optString(o.templateNameSnapshot),
     itemIds,
+    barcodeId: optString(o.barcodeId),
     copies,
     mode: mode as PrintJobMode,
     status: status as PrintJobStatus,
+    source: optString(o.source),
+    errorMessage: optString(o.errorMessage),
+    isDemoContext: optBool(o.isDemoContext),
+    itemCodeSnapshot: optString(o.itemCodeSnapshot),
+    itemNameSnapshot: optString(o.itemNameSnapshot),
+    barcodeValueSnapshot: optString(o.barcodeValueSnapshot),
+    paperPreset: optString(o.paperPreset),
+    mediaPreset: optString(o.mediaPreset),
+    labelSizeMode: o.labelSizeMode === "template" || o.labelSizeMode === "fit" ? o.labelSizeMode : undefined,
     createdAt,
     updatedAt,
   };

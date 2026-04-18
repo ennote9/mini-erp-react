@@ -611,7 +611,7 @@ export function ItemPage() {
               </div>
               </div>
             </Tabs.Content>
-            <Tabs.Content value="prices" className="outline-none focus-visible:outline-none">
+            <Tabs.Content value="prices" className="w-full min-w-0 outline-none focus-visible:outline-none">
               <ItemPricesTab
                 isNew={isNew}
                 itemId={isNew ? undefined : id}

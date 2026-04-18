@@ -6,6 +6,7 @@ import {
   buildEmployeeDisplaySlice,
   employeeLinkedToItemBrandScope,
   employeeLinkedToItemCategoryScope,
+  isEmployeeOperationallyUnavailable,
 } from "../lib/itemResponsibles";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -50,10 +51,18 @@ export function ItemResponsibleEditDialog({
   const [note, setNote] = useState("");
   const [error, setError] = useState<string | null>(null);
 
-  const sortedEmployees = useMemo(
-    () => [...employees].sort((a, b) => a.identity.displayName.localeCompare(b.identity.displayName)),
-    [employees],
-  );
+  const sortedEmployees = useMemo(() => {
+    const scoreRecommended = (e: Employee) =>
+      employeeLinkedToItemBrandScope(e, itemBrandId) || employeeLinkedToItemCategoryScope(e, itemCategoryId) ? 0 : 1;
+    const scoreOperational = (e: Employee) => (isEmployeeOperationallyUnavailable(e) ? 1 : 0);
+    return [...employees].sort((a, b) => {
+      const r = scoreRecommended(a) - scoreRecommended(b);
+      if (r !== 0) return r;
+      const o = scoreOperational(a) - scoreOperational(b);
+      if (o !== 0) return o;
+      return a.identity.displayName.localeCompare(b.identity.displayName);
+    });
+  }, [employees, itemBrandId, itemCategoryId]);
 
   const selectedEmployee = useMemo(
     () => (employeeId ? sortedEmployees.find((e) => e.id === employeeId) : undefined),

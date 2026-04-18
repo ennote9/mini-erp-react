@@ -92,6 +92,7 @@ export const kkMessages: MessageTree = {
     nav: {
       templates: "Үлгілер",
       workspace: "Жұмыс орны",
+      station: "Стикерлеу",
       operations: "Операциялар",
     },
     list: {
@@ -128,6 +129,7 @@ export const kkMessages: MessageTree = {
     },
     itemBarcodes: {
       openInPrint: "Басып шығаруда ашу",
+      openInStation: "Стикерлеу орнында ашу",
     },
     editor: {
       title: "Үлгі редакторы",
@@ -220,6 +222,45 @@ export const kkMessages: MessageTree = {
       noTemplates: "Белсенді үлгілер жоқ.",
       copiesLabel: "Дана",
       copiesHint: "Тек алдын ала қарау — принтерге әлі жіберілмейді.",
+      reprintHint:
+        "Өткен операциядан контекст қалпына келтірілді — қажет болса өзгертіңіз, содан кейін Басып шығару немесе PDF.",
+      actions: {
+        sectionTitle: "Басып шығару әрекеттері",
+        createJob: "Тапсырыс жасау",
+        savePdf: "PDF сақтау",
+        print: "Басып шығару",
+        hint: "Ағымдағы үлгі және алдын ала қарау бойынша черновик немесе PDF. Демо контекст операциялар тізімінде белгіленеді.",
+        hintPrint:
+          "Жүйелік басып шығару терезесі ашылады. Терезе жабылғаннан кейін тапсырыс «терезе жабылды» күйін алады — принтерге шығару расталмайды.",
+      },
+      feedback: {
+        jobCreated: "Басып шығару тапсырысы черновик ретінде сақталды.",
+        pdfSaved: "PDF сақталды.",
+        pdfFailed: "PDF сақтау сәтсіз аяқталды.",
+        printDialogDone:
+          "Басып шығару терезесі жабылды. Жазба «терезе жабылды» деп белгіленді (физикалық басып шығару тексерілмейді).",
+        printFailed: "Басып шығару қатесі.",
+        genericError: "Тапсырыс жасалмады.",
+      },
+      presets: {
+        paperLabel: "Қағаз / тасымал пресеті",
+        mediaLabel: "Медиа пресеті",
+        storedHint: "Соңғы мәндер осы браузерде сақталады.",
+        paper: {
+          AUTO: "Авто (үлгі бойынша)",
+        },
+        media: {
+          DEFAULT: "Әдепкі",
+          THERMAL: "Термо / орама",
+          SHEET: "Бет / кеңсе",
+        },
+      },
+      validation: {
+        NO_TEMPLATE: "Стикер үлгісін таңдаңыз.",
+        TEMPLATE_NOT_FOUND: "Үлгі енді доступті емес.",
+        TEMPLATE_ARCHIVED: "Бұл үлгі мұрағатта және қолданылмайды.",
+        COPIES_INVALID: "Дана саны 1–999 аралығында болуы керек.",
+      },
       preview: {
         demoHint: "Алдын ала қарау үшін демо деректер. Тауар карточкасымен интеграция осы контекстті ауырады.",
         bindingEmpty: "Мән жоқ",
@@ -229,6 +270,7 @@ export const kkMessages: MessageTree = {
       contextBanner: {
         title: "Контекст: тауар",
         sourceFromBarcodesTab: "Карточкадан ашылды · Штрихкодтар",
+        sourceFromStation: "Стикерлеу",
         itemName: "Атауы",
         itemCode: "Коды",
         selectedBarcode: "Таңдалған ШК",
@@ -242,9 +284,60 @@ export const kkMessages: MessageTree = {
     },
     operations: {
       pageHeading: "Басып шығару операциялары",
-      intro: "Стикерді басып шығару тапсырыстарының тарихы: кезек, күй және контекст.",
+      intro: "Жұмыс орнынан жасалған соңғы PDF экспорттары мен басып шығару тапсырыстары.",
       emptyTitle: "Тапсырыстар әлі жоқ",
-      emptyHint: "Басып шығару қосылғаннан кейін тапсырыстар мен күйдері көрінеді.",
+      emptyHint: "Жұмыс орнында тапсырыс жасаңыз немесе PDF сақтаңыз — жазбалар мұнда пайда болады.",
+      columnWhen: "Жаңартылды",
+      columnMode: "Режим",
+      columnStatus: "Күй",
+      columnTemplate: "Үлгі",
+      columnCopies: "Дана",
+      columnItem: "Тауар",
+      columnSource: "Көз",
+      openWorkspace: "Жұмыс орнында ашу",
+      reprint: "Қайта ашу (басып шығару)",
+      badgeDemo: "Демо",
+      status: {
+        draft: "Черновик",
+        queued: "Кезекте",
+        submitted: "Терезе жабылды",
+        completed: "Дайын",
+        failed: "Қате",
+      },
+      mode: {
+        preview: "Алдын ала қарау",
+        print: "Басып шығару",
+        pdf: "PDF",
+      },
+    },
+    station: {
+      pageHeading: "Стикерлеу орны",
+      intro: "Тауарды сканерлеңіз немесе табыңыз, штрихкодты растаңыз және экраннан шықпай басып шығарыңыз.",
+      columnItem: "Тауар",
+      primaryBarcode: "Негізгі ШК",
+      selectedBarcode: "Таңдалған ШК",
+      barcodesTitle: "Штрихкодтар",
+      noItem: "Стикерді көру үшін тауарды табыңыз.",
+      noActiveBarcodes: "Белсенді штрихкодтар жоқ — байламдар бос болуы мүмкін.",
+      actionsTitle: "Әрекеттер",
+      search: {
+        label: "Код, атау немесе штрихкод",
+        placeholder: "Штрихкодты сканерлеңіз немесе код / атау енгізіңіз…",
+        find: "Табу",
+        emptyQuery: "Код, атау немесе штрихкод енгізіңіз.",
+        notFound: "Тауар табылмады.",
+        pickPrompt: "Бірнеше нұсқа бар — төменнен таңдаңыз.",
+        pickTitle: "Тауарды таңдаңыз",
+      },
+      repeat: {
+        button: "Соңғысын қайталау",
+        none: "Әлі қайталанатын басып шығару/PDF жоқ.",
+        itemMissing: "Соңғы операциядағы тауар каталогта жоқ.",
+        restored: "Контекст қалпына келтірілді — қайта басып шығаруға болады.",
+      },
+      validation: {
+        noItem: "Алдымен каталогтан тауарды табыңыз.",
+      },
     },
   },
   routes: {
@@ -284,6 +377,7 @@ export const kkMessages: MessageTree = {
     markdownJournal: "Уценка журналы",
     labels: "Стикер үлгілері",
     labelsWorkspace: "Басып шығару жұмыс орны",
+    labelsStation: "Стикерлеу орны",
     labelsOperations: "Басып шығару операциялары",
     labelTemplateEditor: "Стикер үлгісін өңдеу",
     markdownCreate: "Уценка операциясын жасау",

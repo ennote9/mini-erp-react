@@ -676,14 +676,14 @@ test.describe("Item card — Prices tab (acceptance)", () => {
     await expect(page.getByTestId("item-price-edit-dialog")).toBeHidden({ timeout: 15_000 });
 
     await expect(page.getByTestId("item-prices-card-purchase-next")).toContainText("5.55", { timeout: 15_000 });
-    await expect(page.getByTestId("item-prices-row-cancel-scheduled")).toHaveCount(1, { timeout: 10_000 });
+    await expect(page.getByTestId("item-prices-cancel-scheduled-purchase")).toBeVisible({ timeout: 10_000 });
 
     const sortAmount = page.getByTestId("item-prices-history-sort-amount");
     await sortAmount.scrollIntoViewIfNeeded();
     await sortAmount.click();
     await sortAmount.click();
 
-    await page.getByTestId("item-prices-row-cancel-scheduled").first().click();
+    await page.getByTestId("item-prices-cancel-scheduled-purchase").click();
     await expect(page.getByTestId("item-price-cancel-dialog")).toBeVisible({ timeout: 10_000 });
     await page.getByTestId("item-price-cancel-confirm").click();
     await expect(page.getByTestId("item-price-cancel-dialog")).toBeHidden({ timeout: 15_000 });

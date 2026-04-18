@@ -1,4 +1,5 @@
 import { useTranslation } from "@/shared/i18n";
+import { LABELS_STATION_SOURCE } from "../lib/labelsStationConstants";
 import type { ItemPreviewWarningCode } from "../lib/itemPreviewContext";
 
 type Props = {
@@ -43,6 +44,10 @@ export function WorkspaceItemContextBanner({
         {source === "item-barcodes" ? (
           <span className="text-[10px] uppercase tracking-wide text-muted-foreground">
             {t("labels.workspace.contextBanner.sourceFromBarcodesTab")}
+          </span>
+        ) : source === LABELS_STATION_SOURCE ? (
+          <span className="text-[10px] uppercase tracking-wide text-muted-foreground">
+            {t("labels.workspace.contextBanner.sourceFromStation")}
           </span>
         ) : null}
       </div>

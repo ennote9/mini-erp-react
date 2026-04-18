@@ -20,6 +20,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { MoreHorizontal } from "lucide-react";
+import { buildLabelsStationUrl } from "@/modules/labels/lib/labelsStationQueryParams";
 import { buildLabelsWorkspaceUrl } from "@/modules/labels/lib/workspaceQueryParams";
 
 type Props = {
@@ -238,6 +239,21 @@ export function ItemBarcodesCard({ isNew, itemId, barcodes, onBarcodesChanged }:
                                 }}
                               >
                                 {t("labels.itemBarcodes.openInPrint")}
+                              </DropdownMenu.Item>
+                              <DropdownMenu.Item
+                                className="cursor-pointer rounded-sm px-2 py-1.5 text-xs text-popover-foreground outline-none hover:bg-accent hover:text-accent-foreground data-[disabled]:pointer-events-none data-[disabled]:opacity-45"
+                                disabled={busy || !itemId}
+                                onSelect={() => {
+                                  if (!itemId) return;
+                                  navigate(
+                                    buildLabelsStationUrl({
+                                      itemId,
+                                      barcodeId: row.id,
+                                    }),
+                                  );
+                                }}
+                              >
+                                {t("labels.itemBarcodes.openInStation")}
                               </DropdownMenu.Item>
                               <DropdownMenu.Item
                                 className="cursor-pointer rounded-sm px-2 py-1.5 text-xs text-destructive outline-none hover:bg-destructive/10 data-[disabled]:pointer-events-none data-[disabled]:opacity-45"

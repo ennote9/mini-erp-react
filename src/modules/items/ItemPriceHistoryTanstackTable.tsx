@@ -3,13 +3,13 @@ import {
   getCoreRowModel,
   useReactTable,
   createColumnHelper,
+  type Column,
   type ColumnDef,
   type OnChangeFn,
   type SortingState,
 } from "@tanstack/react-table";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useLayoutEffect, useMemo, useRef, useState } from "react";
 import { ChevronDown, ChevronsUpDown, ChevronUp, Funnel } from "lucide-react";
-import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import type { TFunction } from "@/shared/i18n";
@@ -22,10 +22,85 @@ type ColumnMeta = {
 
 const columnHelper = createColumnHelper<PriceHistoryRow>();
 
-/** Trailing utility column — not part of schema-driven data columns. */
-const ACTION_COLUMN_ID = "actions";
-const ACTION_COLUMN_WIDTH_PX = 76;
-const ACTION_COLUMN_MIN_PX = 72;
+const MIN_TABLE_WIDTH_PX = 640;
+
+/** Last-resort floor when the card is narrower than soft minimums (shrink high–flex columns first). */
+const ABS_MIN_WIDTH_BY_ID: Record<string, number> = {
+  priceType: 64,
+  amount: 64,
+  validFrom: 78,
+  validTo: 78,
+  status: 88,
+  reasonCode: 92,
+  comment: 72,
+  createdAt: 104,
+};
+
+/**
+ * Fits columns to `targetWidth` with no horizontal overflow: soft mins first, remainder by flexWeight
+ * (comment + reason absorb extra; under budget, shrink from highest flex first).
+ */
+function computeFlexColumnWidths(
+  leafColumns: Column<PriceHistoryRow, unknown>[],
+  targetWidth: number,
+  getSoftMin: (id: string) => number,
+  getFlexWeight: (id: string) => number,
+): number[] {
+  const n = leafColumns.length;
+  if (n === 0 || targetWidth <= 0) return [];
+
+  const ids = leafColumns.map((c) => c.id);
+  const softMins = ids.map((id) => getSoftMin(id));
+  const flexW = ids.map((id) => getFlexWeight(id));
+  const absMins = ids.map((id) => ABS_MIN_WIDTH_BY_ID[id] ?? 52);
+
+  let w = softMins.slice();
+  let sumW = w.reduce((a, b) => a + b, 0);
+
+  if (sumW > targetWidth) {
+    let guard = 0;
+    while (sumW > targetWidth && guard < 10000) {
+      guard++;
+      let bestI = -1;
+      let bestFlex = -Infinity;
+      for (let i = 0; i < n; i++) {
+        if (w[i]! <= absMins[i]!) continue;
+        if (flexW[i]! > bestFlex) {
+          bestFlex = flexW[i]!;
+          bestI = i;
+        }
+      }
+      if (bestI < 0) break;
+      w[bestI]!--;
+      sumW--;
+    }
+    return w;
+  }
+
+  let rem = targetWidth - sumW;
+  const totalFlex = flexW.reduce((a, b) => a + b, 0);
+  if (totalFlex <= 0) {
+    let i = 0;
+    while (rem > 0) {
+      w[i % n]!++;
+      rem--;
+      i++;
+    }
+    return w;
+  }
+
+  const add = flexW.map((fw) => (rem * fw) / totalFlex);
+  for (let i = 0; i < n; i++) w[i] += Math.floor(add[i]!);
+  rem = targetWidth - w.reduce((a, b) => a + b, 0);
+  const order = ids.map((_, i) => i).sort((a, b) => flexW[b]! - flexW[a]!);
+  let idx = 0;
+  while (rem > 0) {
+    w[order[idx % n]!]!++;
+    rem--;
+    idx++;
+  }
+  return w;
+}
 
 function statusBadgeClasses(status: PriceHistoryRow["status"]): string {
   switch (status) {
@@ -54,8 +129,6 @@ type Props = {
   formatMoney: (n: number | undefined) => string;
   reasonLabel: (code: string) => string;
   statusLabel: (status: PriceHistoryRow["status"]) => string;
-  busy: boolean;
-  onCancelScheduled: (row: PriceHistoryRow) => void;
 };
 
 export function ItemPriceHistoryTanstackTable(props: Props) {
@@ -71,8 +144,6 @@ export function ItemPriceHistoryTanstackTable(props: Props) {
     formatMoney,
     reasonLabel,
     statusLabel,
-    busy,
-    onCancelScheduled,
   } = props;
 
   const schemaById = useMemo(() => new Map(schema.map((c) => [c.id, c])), [schema]);
@@ -80,17 +151,25 @@ export function ItemPriceHistoryTanstackTable(props: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [containerWidth, setContainerWidth] = useState(0);
 
-  useEffect(() => {
+  const measureContainer = useMemo(
+    () => () => {
+      const el = containerRef.current;
+      if (!el) return;
+      const w = Math.round(el.getBoundingClientRect().width);
+      setContainerWidth((prev) => (prev !== w ? w : prev));
+    },
+    [],
+  );
+
+  useLayoutEffect(() => {
     const el = containerRef.current;
-    if (!el || typeof ResizeObserver === "undefined") return;
-    const ro = new ResizeObserver((entries) => {
-      const w = entries[0]?.contentRect.width ?? 0;
-      setContainerWidth(w);
-    });
+    if (!el) return;
+    measureContainer();
+    if (typeof ResizeObserver === "undefined") return;
+    const ro = new ResizeObserver(() => measureContainer());
     ro.observe(el);
-    setContainerWidth(el.getBoundingClientRect().width);
     return () => ro.disconnect();
-  }, []);
+  }, [measureContainer, rows.length, schema.length, sorting]);
 
   const columns = useMemo(() => {
     const defs: ColumnDef<PriceHistoryRow, unknown>[] = [];
@@ -163,45 +242,8 @@ export function ItemPriceHistoryTanstackTable(props: Props) {
       );
     }
 
-    defs.push(
-      columnHelper.display({
-        id: ACTION_COLUMN_ID,
-        header: t("master.item.prices.colActions"),
-        enableSorting: false,
-        size: ACTION_COLUMN_WIDTH_PX,
-        minSize: ACTION_COLUMN_MIN_PX,
-        maxSize: ACTION_COLUMN_WIDTH_PX,
-        meta: { align: "right" } satisfies ColumnMeta,
-        cell: ({ row }) => {
-          const r = row.original;
-          return (
-            <div
-              className="block w-full text-right leading-none"
-              onClick={(e) => e.stopPropagation()}
-            >
-              {r.status === "scheduled" && !r.cancelledAt ? (
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  className="inline-flex h-7 max-w-full px-2 text-[10px]"
-                  disabled={busy}
-                  data-testid="item-prices-row-cancel-scheduled"
-                  onClick={() => onCancelScheduled(r)}
-                >
-                  {t("master.item.prices.actionCancel")}
-                </Button>
-              ) : (
-                <span className="inline-block text-[10px] text-muted-foreground">—</span>
-              )}
-            </div>
-          );
-        },
-      }),
-    );
-
     return defs;
-  }, [schema, t, formatMoney, reasonLabel, statusLabel, busy, onCancelScheduled]);
+  }, [schema, t, formatMoney, reasonLabel, statusLabel]);
 
   const table = useReactTable({
     data: rows,
@@ -214,59 +256,47 @@ export function ItemPriceHistoryTanstackTable(props: Props) {
   });
 
   const visibleLeafColumns = table.getVisibleLeafColumns();
-  const dataLeafColumns = visibleLeafColumns.filter((c) => c.id !== ACTION_COLUMN_ID);
-  /**
-   * Schema-driven columns share scaled width to reach (tableDisplayWidth − actions).
-   * `tableDisplayWidth` = max(natural, available): fills the card when there is room, scrolls when content is wider.
-   */
-  const MIN_TABLE_WIDTH_PX = 640;
-  const dataRawSum = dataLeafColumns.reduce((s, c) => s + c.getSize(), 0);
-  const naturalTableWidth = dataRawSum + ACTION_COLUMN_WIDTH_PX;
   const availableWidth = containerWidth > 0 ? containerWidth : MIN_TABLE_WIDTH_PX;
-  const tableDisplayWidth = Math.max(naturalTableWidth, availableWidth);
-  const dataTargetWidth = tableDisplayWidth - ACTION_COLUMN_WIDTH_PX;
+  const tableDisplayWidth = availableWidth;
 
   const columnWidthsById = new Map<string, number>();
-  columnWidthsById.set(ACTION_COLUMN_ID, ACTION_COLUMN_WIDTH_PX);
 
-  if (dataLeafColumns.length > 0 && dataRawSum > 0) {
-    const scale = dataTargetWidth / dataRawSum;
-    const scaled = dataLeafColumns.map((c) => c.getSize() * scale);
-    const floored = scaled.map((w) => Math.floor(w));
-    let remainder = dataTargetWidth - floored.reduce((a, b) => a + b, 0);
-    const distributed = [...floored];
-    let i = 0;
-    while (remainder > 0) {
-      distributed[i % distributed.length] += 1;
-      remainder -= 1;
-      i += 1;
+  if (visibleLeafColumns.length > 0) {
+    const widths = computeFlexColumnWidths(
+      visibleLeafColumns,
+      tableDisplayWidth,
+      (id) => schemaById.get(id)?.minSize ?? 64,
+      (id) => schemaById.get(id)?.flexWeight ?? 1,
+    );
+    const sumW = widths.reduce((a, b) => a + b, 0);
+    if (widths.length > 0 && sumW !== tableDisplayWidth) {
+      widths[widths.length - 1]! += tableDisplayWidth - sumW;
     }
-    dataLeafColumns.forEach((c, idx) => {
-      columnWidthsById.set(c.id, distributed[idx]!);
+    visibleLeafColumns.forEach((c, idx) => {
+      columnWidthsById.set(c.id, widths[idx]!);
     });
   } else {
-    dataLeafColumns.forEach((c) => columnWidthsById.set(c.id, c.getSize()));
+    visibleLeafColumns.forEach((c) => columnWidthsById.set(c.id, c.getSize()));
   }
 
   const cellWidth = (columnId: string, fallback: number) => columnWidthsById.get(columnId) ?? fallback;
+  const colPercent = (columnId: string, fallback: number) =>
+    tableDisplayWidth > 0 ? `${(cellWidth(columnId, fallback) / tableDisplayWidth) * 100}%` : undefined;
 
   return (
     <div
       ref={containerRef}
-      className="min-w-0 overflow-x-auto rounded-lg border border-border/60 bg-card/20 shadow-sm"
+      className="min-w-0 w-full overflow-hidden rounded-lg border border-border/60 bg-card/20 shadow-sm"
       data-testid="item-prices-history-table"
     >
-      <div className="relative inline-block align-top" style={{ width: tableDisplayWidth }}>
-        <table
-          className="border-collapse table-fixed text-xs leading-tight"
-          style={{ width: tableDisplayWidth }}
-        >
+      <div className="max-h-[380px] overflow-y-auto overflow-x-hidden overscroll-contain">
+        <table className="w-full min-w-0 table-fixed border-collapse text-xs leading-tight">
           <colgroup>
             {visibleLeafColumns.map((column) => (
-              <col key={column.id} style={{ width: cellWidth(column.id, column.getSize()) }} />
+              <col key={column.id} style={{ width: colPercent(column.id, column.getSize()) }} />
             ))}
           </colgroup>
-          <thead className="bg-muted/35 text-[11px]">
+          <thead className="sticky top-0 z-[2] bg-card text-[11px] shadow-[0_1px_0_0_hsl(var(--border))]">
             {table.getHeaderGroups().map((headerGroup) => (
               <tr key={headerGroup.id} className="border-b border-border/60">
                 {headerGroup.headers.map((header) => {
@@ -278,14 +308,12 @@ export function ItemPriceHistoryTanstackTable(props: Props) {
                   const hasActiveFilter = headerFilterState?.[header.column.id] === true;
                   const isOpenFilterField = openHeaderFilterFieldId === header.column.id;
                   const isLastHeaderCell = header.index === headerGroup.headers.length - 1;
-                  const isActionsHeader = header.column.id === ACTION_COLUMN_ID;
 
                   return (
                     <th
                       key={header.id}
                       className={cn(
-                        "group relative h-8 select-none py-1.5",
-                        isActionsHeader ? "pl-2 pr-0" : "px-2",
+                        "group relative h-9 max-h-9 select-none whitespace-nowrap px-2 align-middle py-1.5",
                         !isLastHeaderCell && "border-r border-border/50",
                         meta?.align === "right"
                           ? "text-right"
@@ -294,25 +322,30 @@ export function ItemPriceHistoryTanstackTable(props: Props) {
                             : "text-left",
                       )}
                       style={{
-                        width: cellWidth(header.column.id, header.getSize()),
-                        minWidth: header.column.columnDef.minSize,
+                        width: colPercent(header.column.id, header.getSize()),
                       }}
                     >
                       {header.isPlaceholder ? null : (
-                        <div className="flex min-w-0 items-center gap-0.5">
+                        <div
+                          className={cn(
+                            "flex min-w-0 items-center gap-1",
+                            meta?.align === "right" && "justify-end",
+                            meta?.align === "center" && "justify-center",
+                          )}
+                        >
                           {canSort ? (
                             <button
                               type="button"
                               data-testid={`item-prices-history-sort-${header.column.id}`}
                               className={cn(
-                                "flex min-w-0 flex-1 items-center gap-0.5 rounded-sm px-1 py-px text-[10px] font-medium uppercase tracking-wide text-muted-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring",
-                                meta?.align === "right" && "justify-end",
-                                meta?.align === "center" && "justify-center",
+                                "flex min-h-0 min-w-0 max-w-full items-center gap-1 rounded-sm px-0.5 py-0.5 text-left text-[10px] font-semibold uppercase leading-none tracking-wide text-muted-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring",
+                                meta?.align === "right" && "justify-end text-right",
+                                meta?.align === "center" && "justify-center text-center",
                               )}
                               title={String(header.column.columnDef.header ?? "")}
                               onClick={header.column.getToggleSortingHandler()}
                             >
-                              <span className="min-w-0 flex-1 truncate">
+                              <span className="shrink-0 whitespace-nowrap">
                                 {flexRender(header.column.columnDef.header, header.getContext())}
                               </span>
                               <span
@@ -332,19 +365,15 @@ export function ItemPriceHistoryTanstackTable(props: Props) {
                                 )}
                               </span>
                             </button>
-                          ) : isActionsHeader ? (
-                            <div className="w-full py-px pl-0 pr-0 text-right text-[10px] font-medium uppercase leading-tight tracking-wide text-muted-foreground">
-                              {flexRender(header.column.columnDef.header, header.getContext())}
-                            </div>
                           ) : (
                             <div
                               className={cn(
-                                "flex min-w-0 flex-1 items-center px-1 py-px text-[10px] font-medium uppercase tracking-wide text-muted-foreground",
-                                meta?.align === "right" && "justify-end",
-                                meta?.align === "center" && "justify-center",
+                                "flex min-h-0 items-center px-0.5 py-0.5 text-[10px] font-semibold uppercase leading-none tracking-wide text-muted-foreground",
+                                meta?.align === "right" && "justify-end text-right",
+                                meta?.align === "center" && "justify-center text-center",
                               )}
                             >
-                              <span className="min-w-0 flex-1 truncate">
+                              <span className="shrink-0 whitespace-nowrap">
                                 {flexRender(header.column.columnDef.header, header.getContext())}
                               </span>
                             </div>
@@ -408,15 +437,13 @@ export function ItemPriceHistoryTanstackTable(props: Props) {
                     {visibleCells.map((cell, cellIndex) => {
                       const cmeta = cell.column.columnDef.meta as ColumnMeta | undefined;
                       const isLastBodyCell = cellIndex === visibleCells.length - 1;
-                      const isActions = cell.column.id === ACTION_COLUMN_ID;
                       return (
                         <td
                           key={cell.id}
                           className={cn(
-                            "py-2 align-top",
-                            isActions ? "pl-2 pr-0" : "px-2",
+                            "py-2.5 align-top px-2",
                             !isLastBodyCell && "border-r border-border/50",
-                            !isActions && "max-w-0",
+                            "max-w-0",
                             cmeta?.align === "right"
                               ? "text-right"
                               : cmeta?.align === "center"
@@ -424,8 +451,7 @@ export function ItemPriceHistoryTanstackTable(props: Props) {
                                 : "text-left",
                           )}
                           style={{
-                            width: cellWidth(cell.column.id, cell.column.getSize()),
-                            minWidth: cell.column.columnDef.minSize,
+                            width: colPercent(cell.column.id, cell.column.getSize()),
                           }}
                         >
                           {flexRender(cell.column.columnDef.cell, cell.getContext())}
@@ -442,3 +468,4 @@ export function ItemPriceHistoryTanstackTable(props: Props) {
     </div>
   );
 }
+

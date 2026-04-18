@@ -82,6 +82,7 @@ export const coreEn = {
     nav: {
       templates: "Templates",
       workspace: "Workspace",
+      station: "Sticker station",
       operations: "Operations",
     },
     list: {
@@ -118,6 +119,7 @@ export const coreEn = {
     },
     itemBarcodes: {
       openInPrint: "Open in print workspace",
+      openInStation: "Open in sticker station",
     },
     editor: {
       title: "Template editor",
@@ -210,6 +212,44 @@ export const coreEn = {
       noTemplates: "No active templates available.",
       copiesLabel: "Copies",
       copiesHint: "Preview only — not sent to a printer yet.",
+      reprintHint:
+        "Context restored from a previous operation — adjust if needed, then use Print or Save PDF.",
+      actions: {
+        sectionTitle: "Print actions",
+        createJob: "Create print job",
+        savePdf: "Save PDF",
+        print: "Print",
+        hint: "Creates a draft job or exports a PDF using the current template and preview. Demo context is labeled on the operations list.",
+        hintPrint:
+          "Print opens the system dialog. The job is marked “submitted” after the dialog closes — physical printing is not verified.",
+      },
+      feedback: {
+        jobCreated: "Print job saved as draft.",
+        pdfSaved: "PDF saved.",
+        pdfFailed: "PDF export failed.",
+        printDialogDone: "Print dialog closed. Job recorded as submitted (physical print not verified).",
+        printFailed: "Print failed.",
+        genericError: "Could not create the print job.",
+      },
+      presets: {
+        paperLabel: "Paper / stock preset",
+        mediaLabel: "Media preset",
+        storedHint: "Last used values are saved in this browser for the next session.",
+        paper: {
+          AUTO: "Auto (template default)",
+        },
+        media: {
+          DEFAULT: "Default",
+          THERMAL: "Thermal / roll",
+          SHEET: "Sheet / office",
+        },
+      },
+      validation: {
+        NO_TEMPLATE: "Select a label template.",
+        TEMPLATE_NOT_FOUND: "Template is no longer available.",
+        TEMPLATE_ARCHIVED: "This template is archived and cannot be used.",
+        COPIES_INVALID: "Copies must be between 1 and 999.",
+      },
       preview: {
         demoHint: "Demo data for preview. Item integration will replace this context.",
         bindingEmpty: "No value",
@@ -219,6 +259,7 @@ export const coreEn = {
       contextBanner: {
         title: "Catalog context",
         sourceFromBarcodesTab: "Opened from item · Barcodes",
+        sourceFromStation: "Sticker station",
         itemName: "Name",
         itemCode: "Code",
         selectedBarcode: "Selected barcode",
@@ -232,9 +273,60 @@ export const coreEn = {
     },
     operations: {
       pageHeading: "Print operations",
-      intro: "History of label print jobs: queued tasks, completion status, and audit context.",
+      intro: "Recent label PDF exports and print jobs created from the workspace.",
       emptyTitle: "No print jobs yet",
-      emptyHint: "Print tasks and their status will appear here once printing is connected.",
+      emptyHint: "Create a job or save a PDF from the print workspace — entries will appear here.",
+      columnWhen: "Updated",
+      columnMode: "Mode",
+      columnStatus: "Status",
+      columnTemplate: "Template",
+      columnCopies: "Copies",
+      columnItem: "Item",
+      columnSource: "Source",
+      openWorkspace: "Open in workspace",
+      reprint: "Reopen for reprint",
+      badgeDemo: "Demo",
+      status: {
+        draft: "Draft",
+        queued: "Queued",
+        submitted: "Dialog closed",
+        completed: "Done",
+        failed: "Failed",
+      },
+      mode: {
+        preview: "Preview",
+        print: "Print",
+        pdf: "PDF",
+      },
+    },
+    station: {
+      pageHeading: "Sticker station",
+      intro: "Scan or search an item, confirm the barcode, and print without leaving this screen.",
+      columnItem: "Item",
+      primaryBarcode: "Primary barcode",
+      selectedBarcode: "Selected barcode",
+      barcodesTitle: "Barcodes",
+      noItem: "Find an item to preview the label.",
+      noActiveBarcodes: "No active barcodes — bindings may be empty.",
+      actionsTitle: "Actions",
+      search: {
+        label: "Code, name, or barcode",
+        placeholder: "Scan barcode or type code / name…",
+        find: "Find",
+        emptyQuery: "Enter a code, name, or barcode.",
+        notFound: "No matching item.",
+        pickPrompt: "Several items match — pick one below.",
+        pickTitle: "Choose an item",
+      },
+      repeat: {
+        button: "Repeat last",
+        none: "No previous print/PDF job to repeat yet.",
+        itemMissing: "The catalog item from the last job is no longer available.",
+        restored: "Last operation restored — you can print again.",
+      },
+      validation: {
+        noItem: "Find a catalog item before printing.",
+      },
     },
   },
   routes: {
@@ -275,6 +367,7 @@ export const coreEn = {
     markdownJournal: "Markdown Journal",
     labels: "Label templates",
     labelsWorkspace: "Label print workspace",
+    labelsStation: "Sticker station",
     labelsOperations: "Print operations",
     labelTemplateEditor: "Label template editor",
     markdownCreate: "Create markdown operation",
