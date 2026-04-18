@@ -32,6 +32,7 @@ import { StockMovementsListPage } from "../modules/stock-movements";
 import { SettingsPage } from "../modules/settings";
 import { MarkdownCreatePage, MarkdownJournalPage } from "../modules/markdown-journal";
 import { BarcodeRegistryPage } from "../modules/barcode-registry";
+import { LabelsListPage, LabelsOperationsPage, LabelsWorkspacePage } from "../modules/labels";
 
 /**
  * Route tree: shell layout with nested page routes.
@@ -44,6 +45,9 @@ export function AppRoutes() {
         <Route index element={<DashboardPage />} />
         <Route path="items" element={<ItemsListPage />} />
         <Route path="barcodes" element={<BarcodeRegistryPage />} />
+        <Route path="labels/workspace" element={<LabelsWorkspacePage />} />
+        <Route path="labels/operations" element={<LabelsOperationsPage />} />
+        <Route path="labels" element={<LabelsListPage />} />
         <Route path="items/:id" element={<ItemPage />} />
         <Route path="brands" element={<BrandsListPage />} />
         <Route path="brands/:id" element={<BrandPage />} />

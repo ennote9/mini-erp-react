@@ -19,6 +19,7 @@ import type { UpdateItemPatch } from "@/modules/items/repository";
 import { purchaseOrderRepository, flushPendingPurchaseOrderPersist } from "@/modules/purchase-orders/repository";
 import { salesOrderRepository, flushPendingSalesOrderPersist } from "@/modules/sales-orders/repository";
 import { employeeRepository, flushPendingEmployeePersist } from "@/modules/employees/repository";
+import { flushPendingLabelWrites } from "@/modules/labels/service";
 
 export type MiniErpE2eApi = {
   itemRepository: typeof itemRepository;
@@ -52,6 +53,7 @@ async function flushAll(): Promise<void> {
   await flushPendingPurchaseOrderPersist().catch(() => undefined);
   await flushPendingSalesOrderPersist().catch(() => undefined);
   await flushPendingEmployeePersist().catch(() => undefined);
+  await flushPendingLabelWrites().catch(() => undefined);
 }
 
 async function patchItem(id: string, patch: UpdateItemPatch): Promise<void> {

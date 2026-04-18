@@ -27,14 +27,6 @@ export type DirectAssignmentRowModel = {
   display: EmployeeDisplaySlice | null;
 };
 
-export type RelatedContextRowModel = {
-  employee: Employee;
-  display: EmployeeDisplaySlice;
-  scopeKind: "brand" | "category";
-  scopeLabel: string;
-  businessRoleLabels: string[];
-};
-
 function positionDepartmentLine(e: Employee): string {
   const pos = e.identity.positionCode.trim();
   const dep = e.identity.departmentCode.trim();
@@ -59,6 +51,18 @@ export function buildEmployeeDisplaySlice(e: Employee): EmployeeDisplaySlice {
 export function isEmployeeOperationallyUnavailable(e: Employee): boolean {
   if (e.identity.status !== "active") return true;
   return e.availability.kind !== "active";
+}
+
+/** Employee has an assignment scope row matching the item brand (for picker hints). */
+export function employeeLinkedToItemBrandScope(employee: Employee, brandId: string | undefined): boolean {
+  if (!brandId) return false;
+  return employee.org.assignmentScopes.some((s) => s.kind === "brand" && s.entityId === brandId);
+}
+
+/** Employee has an assignment scope row matching the item category (for picker hints). */
+export function employeeLinkedToItemCategoryScope(employee: Employee, categoryId: string | undefined): boolean {
+  if (!categoryId) return false;
+  return employee.org.assignmentScopes.some((s) => s.kind === "category" && s.entityId === categoryId);
 }
 
 export function buildDirectAssignmentRows(item: Item): DirectAssignmentRowModel[] {
@@ -89,103 +93,4 @@ export function attachEmployeesToDirectRows(
     const display = employee ? buildEmployeeDisplaySlice(employee) : null;
     return { ...row, employee, display };
   });
-}
-
-function scopeMatches(
-  emp: Employee,
-  kind: "brand" | "category",
-  entityId: string | undefined,
-): boolean {
-  if (!entityId) return false;
-  return emp.org.assignmentScopes.some((s) => s.kind === kind && s.entityId === entityId);
-}
-
-function businessRoleLabels(emp: Employee): string[] {
-  const roles = emp.businessRoles?.assignedRoles ?? [];
-  const out: string[] = [];
-  for (const r of roles) {
-    const desc = r.description.trim();
-    out.push(desc ? `${r.roleCode} — ${desc}` : r.roleCode);
-  }
-  return out.length > 0 ? out : ["—"];
-}
-
-/**
- * Employees with a brand scope matching the item brand (unique by employee id).
- */
-export function buildRelatedByBrandRows(
-  item: Item,
-  employees: Employee[],
-  brandLabel: string | undefined,
-): RelatedContextRowModel[] {
-  const bid = item.brandId;
-  if (!bid) return [];
-  const seen = new Set<string>();
-  const out: RelatedContextRowModel[] = [];
-  for (const emp of employees) {
-    if (!scopeMatches(emp, "brand", bid)) continue;
-    if (seen.has(emp.id)) continue;
-    seen.add(emp.id);
-    out.push({
-      employee: emp,
-      display: buildEmployeeDisplaySlice(emp),
-      scopeKind: "brand",
-      scopeLabel: brandLabel ?? bid,
-      businessRoleLabels: businessRoleLabels(emp),
-    });
-  }
-  return out;
-}
-
-/**
- * Employees with a category scope matching the item category (unique by employee id).
- */
-export function buildRelatedByCategoryRows(
-  item: Item,
-  employees: Employee[],
-  categoryLabel: string | undefined,
-): RelatedContextRowModel[] {
-  const cid = item.categoryId;
-  if (!cid) return [];
-  const seen = new Set<string>();
-  const out: RelatedContextRowModel[] = [];
-  for (const emp of employees) {
-    if (!scopeMatches(emp, "category", cid)) continue;
-    if (seen.has(emp.id)) continue;
-    seen.add(emp.id);
-    out.push({
-      employee: emp,
-      display: buildEmployeeDisplaySlice(emp),
-      scopeKind: "category",
-      scopeLabel: categoryLabel ?? cid,
-      businessRoleLabels: businessRoleLabels(emp),
-    });
-  }
-  return out;
-}
-
-export type ResponsiblesSummaryCounts = {
-  directFilled: number;
-  relatedBrand: number;
-  relatedCategory: number;
-  unavailableDirect: number;
-};
-
-export function computeResponsiblesSummary(
-  directRows: DirectAssignmentRowModel[],
-  relatedBrand: RelatedContextRowModel[],
-  relatedCategory: RelatedContextRowModel[],
-): ResponsiblesSummaryCounts {
-  const directFilled = directRows.filter((r) => r.assignment != null).length;
-  let unavailableDirect = 0;
-  for (const r of directRows) {
-    if (!r.assignment || !r.employee) continue;
-    if (isEmployeeOperationallyUnavailable(r.employee)) unavailableDirect += 1;
-  }
-  return {
-    directFilled,
-    relatedBrand: relatedBrand.length,
-    relatedCategory: relatedCategory.length,
-    unavailableDirect,
-  };
 }

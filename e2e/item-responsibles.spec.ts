@@ -81,30 +81,21 @@ async function waitNewItemFormVisible(page: Page) {
 test.describe("Item card — Responsibles tab (acceptance)", () => {
   test.describe.configure({ timeout: 120_000 });
 
-  test("13.1 tab smoke: Responsibles tab, summary, three sections", async ({ page }) => {
+  test("10.1 Responsibles tab: direct table only, no summary or related blocks", async ({ page }) => {
     await openApp(page);
     const itemId = await itemIdByCode(page, "ITEM-001");
     test.skip(!itemId, "Seed item ITEM-001 not found");
     await gotoReady(page, `/items/${encodeURIComponent(itemId!)}`);
     await waitItemTabsVisible(page);
-    await expect(page.getByTestId("item-tab-responsibles")).toBeVisible();
     await page.getByTestId("item-tab-responsibles").click();
-    await expect(page.getByTestId("item-responsibles-summary")).toBeVisible({ timeout: 30_000 });
-    await expect(page.getByTestId("item-responsibles-direct")).toBeVisible();
-    await expect(page.getByTestId("item-responsibles-brand")).toBeVisible();
-    await expect(page.getByTestId("item-responsibles-category")).toBeVisible();
+    await expect(page.getByTestId("item-responsibles-direct")).toBeVisible({ timeout: 30_000 });
+    await expect(page.locator('[data-testid="item-responsibles-summary"]')).toHaveCount(0);
+    await expect(page.locator('[data-testid="item-responsibles-brand"]')).toHaveCount(0);
+    await expect(page.locator('[data-testid="item-responsibles-category"]')).toHaveCount(0);
+    await expect(page.getByTestId("item-responsibles-direct").locator("table")).toBeVisible();
   });
 
-  test("13.2 unsaved item: direct assignments blocked", async ({ page }) => {
-    await openApp(page);
-    await gotoReady(page, "/items/new");
-    await waitNewItemFormVisible(page);
-    await expect(page.getByTestId("item-tab-responsibles")).toBeVisible({ timeout: 30_000 });
-    await page.getByTestId("item-tab-responsibles").click();
-    await expect(page.getByTestId("item-responsibles-unsaved-hint")).toBeVisible({ timeout: 30_000 });
-  });
-
-  test("13.3–13.5 direct assignments: add, replace, remove (same session)", async ({ page }) => {
+  test("10.2–10.4 direct assignments: add, replace, remove (same session)", async ({ page }) => {
     await openApp(page);
     const itemId = await itemIdByCode(page, "ITEM-001");
     test.skip(!itemId, "Seed item ITEM-001 not found");
@@ -171,67 +162,32 @@ test.describe("Item card — Responsibles tab (acceptance)", () => {
     expect(assignments.length).toBe(0);
   });
 
-  test("13.6 related by brand: employee with brand scope visible", async ({ page }) => {
+  test("10.5 unsaved item: responsibles blocked until save", async ({ page }) => {
     await openApp(page);
-    const itemId = await itemIdByCode(page, "ITEM-001");
-    test.skip(!itemId, "Seed item ITEM-001 not found");
-    await gotoReady(page, `/items/${encodeURIComponent(itemId!)}?tab=responsibles`);
-    await waitItemTabsVisible(page);
-    const brand = page.getByTestId("item-responsibles-brand");
-    await expect(brand).toContainText(/J\. Lee|Jordan Lee/i, { timeout: 15_000 });
+    await gotoReady(page, "/items/new");
+    await waitNewItemFormVisible(page);
+    await expect(page.getByTestId("item-tab-responsibles")).toBeVisible({ timeout: 30_000 });
+    await page.getByTestId("item-tab-responsibles").click();
+    await expect(page.getByTestId("item-responsibles-unsaved-hint")).toBeVisible({ timeout: 30_000 });
   });
 
-  test("13.7 related by category: employee with category scope visible", async ({ page }) => {
+  test("10.6 modal: employee hint panel when selecting scoped employee (ITEM-001 + emp 4)", async ({
+    page,
+  }) => {
     await openApp(page);
     const itemId = await itemIdByCode(page, "ITEM-001");
     test.skip(!itemId, "Seed item ITEM-001 not found");
     await gotoReady(page, `/items/${encodeURIComponent(itemId!)}?tab=responsibles`);
     await waitItemTabsVisible(page);
-    const cat = page.getByTestId("item-responsibles-category");
-    await expect(cat).toContainText(/J\. Lee|Jordan Lee/i, { timeout: 15_000 });
-  });
-
-  test("13.8 quick assign from related block creates direct assignment", async ({ page }) => {
-    await openApp(page);
-    const itemId = await itemIdByCode(page, "ITEM-001");
-    test.skip(!itemId, "Seed item ITEM-001 not found");
-    await page.evaluate(async (id) => {
-      const w = (window as Window & { __MINI_ERP_E2E__?: { patchItem: (a: string, b: unknown) => Promise<void> } })
-        .__MINI_ERP_E2E__;
-      const it = w!.itemRepository.getById(id);
-      const prev = it?.responsibleAssignments ?? [];
-      await w!.patchItem(id, {
-        responsibleAssignments: prev.filter((a: { roleCode: string }) => a.roleCode !== "buyer"),
-      });
-    }, itemId!);
-    await gotoReady(page, `/items/${encodeURIComponent(itemId!)}?tab=responsibles`);
-    await waitItemTabsVisible(page);
-    await page.getByTestId("item-responsible-quick-brand-4").click();
+    await page.getByTestId("item-responsible-assign-buyer").click();
     await expect(page.getByTestId("item-responsible-edit-dialog")).toBeVisible({ timeout: 10_000 });
-    await page.getByTestId("item-responsible-dialog-role").selectOption("buyer");
-    await page.getByTestId("item-responsible-dialog-submit").click();
-    await expect(page.getByTestId("item-responsible-edit-dialog")).toBeHidden({ timeout: 15_000 });
-
-    const buyer = await page.evaluate((id) => {
-      const w = (window as Window & { __MINI_ERP_E2E__?: E2eApi }).__MINI_ERP_E2E__;
-      const it = w.itemRepository.getById(id);
-      return (it?.responsibleAssignments ?? []).find((a: { roleCode: string }) => a.roleCode === "buyer");
-    }, itemId!);
-    expect(buyer?.employeeId).toBe("4");
+    await page.getByTestId("item-responsible-dialog-employee").selectOption("4");
+    await expect(page.getByTestId("item-responsible-dialog-employee-hint")).toBeVisible({ timeout: 5_000 });
+    await page.keyboard.press("Escape");
+    await expect(page.getByTestId("item-responsible-edit-dialog")).toBeHidden({ timeout: 5_000 });
   });
 
-  test("13.9 availability and substitute shown for contextual employee", async ({ page }) => {
-    await openApp(page);
-    const itemId = await itemIdByCode(page, "ITEM-001");
-    test.skip(!itemId, "Seed item ITEM-001 not found");
-    await gotoReady(page, `/items/${encodeURIComponent(itemId!)}?tab=responsibles`);
-    await waitItemTabsVisible(page);
-    const brand = page.getByTestId("item-responsibles-brand");
-    await expect(brand).toContainText(/Vacation|Отпуск|Демалыс/i);
-    await expect(brand).toContainText(/R\. Chen|Robert Chen/i);
-  });
-
-  test("13.10 regression: main / prices / images / barcodes / testers still work", async ({ page }) => {
+  test("10.7 regression: main / prices / responsibles / images / barcodes / testers", async ({ page }) => {
     await openApp(page);
     const itemId = await itemIdByCode(page, "ITEM-001");
     test.skip(!itemId, "Seed item ITEM-001 not found");
@@ -245,7 +201,7 @@ test.describe("Item card — Responsibles tab (acceptance)", () => {
     await expect(page.getByTestId("item-prices-summary-grid")).toBeVisible({ timeout: 15_000 });
 
     await page.getByTestId("item-tab-responsibles").click();
-    await expect(page.getByTestId("item-responsibles-summary")).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByTestId("item-responsibles-direct")).toBeVisible({ timeout: 15_000 });
 
     await page.getByTestId("item-tab-images").click();
     await expect(page.getByText(/upload|загруз|жүктеу/i).first()).toBeVisible({ timeout: 15_000 });

@@ -2,18 +2,13 @@ import { useCallback, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import type { Item, ItemResponsibleRoleCode } from "../model";
 import { itemRepository } from "../repository";
-import { brandRepository } from "@/modules/brands/repository";
-import { categoryRepository } from "@/modules/categories/repository";
 import { employeeRepository } from "@/modules/employees/repository";
 import type { Employee } from "@/modules/employees/model";
 import {
   attachEmployeesToDirectRows,
   buildDirectAssignmentRows,
-  buildRelatedByBrandRows,
-  buildRelatedByCategoryRows,
-  computeResponsiblesSummary,
+  isEmployeeOperationallyUnavailable,
   type DirectAssignmentRowModel,
-  type RelatedContextRowModel,
 } from "../lib/itemResponsibles";
 import {
   removeItemResponsibleAssignmentAwaitPersist,
@@ -22,6 +17,7 @@ import {
 import { ItemResponsibleEditDialog } from "./ItemResponsibleEditDialog";
 import { Button } from "@/components/ui/button";
 import { useTranslation } from "@/shared/i18n/context";
+import { cn } from "@/lib/utils";
 
 type Props = {
   itemId: string | undefined;
@@ -42,7 +38,6 @@ export function ItemResponsiblesTab({ itemId, isNew, revision, onResponsiblesCha
   const [busy, setBusy] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [dialogFixedRole, setDialogFixedRole] = useState<ItemResponsibleRoleCode | undefined>(undefined);
-  const [dialogInitialEmployeeId, setDialogInitialEmployeeId] = useState<string | undefined>(undefined);
   const [dialogServerError, setDialogServerError] = useState<string | null>(null);
 
   const item: Item | undefined = useMemo(() => {
@@ -58,50 +53,15 @@ export function ItemResponsiblesTab({ itemId, isNew, revision, onResponsiblesCha
     return m;
   }, [employees]);
 
-  const brandLabel = useMemo(() => {
-    const bid = item?.brandId;
-    if (!bid) return undefined;
-    return brandRepository.getById(bid)?.name;
-  }, [item?.brandId, revision]);
-
-  const categoryLabel = useMemo(() => {
-    const cid = item?.categoryId;
-    if (!cid) return undefined;
-    return categoryRepository.getById(cid)?.name;
-  }, [item?.categoryId, revision]);
-
   const directRows = useMemo(() => {
     if (!item) return [];
     const base = buildDirectAssignmentRows(item);
     return attachEmployeesToDirectRows(base, employeesById);
   }, [item, employeesById]);
 
-  const relatedBrandRows = useMemo(() => {
-    if (!item) return [];
-    return buildRelatedByBrandRows(item, employees, brandLabel);
-  }, [item, employees, brandLabel]);
-
-  const relatedCategoryRows = useMemo(() => {
-    if (!item) return [];
-    return buildRelatedByCategoryRows(item, employees, categoryLabel);
-  }, [item, employees, categoryLabel]);
-
-  const summary = useMemo(
-    () => computeResponsiblesSummary(directRows, relatedBrandRows, relatedCategoryRows),
-    [directRows, relatedBrandRows, relatedCategoryRows],
-  );
-
-  const openAssign = useCallback((roleCode: ItemResponsibleRoleCode, initialEmployeeId?: string) => {
+  const openAssign = useCallback((roleCode: ItemResponsibleRoleCode) => {
     setDialogServerError(null);
     setDialogFixedRole(roleCode);
-    setDialogInitialEmployeeId(initialEmployeeId);
-    setDialogOpen(true);
-  }, []);
-
-  const openAssignChooseRole = useCallback((initialEmployeeId: string) => {
-    setDialogServerError(null);
-    setDialogFixedRole(undefined);
-    setDialogInitialEmployeeId(initialEmployeeId);
     setDialogOpen(true);
   }, []);
 
@@ -176,40 +136,67 @@ export function ItemResponsiblesTab({ itemId, isNew, revision, onResponsiblesCha
   const renderDirectRow = (row: DirectAssignmentRowModel) => {
     const emp = row.employee;
     const a = row.assignment;
+    const filled = Boolean(a && emp);
+    const highlightAvail = emp && isEmployeeOperationallyUnavailable(emp);
+    const subId = emp?.availability.substituteEmployeeId;
+
     return (
-      <tr key={row.roleCode} className="border-t border-border/60">
-        <td className="px-2 py-1 align-top text-[11px] font-medium">
+      <tr
+        key={row.roleCode}
+        data-filled={filled ? "true" : "false"}
+        className={cn(
+          "border-t border-border/60 bg-transparent",
+          !filled && "text-muted-foreground",
+        )}
+      >
+        <td className={cn("px-2 py-1 align-top text-[11px] font-medium", !filled && "italic text-muted-foreground/90")}>
           {t(`master.item.responsibles.roles.${row.roleCode}`)}
         </td>
         <td className="px-2 py-1 align-top text-[11px]">
           {emp ? (
-            <Link className="list-table__link font-medium" to={`/employees/${encodeURIComponent(emp.id)}`}>
+            <Link className="list-table__link font-medium text-foreground" to={`/employees/${encodeURIComponent(emp.id)}`}>
               {row.display?.displayName ?? emp.identity.displayName}
             </Link>
           ) : (
-            <span className="text-muted-foreground">{t("master.item.responsibles.emptyRole")}</span>
+            <span className="text-muted-foreground/80">{t("master.item.responsibles.emptyRole")}</span>
           )}
         </td>
-        <td className="px-2 py-1 align-top text-[11px] text-muted-foreground">
+        <td className={cn("px-2 py-1 align-top text-[11px]", filled ? "text-muted-foreground" : "text-muted-foreground/70")}>
           {row.display?.positionDepartment ?? "—"}
         </td>
-        <td className="px-2 py-1 align-top text-[11px]">
+        <td
+          className={cn(
+            "px-2 py-1 align-top text-[11px]",
+            highlightAvail && filled && "font-medium text-amber-800 dark:text-amber-500/95",
+            !filled && "text-muted-foreground/70",
+          )}
+        >
           {emp ? (
             <div className="space-y-0.5">
               <div>{availabilityLabel(emp)}</div>
               {emp.identity.status !== "active" ? (
-                <div className="text-[10px] text-amber-600/90">{recordStatusLabel(emp)}</div>
+                <div className="text-[10px] font-normal text-amber-700/90 dark:text-amber-400/90">
+                  {recordStatusLabel(emp)}
+                </div>
               ) : null}
             </div>
           ) : (
             "—"
           )}
         </td>
-        <td className="px-2 py-1 align-top text-[11px]">
-          {emp?.availability.substituteEmployeeId ? substituteName(emp.availability.substituteEmployeeId) : "—"}
+        <td
+          className={cn(
+            "px-2 py-1 align-top text-[11px]",
+            subId && filled && "font-medium text-foreground/95",
+            !filled && "text-muted-foreground/70",
+          )}
+        >
+          {subId ? substituteName(subId) : "—"}
         </td>
-        <td className="px-2 py-1 align-top text-[11px] text-muted-foreground">{a?.note?.trim() ? a.note : "—"}</td>
-        <td className="px-2 py-1 align-top text-[11px] text-muted-foreground">
+        <td className={cn("px-2 py-1 align-top text-[11px]", filled ? "text-muted-foreground" : "text-muted-foreground/70")}>
+          {a?.note?.trim() ? a.note : "—"}
+        </td>
+        <td className={cn("px-2 py-1 align-top text-[11px]", filled ? "text-muted-foreground" : "text-muted-foreground/70")}>
           {a ? formatAssignedAt(a.assignedAt, locale) : "—"}
         </td>
         <td className="px-2 py-1 align-top text-[11px]">
@@ -258,58 +245,6 @@ export function ItemResponsiblesTab({ itemId, isNew, revision, onResponsiblesCha
     );
   };
 
-  const renderRelatedRow = (row: RelatedContextRowModel, keyPrefix: string) => {
-    const emp = row.employee;
-    return (
-      <tr key={`${keyPrefix}-${emp.id}`} className="border-t border-border/60">
-        <td className="px-2 py-1 align-top text-[11px]">
-          <Link className="list-table__link font-medium" to={`/employees/${encodeURIComponent(emp.id)}`}>
-            {row.display.displayName}
-          </Link>
-        </td>
-        <td className="px-2 py-1 align-top text-[11px] text-muted-foreground">
-          <ul className="list-inside list-disc space-y-0.5">
-            {row.businessRoleLabels.map((x) => (
-              <li key={x} className="text-[10px] leading-snug">
-                {x}
-              </li>
-            ))}
-          </ul>
-        </td>
-        <td className="px-2 py-1 align-top text-[11px]">
-          {row.scopeKind === "brand"
-            ? t("master.item.responsibles.scopeBrandLine", { name: row.scopeLabel })
-            : t("master.item.responsibles.scopeCategoryLine", { name: row.scopeLabel })}
-        </td>
-        <td className="px-2 py-1 align-top text-[11px] text-muted-foreground">{row.display.positionDepartment}</td>
-        <td className="px-2 py-1 align-top text-[11px]">
-          <div className="space-y-0.5">
-            <div>{availabilityLabel(emp)}</div>
-            {emp.identity.status !== "active" ? (
-              <div className="text-[10px] text-amber-600/90">{recordStatusLabel(emp)}</div>
-            ) : null}
-          </div>
-        </td>
-        <td className="px-2 py-1 align-top text-[11px]">
-          {emp.availability.substituteEmployeeId ? substituteName(emp.availability.substituteEmployeeId) : "—"}
-        </td>
-        <td className="px-2 py-1 align-top text-[11px]">
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            className="h-6 px-2 text-[10px]"
-            disabled={busy}
-            data-testid={`item-responsible-quick-${keyPrefix}-${emp.id}`}
-            onClick={() => openAssignChooseRole(emp.id)}
-          >
-            {t("master.item.responsibles.actionQuickAssign")}
-          </Button>
-        </td>
-      </tr>
-    );
-  };
-
   if (isNew || !itemId) {
     return (
       <div
@@ -322,103 +257,24 @@ export function ItemResponsiblesTab({ itemId, isNew, revision, onResponsiblesCha
   }
 
   return (
-    <div className="space-y-5">
-      <p className="max-w-3xl text-xs leading-relaxed text-muted-foreground">{t("master.item.responsibles.tabIntro")}</p>
-
-      <div
-        data-testid="item-responsibles-summary"
-        className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4"
-      >
-        <div className="rounded border border-border/60 bg-muted/10 px-2 py-1.5 text-[11px]">
-          <div className="text-muted-foreground">{t("master.item.responsibles.summaryDirect")}</div>
-          <div className="text-sm font-semibold tabular-nums">{summary.directFilled}</div>
-        </div>
-        <div className="rounded border border-border/60 bg-muted/10 px-2 py-1.5 text-[11px]">
-          <div className="text-muted-foreground">{t("master.item.responsibles.summaryBrand")}</div>
-          <div className="text-sm font-semibold tabular-nums">{summary.relatedBrand}</div>
-        </div>
-        <div className="rounded border border-border/60 bg-muted/10 px-2 py-1.5 text-[11px]">
-          <div className="text-muted-foreground">{t("master.item.responsibles.summaryCategory")}</div>
-          <div className="text-sm font-semibold tabular-nums">{summary.relatedCategory}</div>
-        </div>
-        <div className="rounded border border-border/60 bg-muted/10 px-2 py-1.5 text-[11px]">
-          <div className="text-muted-foreground">{t("master.item.responsibles.summaryUnavailable")}</div>
-          <div className="text-sm font-semibold tabular-nums">{summary.unavailableDirect}</div>
-        </div>
+    <div data-testid="item-responsibles-direct">
+      <div className="overflow-x-auto rounded-md border border-border/70">
+        <table className="w-full min-w-[52rem] bg-transparent text-[11px]">
+          <thead className="bg-muted/30">
+            <tr>
+              <th className="px-2 py-0.5 text-left font-medium">{t("master.item.responsibles.colRole")}</th>
+              <th className="px-2 py-0.5 text-left font-medium">{t("master.item.responsibles.colEmployee")}</th>
+              <th className="px-2 py-0.5 text-left font-medium">{t("master.item.responsibles.colPositionDept")}</th>
+              <th className="px-2 py-0.5 text-left font-medium">{t("master.item.responsibles.colAvailability")}</th>
+              <th className="px-2 py-0.5 text-left font-medium">{t("master.item.responsibles.colSubstitute")}</th>
+              <th className="px-2 py-0.5 text-left font-medium">{t("master.item.responsibles.colComment")}</th>
+              <th className="px-2 py-0.5 text-left font-medium">{t("master.item.responsibles.colAssigned")}</th>
+              <th className="px-2 py-0.5 text-left font-medium">{t("master.item.responsibles.colActions")}</th>
+            </tr>
+          </thead>
+          <tbody className="bg-transparent [&_tr]:bg-transparent">{directRows.map(renderDirectRow)}</tbody>
+        </table>
       </div>
-
-      <section data-testid="item-responsibles-direct">
-        <h3 className="mb-1.5 text-xs font-semibold">{t("master.item.responsibles.sectionDirect")}</h3>
-        <div className="overflow-x-auto rounded-md border border-border/70">
-          <table className="w-full min-w-[52rem] text-[11px]">
-            <thead className="bg-muted/30">
-              <tr>
-                <th className="px-2 py-0.5 text-left font-medium">{t("master.item.responsibles.colRole")}</th>
-                <th className="px-2 py-0.5 text-left font-medium">{t("master.item.responsibles.colEmployee")}</th>
-                <th className="px-2 py-0.5 text-left font-medium">{t("master.item.responsibles.colPositionDept")}</th>
-                <th className="px-2 py-0.5 text-left font-medium">{t("master.item.responsibles.colAvailability")}</th>
-                <th className="px-2 py-0.5 text-left font-medium">{t("master.item.responsibles.colSubstitute")}</th>
-                <th className="px-2 py-0.5 text-left font-medium">{t("master.item.responsibles.colComment")}</th>
-                <th className="px-2 py-0.5 text-left font-medium">{t("master.item.responsibles.colAssigned")}</th>
-                <th className="px-2 py-0.5 text-left font-medium">{t("master.item.responsibles.colActions")}</th>
-              </tr>
-            </thead>
-            <tbody>{directRows.map(renderDirectRow)}</tbody>
-          </table>
-        </div>
-      </section>
-
-      <section data-testid="item-responsibles-brand">
-        <h3 className="mb-1.5 text-xs font-semibold">{t("master.item.responsibles.sectionBrand")}</h3>
-        {!item?.brandId ? (
-          <div className="text-[11px] text-muted-foreground">{t("master.item.responsibles.noBrandOnItem")}</div>
-        ) : relatedBrandRows.length === 0 ? (
-          <div className="text-[11px] text-muted-foreground">{t("master.item.responsibles.relatedEmpty")}</div>
-        ) : (
-          <div className="overflow-x-auto rounded-md border border-border/70">
-            <table className="w-full min-w-[44rem] text-[11px]">
-              <thead className="bg-muted/30">
-                <tr>
-                  <th className="px-2 py-0.5 text-left font-medium">{t("master.item.responsibles.colEmployee")}</th>
-                  <th className="px-2 py-0.5 text-left font-medium">{t("master.item.responsibles.colBusinessRoles")}</th>
-                  <th className="px-2 py-0.5 text-left font-medium">{t("master.item.responsibles.colScope")}</th>
-                  <th className="px-2 py-0.5 text-left font-medium">{t("master.item.responsibles.colPositionDept")}</th>
-                  <th className="px-2 py-0.5 text-left font-medium">{t("master.item.responsibles.colAvailability")}</th>
-                  <th className="px-2 py-0.5 text-left font-medium">{t("master.item.responsibles.colSubstitute")}</th>
-                  <th className="px-2 py-0.5 text-left font-medium">{t("master.item.responsibles.colActions")}</th>
-                </tr>
-              </thead>
-              <tbody>{relatedBrandRows.map((r) => renderRelatedRow(r, "brand"))}</tbody>
-            </table>
-          </div>
-        )}
-      </section>
-
-      <section data-testid="item-responsibles-category">
-        <h3 className="mb-1.5 text-xs font-semibold">{t("master.item.responsibles.sectionCategory")}</h3>
-        {!item?.categoryId ? (
-          <div className="text-[11px] text-muted-foreground">{t("master.item.responsibles.noCategoryOnItem")}</div>
-        ) : relatedCategoryRows.length === 0 ? (
-          <div className="text-[11px] text-muted-foreground">{t("master.item.responsibles.relatedEmpty")}</div>
-        ) : (
-          <div className="overflow-x-auto rounded-md border border-border/70">
-            <table className="w-full min-w-[44rem] text-[11px]">
-              <thead className="bg-muted/30">
-                <tr>
-                  <th className="px-2 py-0.5 text-left font-medium">{t("master.item.responsibles.colEmployee")}</th>
-                  <th className="px-2 py-0.5 text-left font-medium">{t("master.item.responsibles.colBusinessRoles")}</th>
-                  <th className="px-2 py-0.5 text-left font-medium">{t("master.item.responsibles.colScope")}</th>
-                  <th className="px-2 py-0.5 text-left font-medium">{t("master.item.responsibles.colPositionDept")}</th>
-                  <th className="px-2 py-0.5 text-left font-medium">{t("master.item.responsibles.colAvailability")}</th>
-                  <th className="px-2 py-0.5 text-left font-medium">{t("master.item.responsibles.colSubstitute")}</th>
-                  <th className="px-2 py-0.5 text-left font-medium">{t("master.item.responsibles.colActions")}</th>
-                </tr>
-              </thead>
-              <tbody>{relatedCategoryRows.map((r) => renderRelatedRow(r, "category"))}</tbody>
-            </table>
-          </div>
-        )}
-      </section>
 
       <ItemResponsibleEditDialog
         open={dialogOpen}
@@ -427,8 +283,9 @@ export function ItemResponsiblesTab({ itemId, isNew, revision, onResponsiblesCha
           if (!o) setDialogServerError(null);
         }}
         fixedRoleCode={dialogFixedRole}
-        initialEmployeeId={dialogInitialEmployeeId}
         employees={employees}
+        itemBrandId={item?.brandId}
+        itemCategoryId={item?.categoryId}
         busy={busy}
         serverError={dialogServerError}
         onSubmit={handleSubmitDialog}

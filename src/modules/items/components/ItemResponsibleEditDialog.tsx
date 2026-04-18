@@ -1,7 +1,12 @@
 import { useEffect, useMemo, useState } from "react";
 import { Dialog } from "radix-ui";
 import type { ItemResponsibleRoleCode } from "../model";
-import { ITEM_RESPONSIBLE_ROLE_CODES } from "../lib/itemResponsibles";
+import {
+  ITEM_RESPONSIBLE_ROLE_CODES,
+  buildEmployeeDisplaySlice,
+  employeeLinkedToItemBrandScope,
+  employeeLinkedToItemCategoryScope,
+} from "../lib/itemResponsibles";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { useTranslation } from "@/shared/i18n/context";
@@ -13,10 +18,12 @@ type Props = {
   onOpenChange: (open: boolean) => void;
   /** When set, role dropdown is hidden / fixed. */
   fixedRoleCode?: ItemResponsibleRoleCode;
-  /** Pre-selected employee (e.g. quick assign from related list). */
   initialEmployeeId?: string;
   initialNote?: string;
   employees: Employee[];
+  /** Item brand/category for optional scope hints in the picker. */
+  itemBrandId?: string;
+  itemCategoryId?: string;
   busy?: boolean;
   serverError?: string | null;
   onSubmit: (data: { roleCode: ItemResponsibleRoleCode; employeeId: string; note: string }) => void | Promise<void>;
@@ -29,6 +36,8 @@ export function ItemResponsibleEditDialog({
   initialEmployeeId,
   initialNote,
   employees,
+  itemBrandId,
+  itemCategoryId,
   busy,
   serverError,
   onSubmit,
@@ -46,6 +55,11 @@ export function ItemResponsibleEditDialog({
     [employees],
   );
 
+  const selectedEmployee = useMemo(
+    () => (employeeId ? sortedEmployees.find((e) => e.id === employeeId) : undefined),
+    [sortedEmployees, employeeId],
+  );
+
   useEffect(() => {
     if (!open) return;
     setError(null);
@@ -53,6 +67,15 @@ export function ItemResponsibleEditDialog({
     setEmployeeId(initialEmployeeId ?? "");
     setNote(initialNote ?? "");
   }, [open, fixedRoleCode, initialEmployeeId, initialNote]);
+
+  const availabilityLabel = (e: Employee) =>
+    t(`employees.employees.enums.availability.${e.availability.kind}` as never);
+
+  const substituteName = (id: string | null | undefined, pool: Employee[]) => {
+    if (!id) return null;
+    const s = pool.find((x) => x.id === id);
+    return s?.identity.displayName ?? s?.identity.fullName ?? id;
+  };
 
   const handleSubmit = () => {
     void (async () => {
@@ -79,9 +102,7 @@ export function ItemResponsibleEditDialog({
           <Dialog.Title className="text-sm font-semibold leading-tight">
             {t("master.item.responsibles.dialogTitle")}
           </Dialog.Title>
-          <Dialog.Description className="mt-1 text-[11px] text-muted-foreground">
-            {t("master.item.responsibles.dialogHint")}
-          </Dialog.Description>
+          <Dialog.Description className="sr-only">{t("master.item.responsibles.dialogAriaDescription")}</Dialog.Description>
 
           <div className="mt-3 space-y-2">
             {!fixedRoleCode ? (
@@ -136,6 +157,41 @@ export function ItemResponsibleEditDialog({
                 })}
               </select>
             </div>
+
+            {selectedEmployee ? (
+              <div
+                data-testid="item-responsible-dialog-employee-hint"
+                className="rounded border border-border/50 bg-muted/20 px-2 py-1.5 text-[10px] leading-snug text-muted-foreground"
+              >
+                <div className="font-medium text-foreground/90">
+                  {buildEmployeeDisplaySlice(selectedEmployee).positionDepartment}
+                </div>
+                <div className="mt-0.5">
+                  {availabilityLabel(selectedEmployee)}
+                  {selectedEmployee.availability.substituteEmployeeId ? (
+                    <span className="text-foreground/80">
+                      {" · "}
+                      {t("master.item.responsibles.dialogSubstituteLine", {
+                        name:
+                          substituteName(selectedEmployee.availability.substituteEmployeeId, sortedEmployees) ?? "—",
+                      })}
+                    </span>
+                  ) : null}
+                </div>
+                <div className="mt-1 flex flex-wrap gap-1">
+                  {employeeLinkedToItemBrandScope(selectedEmployee, itemBrandId) ? (
+                    <span className="rounded bg-background/80 px-1.5 py-px text-[9px] font-medium text-foreground/80 ring-1 ring-border/60">
+                      {t("master.item.responsibles.dialogBadgeBrand")}
+                    </span>
+                  ) : null}
+                  {employeeLinkedToItemCategoryScope(selectedEmployee, itemCategoryId) ? (
+                    <span className="rounded bg-background/80 px-1.5 py-px text-[9px] font-medium text-foreground/80 ring-1 ring-border/60">
+                      {t("master.item.responsibles.dialogBadgeCategory")}
+                    </span>
+                  ) : null}
+                </div>
+              </div>
+            ) : null}
 
             <div className="flex flex-col gap-0.5">
               <Label className="text-xs">{t("master.item.responsibles.colComment")}</Label>

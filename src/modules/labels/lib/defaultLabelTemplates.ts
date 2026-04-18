@@ -1,0 +1,133 @@
+import type { LabelTemplate } from "../model";
+
+const now = () => new Date().toISOString();
+
+/**
+ * Three built-in templates for first-run seed. Not print-ready artwork — valid structural placeholders.
+ */
+export function buildDefaultLabelTemplates(): LabelTemplate[] {
+  const t = now();
+  return [
+    {
+      id: "label-tpl-sys-item",
+      name: "Товарная этикетка",
+      description: "Наименование, код и основной штрихкод.",
+      kind: "ITEM_LABEL",
+      paperType: "LABEL",
+      sizeMm: { width: 58, height: 40 },
+      isActive: true,
+      isDefault: true,
+      isArchived: false,
+      isSystem: true,
+      tags: ["system", "builtin"],
+      createdAt: t,
+      updatedAt: t,
+      elements: [
+        {
+          id: "el-title",
+          type: "text",
+          xMm: 2,
+          yMm: 4,
+          widthMm: 54,
+          heightMm: 8,
+          binding: { kind: "field", path: "item.name" },
+          style: { fontSizeMm: 2.8, fontWeight: "bold", textAlign: "left" },
+        },
+        {
+          id: "el-code",
+          type: "text",
+          xMm: 2,
+          yMm: 13,
+          widthMm: 54,
+          heightMm: 5,
+          binding: { kind: "field", path: "item.code" },
+          style: { fontSizeMm: 2.2, textAlign: "left" },
+        },
+        {
+          id: "el-bc",
+          type: "barcode",
+          xMm: 4,
+          yMm: 20,
+          widthMm: 50,
+          heightMm: 14,
+          binding: { kind: "primary_barcode" },
+          options: { showHumanReadableText: true },
+        },
+      ],
+    },
+    {
+      id: "label-tpl-sys-price",
+      name: "Ценник",
+      description: "Название и цена продажи.",
+      kind: "PRICE_TAG",
+      paperType: "LABEL",
+      sizeMm: { width: 50, height: 30 },
+      isActive: true,
+      isDefault: false,
+      isArchived: false,
+      isSystem: true,
+      tags: ["system", "builtin"],
+      createdAt: t,
+      updatedAt: t,
+      elements: [
+        {
+          id: "el-name",
+          type: "text",
+          xMm: 2,
+          yMm: 3,
+          widthMm: 46,
+          heightMm: 8,
+          binding: { kind: "field", path: "item.name" },
+          style: { fontSizeMm: 2.4, fontWeight: "bold", textAlign: "center" },
+        },
+        {
+          id: "el-price",
+          type: "text",
+          xMm: 2,
+          yMm: 12,
+          widthMm: 46,
+          heightMm: 10,
+          binding: { kind: "field", path: "item.salePrice" },
+          style: { fontSizeMm: 4, fontWeight: "bold", textAlign: "center" },
+        },
+        {
+          id: "el-border",
+          type: "shape",
+          xMm: 0.5,
+          yMm: 0.5,
+          widthMm: 49,
+          heightMm: 29,
+          shapeKind: "rect",
+          style: { strokeMm: 0.2, stroke: "#333333" },
+        },
+      ],
+    },
+    {
+      id: "label-tpl-sys-qr",
+      name: "QR-наклейка",
+      description: "Компактный QR по основному штрихкоду.",
+      kind: "QR_LABEL",
+      paperType: "LABEL",
+      sizeMm: { width: 25, height: 25 },
+      isActive: true,
+      isDefault: false,
+      isArchived: false,
+      isSystem: true,
+      tags: ["system", "builtin"],
+      createdAt: t,
+      updatedAt: t,
+      elements: [
+        {
+          id: "el-qr",
+          type: "qr",
+          xMm: 3,
+          yMm: 3,
+          widthMm: 19,
+          heightMm: 19,
+          binding: { kind: "primary_barcode" },
+          options: { errorCorrection: "M" },
+        },
+      ],
+    },
+  ];
+}

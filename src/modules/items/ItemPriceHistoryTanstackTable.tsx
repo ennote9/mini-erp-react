@@ -91,13 +91,16 @@ export function ItemPriceHistoryTanstackTable(props: Props) {
             cell: ({ row }) => {
               const r = row.original;
               return (
-                <div className="flex justify-end" onClick={(e) => e.stopPropagation()}>
+                <div
+                  className="block w-full text-right leading-none"
+                  onClick={(e) => e.stopPropagation()}
+                >
                   {r.status === "scheduled" && !r.cancelledAt ? (
                     <Button
                       type="button"
                       variant="outline"
                       size="sm"
-                      className="h-7 px-2 text-[10px]"
+                      className="inline-flex h-7 max-w-full px-2 text-[10px]"
                       disabled={busy}
                       data-testid="item-prices-row-cancel-scheduled"
                       onClick={() => onCancelScheduled(r)}
@@ -105,7 +108,7 @@ export function ItemPriceHistoryTanstackTable(props: Props) {
                       {t("master.item.prices.actionCancel")}
                     </Button>
                   ) : (
-                    <span className="text-[10px] text-muted-foreground">—</span>
+                    <span className="inline-block text-[10px] text-muted-foreground">—</span>
                   )}
                 </div>
               );
@@ -201,7 +204,7 @@ export function ItemPriceHistoryTanstackTable(props: Props) {
       className="overflow-x-auto rounded-lg border border-border/60 bg-card/20 shadow-sm"
       data-testid="item-prices-history-table"
     >
-      <div className="relative inline-block min-w-full align-top" style={{ width: Math.max(totalWidth, 640) }}>
+      <div className="relative inline-block align-top" style={{ width: Math.max(totalWidth, 640) }}>
         <table
           className="w-full border-collapse table-fixed text-xs leading-tight"
           style={{ width: Math.max(totalWidth, 640) }}
@@ -223,12 +226,14 @@ export function ItemPriceHistoryTanstackTable(props: Props) {
                   const hasActiveFilter = headerFilterState?.[header.column.id] === true;
                   const isOpenFilterField = openHeaderFilterFieldId === header.column.id;
                   const isLastHeaderCell = header.index === headerGroup.headers.length - 1;
+                  const isActionsHeader = header.column.id === "actions";
 
                   return (
                     <th
                       key={header.id}
                       className={cn(
-                        "group relative h-8 select-none px-2 py-1.5",
+                        "group relative h-8 select-none py-1.5",
+                        isActionsHeader ? "pl-2 pr-0" : "px-2",
                         !isLastHeaderCell && "border-r border-border/50",
                         meta?.align === "right"
                           ? "text-right"
@@ -272,6 +277,10 @@ export function ItemPriceHistoryTanstackTable(props: Props) {
                                 )}
                               </span>
                             </button>
+                          ) : isActionsHeader ? (
+                            <div className="w-full py-px pl-0 pr-0 text-right text-[10px] font-medium uppercase leading-tight tracking-wide text-muted-foreground">
+                              {flexRender(header.column.columnDef.header, header.getContext())}
+                            </div>
                           ) : (
                             <div
                               className={cn(
@@ -349,7 +358,8 @@ export function ItemPriceHistoryTanstackTable(props: Props) {
                         <td
                           key={cell.id}
                           className={cn(
-                            "px-2 py-2 align-top",
+                            "py-2 align-top",
+                            isActions ? "pl-2 pr-0" : "px-2",
                             !isLastBodyCell && "border-r border-border/50",
                             !isActions && "max-w-0",
                             cmeta?.align === "right"

@@ -16,6 +16,7 @@ import {
   Users,
   Warehouse,
   Route,
+  Printer,
   ScanBarcode,
   UserCog,
 } from "lucide-react";
@@ -25,6 +26,9 @@ const PAGE_TITLES: Record<string, string> = {
   "/": "routes.dashboard",
   "/items": "routes.items",
   "/barcodes": "routes.barcodes",
+  "/labels": "routes.labels",
+  "/labels/workspace": "routes.labelsWorkspace",
+  "/labels/operations": "routes.labelsOperations",
   "/brands": "routes.brands",
   "/categories": "routes.categories",
   "/suppliers": "routes.suppliers",
@@ -77,6 +81,8 @@ function getPageIcon(
   if (pathname === "/") return LayoutDashboard;
   if (pathname === "/items" || pathname.match(/^\/items\/[^/]+$/)) return Package;
   if (pathname === "/barcodes") return ScanBarcode;
+  if (pathname === "/labels" || pathname === "/labels/workspace" || pathname === "/labels/operations")
+    return Printer;
   if (pathname === "/brands" || pathname.match(/^\/brands\/[^/]+$/)) return Tag;
   if (pathname === "/categories" || pathname.match(/^\/categories\/[^/]+$/))
     return FolderOpen;
