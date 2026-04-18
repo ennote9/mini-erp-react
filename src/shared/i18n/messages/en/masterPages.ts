@@ -86,6 +86,7 @@ export const masterPagesEn = {
       cardDescription:
         "Up to {{max}} images (JPG, PNG, WebP, 10 MB each). Upload accepts multiple files. Arrows change selection; drag thumbnails to reorder. Stored locally.",
       uploadImage: "Upload image",
+      uploadImageShort: "Upload",
       maxReached: "Maximum {{max}} images reached.",
       previewLoadError: "Could not load image preview.",
       saveMetaFailed: "Could not save item metadata to disk.",
@@ -109,6 +110,8 @@ export const masterPagesEn = {
       replace: "Replace",
       replaceTitle: "Replace selected image",
       openFullSize: "Open full size",
+      /** Short label for the inline Open action next to Upload on the Images tab. */
+      openImageShort: "Open",
       openFullSizeTitle: "Open full size",
       remove: "Remove",
       removeTitle: "Remove selected image",
@@ -121,6 +124,8 @@ export const masterPagesEn = {
       nextImage: "Next image",
       errorFileTooLarge: "Image must be 10 MB or smaller.",
       errorFileType: "Allowed types: JPG, JPEG, PNG, WebP.",
+      errorBrowserPersist:
+        "Could not store the image in browser storage (quota full or storage unavailable). Try a smaller file or free disk space.",
       errorSlotFull:
         "You can add up to {{max}} images per item. Remove one to add another.",
       bytesB: "{{n}} B",

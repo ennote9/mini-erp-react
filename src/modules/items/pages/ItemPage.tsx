@@ -16,7 +16,6 @@ import { Tabs } from "radix-ui";
 import {
   Card,
   CardContent,
-  CardDescription,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
@@ -338,12 +337,12 @@ export function ItemPage() {
           aria-label={t("master.item.backToListAria")}
         />
         {itemRecordId ? (
-          <div className="ml-1 flex flex-wrap gap-2">
+          <div className="ml-1 flex flex-wrap gap-1.5">
             <Button
               type="button"
               variant="outline"
               size="sm"
-              className="h-7 shrink-0 px-2.5 text-xs"
+              className="h-6 shrink-0 px-2 text-xs"
               onClick={openStockBalancesForItem}
             >
               {t("master.item.openAllStockBalances")}
@@ -352,7 +351,7 @@ export function ItemPage() {
               type="button"
               variant="outline"
               size="sm"
-              className="h-7 shrink-0 px-2.5 text-xs"
+              className="h-6 shrink-0 px-2 text-xs"
               onClick={openStockMovementsForItem}
             >
               {t("master.item.openAllStockMovements")}
@@ -361,7 +360,7 @@ export function ItemPage() {
               type="button"
               variant="outline"
               size="sm"
-              className="h-7 shrink-0 px-2.5 text-xs"
+              className="h-6 shrink-0 px-2 text-xs"
               onClick={openMarkdownForItem}
             >
               {t("master.item.openAllMarkdown")}
@@ -370,34 +369,34 @@ export function ItemPage() {
         ) : null}
       </div>
       <div className="doc-page__header">
-        <div className="doc-header">
+        <div className="doc-header gap-3">
           <div>
             <div className="doc-header__title-row">
-              <h2 className="doc-header__title">{displayTitle}</h2>
+              <h2 className="doc-header__title !text-base">{displayTitle}</h2>
             </div>
           </div>
           <div className="doc-header__right">
             {(hasErrors(combinedIssues) || hasWarnings(combinedIssues)) && (
               <DocumentIssueStrip issues={combinedIssues} />
             )}
-            <div className="doc-header__actions">
-              <Button type="button" onClick={handleSave}>
-                <Save aria-hidden />
+            <div className="doc-header__actions gap-1.5">
+              <Button type="button" size="sm" className="h-7 gap-1 px-3 text-xs" onClick={handleSave}>
+                <Save className="h-3.5 w-3.5" aria-hidden />
                 {t("common.save")}
               </Button>
-              <Button type="button" variant="outline" onClick={handleCancel}>
-                <X aria-hidden />
+              <Button type="button" variant="outline" size="sm" className="h-7 gap-1 px-3 text-xs" onClick={handleCancel}>
+                <X className="h-3.5 w-3.5" aria-hidden />
                 {t("common.cancel")}
               </Button>
             </div>
           </div>
         </div>
       </div>
-      <Card className="mt-4 max-w-2xl w-full border-0 shadow-none">
+      <Card className="mt-3 w-full max-w-3xl border-0 shadow-none">
         <Tabs.Root value={activeTab} onValueChange={setActiveTab}>
-          <CardHeader className="p-2 pb-0.5 space-y-2">
+          <CardHeader className="space-y-1 p-1.5 pb-0">
             <Tabs.List
-              className="inline-flex min-h-8 w-full max-w-full flex-wrap items-stretch overflow-hidden rounded-md border border-input bg-background sm:w-fit"
+              className="inline-flex min-h-7 w-full max-w-full flex-wrap items-stretch overflow-hidden rounded-md border border-input bg-background sm:w-fit"
               aria-label={t("master.item.tabsAria")}
             >
               <ButtonGroup className="w-full flex-wrap rounded-none border-0 bg-transparent sm:w-auto" aria-label={t("master.item.tabsAria")}>
@@ -407,7 +406,7 @@ export function ItemPage() {
                     <Tabs.Trigger
                       value={tab.value}
                       className={cn(
-                        "inline-flex h-8 flex-1 items-center justify-center rounded-none border-0 bg-background px-3 text-sm font-medium transition-colors sm:flex-initial",
+                        "inline-flex h-7 flex-1 items-center justify-center rounded-none border-0 bg-background px-2.5 text-xs font-medium transition-colors sm:flex-initial",
                         "text-foreground hover:bg-accent hover:text-accent-foreground",
                         "data-[state=active]:bg-primary data-[state=active]:text-primary-foreground",
                         "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
@@ -420,32 +419,30 @@ export function ItemPage() {
               </ButtonGroup>
             </Tabs.List>
           </CardHeader>
-          <CardContent className="p-2 pt-1">
+          <CardContent className="px-1.5 pb-1.5 pt-[7mm]">
             <Tabs.Content value="main" className="outline-none focus-visible:outline-none">
-              <div className="space-y-2">
+              <div className="w-full max-w-[33.75rem]">
+              <div className="space-y-1.5">
                 <div>
-                  <CardTitle className="text-[0.9rem] font-semibold">{t("master.common.detailsTitle")}</CardTitle>
-                  <CardDescription className="text-xs">
-                    {t("master.item.detailsDescription")}
-                  </CardDescription>
+                  <CardTitle className="text-sm font-semibold leading-tight">{t("master.common.detailsTitle")}</CardTitle>
                 </div>
-                <div className="grid gap-2 sm:grid-cols-2">
+                <div className="grid gap-1.5 sm:grid-cols-2">
                   <div className="flex flex-col gap-0.5 sm:col-span-2">
-                    <Label htmlFor="item-code" className="text-sm">
-                      {t("doc.columns.code")} <span className="text-destructive">{t("doc.page.requiredStar")}</span>
+                    <Label htmlFor="item-name" className="text-xs">
+                      {t("doc.columns.name")} <span className="text-destructive">{t("doc.page.requiredStar")}</span>
                     </Label>
                     <Input
-                      id="item-code"
+                      id="item-name"
                       type="text"
-                      value={form.code}
-                      onChange={(e) => setForm((f) => ({ ...f, code: e.target.value }))}
-                      placeholder={t("master.item.codePlaceholder")}
-                      className="h-8 text-sm"
+                      value={form.name}
+                      onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
+                      placeholder={t("master.item.namePlaceholder")}
+                      className="h-7 text-xs"
                     />
                   </div>
                   {createKind === "TESTER" && (
                     <div className="flex flex-col gap-0.5 sm:col-span-2">
-                      <Label htmlFor="item-base" className="text-sm">
+                      <Label htmlFor="item-base" className="text-xs">
                         {t("master.item.baseItem")} <span className="text-destructive">{t("doc.page.requiredStar")}</span>
                       </Label>
                       <select
@@ -461,7 +458,7 @@ export function ItemPage() {
                           }));
                         }}
                         className={cn(
-                          "flex h-8 w-full rounded border border-input bg-background px-2 py-1 text-sm text-foreground",
+                          "flex h-7 w-full rounded border border-input bg-background px-2 py-0.5 text-xs text-foreground",
                           "focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50",
                         )}
                       >
@@ -478,20 +475,20 @@ export function ItemPage() {
                     </div>
                   )}
                   <div className="flex flex-col gap-0.5">
-                    <Label htmlFor="item-name" className="text-sm">
-                      {t("doc.columns.name")} <span className="text-destructive">{t("doc.page.requiredStar")}</span>
+                    <Label htmlFor="item-code" className="text-xs">
+                      {t("doc.columns.code")} <span className="text-destructive">{t("doc.page.requiredStar")}</span>
                     </Label>
                     <Input
-                      id="item-name"
+                      id="item-code"
                       type="text"
-                      value={form.name}
-                      onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
-                      placeholder={t("master.item.namePlaceholder")}
-                      className="h-8 text-sm"
+                      value={form.code}
+                      onChange={(e) => setForm((f) => ({ ...f, code: e.target.value }))}
+                      placeholder={t("master.item.codePlaceholder")}
+                      className="h-7 text-xs"
                     />
                   </div>
                   <div className="flex flex-col gap-0.5">
-                    <Label htmlFor="item-uom" className="text-sm">
+                    <Label htmlFor="item-uom" className="text-xs">
                       {t("doc.columns.uom")} <span className="text-destructive">{t("doc.page.requiredStar")}</span>
                     </Label>
                     <Input
@@ -500,11 +497,11 @@ export function ItemPage() {
                       value={form.uom}
                       onChange={(e) => setForm((f) => ({ ...f, uom: e.target.value }))}
                       placeholder={t("master.item.uomPlaceholder")}
-                      className="h-8 text-sm"
+                      className="h-7 text-xs"
                     />
                   </div>
                   <div className="flex flex-col gap-0.5">
-                    <Label htmlFor="item-accounting-profile" className="text-sm">
+                    <Label htmlFor="item-accounting-profile" className="text-xs">
                       {t("master.item.accountingProfile")}
                     </Label>
                     <Input
@@ -513,17 +510,17 @@ export function ItemPage() {
                       value={form.accountingProfile}
                       onChange={(e) => setForm((f) => ({ ...f, accountingProfile: e.target.value }))}
                       placeholder={t("master.common.optionalPlaceholder")}
-                      className="h-8 text-sm"
+                      className="h-7 text-xs"
                     />
                   </div>
                   <div className="flex flex-col gap-0.5">
-                    <Label htmlFor="item-brand" className="text-sm">{t("doc.columns.brand")}</Label>
+                    <Label htmlFor="item-brand" className="text-xs">{t("doc.columns.brand")}</Label>
                     <select
                       id="item-brand"
                       value={form.brandId}
                       onChange={(e) => setForm((f) => ({ ...f, brandId: e.target.value }))}
                       className={cn(
-                        "flex h-8 w-full rounded border border-input bg-background px-2 py-1 text-sm text-foreground",
+                        "flex h-7 w-full rounded border border-input bg-background px-2 py-0.5 text-xs text-foreground",
                         "focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50",
                       )}
                     >
@@ -536,13 +533,13 @@ export function ItemPage() {
                     </select>
                   </div>
                   <div className="flex flex-col gap-0.5">
-                    <Label htmlFor="item-category" className="text-sm">{t("doc.columns.category")}</Label>
+                    <Label htmlFor="item-category" className="text-xs">{t("doc.columns.category")}</Label>
                     <select
                       id="item-category"
                       value={form.categoryId}
                       onChange={(e) => setForm((f) => ({ ...f, categoryId: e.target.value }))}
                       className={cn(
-                        "flex h-8 w-full rounded border border-input bg-background px-2 py-1 text-sm text-foreground",
+                        "flex h-7 w-full rounded border border-input bg-background px-2 py-0.5 text-xs text-foreground",
                         "focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50",
                       )}
                     >
@@ -555,7 +552,7 @@ export function ItemPage() {
                     </select>
                   </div>
                   <div className="flex flex-col gap-0.5">
-                    <Label htmlFor="item-purchasePrice" className="text-sm">{t("doc.columns.purchasePrice")}</Label>
+                    <Label htmlFor="item-purchasePrice" className="text-xs">{t("doc.columns.purchasePrice")}</Label>
                     <Input
                       id="item-purchasePrice"
                       type="number"
@@ -564,11 +561,11 @@ export function ItemPage() {
                       value={form.purchasePrice}
                       onChange={(e) => setForm((f) => ({ ...f, purchasePrice: e.target.value }))}
                       placeholder="0.00"
-                      className="h-8 text-sm"
+                      className="h-7 text-xs"
                     />
                   </div>
                   <div className="flex flex-col gap-0.5">
-                    <Label htmlFor="item-salePrice" className="text-sm">{t("doc.columns.salePrice")}</Label>
+                    <Label htmlFor="item-salePrice" className="text-xs">{t("doc.columns.salePrice")}</Label>
                     <Input
                       id="item-salePrice"
                       type="number"
@@ -577,7 +574,7 @@ export function ItemPage() {
                       value={form.salePrice}
                       onChange={(e) => setForm((f) => ({ ...f, salePrice: e.target.value }))}
                       placeholder="0.00"
-                      className="h-8 text-sm"
+                      className="h-7 text-xs"
                     />
                   </div>
                   <div className="flex items-center space-x-2 sm:col-span-2">
@@ -590,13 +587,13 @@ export function ItemPage() {
                     />
                     <Label
                       htmlFor="item-active"
-                      className="cursor-pointer text-sm font-normal"
+                      className="cursor-pointer text-xs font-normal"
                     >
                       {t("ops.master.activeCell.active")}
                     </Label>
                   </div>
                   <div className="flex flex-col gap-0.5 sm:col-span-2">
-                    <Label htmlFor="item-description" className="text-sm">{t("common.description")}</Label>
+                    <Label htmlFor="item-description" className="text-xs">{t("common.description")}</Label>
                     <Textarea
                       id="item-description"
                       value={form.description}
@@ -605,11 +602,11 @@ export function ItemPage() {
                       }
                       placeholder={t("common.optional")}
                       rows={2}
-                      className="resize-none h-auto min-h-[4.5rem] text-sm"
+                      className="resize-none h-auto min-h-[3.75rem] text-xs leading-snug"
                     />
                   </div>
                   {((isNew && createKind === "TESTER") || (!isNew && item!.itemKind === "TESTER")) && (
-                    <div className="sm:col-span-2 rounded-md border border-border/60 bg-muted/20 p-2 text-xs">
+                    <div className="sm:col-span-2 rounded-md border border-border/60 bg-muted/20 p-1.5 text-[11px] leading-snug">
                       <div className="font-medium text-foreground/90">{t("master.item.baseItemSectionTitle")}</div>
                       {baseItemForTesterView ? (
                         <div className="mt-1 space-y-1 text-muted-foreground">
@@ -632,70 +629,65 @@ export function ItemPage() {
                   )}
                 </div>
               </div>
+              </div>
             </Tabs.Content>
             <Tabs.Content value="images" className="outline-none focus-visible:outline-none">
-              <div className="space-y-2">
-                <p className="text-xs text-muted-foreground">{t("master.item.images.tabHint")}</p>
-                <ItemImagesCard
-                  isNew={isNew}
-                  itemId={isNew ? undefined : id}
-                  images={item?.images ?? []}
-                  onImagesChanged={() => setImagesRevision((n) => n + 1)}
-                />
-              </div>
+              <ItemImagesCard
+                isNew={isNew}
+                itemId={isNew ? undefined : id}
+                images={item?.images ?? []}
+                onImagesChanged={() => setImagesRevision((n) => n + 1)}
+              />
             </Tabs.Content>
             <Tabs.Content value="barcodes" className="outline-none focus-visible:outline-none">
-              <div className="space-y-2">
-                <p className="text-xs text-muted-foreground">{t("master.item.barcodes.tabHint")}</p>
-                <ItemBarcodesCard
-                  isNew={isNew}
-                  itemId={isNew ? undefined : id}
-                  barcodes={item?.barcodes ?? []}
-                  onBarcodesChanged={() => setBarcodesRevision((n) => n + 1)}
-                />
-              </div>
+              <ItemBarcodesCard
+                isNew={isNew}
+                itemId={isNew ? undefined : id}
+                barcodes={item?.barcodes ?? []}
+                onBarcodesChanged={() => setBarcodesRevision((n) => n + 1)}
+              />
             </Tabs.Content>
             {showTestersTab ? (
               <Tabs.Content value="testers" className="outline-none focus-visible:outline-none">
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <p className="text-xs text-muted-foreground">{t("master.item.testers.tabHint")}</p>
-	                    {itemRecordId ? (
-	                      <Button
-	                        type="button"
-	                        size="sm"
-	                        variant="outline"
-	                        onClick={() =>
-	                          navigate(
-	                            appendReturnTo(
-	                              `/items/new?kind=TESTER&baseItemId=${encodeURIComponent(itemRecordId)}`,
-	                              currentReturnTo,
-	                            ),
-	                          )
-	                        }
-	                      >
+                <div className="space-y-1.5">
+                  {itemRecordId ? (
+                    <div className="flex justify-end">
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        className="h-7 px-2.5 text-xs"
+                        onClick={() =>
+                          navigate(
+                            appendReturnTo(
+                              `/items/new?kind=TESTER&baseItemId=${encodeURIComponent(itemRecordId)}`,
+                              currentReturnTo,
+                            ),
+                          )
+                        }
+                      >
                         {t("master.item.testers.createTester")}
                       </Button>
-                    ) : null}
-                  </div>
+                    </div>
+                  ) : null}
                   <div className="rounded-md border border-border/70">
                     {relatedTesters.length === 0 ? (
-                      <div className="p-3 text-xs text-muted-foreground">{t("master.item.testers.empty")}</div>
+                      <div className="p-2 text-[11px] text-muted-foreground">{t("master.item.testers.empty")}</div>
                     ) : (
-                      <table className="w-full text-xs">
+                      <table className="w-full text-[11px]">
                         <thead className="bg-muted/30">
                           <tr>
-                            <th className="px-2 py-1 text-left">{t("doc.columns.code")}</th>
-                            <th className="px-2 py-1 text-left">{t("doc.columns.name")}</th>
-                            <th className="px-2 py-1 text-left">{t("common.actions")}</th>
+                            <th className="px-2 py-0.5 text-left font-medium">{t("doc.columns.code")}</th>
+                            <th className="px-2 py-0.5 text-left font-medium">{t("doc.columns.name")}</th>
+                            <th className="px-2 py-0.5 text-left font-medium">{t("common.actions")}</th>
                           </tr>
                         </thead>
                         <tbody>
                           {relatedTesters.map((row) => (
                             <tr key={row.id} className="border-t border-border/60">
-                              <td className="px-2 py-1">{row.code}</td>
-                              <td className="px-2 py-1">{row.name}</td>
-                              <td className="px-2 py-1">
+                              <td className="px-2 py-0.5">{row.code}</td>
+                              <td className="px-2 py-0.5">{row.name}</td>
+                              <td className="px-2 py-0.5">
                                 <Link className="list-table__link" to={`/items/${encodeURIComponent(row.id)}`}>
                                   {t("common.open")}
                                 </Link>

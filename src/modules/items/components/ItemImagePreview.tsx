@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
+import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 import type { ItemImage } from "../model";
 import { Button } from "@/components/ui/button";
-import { ChevronLeft, ChevronRight, ExternalLink, Star, Trash2, Upload } from "lucide-react";
+import { ChevronLeft, ChevronRight, ExternalLink, MoreVertical, Upload } from "lucide-react";
 import { useTranslation } from "@/shared/i18n/context";
 import { useAppDisplayFormatters } from "@/shared/formatting";
 
@@ -23,6 +24,11 @@ type Props = {
   canSelectPrevious: boolean;
   canSelectNext: boolean;
   busy?: boolean;
+  /** Add-upload control sits in the bottom row with arrows and the menu. */
+  onUploadClick: () => void;
+  /** When false, upload button is hidden and max-count hint is shown in the row area. */
+  canAddMore: boolean;
+  maxImagesCount: number;
 };
 
 function formatBytes(
@@ -56,6 +62,9 @@ export function ItemImagePreview({
   canSelectPrevious,
   canSelectNext,
   busy,
+  onUploadClick,
+  canAddMore,
+  maxImagesCount,
 }: Props) {
   const { t } = useTranslation();
   const { formatNumber } = useAppDisplayFormatters();
@@ -74,18 +83,18 @@ export function ItemImagePreview({
     busy || image.isPrimary || !onSetPrimary || !canSetPrimary;
 
   return (
-    <div className="flex flex-col gap-2">
-      <div className="relative overflow-hidden rounded-md border border-input bg-background aspect-[4/3] max-h-[220px] flex items-center justify-center">
+    <div className="flex flex-col gap-1.5">
+      <div className="relative flex aspect-square w-full max-h-[320px] max-w-[320px] min-w-0 self-start items-center justify-center overflow-hidden rounded-md border border-input bg-background">
         {image.isPrimary && (
           <span className="absolute left-1.5 top-1.5 z-[1] rounded bg-primary/90 px-1.5 py-0.5 text-[10px] font-medium text-primary-foreground">
             {t("master.item.images.badgePrimary")}
           </span>
         )}
         {(loadState === "loading" || loadState === "idle") && (
-          <p className="text-xs text-muted-foreground px-2 text-center">{t("master.item.images.loadingPreview")}</p>
+          <p className="px-2 text-center text-[11px] text-muted-foreground">{t("master.item.images.loadingPreview")}</p>
         )}
         {loadState === "error" && (
-          <p className="text-xs text-destructive px-2 text-center">{t("master.item.images.previewUnavailable")}</p>
+          <p className="px-2 text-center text-[11px] text-destructive">{t("master.item.images.previewUnavailable")}</p>
         )}
         {loadState === "ready" && previewUrl && (
           <img
@@ -96,7 +105,7 @@ export function ItemImagePreview({
           />
         )}
         {loadState === "ready" && !previewUrl && (
-          <p className="text-xs text-muted-foreground px-2 text-center">{t("master.item.images.noPreviewUrl")}</p>
+          <p className="px-2 text-center text-[11px] text-muted-foreground">{t("master.item.images.noPreviewUrl")}</p>
         )}
       </div>
       {showDevDecodeHint && (
@@ -109,7 +118,7 @@ export function ItemImagePreview({
           </p>
         </div>
       )}
-      <div className="space-y-0.5 text-xs text-muted-foreground">
+      <div className="space-y-0.5 text-[11px] text-muted-foreground">
         <p className="truncate font-medium text-foreground" title={image.fileName}>
           {image.fileName}
         </p>
@@ -118,93 +127,107 @@ export function ItemImagePreview({
           {dim ? ` · ${dim}` : ""}
         </p>
       </div>
-      <div className="flex flex-wrap gap-1.5 pt-0.5">
+      <div className="flex flex-wrap items-center gap-1 pt-0.5">
         <Button
           type="button"
           variant="outline"
           size="sm"
-          className="h-8 gap-1"
-          onClick={onReplace}
-          disabled={busy}
-          title={t("master.item.images.replaceTitle")}
-          aria-label={t("master.item.images.replaceTitle")}
-        >
-          <Upload className="h-3.5 w-3.5" />
-          {t("master.item.images.replace")}
-        </Button>
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          className="h-8 gap-1"
-          onClick={onOpenFullSize}
-          disabled={busy}
-          title={t("master.item.images.openFullSizeTitle")}
-          aria-label={t("master.item.images.openFullSizeTitle")}
-        >
-          <ExternalLink className="h-3.5 w-3.5" />
-          {t("master.item.images.openFullSize")}
-        </Button>
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          className="h-8 gap-1 text-destructive hover:text-destructive"
-          onClick={onRemove}
-          disabled={busy}
-          title={t("master.item.images.removeTitle")}
-          aria-label={t("master.item.images.removeTitle")}
-        >
-          <Trash2 className="h-3.5 w-3.5" />
-          {t("master.item.images.remove")}
-        </Button>
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          className="h-8 gap-1"
-          onClick={() => onSetPrimary?.()}
-          disabled={primaryDisabled}
-          title={
-            !canSetPrimary
-              ? t("master.item.images.setPrimaryTitleDisabledNoSelection")
-              : image.isPrimary
-                ? t("master.item.images.setPrimaryTitleAlready")
-                : t("master.item.images.setPrimaryTitle")
-          }
-          aria-label={
-            image.isPrimary
-              ? t("master.item.images.setPrimaryAriaAlready")
-              : t("master.item.images.setPrimaryTitle")
-          }
-        >
-          <Star className="h-3.5 w-3.5" />
-          {t("master.item.images.setPrimary")}
-        </Button>
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          className="h-8 w-8 p-0"
+          className="h-7 w-7 shrink-0 p-0"
           onClick={onSelectPrevious}
           disabled={busy || !canSelectPrevious}
           title={t("master.item.images.previousImage")}
           aria-label={t("master.item.images.previousImage")}
         >
-          <ChevronLeft className="h-4 w-4" />
+          <ChevronLeft className="h-3.5 w-3.5" />
         </Button>
         <Button
           type="button"
           variant="outline"
           size="sm"
-          className="h-8 w-8 p-0"
+          className="h-7 w-7 shrink-0 p-0"
           onClick={onSelectNext}
           disabled={busy || !canSelectNext}
           title={t("master.item.images.nextImage")}
           aria-label={t("master.item.images.nextImage")}
         >
-          <ChevronRight className="h-4 w-4" />
+          <ChevronRight className="h-3.5 w-3.5" />
         </Button>
+        {canAddMore ? (
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="h-7 shrink-0 gap-1 px-2 text-xs"
+            onClick={onUploadClick}
+            disabled={busy}
+            title={t("master.item.images.uploadImage")}
+            aria-label={t("master.item.images.uploadImage")}
+          >
+            <Upload className="h-3.5 w-3.5 shrink-0" aria-hidden />
+            <span className="truncate">{t("master.item.images.uploadImageShort")}</span>
+          </Button>
+        ) : (
+          <span className="min-w-0 shrink text-[11px] text-muted-foreground sm:max-w-[14rem]">
+            {t("master.item.images.maxReached", { max: maxImagesCount })}
+          </span>
+        )}
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          className="h-7 shrink-0 gap-1 px-2 text-xs"
+          onClick={() => void onOpenFullSize()}
+          disabled={busy}
+          title={t("master.item.images.openFullSize")}
+          aria-label={t("master.item.images.openFullSize")}
+        >
+          <ExternalLink className="h-3.5 w-3.5 shrink-0" aria-hidden />
+          <span className="truncate">{t("master.item.images.openImageShort")}</span>
+        </Button>
+        <DropdownMenu.Root>
+          <DropdownMenu.Trigger asChild>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="h-7 w-7 shrink-0 p-0"
+              disabled={busy}
+              title={`${t("common.actions")} — ${image.fileName}`}
+              aria-label={`${t("common.actions")} — ${image.fileName}`}
+            >
+              <MoreVertical className="h-3.5 w-3.5" aria-hidden />
+            </Button>
+          </DropdownMenu.Trigger>
+          <DropdownMenu.Portal>
+            <DropdownMenu.Content
+              align="end"
+              sideOffset={6}
+              className="z-[120] min-w-[12rem] rounded-md border border-input bg-popover p-1 shadow-md"
+            >
+              <DropdownMenu.Item
+                className="cursor-pointer rounded-sm px-2 py-1.5 text-xs text-popover-foreground outline-none hover:bg-accent hover:text-accent-foreground data-[disabled]:pointer-events-none data-[disabled]:opacity-45"
+                disabled={primaryDisabled}
+                onSelect={() => onSetPrimary?.()}
+              >
+                {t("master.item.images.setPrimary")}
+              </DropdownMenu.Item>
+              <DropdownMenu.Item
+                className="cursor-pointer rounded-sm px-2 py-1.5 text-xs text-popover-foreground outline-none hover:bg-accent hover:text-accent-foreground data-[disabled]:pointer-events-none data-[disabled]:opacity-45"
+                disabled={busy}
+                onSelect={() => onReplace()}
+              >
+                {t("master.item.images.replace")}
+              </DropdownMenu.Item>
+              <DropdownMenu.Item
+                className="cursor-pointer rounded-sm px-2 py-1.5 text-xs text-destructive outline-none hover:bg-destructive/10 data-[disabled]:pointer-events-none data-[disabled]:opacity-45"
+                disabled={busy}
+                onSelect={() => void onRemove()}
+              >
+                {t("master.item.images.remove")}
+              </DropdownMenu.Item>
+            </DropdownMenu.Content>
+          </DropdownMenu.Portal>
+        </DropdownMenu.Root>
       </div>
     </div>
   );

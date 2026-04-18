@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 import { Dialog } from "radix-ui";
 import type { ItemBarcode } from "../model";
 import {
@@ -16,7 +17,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { MoreVertical } from "lucide-react";
 
 type Props = {
   isNew: boolean;
@@ -131,9 +133,8 @@ export function ItemBarcodesCard({ isNew, itemId, barcodes, onBarcodesChanged }:
   if (isNew || !itemId) {
     return (
       <Card className="border-0 shadow-none">
-        <CardHeader className="p-2 pb-0.5">
-          <CardTitle className="text-[0.9rem] font-semibold">{t("master.item.barcodes.title")}</CardTitle>
-          <CardDescription className="text-xs">{t("master.item.barcodes.unsavedHint")}</CardDescription>
+        <CardHeader className="p-1.5 pb-0">
+          <CardTitle className="text-sm font-semibold leading-tight">{t("master.item.barcodes.title")}</CardTitle>
         </CardHeader>
       </Card>
     );
@@ -141,62 +142,94 @@ export function ItemBarcodesCard({ isNew, itemId, barcodes, onBarcodesChanged }:
 
   return (
     <Card className="border-0 shadow-none">
-      <CardHeader className="p-2 pb-0.5">
-        <div className="flex flex-wrap items-start justify-between gap-2">
-          <div className="space-y-1">
-            <CardTitle className="text-[0.9rem] font-semibold">{t("master.item.barcodes.title")}</CardTitle>
-            <CardDescription className="text-xs">{t("master.item.barcodes.description")}</CardDescription>
-          </div>
-          <Button type="button" size="sm" onClick={startCreate}>
+      <CardHeader className="p-1.5 pb-0">
+        <div className="flex flex-wrap items-center justify-between gap-1.5">
+          <CardTitle className="text-sm font-semibold leading-tight">{t("master.item.barcodes.title")}</CardTitle>
+          <Button type="button" size="sm" className="h-7 px-2.5 text-xs" onClick={startCreate}>
             {t("master.item.barcodes.create")}
           </Button>
         </div>
       </CardHeader>
-      <CardContent className="p-2 pt-1 space-y-3">
+      <CardContent className="space-y-2 p-1.5 pt-1">
         {message && (
-          <p className={message.variant === "error" ? "text-xs text-destructive" : "text-xs text-muted-foreground"}>
+          <p
+            className={
+              message.variant === "error" ? "text-[11px] text-destructive" : "text-[11px] text-muted-foreground"
+            }
+          >
             {message.text}
           </p>
         )}
         <div className="overflow-x-auto rounded border border-border/70">
-          <table className="w-full min-w-[720px] text-xs">
+          <table className="w-full min-w-[720px] text-[11px]">
             <thead className="bg-muted/20">
               <tr className="border-b border-border/70">
-                <th className="px-2 py-1 text-left font-medium">{t("master.item.barcodes.codeValue")}</th>
-                <th className="px-2 py-1 text-left font-medium">{t("master.item.barcodes.symbology")}</th>
-                <th className="px-2 py-1 text-left font-medium">{t("master.item.barcodes.packagingLevel")}</th>
-                <th className="px-2 py-1 text-left font-medium">{t("master.item.barcodes.barcodeRole")}</th>
-                <th className="px-2 py-1 text-left font-medium">{t("master.item.barcodes.sourceType")}</th>
-                <th className="px-2 py-1 text-left font-medium">{t("master.item.barcodes.primary")}</th>
-                <th className="px-2 py-1 text-left font-medium">{t("master.item.barcodes.active")}</th>
-                <th className="px-2 py-1 text-right font-medium">{t("common.actions")}</th>
+                <th className="px-2 py-0.5 text-left font-medium">{t("master.item.barcodes.codeValue")}</th>
+                <th className="px-2 py-0.5 text-left font-medium">{t("master.item.barcodes.symbology")}</th>
+                <th className="px-2 py-0.5 text-left font-medium">{t("master.item.barcodes.packagingLevel")}</th>
+                <th className="px-2 py-0.5 text-left font-medium">{t("master.item.barcodes.barcodeRole")}</th>
+                <th className="px-2 py-0.5 text-left font-medium">{t("master.item.barcodes.sourceType")}</th>
+                <th className="px-2 py-0.5 text-left font-medium">{t("master.item.barcodes.primary")}</th>
+                <th className="px-2 py-0.5 text-left font-medium">{t("master.item.barcodes.active")}</th>
+                <th className="px-2 py-0.5 text-right font-medium">{t("common.actions")}</th>
               </tr>
             </thead>
             <tbody>
               {ordered.length === 0 ? (
                 <tr>
-                  <td className="px-2 py-2 text-muted-foreground" colSpan={8}>
+                  <td className="px-2 py-1.5 text-muted-foreground" colSpan={8}>
                     {t("master.item.barcodes.empty")}
                   </td>
                 </tr>
               ) : (
                 ordered.map((row) => (
                   <tr key={row.id} className="border-b border-border/50 last:border-b-0">
-                    <td className="px-2 py-1.5 font-mono">{row.codeValue}</td>
-                    <td className="px-2 py-1.5 whitespace-nowrap">{t(`master.item.barcodes.types.${row.symbology}`)}</td>
-                    <td className="px-2 py-1.5 whitespace-nowrap">{t(`master.item.barcodes.packaging.${row.packagingLevel}`)}</td>
-                    <td className="px-2 py-1.5 whitespace-nowrap">{t(`master.item.barcodes.roles.${row.barcodeRole}`)}</td>
-                    <td className="px-2 py-1.5 whitespace-nowrap">{t(`master.item.barcodes.sources.${row.sourceType}`)}</td>
-                    <td className="px-2 py-1.5">{row.isPrimary ? t("common.yes") : "—"}</td>
-                    <td className="px-2 py-1.5">{row.isActive ? t("common.yes") : "—"}</td>
-                    <td className="px-2 py-1.5 text-right">
-                      <div className="inline-flex gap-1">
-                        <Button type="button" variant="outline" size="sm" className="h-7 px-2 text-xs" onClick={() => startEdit(row)} disabled={busy}>
-                          {t("common.edit")}
-                        </Button>
-                        <Button type="button" variant="outline" size="sm" className="h-7 px-2 text-xs" onClick={() => void handleRemove(row.id)} disabled={busy}>
-                          {t("common.delete")}
-                        </Button>
+                    <td className="px-2 py-1 font-mono">{row.codeValue}</td>
+                    <td className="px-2 py-1 whitespace-nowrap">{t(`master.item.barcodes.types.${row.symbology}`)}</td>
+                    <td className="px-2 py-1 whitespace-nowrap">{t(`master.item.barcodes.packaging.${row.packagingLevel}`)}</td>
+                    <td className="px-2 py-1 whitespace-nowrap">{t(`master.item.barcodes.roles.${row.barcodeRole}`)}</td>
+                    <td className="px-2 py-1 whitespace-nowrap">{t(`master.item.barcodes.sources.${row.sourceType}`)}</td>
+                    <td className="px-2 py-1">{row.isPrimary ? t("common.yes") : "—"}</td>
+                    <td className="px-2 py-1">{row.isActive ? t("common.yes") : "—"}</td>
+                    <td className="px-2 py-1 text-right">
+                      <div className="inline-flex justify-end">
+                        <DropdownMenu.Root>
+                          <DropdownMenu.Trigger asChild>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              className="h-7 w-7 min-w-7 shrink-0 border-0 bg-transparent p-0 text-muted-foreground shadow-none hover:bg-muted/50 hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background data-[state=open]:bg-muted/50 [&_svg]:size-3.5"
+                              disabled={busy}
+                              title={`${t("common.actions")} (${row.codeValue})`}
+                              aria-label={`${t("common.actions")} (${row.codeValue})`}
+                            >
+                              <MoreVertical className="h-3.5 w-3.5" aria-hidden />
+                            </Button>
+                          </DropdownMenu.Trigger>
+                          <DropdownMenu.Portal>
+                            <DropdownMenu.Content
+                              align="end"
+                              sideOffset={6}
+                              className="z-[120] min-w-[10rem] rounded-md border border-input bg-popover p-1 shadow-md"
+                            >
+                              <DropdownMenu.Item
+                                className="cursor-pointer rounded-sm px-2 py-1.5 text-xs text-popover-foreground outline-none hover:bg-accent hover:text-accent-foreground data-[disabled]:pointer-events-none data-[disabled]:opacity-45"
+                                disabled={busy}
+                                onSelect={() => startEdit(row)}
+                              >
+                                {t("common.edit")}
+                              </DropdownMenu.Item>
+                              <DropdownMenu.Item
+                                className="cursor-pointer rounded-sm px-2 py-1.5 text-xs text-destructive outline-none hover:bg-destructive/10 data-[disabled]:pointer-events-none data-[disabled]:opacity-45"
+                                disabled={busy}
+                                onSelect={() => void handleRemove(row.id)}
+                              >
+                                {t("common.delete")}
+                              </DropdownMenu.Item>
+                            </DropdownMenu.Content>
+                          </DropdownMenu.Portal>
+                        </DropdownMenu.Root>
                       </div>
                     </td>
                   </tr>
@@ -220,29 +253,29 @@ export function ItemBarcodesCard({ isNew, itemId, barcodes, onBarcodesChanged }:
         <Dialog.Portal>
           <Dialog.Overlay className="fixed inset-0 z-50 bg-black/50 backdrop-blur-[1px]" />
           <Dialog.Content
-            className="fixed left-1/2 top-1/2 z-50 w-[min(92vw,42rem)] -translate-x-1/2 -translate-y-1/2 rounded-lg border border-border bg-background p-4 shadow-lg focus:outline-none"
+            className="fixed left-1/2 top-1/2 z-50 w-[min(92vw,42rem)] -translate-x-1/2 -translate-y-1/2 rounded-lg border border-border bg-background p-3 shadow-lg focus:outline-none"
           >
-            <Dialog.Title className="text-base font-semibold text-foreground">
+            <Dialog.Title className="text-sm font-semibold leading-tight text-foreground">
               {editingId ? t("master.item.barcodes.editTitle") : t("master.item.barcodes.createTitle")}
             </Dialog.Title>
-            <Dialog.Description className="mt-1 text-sm text-muted-foreground">
+            <Dialog.Description className="mt-0.5 text-xs leading-snug text-muted-foreground">
               {t("master.item.barcodes.dialogDescription")}
             </Dialog.Description>
-            <div className="mt-4 grid gap-2 sm:grid-cols-2">
+            <div className="mt-3 grid gap-1.5 sm:grid-cols-2">
               <div className="flex flex-col gap-0.5 sm:col-span-2">
-                <Label className="text-sm">{t("master.item.barcodes.codeValue")}</Label>
+                <Label className="text-xs">{t("master.item.barcodes.codeValue")}</Label>
                 <Input
                   value={draft.codeValue}
                   onChange={(e) => setDraft((x) => ({ ...x, codeValue: e.target.value }))}
-                  className="h-8 text-sm font-mono"
+                  className="h-7 font-mono text-xs"
                 />
               </div>
               <div className="flex flex-col gap-0.5">
-                <Label className="text-sm">{t("master.item.barcodes.symbology")}</Label>
+                <Label className="text-xs">{t("master.item.barcodes.symbology")}</Label>
                 <select
                   value={draft.symbology}
                   onChange={(e) => setDraft((x) => ({ ...x, symbology: e.target.value as ItemBarcodeDraft["symbology"] }))}
-                  className="flex h-8 w-full rounded border border-input bg-background px-2 py-1 text-sm text-foreground"
+                  className="flex h-7 w-full rounded border border-input bg-background px-2 py-0.5 text-xs text-foreground"
                 >
                   {ITEM_BARCODE_SYMBOLOGIES.map((v) => (
                     <option key={v} value={v}>{t(`master.item.barcodes.types.${v}`)}</option>
@@ -250,13 +283,13 @@ export function ItemBarcodesCard({ isNew, itemId, barcodes, onBarcodesChanged }:
                 </select>
               </div>
               <div className="flex flex-col gap-0.5">
-                <Label className="text-sm">{t("master.item.barcodes.packagingLevel")}</Label>
+                <Label className="text-xs">{t("master.item.barcodes.packagingLevel")}</Label>
                 <select
                   value={draft.packagingLevel}
                   onChange={(e) =>
                     setDraft((x) => ({ ...x, packagingLevel: e.target.value as ItemBarcodeDraft["packagingLevel"] }))
                   }
-                  className="flex h-8 w-full rounded border border-input bg-background px-2 py-1 text-sm text-foreground"
+                  className="flex h-7 w-full rounded border border-input bg-background px-2 py-0.5 text-xs text-foreground"
                 >
                   {ITEM_BARCODE_PACKAGING_LEVELS.map((v) => (
                     <option key={v} value={v}>{t(`master.item.barcodes.packaging.${v}`)}</option>
@@ -264,13 +297,13 @@ export function ItemBarcodesCard({ isNew, itemId, barcodes, onBarcodesChanged }:
                 </select>
               </div>
               <div className="flex flex-col gap-0.5">
-                <Label className="text-sm">{t("master.item.barcodes.barcodeRole")}</Label>
+                <Label className="text-xs">{t("master.item.barcodes.barcodeRole")}</Label>
                 <select
                   value={draft.barcodeRole}
                   onChange={(e) =>
                     setDraft((x) => ({ ...x, barcodeRole: e.target.value as ItemBarcodeDraft["barcodeRole"] }))
                   }
-                  className="flex h-8 w-full rounded border border-input bg-background px-2 py-1 text-sm text-foreground"
+                  className="flex h-7 w-full rounded border border-input bg-background px-2 py-0.5 text-xs text-foreground"
                 >
                   {ITEM_BARCODE_ROLES.map((v) => (
                     <option key={v} value={v}>{t(`master.item.barcodes.roles.${v}`)}</option>
@@ -278,13 +311,13 @@ export function ItemBarcodesCard({ isNew, itemId, barcodes, onBarcodesChanged }:
                 </select>
               </div>
               <div className="flex flex-col gap-0.5">
-                <Label className="text-sm">{t("master.item.barcodes.sourceType")}</Label>
+                <Label className="text-xs">{t("master.item.barcodes.sourceType")}</Label>
                 <select
                   value={draft.sourceType}
                   onChange={(e) =>
                     setDraft((x) => ({ ...x, sourceType: e.target.value as ItemBarcodeDraft["sourceType"] }))
                   }
-                  className="flex h-8 w-full rounded border border-input bg-background px-2 py-1 text-sm text-foreground"
+                  className="flex h-7 w-full rounded border border-input bg-background px-2 py-0.5 text-xs text-foreground"
                 >
                   {ITEM_BARCODE_SOURCE_TYPES.map((v) => (
                     <option key={v} value={v}>{t(`master.item.barcodes.sources.${v}`)}</option>
@@ -293,22 +326,27 @@ export function ItemBarcodesCard({ isNew, itemId, barcodes, onBarcodesChanged }:
               </div>
               <div className="flex items-center gap-2">
                 <Checkbox checked={draft.isPrimary} onCheckedChange={(checked) => setDraft((x) => ({ ...x, isPrimary: checked === true }))} />
-                <Label className="text-sm">{t("master.item.barcodes.primary")}</Label>
+                <Label className="text-xs">{t("master.item.barcodes.primary")}</Label>
               </div>
               <div className="flex items-center gap-2">
                 <Checkbox checked={draft.isActive} onCheckedChange={(checked) => setDraft((x) => ({ ...x, isActive: checked === true }))} />
-                <Label className="text-sm">{t("master.item.barcodes.active")}</Label>
+                <Label className="text-xs">{t("master.item.barcodes.active")}</Label>
               </div>
               <div className="flex flex-col gap-0.5 sm:col-span-2">
-                <Label className="text-sm">{t("master.item.barcodes.comment")}</Label>
-                <Textarea value={draft.comment ?? ""} onChange={(e) => setDraft((x) => ({ ...x, comment: e.target.value }))} rows={2} className="resize-none min-h-[4.5rem] text-sm" />
+                <Label className="text-xs">{t("master.item.barcodes.comment")}</Label>
+                <Textarea
+                  value={draft.comment ?? ""}
+                  onChange={(e) => setDraft((x) => ({ ...x, comment: e.target.value }))}
+                  rows={2}
+                  className="min-h-[3.75rem] resize-none text-xs leading-snug"
+                />
               </div>
             </div>
-            <div className="mt-4 flex justify-end gap-2">
-              <Button type="button" variant="outline" onClick={closeDialog} disabled={busy}>
+            <div className="mt-3 flex justify-end gap-1.5">
+              <Button type="button" variant="outline" size="sm" className="h-7 px-3 text-xs" onClick={closeDialog} disabled={busy}>
                 {t("common.cancel")}
               </Button>
-              <Button type="button" onClick={() => void handleSave()} disabled={busy}>
+              <Button type="button" size="sm" className="h-7 px-3 text-xs" onClick={() => void handleSave()} disabled={busy}>
                 {editingId ? t("common.save") : t("common.create")}
               </Button>
             </div>

@@ -88,6 +88,7 @@ export const kkMasterPages: MessageTree = {
       cardDescription:
         "Ең көбі {{max}} сурет (JPG, PNG, WebP, әрқайсысы 10 МБ). Бірнеше файл таңдауға болады. Ок таңдауды, миниатюраларды сүйреп реттейді. Жергілікті сақталады.",
       uploadImage: "Сурет жүктеу",
+      uploadImageShort: "Жүктеу",
       maxReached: "Ең көбі {{max}} сурет.",
       previewLoadError: "Алдын ала қарауды жүктеу мүмкін болмады.",
       saveMetaFailed: "Тауар метадеректерін дискіге сақтау мүмкін болмады.",
@@ -112,6 +113,8 @@ export const kkMasterPages: MessageTree = {
       replace: "Ауыстыру",
       replaceTitle: "Таңдалған суретті ауыстыру",
       openFullSize: "Толық өлшемде ашу",
+      /** Short label for the inline Open action next to Upload on the Images tab. */
+      openImageShort: "Ашу",
       openFullSizeTitle: "Толық өлшемде ашу",
       remove: "Жою",
       removeTitle: "Таңдалған суретті жою",
@@ -124,6 +127,8 @@ export const kkMasterPages: MessageTree = {
       nextImage: "Келесі сурет",
       errorFileTooLarge: "Сурет 10 МБ немесе одан кіші болуы керек.",
       errorFileType: "Рұқсат етілген түрлер: JPG, JPEG, PNG, WebP.",
+      errorBrowserPersist:
+        "Суретті браузер қоймасында сақтау мүмкін болмады (квота немесе қолжетімсіздік). Кішірек файл немесе бос орын қолданыңыз.",
       errorSlotFull:
         "Тауарға ең көбі {{max}} сурет. Басқасын қосу үшін біреуін жойыңыз.",
       bytesB: "{{n}} Б",

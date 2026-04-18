@@ -8,6 +8,7 @@ import {
   saveItemImageFromFile,
   ITEM_IMAGE_STORAGE_ERROR_TOO_LARGE,
   ITEM_IMAGE_STORAGE_ERROR_BAD_TYPE,
+  ITEM_IMAGE_STORAGE_ERROR_BROWSER_PERSIST,
 } from "../lib/itemImageStorage";
 import {
   getPrimaryImage,
@@ -27,14 +28,12 @@ import { ItemImageThumbnails } from "./ItemImageThumbnails";
 import {
   Card,
   CardContent,
-  CardDescription,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import { openPath } from "@tauri-apps/plugin-opener";
-import { Upload } from "lucide-react";
 import { useTranslation } from "@/shared/i18n/context";
+import { shouldUseTauriPluginFs } from "@/shared/tauriRuntime";
 
 type Props = {
   isNew: boolean;
@@ -62,6 +61,7 @@ export function ItemImagesCard({ isNew, itemId, images, onImagesChanged }: Props
     (msg: string) => {
       if (msg === ITEM_IMAGE_STORAGE_ERROR_TOO_LARGE) return t("master.item.images.errorFileTooLarge");
       if (msg === ITEM_IMAGE_STORAGE_ERROR_BAD_TYPE) return t("master.item.images.errorFileType");
+      if (msg === ITEM_IMAGE_STORAGE_ERROR_BROWSER_PERSIST) return t("master.item.images.errorBrowserPersist");
       return msg;
     },
     [t],
@@ -440,6 +440,11 @@ export function ItemImagesCard({ isNew, itemId, images, onImagesChanged }: Props
     setCardMessage(null);
     let absolutePathForOpen: string | undefined;
     try {
+      if (!shouldUseTauriPluginFs()) {
+        const { previewUrl } = await getItemImagePreviewSources(displayImage.relativePath);
+        window.open(previewUrl, "_blank", "noopener,noreferrer");
+        return;
+      }
       absolutePathForOpen = await resolveAbsoluteImagePath(displayImage.relativePath);
       await openPath(absolutePathForOpen);
     } catch (e) {
@@ -504,13 +509,10 @@ export function ItemImagesCard({ isNew, itemId, images, onImagesChanged }: Props
 
   return (
     <Card className="border-0 shadow-none xl:sticky xl:top-2">
-      <CardHeader className="p-2 pb-0.5">
-        <CardTitle className="text-[0.9rem] font-semibold">{t("master.item.images.cardTitle")}</CardTitle>
-        <CardDescription className="text-xs">
-          {t("master.item.images.cardDescription", { max: ITEM_IMAGE_MAX_COUNT })}
-        </CardDescription>
+      <CardHeader className="p-1.5 pb-0">
+        <CardTitle className="text-sm font-semibold leading-tight">{t("master.item.images.cardTitle")}</CardTitle>
       </CardHeader>
-      <CardContent className="p-2 pt-1">
+      <CardContent className="p-1.5 pt-1">
         <input
           ref={fileInputRef}
           type="file"
@@ -530,8 +532,8 @@ export function ItemImagesCard({ isNew, itemId, images, onImagesChanged }: Props
           <p
             className={
               cardMessage.variant === "error"
-                ? "mb-2 text-xs text-destructive"
-                : "mb-2 text-xs text-muted-foreground"
+                ? "mb-1.5 text-[11px] text-destructive"
+                : "mb-1.5 text-[11px] text-muted-foreground"
             }
             role={cardMessage.variant === "error" ? "alert" : "status"}
           >
@@ -543,7 +545,7 @@ export function ItemImagesCard({ isNew, itemId, images, onImagesChanged }: Props
         ) : orderedImages.length === 0 ? (
           <ItemImageEmptyState variant="ready" onUploadClick={triggerPickAdd} disabled={busy} />
         ) : (
-          <div className="flex flex-col gap-2">
+          <div className="flex flex-col gap-1.5">
             {displayImage && (
               <ItemImagePreview
                 loadState={previewLoadState}
@@ -560,6 +562,9 @@ export function ItemImagesCard({ isNew, itemId, images, onImagesChanged }: Props
                 canSelectPrevious={selectedIndex > 0}
                 canSelectNext={selectedIndex >= 0 && selectedIndex < orderedImages.length - 1}
                 busy={busy}
+                onUploadClick={triggerPickAdd}
+                canAddMore={canAddMore}
+                maxImagesCount={ITEM_IMAGE_MAX_COUNT}
               />
             )}
             <ItemImageThumbnails
@@ -570,23 +575,6 @@ export function ItemImagesCard({ isNew, itemId, images, onImagesChanged }: Props
               onReorderIds={(ids) => void handleReorderIds(ids)}
               disabled={busy}
             />
-            {canAddMore ? (
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                className="h-8 w-full gap-1.5"
-                onClick={triggerPickAdd}
-                disabled={busy}
-              >
-                <Upload className="h-3.5 w-3.5" />
-                {t("master.item.images.uploadImage")}
-              </Button>
-            ) : (
-              <p className="text-[11px] text-muted-foreground">
-                {t("master.item.images.maxReached", { max: ITEM_IMAGE_MAX_COUNT })}
-              </p>
-            )}
           </div>
         )}
       </CardContent>

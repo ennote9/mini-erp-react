@@ -61,7 +61,7 @@ function SortableThumb({ img, selectedId, thumbUrls, disabled, onSelect }: Sorta
       disabled={disabled}
       style={style}
       className={cn(
-        "relative h-12 w-12 shrink-0 touch-none cursor-grab overflow-hidden rounded border bg-muted/30 transition-colors active:cursor-grabbing",
+        "relative h-10 w-10 shrink-0 touch-none cursor-grab overflow-hidden rounded border bg-muted/30 transition-colors active:cursor-grabbing",
         "focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring",
         selected ? "border-primary ring-1 ring-primary" : "border-input hover:border-muted-foreground/40",
         disabled && "cursor-not-allowed opacity-50",
@@ -129,7 +129,7 @@ export function ItemImageThumbnails({
   return (
     <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
       <SortableContext items={ids} strategy={horizontalListSortingStrategy}>
-        <div className="flex flex-wrap gap-1.5 pt-1" role="listbox" aria-label="Item images">
+        <div className="flex flex-wrap gap-1 pt-0.5" role="listbox" aria-label="Item images">
           {images.map((img) => (
             <SortableThumb
               key={img.id}

@@ -87,6 +87,7 @@ export const ruMasterPages: MessageTree = {
       cardDescription:
         "До {{max}} изображений (JPG, PNG, WebP, по 10 МБ). Можно выбрать несколько файлов. Стрелки — выбор, миниатюры перетаскиванием — порядок. Хранятся локально.",
       uploadImage: "Загрузить изображение",
+      uploadImageShort: "Загрузить",
       maxReached: "Достигнуто максимум {{max}} изображений.",
       previewLoadError: "Не удалось загрузить предпросмотр.",
       saveMetaFailed: "Не удалось сохранить метаданные номенклатуры на диск.",
@@ -111,6 +112,8 @@ export const ruMasterPages: MessageTree = {
       replace: "Заменить",
       replaceTitle: "Заменить выбранное изображение",
       openFullSize: "Открыть в полном размере",
+      /** Short label for the inline Open action next to Upload on the Images tab. */
+      openImageShort: "Открыть",
       openFullSizeTitle: "Открыть в полном размере",
       remove: "Удалить",
       removeTitle: "Удалить выбранное изображение",
@@ -123,6 +126,8 @@ export const ruMasterPages: MessageTree = {
       nextImage: "Следующее изображение",
       errorFileTooLarge: "Размер изображения не более 10 МБ.",
       errorFileType: "Допустимые типы: JPG, JPEG, PNG, WebP.",
+      errorBrowserPersist:
+        "Не удалось сохранить изображение в хранилище браузера (квота или недоступность). Попробуйте файл меньше или освободите место.",
       errorSlotFull:
         "Не более {{max}} изображений на позицию. Удалите одно, чтобы добавить другое.",
       bytesB: "{{n}} Б",
