@@ -30,6 +30,7 @@ const PAGE_TITLES: Record<string, string> = {
   "/labels": "routes.labels",
   "/labels/workspace": "routes.labelsWorkspace",
   "/labels/station": "routes.labelsStation",
+  "/labels/batch": "routes.labelsBatch",
   "/labels/operations": "routes.labelsOperations",
   "/brands": "routes.brands",
   "/categories": "routes.categories",
@@ -89,6 +90,7 @@ function getPageIcon(
     pathname === "/labels" ||
     pathname === "/labels/workspace" ||
     pathname === "/labels/station" ||
+    pathname === "/labels/batch" ||
     pathname === "/labels/operations"
   )
     return Printer;

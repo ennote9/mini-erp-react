@@ -3,6 +3,7 @@ export { LabelTemplateEditorPage } from "./pages/LabelTemplateEditorPage";
 export { LabelsWorkspacePage } from "./pages/LabelsWorkspacePage";
 export { LabelsOperationsPage } from "./pages/LabelsOperationsPage";
 export { LabelsStationPage } from "./pages/LabelsStationPage";
+export { LabelsBatchPage } from "./pages/LabelsBatchPage";
 export type {
   LabelBinding,
   LabelElement,
@@ -19,6 +20,7 @@ export {
 export { flushPendingPrintJobPersist, printJobRepository } from "./printJobRepository";
 export {
   createDraftPrintJob,
+  createPrintJobFromBatch,
   createPrintJobFromWorkspace,
   ensureLabelsModuleLoaded,
   flushPendingLabelWrites,
@@ -32,4 +34,4 @@ export {
   markPrintJobSubmitted,
   persistLabelTemplate,
 } from "./service";
-export type { CreateWorkspacePrintJobInput } from "./service";
+export type { CreateBatchPrintJobInput, CreateWorkspacePrintJobInput } from "./service";

@@ -6,6 +6,7 @@ const NAV_ITEMS = [
   { to: "/labels", labelKey: "labels.nav.templates", end: true as const },
   { to: "/labels/workspace", labelKey: "labels.nav.workspace", end: false as const },
   { to: "/labels/station", labelKey: "labels.nav.station", end: false as const },
+  { to: "/labels/batch", labelKey: "labels.nav.batch", end: false as const },
   { to: "/labels/operations", labelKey: "labels.nav.operations", end: false as const },
 ];
 

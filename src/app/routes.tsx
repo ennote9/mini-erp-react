@@ -34,6 +34,7 @@ import { MarkdownCreatePage, MarkdownJournalPage } from "../modules/markdown-jou
 import { BarcodeRegistryPage } from "../modules/barcode-registry";
 import {
   LabelTemplateEditorPage,
+  LabelsBatchPage,
   LabelsListPage,
   LabelsOperationsPage,
   LabelsStationPage,
@@ -54,6 +55,7 @@ export function AppRoutes() {
         <Route path="labels/templates/:id" element={<LabelTemplateEditorPage />} />
         <Route path="labels/workspace" element={<LabelsWorkspacePage />} />
         <Route path="labels/station" element={<LabelsStationPage />} />
+        <Route path="labels/batch" element={<LabelsBatchPage />} />
         <Route path="labels/operations" element={<LabelsOperationsPage />} />
         <Route path="labels" element={<LabelsListPage />} />
         <Route path="items/:id" element={<ItemPage />} />

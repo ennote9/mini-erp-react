@@ -24,15 +24,7 @@ function downloadPdfBytes(bytes: Uint8Array, filename: string): void {
   URL.revokeObjectURL(url);
 }
 
-/**
- * Rasterizes the label DOM (same surface as on-screen preview) and builds a compact PDF in real mm size.
- * Reuses html2canvas + jsPDF like {@link renderElementToPdfBase64}, but one page per copy at label dimensions.
- */
-export async function buildLabelPdfBytes(
-  element: HTMLElement,
-  sizeMm: { width: number; height: number },
-  copies: number,
-): Promise<Uint8Array> {
+async function rasterizeLabelToPngDataUrl(element: HTMLElement): Promise<string> {
   if (document.fonts?.ready) {
     try {
       await document.fonts.ready;
@@ -61,7 +53,19 @@ export async function buildLabelPdfBytes(
     scrollY: 0,
   });
 
-  const imgData = canvas.toDataURL("image/png");
+  return canvas.toDataURL("image/png");
+}
+
+/**
+ * Rasterizes the label DOM (same surface as on-screen preview) and builds a compact PDF in real mm size.
+ * Reuses html2canvas + jsPDF like {@link renderElementToPdfBase64}, but one page per copy at label dimensions.
+ */
+export async function buildLabelPdfBytes(
+  element: HTMLElement,
+  sizeMm: { width: number; height: number },
+  copies: number,
+): Promise<Uint8Array> {
+  const imgData = await rasterizeLabelToPngDataUrl(element);
   const wMm = sizeMm.width;
   const hMm = sizeMm.height;
   const orientation = wMm >= hMm ? "landscape" : "portrait";
@@ -82,6 +86,74 @@ export async function buildLabelPdfBytes(
 
   const buf = pdf.output("arraybuffer");
   return new Uint8Array(buf);
+}
+
+export type BatchLabelPdfSegment = {
+  element: HTMLElement;
+  sizeMm: { width: number; height: number };
+  copies: number;
+};
+
+/** One PDF document: each segment contributes `copies` pages (same pipeline as {@link buildLabelPdfBytes}). */
+export async function buildBatchLabelPdfBytes(segments: BatchLabelPdfSegment[]): Promise<Uint8Array> {
+  if (segments.length === 0) throw new Error("BATCH_PDF_EMPTY");
+  let pdf: InstanceType<typeof jsPDF> | null = null;
+
+  for (const seg of segments) {
+    const imgData = await rasterizeLabelToPngDataUrl(seg.element);
+    const wMm = seg.sizeMm.width;
+    const hMm = seg.sizeMm.height;
+    const orientation = wMm >= hMm ? "landscape" : "portrait";
+    const n = Math.max(1, Math.min(999, seg.copies));
+
+    for (let i = 0; i < n; i++) {
+      if (pdf === null) {
+        pdf = new jsPDF({
+          orientation,
+          unit: "mm",
+          format: [wMm, hMm],
+        });
+      } else {
+        pdf.addPage([wMm, hMm], orientation);
+      }
+      pdf.addImage(imgData, "PNG", 0, 0, wMm, hMm);
+    }
+  }
+
+  if (!pdf) throw new Error("BATCH_PDF_EMPTY");
+  return new Uint8Array(pdf.output("arraybuffer"));
+}
+
+export async function saveBatchLabelPdf(options: {
+  segments: BatchLabelPdfSegment[];
+  filenameBase: string;
+}): Promise<{ path?: string; filename: string }> {
+  const bytes = await buildBatchLabelPdfBytes(options.segments);
+  const defaultFilename = buildReadableUniqueFilename({
+    base: options.filenameBase.replace(/\.pdf$/i, ""),
+    extension: "pdf",
+  });
+
+  if (!isTauriRuntime()) {
+    downloadPdfBytes(bytes, defaultFilename);
+    return { filename: defaultFilename };
+  }
+
+  const path = await save({
+    defaultPath: defaultFilename,
+    filters: [{ name: "PDF", extensions: ["pdf"] }],
+  });
+
+  if (path == null) {
+    downloadPdfBytes(bytes, defaultFilename);
+    return { filename: defaultFilename };
+  }
+
+  const safePath = await ensureUniqueExportPath(path);
+  const contentsBase64 = binaryToBase64(bytes);
+  await invoke("write_export_file", { path: safePath, contentsBase64 });
+  const filename = safePath.replace(/^.*[/\\]/, "") || defaultFilename;
+  return { path: safePath, filename };
 }
 
 /**

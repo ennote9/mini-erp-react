@@ -26,6 +26,14 @@ export interface PrintJob {
   itemCodeSnapshot?: string;
   itemNameSnapshot?: string;
   barcodeValueSnapshot?: string;
+  /** Batch print: number of catalog rows in the job. */
+  rowsCount?: number;
+  /** Batch print: sum of per-row copies (total labels). */
+  totalLabels?: number;
+  /** Short human-readable batch summary for lists (locale at save time). */
+  batchSummarySnapshot?: string;
+  /** JSON snapshot of batch rows for reopening the batch screen. */
+  batchRowsSnapshot?: string;
   createdAt: string;
   updatedAt: string;
 }

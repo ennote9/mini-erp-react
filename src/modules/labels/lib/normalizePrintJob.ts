@@ -11,6 +11,10 @@ function optBool(v: unknown): boolean | undefined {
   return typeof v === "boolean" ? v : undefined;
 }
 
+function optPositiveInt(v: unknown): number | undefined {
+  return typeof v === "number" && Number.isFinite(v) && v >= 1 && v === Math.floor(v) ? v : undefined;
+}
+
 export function normalizePrintJob(raw: unknown): PrintJob | null {
   if (!raw || typeof raw !== "object") return null;
   const o = raw as Record<string, unknown>;
@@ -49,6 +53,10 @@ export function normalizePrintJob(raw: unknown): PrintJob | null {
     paperPreset: optString(o.paperPreset),
     mediaPreset: optString(o.mediaPreset),
     labelSizeMode: o.labelSizeMode === "template" || o.labelSizeMode === "fit" ? o.labelSizeMode : undefined,
+    rowsCount: optPositiveInt(o.rowsCount),
+    totalLabels: optPositiveInt(o.totalLabels),
+    batchSummarySnapshot: optString(o.batchSummarySnapshot),
+    batchRowsSnapshot: optString(o.batchRowsSnapshot),
     createdAt,
     updatedAt,
   };

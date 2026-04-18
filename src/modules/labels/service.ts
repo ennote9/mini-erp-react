@@ -1,4 +1,5 @@
 import type { LabelTemplate, PrintJob, PrintJobMode, PrintJobStatus } from "./model";
+import { LABELS_BATCH_SOURCE } from "./lib/labelsBatchConstants";
 import { LABELS_STATION_SOURCE } from "./lib/labelsStationConstants";
 import {
   flushPendingLabelTemplatePersist,
@@ -68,6 +69,65 @@ export function getLastLabelsStationRepeatableJob(): PrintJob | undefined {
   );
   if (fromStation) return fromStation;
   return jobs.find((j) => isRepeatableCatalogJob(j));
+}
+
+/** Latest batch print/PDF job for restoring `/labels/batch`. */
+export function getLastLabelsBatchRepeatableJob(): PrintJob | undefined {
+  return listPrintJobsForDisplay().find(
+    (j) =>
+      !j.isDemoContext &&
+      (j.mode === "print" || j.mode === "pdf") &&
+      j.source === LABELS_BATCH_SOURCE &&
+      j.batchRowsSnapshot,
+  );
+}
+
+export type CreateBatchPrintJobInput = {
+  templateId: string;
+  copies: number;
+  mode: PrintJobMode;
+  status?: PrintJobStatus;
+  itemIds: string[];
+  isDemoContext: boolean;
+  itemNameSnapshot?: string;
+  itemCodeSnapshot?: string;
+  barcodeValueSnapshot?: string;
+  errorMessage?: string;
+  paperPreset?: string;
+  mediaPreset?: string;
+  labelSizeMode?: "template" | "fit";
+  rowsCount: number;
+  totalLabels: number;
+  batchSummarySnapshot?: string;
+  batchRowsSnapshot?: string;
+};
+
+/** Single persisted job for a whole batch (not per line). */
+export function createPrintJobFromBatch(input: CreateBatchPrintJobInput): PrintJob {
+  const tpl = labelTemplateRepository.getById(input.templateId);
+  if (!tpl) throw new Error("TEMPLATE_NOT_FOUND");
+  const payload: CreatePrintJobInput = {
+    templateId: input.templateId,
+    templateNameSnapshot: tpl.name,
+    itemIds: input.itemIds,
+    copies: input.copies,
+    mode: input.mode,
+    status: input.status ?? "draft",
+    source: LABELS_BATCH_SOURCE,
+    isDemoContext: input.isDemoContext,
+    itemNameSnapshot: input.itemNameSnapshot,
+    itemCodeSnapshot: input.itemCodeSnapshot,
+    barcodeValueSnapshot: input.barcodeValueSnapshot,
+    errorMessage: input.errorMessage,
+    paperPreset: input.paperPreset,
+    mediaPreset: input.mediaPreset,
+    labelSizeMode: input.labelSizeMode,
+    rowsCount: input.rowsCount,
+    totalLabels: input.totalLabels,
+    batchSummarySnapshot: input.batchSummarySnapshot,
+    batchRowsSnapshot: input.batchRowsSnapshot,
+  };
+  return printJobRepository.create(payload);
 }
 
 export type CreateWorkspacePrintJobInput = {
