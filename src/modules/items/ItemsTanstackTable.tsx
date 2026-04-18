@@ -307,12 +307,12 @@ export function ItemsTanstackTable(props: ItemsTanstackTableProps) {
                             <button
                               type="button"
                               className={cn(
-                                "shrink-0 rounded-sm p-0.5 transition-colors hover:bg-muted/60 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring",
+                                "relative z-10 shrink-0 rounded-sm p-0.5 transition-colors hover:bg-muted/60 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring",
                                 hasActiveFilter
                                   ? "text-primary opacity-100"
                                   : isOpenFilterField
                                     ? "text-muted-foreground/70 opacity-100"
-                                    : "pointer-events-none text-muted-foreground/70 opacity-0 focus-visible:pointer-events-auto focus-visible:opacity-100 group-hover:pointer-events-auto group-hover:opacity-100",
+                                    : "text-muted-foreground/70 opacity-0 group-hover:opacity-100",
                               )}
                               aria-label={`${t("doc.list.viewTabFiltering")}: ${schemaColumn?.label ?? header.column.id}`}
                               title={`${t("doc.list.viewTabFiltering")}: ${schemaColumn?.label ?? header.column.id}`}

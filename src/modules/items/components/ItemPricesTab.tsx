@@ -1,5 +1,6 @@
 import { useCallback, useMemo, useState } from "react";
 import { Dialog } from "radix-ui";
+import { functionalUpdate, type SortingState } from "@tanstack/react-table";
 import type { Item, ItemPriceReasonCode, ItemPriceRecord, ItemPriceType } from "../model";
 import { itemRepository } from "../repository";
 import {
@@ -14,13 +15,24 @@ import {
   type PriceHistoryRow,
 } from "../lib/itemPriceHistory";
 import { ItemPriceEditDialog } from "./ItemPriceEditDialog";
+import { ItemPriceHistoryTanstackTable } from "../ItemPriceHistoryTanstackTable";
+import { ItemsHeaderFilterPanel } from "../ItemsHeaderFilterPanel";
+import { buildItemPriceHistoryTableSchema } from "../itemPriceHistoryTableSchema";
+import {
+  buildItemPriceHistoryFieldRegistry,
+  buildItemPriceHistoryFilterConfigs,
+} from "../itemPriceHistoryFieldRegistry";
+import {
+  applyDeepSortModel,
+  buildListViewColumnFilterModelFromDeepRules,
+  normalizeDeepFilterRules,
+  type ListViewDeepFilterRule,
+} from "@/shared/ui/list-view/listViewConfig";
+import { applyListViewColumnFilters, type ListViewColumnFilterConfig } from "@/shared/ui/list-view";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { useTranslation } from "@/shared/i18n/context";
 import { useAppDisplayFormatters } from "@/shared/formatting";
 import { cn } from "@/lib/utils";
-
-type Filter = "all" | "purchase" | "sale";
 
 type Props = {
   itemId: string | undefined;
@@ -44,25 +56,18 @@ function statusLabelKey(status: PriceHistoryRow["status"]): string {
   }
 }
 
-function statusBadgeClasses(status: PriceHistoryRow["status"]): string {
-  switch (status) {
-    case "active":
-      return "border-emerald-500/35 bg-emerald-500/12 text-emerald-100";
-    case "scheduled":
-      return "border-sky-500/35 bg-sky-500/12 text-sky-100";
-    case "cancelled":
-      return "border-destructive/40 bg-destructive/15 text-destructive-foreground";
-    case "superseded":
-      return "border-border/60 bg-muted/40 text-muted-foreground";
-    default:
-      return "border-border/60 bg-muted/30 text-foreground";
-  }
-}
-
 export function ItemPricesTab({ itemId, isNew, revision, onPricesChanged }: Props) {
-  const { t } = useTranslation();
+  const { t, locale } = useTranslation();
   const { formatNumber } = useAppDisplayFormatters();
-  const [filter, setFilter] = useState<Filter>("all");
+  const [sorting, setSorting] = useState<SortingState>([]);
+  const [deepFilterRules, setDeepFilterRules] = useState<ListViewDeepFilterRule[]>([]);
+  const [headerFilterAnchor, setHeaderFilterAnchor] = useState<{
+    fieldId: string;
+    left: number;
+    top: number;
+    width: number;
+    height: number;
+  } | null>(null);
   const [editOpen, setEditOpen] = useState(false);
   const [fixedType, setFixedType] = useState<ItemPriceType | undefined>(undefined);
   const [busy, setBusy] = useState(false);
@@ -88,12 +93,103 @@ export function ItemPricesTab({ itemId, isNew, revision, onPricesChanged }: Prop
   const saleCurrent = item ? getCurrentActiveRecord(item, "sale", todayYmd) : undefined;
   const saleNext = item ? getNextScheduledRecord(item, "sale", todayYmd) : undefined;
 
-  const rows = useMemo(() => {
+  const priceHistorySchema = useMemo(() => buildItemPriceHistoryTableSchema(t), [t, locale]);
+  const priceHistoryRegistry = useMemo(() => buildItemPriceHistoryFieldRegistry(t), [t, locale]);
+  const priceHistoryFilterConfigs = useMemo(() => buildItemPriceHistoryFilterConfigs(t), [t, locale]);
+
+  const registryByFieldKey = useMemo(
+    () => new Map(priceHistoryRegistry.map((e) => [e.fieldKey, e])),
+    [priceHistoryRegistry],
+  );
+
+  const baseHistoryRows = useMemo(() => {
     if (!item) return [];
-    const built = buildPriceHistoryRows(item, todayYmd);
-    if (filter === "all") return built;
-    return built.filter((r) => r.priceType === filter);
-  }, [item, filter, todayYmd]);
+    return buildPriceHistoryRows(item, todayYmd);
+  }, [item, todayYmd]);
+
+  const normalizedFilterRules = useMemo(
+    () => normalizeDeepFilterRules({ rules: deepFilterRules, registry: priceHistoryRegistry }),
+    [deepFilterRules, priceHistoryRegistry],
+  );
+
+  const columnFilterModel = useMemo(
+    () => buildListViewColumnFilterModelFromDeepRules(normalizedFilterRules),
+    [normalizedFilterRules],
+  );
+
+  const filteredHistoryRows = useMemo(
+    () => applyListViewColumnFilters(baseHistoryRows, columnFilterModel, priceHistoryFilterConfigs),
+    [baseHistoryRows, columnFilterModel, priceHistoryFilterConfigs],
+  );
+
+  const getHistoryFieldValue = useCallback(
+    (row: PriceHistoryRow, fieldKey: string) => {
+      const cfg = priceHistoryFilterConfigs[fieldKey];
+      if (cfg?.getValue) return cfg.getValue(row);
+      return (row as unknown as Record<string, unknown>)[fieldKey];
+    },
+    [priceHistoryFilterConfigs],
+  );
+
+  const displayHistoryRows = useMemo(() => {
+    const sortModel = sorting.map((s) => ({ colId: s.id, sort: s.desc ? ("desc" as const) : ("asc" as const) }));
+    return applyDeepSortModel({
+      rows: filteredHistoryRows,
+      sortModel,
+      getFieldValue: getHistoryFieldValue,
+    });
+  }, [filteredHistoryRows, sorting, getHistoryFieldValue]);
+
+  const activeHeaderFilterFieldState = useMemo(() => {
+    const m: Record<string, boolean> = {};
+    for (const r of normalizedFilterRules) {
+      if (r.enabled !== false) m[r.fieldKey] = true;
+    }
+    return m;
+  }, [normalizedFilterRules]);
+
+  const activeHeaderFilterField = headerFilterAnchor?.fieldId ?? null;
+  const activeHeaderFilterRegistryField = activeHeaderFilterField
+    ? registryByFieldKey.get(activeHeaderFilterField) ?? null
+    : null;
+  const activeHeaderFilterRule = activeHeaderFilterField
+    ? normalizedFilterRules.find((r) => r.fieldKey === activeHeaderFilterField && r.enabled !== false) ?? null
+    : null;
+  const activeHeaderFilterConfig =
+    activeHeaderFilterField != null ? priceHistoryFilterConfigs[activeHeaderFilterField] : undefined;
+
+  const handleHeaderFilterApply = useCallback(
+    (rule: ListViewDeepFilterRule) => {
+      setDeepFilterRules((prev) => {
+        const others = prev.filter((r) => r.fieldKey !== rule.fieldKey);
+        return normalizeDeepFilterRules({
+          rules: [...others, { ...rule, enabled: true, priority: others.length }],
+          registry: priceHistoryRegistry,
+        });
+      });
+      setHeaderFilterAnchor(null);
+    },
+    [priceHistoryRegistry],
+  );
+
+  const handleHeaderFilterReset = useCallback(() => {
+    const field = headerFilterAnchor?.fieldId;
+    if (!field) return;
+    setDeepFilterRules((prev) => prev.filter((r) => r.fieldKey !== field));
+    setHeaderFilterAnchor(null);
+  }, [headerFilterAnchor?.fieldId]);
+
+  const handleTanstackSortingChange = useCallback(
+    (updater: SortingState | ((old: SortingState) => SortingState)) => {
+      setSorting((old) => functionalUpdate(updater, old));
+    },
+    [],
+  );
+
+  const statusLabelForRow = useCallback(
+    (status: PriceHistoryRow["status"]) => t(statusLabelKey(status)),
+    [t],
+  );
 
   const formatMoney = (n: number | undefined) =>
     formatNumber(n, { minFractionDigits: 2, maxFractionDigits: 2, empty: "—" });
@@ -258,25 +354,6 @@ export function ItemPricesTab({ itemId, isNew, revision, onPricesChanged }: Prop
         )}
       </div>
 
-      <div className="flex flex-wrap gap-1" data-testid="item-prices-filter-row">
-        {(["all", "purchase", "sale"] as const).map((f) => (
-          <Button
-            key={f}
-            type="button"
-            size="sm"
-            variant={filter === f ? "default" : "outline"}
-            className="h-7 px-2 text-xs"
-            onClick={() => setFilter(f)}
-          >
-            {f === "all"
-              ? t("master.item.prices.filterAll")
-              : f === "purchase"
-                ? t("master.item.prices.filterPurchase")
-                : t("master.item.prices.filterSale")}
-          </Button>
-        ))}
-      </div>
-
       <div className="border-t border-border/50 pt-5">
         <div className="mb-3 flex items-baseline justify-between gap-2">
           <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
@@ -284,75 +361,43 @@ export function ItemPricesTab({ itemId, isNew, revision, onPricesChanged }: Prop
           </h3>
         </div>
 
-        <div className="overflow-x-auto rounded-lg border border-border/60 bg-card/20 shadow-sm">
-          <table className="w-full min-w-[920px] table-fixed text-xs" data-testid="item-prices-history-table">
-            <thead className="bg-muted/35 text-[11px]">
-              <tr>
-                <th className="w-[9%] px-2 py-2 text-left font-medium">{t("master.item.prices.colType")}</th>
-                <th className="w-[11%] px-2 py-2 text-right font-semibold">{t("master.item.prices.colAmount")}</th>
-                <th className="w-[10%] px-2 py-2 text-left font-medium">{t("master.item.prices.colValidFrom")}</th>
-                <th className="w-[10%] px-2 py-2 text-left font-medium">{t("master.item.prices.colValidTo")}</th>
-                <th className="w-[12%] px-2 py-2 text-left font-medium">{t("master.item.prices.colStatus")}</th>
-                <th className="w-[14%] px-2 py-2 text-left font-medium">{t("master.item.prices.colReason")}</th>
-                <th className="w-[18%] px-2 py-2 text-left font-medium">{t("master.item.prices.colComment")}</th>
-                <th className="w-[10%] px-2 py-2 text-left font-medium">{t("master.item.prices.colCreated")}</th>
-                <th className="w-[6%] px-2 py-2 text-right font-medium">{t("master.item.prices.colActions")}</th>
-              </tr>
-            </thead>
-            <tbody className="text-[11px]">
-              {rows.map((row) => (
-                <tr
-                  key={row.id}
-                  data-testid="item-prices-history-row"
-                  data-price-record-id={row.id}
-                  className="border-t border-border/50"
-                >
-                  <td className="px-2 py-2 align-top">
-                    {row.priceType === "purchase" ? t("master.item.prices.typePurchase") : t("master.item.prices.typeSale")}
-                  </td>
-                  <td className="px-2 py-2 text-right align-top text-sm font-semibold tabular-nums text-foreground">
-                    {formatMoney(row.amount)}
-                  </td>
-                  <td className="px-2 py-2 align-top tabular-nums text-muted-foreground">{row.validFrom}</td>
-                  <td className="px-2 py-2 align-top tabular-nums text-muted-foreground">{row.validTo ?? "—"}</td>
-                  <td className="px-2 py-2 align-top">
-                    <Badge
-                      variant="outline"
-                      className={cn("h-5 px-1.5 text-[10px] font-semibold leading-none", statusBadgeClasses(row.status))}
-                    >
-                      {t(statusLabelKey(row.status))}
-                    </Badge>
-                  </td>
-                  <td className="px-2 py-2 align-top leading-snug text-muted-foreground">{reasonLabel(row.reasonCode)}</td>
-                  <td className="max-w-0 px-2 py-2 align-top leading-snug text-muted-foreground">
-                    <span className="line-clamp-3 break-words" title={row.comment ?? undefined}>
-                      {row.comment ?? "—"}
-                    </span>
-                  </td>
-                  <td className="px-2 py-2 align-top text-[10px] tabular-nums text-muted-foreground">
-                    {row.createdAt.slice(0, 19).replace("T", " ")}
-                  </td>
-                  <td className="px-2 py-2 text-right align-top">
-                    {row.status === "scheduled" && !row.cancelledAt ? (
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        className="h-7 px-2 text-[10px]"
-                        disabled={busy}
-                        data-testid="item-prices-row-cancel-scheduled"
-                        onClick={() => setCancelTarget({ recordId: row.id, priceType: row.priceType })}
-                      >
-                        {t("master.item.prices.actionCancel")}
-                      </Button>
-                    ) : (
-                      <span className="text-[10px] text-muted-foreground">—</span>
-                    )}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+        <div className="relative">
+          <ItemPriceHistoryTanstackTable
+            rows={displayHistoryRows}
+            schema={priceHistorySchema}
+            sorting={sorting}
+            onSortingChange={handleTanstackSortingChange}
+            onHeaderFilterClick={(fieldId, anchorRect) => setHeaderFilterAnchor({ fieldId, ...anchorRect })}
+            headerFilterState={activeHeaderFilterFieldState}
+            openHeaderFilterFieldId={activeHeaderFilterField}
+            t={t}
+            formatMoney={formatMoney}
+            reasonLabel={reasonLabel}
+            statusLabel={statusLabelForRow}
+            busy={busy}
+            onCancelScheduled={(row) => setCancelTarget({ recordId: row.id, priceType: row.priceType })}
+          />
+          <ItemsHeaderFilterPanel
+            open={headerFilterAnchor != null}
+            anchorRect={
+              headerFilterAnchor
+                ? {
+                    left: headerFilterAnchor.left,
+                    top: headerFilterAnchor.top,
+                    width: headerFilterAnchor.width,
+                    height: headerFilterAnchor.height,
+                  }
+                : null
+            }
+            field={activeHeaderFilterRegistryField}
+            filterConfig={activeHeaderFilterConfig as ListViewColumnFilterConfig<unknown> | undefined}
+            rule={activeHeaderFilterRule}
+            onOpenChange={(open) => {
+              if (!open) setHeaderFilterAnchor(null);
+            }}
+            onApply={handleHeaderFilterApply}
+            onReset={handleHeaderFilterReset}
+          />
         </div>
       </div>
 

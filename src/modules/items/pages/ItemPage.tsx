@@ -32,6 +32,7 @@ import { DocumentIssueStrip } from "../../../shared/ui/feedback/DocumentIssueStr
 import { ItemImagesCard } from "../components/ItemImagesCard";
 import { ItemBarcodesCard } from "../components/ItemBarcodesCard";
 import { ItemPricesTab } from "../components/ItemPricesTab";
+import { ItemResponsiblesTab } from "../components/ItemResponsiblesTab";
 import { Save, X } from "lucide-react";
 import { useTranslation } from "@/shared/i18n/context";
 import { appendReturnTo, buildReturnToValue, readReturnToParam } from "@/shared/navigation/returnTo";
@@ -74,6 +75,7 @@ export function ItemPage() {
   const [imagesRevision, setImagesRevision] = useState(0);
   const [barcodesRevision, setBarcodesRevision] = useState(0);
   const [pricesRevision, setPricesRevision] = useState(0);
+  const [responsiblesRevision, setResponsiblesRevision] = useState(0);
   const [itemDetailRevision, setItemDetailRevision] = useState(0);
   const requestedKind = (searchParams.get("kind") ?? "").toUpperCase();
   const requestedBaseItemId = searchParams.get("baseItemId") ?? "";
@@ -93,7 +95,7 @@ export function ItemPage() {
 
   const item = useMemo(
     () => (itemsReady && id && !isNew ? itemRepository.getById(id) : undefined),
-    [itemsReady, id, isNew, imagesRevision, barcodesRevision, pricesRevision, itemDetailRevision],
+    [itemsReady, id, isNew, imagesRevision, barcodesRevision, pricesRevision, responsiblesRevision, itemDetailRevision],
   );
 
   const [form, setForm] = useState<FormState>(defaultForm);
@@ -292,6 +294,7 @@ export function ItemPage() {
     () => [
       { value: "main", label: t("master.item.tabMain") },
       { value: "prices", label: t("master.item.tabPrices") },
+      { value: "responsibles", label: t("master.item.tabResponsibles") },
       { value: "images", label: t("master.item.tabImages") },
       { value: "barcodes", label: t("master.item.tabBarcodes") },
       ...(showTestersTab ? [{ value: "testers" as const, label: t("master.item.tabTesters") }] : []),
@@ -615,6 +618,17 @@ export function ItemPage() {
                 revision={pricesRevision}
                 onPricesChanged={() => {
                   setPricesRevision((n) => n + 1);
+                  setItemDetailRevision((n) => n + 1);
+                }}
+              />
+            </Tabs.Content>
+            <Tabs.Content value="responsibles" className="outline-none focus-visible:outline-none">
+              <ItemResponsiblesTab
+                isNew={isNew}
+                itemId={isNew ? undefined : id}
+                revision={responsiblesRevision}
+                onResponsiblesChanged={() => {
+                  setResponsiblesRevision((n) => n + 1);
                   setItemDetailRevision((n) => n + 1);
                 }}
               />

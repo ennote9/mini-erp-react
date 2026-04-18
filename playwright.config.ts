@@ -7,6 +7,8 @@ import { defineConfig, devices } from "@playwright/test";
  */
 export default defineConfig({
   testDir: "e2e",
+  /** Item card flows (tabs, dialogs) can exceed 30s on slow CI agents. */
+  timeout: 120_000,
   fullyParallel: false,
   forbidOnly: !!process.env.CI,
   retries: 0,

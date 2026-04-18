@@ -87,6 +87,7 @@ function buildCreatedItem(input: CreateItemInput): Item {
     barcodes: normalizedBarcodes,
     barcode: bridgeLegacyBarcodeValueFromCollection(normalizedBarcodes),
     itemKind: input.itemKind ?? "SELLABLE",
+    responsibleAssignments: input.responsibleAssignments ?? [],
   };
 }
 

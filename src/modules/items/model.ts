@@ -89,6 +89,25 @@ export interface ItemPriceRecord {
   cancelledAt?: string;
 }
 
+/** Direct item-level responsibility roles (v1). One employee per role per item. */
+export type ItemResponsibleRoleCode =
+  | "content_manager"
+  | "category_manager"
+  | "brand_manager"
+  | "buyer"
+  | "sales_manager"
+  | "operations_owner";
+
+export interface ItemResponsibleAssignment {
+  id: string;
+  roleCode: ItemResponsibleRoleCode;
+  employeeId: string;
+  note: string;
+  /** ISO datetime */
+  assignedAt: string;
+  assignedByEmployeeId: string | null;
+}
+
 export interface Item {
   id: string;
   code: string;
@@ -124,4 +143,6 @@ export interface Item {
    * Only meaningful for sellable (non-tester) base items; monotonic so codes are not reused after deletions.
    */
   testerCodeNextSeq?: number;
+  /** Direct nominations on this item; brand/category context is read-only elsewhere. */
+  responsibleAssignments?: ItemResponsibleAssignment[];
 }

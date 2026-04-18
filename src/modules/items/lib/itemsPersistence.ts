@@ -23,6 +23,8 @@ import type {
   ItemPriceReasonCode,
   ItemPriceRecord,
   ItemPriceType,
+  ItemResponsibleAssignment,
+  ItemResponsibleRoleCode,
 } from "../model";
 import {
   ITEM_BARCODE_SYMBOLOGIES,
@@ -104,6 +106,42 @@ const ITEM_PRICE_REASONS: readonly ItemPriceReasonCode[] = [
   "correction",
   "other",
 ];
+
+const ITEM_RESPONSIBLE_ROLE_CODES: readonly ItemResponsibleRoleCode[] = [
+  "content_manager",
+  "category_manager",
+  "brand_manager",
+  "buyer",
+  "sales_manager",
+  "operations_owner",
+];
+
+function normalizeItemResponsibleAssignment(raw: unknown): ItemResponsibleAssignment | null {
+  if (!raw || typeof raw !== "object") return null;
+  const o = raw as Record<string, unknown>;
+  const id = typeof o.id === "string" ? o.id : null;
+  const roleRaw = typeof o.roleCode === "string" ? o.roleCode : null;
+  const employeeId = typeof o.employeeId === "string" ? o.employeeId : null;
+  const note = typeof o.note === "string" ? o.note : "";
+  const assignedAt = typeof o.assignedAt === "string" ? o.assignedAt : new Date(0).toISOString();
+  const assignedByEmployeeId =
+    typeof o.assignedByEmployeeId === "string"
+      ? o.assignedByEmployeeId
+      : o.assignedByEmployeeId === null
+        ? null
+        : null;
+  if (!id || !roleRaw || !ITEM_RESPONSIBLE_ROLE_CODES.includes(roleRaw as ItemResponsibleRoleCode) || !employeeId) {
+    return null;
+  }
+  return {
+    id,
+    roleCode: roleRaw as ItemResponsibleRoleCode,
+    employeeId,
+    note,
+    assignedAt,
+    assignedByEmployeeId,
+  };
+}
 
 function normalizeItemPriceRecord(raw: unknown, fallbackItemId: string): ItemPriceRecord | null {
   if (!raw || typeof raw !== "object") return null;
@@ -204,6 +242,10 @@ function normalizeItem(raw: unknown): Item | null {
   const priceHistory: ItemPriceRecord[] | undefined = Array.isArray(phRaw)
     ? phRaw.map((x) => normalizeItemPriceRecord(x, String(o.id))).filter((x): x is ItemPriceRecord => x !== null)
     : undefined;
+  const raRaw = o.responsibleAssignments;
+  const responsibleAssignments: ItemResponsibleAssignment[] = Array.isArray(raRaw)
+    ? raRaw.map(normalizeItemResponsibleAssignment).filter((x): x is ItemResponsibleAssignment => x !== null)
+    : [];
   return {
     id: o.id,
     code: o.code,
@@ -223,6 +265,7 @@ function normalizeItem(raw: unknown): Item | null {
     itemKind,
     baseItemId,
     testerCodeNextSeq,
+    responsibleAssignments,
   };
 }
 

@@ -18,6 +18,7 @@ import { customerRepository, flushPendingCustomerPersist } from "@/modules/custo
 import type { UpdateItemPatch } from "@/modules/items/repository";
 import { purchaseOrderRepository, flushPendingPurchaseOrderPersist } from "@/modules/purchase-orders/repository";
 import { salesOrderRepository, flushPendingSalesOrderPersist } from "@/modules/sales-orders/repository";
+import { employeeRepository, flushPendingEmployeePersist } from "@/modules/employees/repository";
 
 export type MiniErpE2eApi = {
   itemRepository: typeof itemRepository;
@@ -30,6 +31,7 @@ export type MiniErpE2eApi = {
   customerRepository: typeof customerRepository;
   purchaseOrderRepository: typeof purchaseOrderRepository;
   salesOrderRepository: typeof salesOrderRepository;
+  employeeRepository: typeof employeeRepository;
   /** Persists items + markdown + customer-agreement queues (best-effort). */
   flushAll: () => Promise<void>;
   /** Direct update for deterministic seeding (use sparingly in tests). */
@@ -49,6 +51,7 @@ async function flushAll(): Promise<void> {
   await flushPendingCustomerPersist().catch(() => undefined);
   await flushPendingPurchaseOrderPersist().catch(() => undefined);
   await flushPendingSalesOrderPersist().catch(() => undefined);
+  await flushPendingEmployeePersist().catch(() => undefined);
 }
 
 async function patchItem(id: string, patch: UpdateItemPatch): Promise<void> {
@@ -70,6 +73,7 @@ function attach(): void {
     customerRepository,
     purchaseOrderRepository,
     salesOrderRepository,
+    employeeRepository,
     flushAll,
     patchItem,
   };

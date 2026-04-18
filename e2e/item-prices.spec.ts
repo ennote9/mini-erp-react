@@ -126,6 +126,7 @@ test.describe("Item card — Prices tab (acceptance)", () => {
     await gotoReady(page, `/items/${encodeURIComponent(itemId)}`);
     await waitItemTabsVisible(page);
     await expect(page.getByTestId("item-tab-prices")).toBeVisible();
+    await expect(page.getByTestId("item-tab-responsibles")).toBeVisible();
     await expect(page.getByTestId("item-tab-images")).toBeVisible();
     await expect(page.getByTestId("item-tab-barcodes")).toBeVisible();
     await expect(page.getByTestId("item-tab-testers")).toBeVisible();
@@ -582,5 +583,112 @@ test.describe("Item card — Prices tab (acceptance)", () => {
     const after = await page.getByTestId("item-prices-history-table").textContent();
     expect(after?.length ?? 0).toBeGreaterThan(10);
     expect(before).toEqual(after);
+  });
+
+  test("13.1 history TanStack: sort by amount changes row order", async ({ page }) => {
+    await openApp(page);
+    const itemId = await firstItemId(page);
+    await page.evaluate(async (id: string) => {
+      const w = (window as Window & { __MINI_ERP_E2E__?: E2eApi }).__MINI_ERP_E2E__;
+      const ymd = new Date().toISOString().slice(0, 10);
+      await w!.applyItemPriceAwaitPersist(id, "purchase", {
+        amount: 1.01,
+        validFromYmd: ymd,
+        reasonCode: "correction",
+      });
+      await w!.applyItemPriceAwaitPersist(id, "sale", {
+        amount: 9.99,
+        validFromYmd: ymd,
+        reasonCode: "correction",
+      });
+      await w!.flushAll();
+    }, itemId);
+    await gotoReady(page, `/items/${encodeURIComponent(itemId)}`);
+    await waitItemTabsVisible(page);
+    await page.getByTestId("item-tab-prices").click();
+    await page.getByTestId("item-prices-history-table").waitFor({ state: "visible", timeout: 15_000 });
+
+    const readAmounts = () =>
+      page.$$eval('[data-testid="item-prices-history-row"]', (rows) =>
+        rows.map((r) => (r.querySelectorAll("td")[1]?.textContent ?? "").replace(/\s/g, "").trim()),
+      );
+
+    const before = await readAmounts();
+    expect(before.length).toBeGreaterThanOrEqual(2);
+
+    await page.getByTestId("item-prices-history-sort-amount").click();
+    const afterDesc = await readAmounts();
+    await page.getByTestId("item-prices-history-sort-amount").click();
+    const afterAsc = await readAmounts();
+
+    expect(afterDesc[0] !== afterAsc[0] || afterDesc.join() !== afterAsc.join()).toBeTruthy();
+  });
+
+  test("13.2 history TanStack: type column filter purchase only", async ({ page }) => {
+    await openApp(page);
+    const itemId = await firstItemId(page);
+    await gotoReady(page, `/items/${encodeURIComponent(itemId)}`);
+    await waitItemTabsVisible(page);
+    await page.getByTestId("item-tab-prices").click();
+    await page.getByTestId("item-prices-history-table").waitFor({ state: "visible" });
+
+    await page.getByTestId("item-prices-history-filter-priceType").click();
+    const panel = page.locator('[data-slot="popover-content"]').last();
+    await panel.locator("select").nth(1).selectOption("purchase");
+    await panel.getByRole("button", { name: /apply|применить|қолдану/i }).click();
+
+    await expect(page.getByTestId("item-prices-history-filter-priceType")).toHaveClass(/text-primary/);
+
+    const types = await page.$$eval('[data-testid="item-prices-history-row"]', (rows) =>
+      rows.map((r) => (r.querySelectorAll("td")[0]?.textContent ?? "").trim()),
+    );
+    for (const cell of types) {
+      expect(cell.toLowerCase()).not.toMatch(/sale|продаж|сату/i);
+    }
+
+    await page.getByTestId("item-prices-history-filter-priceType").click();
+    const panel2 = page.locator('[data-slot="popover-content"]').last();
+    await panel2.getByRole("button", { name: /reset|сброс|қалпына|default/i }).click();
+    await expect(page.getByTestId("item-prices-history-filter-priceType")).not.toHaveClass(/text-primary/);
+  });
+
+  test("13.3 history TanStack: cancel scheduled still works after sort", async ({ page }) => {
+    await openApp(page);
+    const code = `E2E-13-3-${Date.now()}`;
+    await gotoReady(page, "/items/new");
+    await waitNewItemFormVisible(page);
+    await page.locator("#item-name").fill(`TanStack sort cancel ${code}`);
+    await page.locator("#item-code").fill(code);
+    await page.locator("#item-uom").fill("EA");
+    await page.getByRole("button", { name: /^Save|Сохранить|Сақтау/i }).click();
+    await expect(page).toHaveURL(/\/items\/\d+/, { timeout: 20_000 });
+
+    await waitItemTabsVisible(page);
+    const future = addDaysYmd(new Date().toISOString().slice(0, 10), 20);
+    await page.getByTestId("item-tab-prices").click();
+    await page.getByTestId("item-prices-history-table").waitFor({ state: "visible", timeout: 15_000 });
+    await page.getByTestId("item-prices-add-purchase").click();
+    await expect(page.getByTestId("item-price-edit-dialog")).toBeVisible({ timeout: 10_000 });
+    await page.getByTestId("item-price-amount-input").fill("5.55");
+    await page.getByTestId("item-price-valid-from-input").fill(future);
+    await page.getByTestId("item-price-reason-select").selectOption("supplier_change");
+    await page.getByTestId("item-price-dialog-submit").click();
+    await expect(page.getByTestId("item-price-edit-dialog")).toBeHidden({ timeout: 15_000 });
+
+    await expect(page.getByTestId("item-prices-card-purchase-next")).toContainText("5.55", { timeout: 15_000 });
+    await expect(page.getByTestId("item-prices-row-cancel-scheduled")).toHaveCount(1, { timeout: 10_000 });
+
+    const sortAmount = page.getByTestId("item-prices-history-sort-amount");
+    await sortAmount.scrollIntoViewIfNeeded();
+    await sortAmount.click();
+    await sortAmount.click();
+
+    await page.getByTestId("item-prices-row-cancel-scheduled").first().click();
+    await expect(page.getByTestId("item-price-cancel-dialog")).toBeVisible({ timeout: 10_000 });
+    await page.getByTestId("item-price-cancel-confirm").click();
+    await expect(page.getByTestId("item-price-cancel-dialog")).toBeHidden({ timeout: 15_000 });
+    await expect(page.getByTestId("item-prices-card-purchase-next")).toContainText(
+      /Not scheduled|Не запланирована|Жоспарланбаған/i,
+    );
   });
 });

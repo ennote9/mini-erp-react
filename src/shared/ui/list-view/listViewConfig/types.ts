@@ -2,6 +2,7 @@ import type { ListViewFilterOperator } from "@/shared/navigation/listViewColumnF
 
 export type ListViewEntityType =
   | "items"
+  | "item-price-history"
   | "sales-orders"
   | "purchase-orders"
   | "receipts"

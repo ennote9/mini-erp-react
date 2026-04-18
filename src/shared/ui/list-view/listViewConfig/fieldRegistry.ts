@@ -2405,6 +2405,7 @@ const MARKDOWN_CODE_FIELDS: ListViewFieldRegistryEntry[] = [
 
 const REGISTRY: Record<ListViewEntityType, ListViewFieldRegistryEntry[]> = {
   items: ITEMS_FIELDS,
+  "item-price-history": [],
   "sales-orders": SALES_ORDER_FIELDS,
   "purchase-orders": PURCHASE_ORDER_FIELDS,
   receipts: RECEIPT_FIELDS,
