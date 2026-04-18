@@ -20,6 +20,9 @@ import type {
   ItemBarcodeSymbology,
   ItemImage,
   ItemKind,
+  ItemPriceReasonCode,
+  ItemPriceRecord,
+  ItemPriceType,
 } from "../model";
 import {
   ITEM_BARCODE_SYMBOLOGIES,
@@ -93,6 +96,46 @@ function normalizeItemImage(raw: unknown): ItemImage | null {
   };
 }
 
+const ITEM_PRICE_REASONS: readonly ItemPriceReasonCode[] = [
+  "initial_migration",
+  "manual_update",
+  "supplier_change",
+  "commercial_review",
+  "correction",
+  "other",
+];
+
+function normalizeItemPriceRecord(raw: unknown, fallbackItemId: string): ItemPriceRecord | null {
+  if (!raw || typeof raw !== "object") return null;
+  const o = raw as Record<string, unknown>;
+  const id = typeof o.id === "string" ? o.id : null;
+  const itemId = typeof o.itemId === "string" ? o.itemId : fallbackItemId;
+  const priceType = o.priceType === "purchase" || o.priceType === "sale" ? o.priceType : null;
+  const amount = typeof o.amount === "number" && !Number.isNaN(o.amount) ? o.amount : null;
+  const validFrom = typeof o.validFrom === "string" ? o.validFrom : null;
+  const createdAt = typeof o.createdAt === "string" ? o.createdAt : new Date(0).toISOString();
+  if (!id || !priceType || amount === null || !validFrom) return null;
+  const reasonRaw = typeof o.reasonCode === "string" ? o.reasonCode : "other";
+  const reasonCode: ItemPriceReasonCode = ITEM_PRICE_REASONS.includes(reasonRaw as ItemPriceReasonCode)
+    ? (reasonRaw as ItemPriceReasonCode)
+    : "other";
+  const validTo = typeof o.validTo === "string" ? o.validTo : undefined;
+  const comment = typeof o.comment === "string" ? o.comment : undefined;
+  const cancelledAt = typeof o.cancelledAt === "string" ? o.cancelledAt : undefined;
+  return {
+    id,
+    itemId,
+    priceType: priceType as ItemPriceType,
+    amount,
+    validFrom,
+    validTo,
+    reasonCode,
+    comment,
+    createdAt,
+    cancelledAt,
+  };
+}
+
 function normalizeItem(raw: unknown): Item | null {
   if (!raw || typeof raw !== "object") return null;
   const o = raw as Record<string, unknown>;
@@ -157,6 +200,10 @@ function normalizeItem(raw: unknown): Item | null {
     typeof o.testerCodeNextSeq === "number" && Number.isFinite(o.testerCodeNextSeq) && o.testerCodeNextSeq >= 1
       ? Math.floor(o.testerCodeNextSeq)
       : undefined;
+  const phRaw = o.priceHistory;
+  const priceHistory: ItemPriceRecord[] | undefined = Array.isArray(phRaw)
+    ? phRaw.map((x) => normalizeItemPriceRecord(x, String(o.id))).filter((x): x is ItemPriceRecord => x !== null)
+    : undefined;
   return {
     id: o.id,
     code: o.code,
@@ -170,6 +217,7 @@ function normalizeItem(raw: unknown): Item | null {
     barcode: bridgeLegacyBarcodeValueFromCollection(barcodes),
     purchasePrice,
     salePrice,
+    priceHistory: priceHistory && priceHistory.length > 0 ? priceHistory : undefined,
     images,
     barcodes,
     itemKind,

@@ -23,8 +23,6 @@ export type ItemFormHealthInput = {
   code: string;
   name: string;
   uom: string;
-  purchasePrice: string;
-  salePrice: string;
 };
 
 export function getItemFormHealth(input: ItemFormHealthInput): { issues: Issue[] } {
@@ -66,38 +64,6 @@ export function getItemFormHealth(input: ItemFormHealthInput): { issues: Issue[]
     issues.push(fieldIssue("error", "uom", uomErr, { key, params }));
   }
 
-  const purchaseTrim = input.purchasePrice.trim();
-  if (purchaseTrim !== "") {
-    const purchase = Number(purchaseTrim);
-    if (Number.isNaN(purchase))
-      issues.push(
-        fieldIssue("error", "purchasePrice", "Purchase price must be a valid number.", {
-          key: "issues.master.purchasePriceInvalid",
-        }),
-      );
-    else if (purchase < 0)
-      issues.push(
-        fieldIssue("error", "purchasePrice", "Purchase price cannot be negative.", {
-          key: "issues.master.purchasePriceNegative",
-        }),
-      );
-  }
-  const saleTrim = input.salePrice.trim();
-  if (saleTrim !== "") {
-    const sale = Number(saleTrim);
-    if (Number.isNaN(sale))
-      issues.push(
-        fieldIssue("error", "salePrice", "Sale price must be a valid number.", {
-          key: "issues.master.salePriceInvalid",
-        }),
-      );
-    else if (sale < 0)
-      issues.push(
-        fieldIssue("error", "salePrice", "Sale price cannot be negative.", {
-          key: "issues.master.salePriceNegative",
-        }),
-      );
-  }
   return { issues };
 }
 

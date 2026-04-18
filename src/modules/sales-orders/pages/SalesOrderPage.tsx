@@ -10,6 +10,7 @@ import { carrierRepository } from "../../carriers/repository";
 import { translateCarrierType } from "../../carriers";
 import { warehouseRepository } from "../../warehouses/repository";
 import { itemRepository } from "../../items/repository";
+import { getEffectiveItemBasePriceOrZero } from "../../items/itemPriceService";
 import { shipmentRepository } from "../../shipments/repository";
 import { listSellableItemsForDocumentLines } from "../../items/orderLineItemsPolicy";
 import { markdownRepository } from "../../markdown-journal/repository";
@@ -211,7 +212,7 @@ function applyAgreementUnitPrice(basePrice: number, defaults: AgreementDefaults)
   return roundMoney((normalized * (100 - bounded)) / 100);
 }
 
-function getLineBaseUnitPrice(line: LineFormRow): number {
+function getLineBaseUnitPrice(line: LineFormRow, documentDateYmd: string): number {
   const markdownCode = line.markdownCode?.trim().toUpperCase();
   if (markdownCode) {
     const record = markdownRepository.getByCode(markdownCode);
@@ -220,16 +221,15 @@ function getLineBaseUnitPrice(line: LineFormRow): number {
       return markdownPrice;
     }
   }
-  const item = itemRepository.getById(line.itemId);
-  const salePrice = item?.salePrice;
-  if (typeof salePrice === "number" && Number.isFinite(salePrice) && salePrice >= 0) {
-    return salePrice;
-  }
-  return 0;
+  return getEffectiveItemBasePriceOrZero(line.itemId, "sale", documentDateYmd);
 }
 
-function applyAgreementDefaultsToLine(line: LineFormRow, defaults: AgreementDefaults): LineFormRow {
-  const unitPrice = applyAgreementUnitPrice(getLineBaseUnitPrice(line), defaults);
+function applyAgreementDefaultsToLine(
+  line: LineFormRow,
+  defaults: AgreementDefaults,
+  documentDateYmd: string,
+): LineFormRow {
+  const unitPrice = applyAgreementUnitPrice(getLineBaseUnitPrice(line, documentDateYmd), defaults);
   return {
     ...line,
     unitPrice,
@@ -237,8 +237,12 @@ function applyAgreementDefaultsToLine(line: LineFormRow, defaults: AgreementDefa
   };
 }
 
-function applyAgreementDefaultsToLines(lines: LineFormRow[], defaults: AgreementDefaults): LineFormRow[] {
-  return lines.map((line) => applyAgreementDefaultsToLine(line, defaults));
+function applyAgreementDefaultsToLines(
+  lines: LineFormRow[],
+  defaults: AgreementDefaults,
+  documentDateYmd: string,
+): LineFormRow[] {
+  return lines.map((line) => applyAgreementDefaultsToLine(line, defaults, documentDateYmd));
 }
 
 function agreementSignature(defaults: AgreementDefaults): string {
@@ -535,7 +539,9 @@ export function SalesOrderPage() {
         recipientPhone: next.recipientPhone,
         deliveryAddress: next.deliveryAddress,
         deliveryComment: next.deliveryComment,
-        lines: recalculateLines ? applyAgreementDefaultsToLines(f.lines, next.agreementDefaults) : f.lines,
+        lines: recalculateLines
+          ? applyAgreementDefaultsToLines(f.lines, next.agreementDefaults, normalizeDateForSO(f.date))
+          : f.lines,
       }));
       if (recalculateLines) {
         setEditingLineId(null);
@@ -1128,8 +1134,8 @@ export function SalesOrderPage() {
     setLineEntryItemId(itemId);
     setLineEntryMarkdownCode(null);
     setLineEntryZeroPriceReason("");
-    const item = itemId ? itemRepository.getById(itemId) : undefined;
-    const price = item?.salePrice;
+    const docDate = normalizeDateForSO(form.date);
+    const price = itemId ? getEffectiveItemBasePriceOrZero(itemId, "sale", docDate) : 0;
     const up = applyAgreementUnitPriceDefault(
       typeof price === "number" && !Number.isNaN(price) && price >= 0 ? price : 0,
     );
@@ -2722,11 +2728,7 @@ export function SalesOrderPage() {
         items={documentLineItems}
         getDefaultUnitPrice={(item) =>
           applyAgreementUnitPriceDefault(
-            typeof item.salePrice === "number" &&
-              Number.isFinite(item.salePrice) &&
-              item.salePrice >= 0
-              ? item.salePrice
-              : 0,
+            getEffectiveItemBasePriceOrZero(item.id, "sale", normalizeDateForSO(form.date)),
           )
         }
         templateFileName="sales-order-lines-template.xlsx"

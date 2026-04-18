@@ -27,8 +27,6 @@ export type SaveItemInput = {
   accountingProfile?: string;
   brandId?: string;
   categoryId?: string;
-  purchasePrice?: number;
-  salePrice?: number;
   itemKind?: ItemKind;
   baseItemId?: string;
 };
@@ -38,14 +36,6 @@ export type SaveItemResult =
 export type SaveItemBarcodeResult =
   | { success: true; barcodeId: string }
   | { success: false; error: string };
-
-function validatePrice(value: number | undefined, fieldName: string): string | null {
-  if (value === undefined) return null;
-  if (typeof value !== "number" || Number.isNaN(value))
-    return `${fieldName} must be a valid number.`;
-  if (value < 0) return `${fieldName} cannot be negative.`;
-  return null;
-}
 
 function validateSaveItem(data: SaveItemInput, existingId?: string): string | null {
   const codeErr = validateItemCode(data.code);
@@ -57,11 +47,6 @@ function validateSaveItem(data: SaveItemInput, existingId?: string): string | nu
     return `Name must be at least ${NAME_MIN_LENGTH} characters.`;
   const uomErr = validateUOM(data.uom);
   if (uomErr) return uomErr;
-
-  const purchaseErr = validatePrice(data.purchasePrice, "Purchase price");
-  if (purchaseErr) return purchaseErr;
-  const saleErr = validatePrice(data.salePrice, "Sale price");
-  if (saleErr) return saleErr;
 
   if (data.brandId !== undefined && data.brandId !== "") {
     const brand = brandRepository.getById(data.brandId);
@@ -107,8 +92,6 @@ export function saveItem(
   const accountingProfile = normalizeTrim(data.accountingProfile) || undefined;
   const brandId = data.brandId && data.brandId.trim() !== "" ? data.brandId.trim() : undefined;
   const categoryId = data.categoryId && data.categoryId.trim() !== "" ? data.categoryId.trim() : undefined;
-  const purchasePrice = data.purchasePrice !== undefined ? Number(data.purchasePrice) : undefined;
-  const salePrice = data.salePrice !== undefined ? Number(data.salePrice) : undefined;
   const itemKind: ItemKind = data.itemKind ?? "SELLABLE";
   const baseItemId = normalizeTrim(data.baseItemId) || undefined;
 
@@ -121,8 +104,6 @@ export function saveItem(
     accountingProfile,
     brandId,
     categoryId,
-    purchasePrice,
-    salePrice,
     itemKind,
     baseItemId: itemKind === "TESTER" ? baseItemId : undefined,
   };

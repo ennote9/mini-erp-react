@@ -31,6 +31,7 @@ import { getItemFormHealth } from "../../../shared/masterDataHealth";
 import { DocumentIssueStrip } from "../../../shared/ui/feedback/DocumentIssueStrip";
 import { ItemImagesCard } from "../components/ItemImagesCard";
 import { ItemBarcodesCard } from "../components/ItemBarcodesCard";
+import { ItemPricesTab } from "../components/ItemPricesTab";
 import { Save, X } from "lucide-react";
 import { useTranslation } from "@/shared/i18n/context";
 import { appendReturnTo, buildReturnToValue, readReturnToParam } from "@/shared/navigation/returnTo";
@@ -45,8 +46,6 @@ type FormState = {
   accountingProfile: string;
   brandId: string;
   categoryId: string;
-  purchasePrice: string;
-  salePrice: string;
   baseItemId: string;
 };
 
@@ -60,8 +59,6 @@ function defaultForm(): FormState {
     accountingProfile: "",
     brandId: "",
     categoryId: "",
-    purchasePrice: "",
-    salePrice: "",
     baseItemId: "",
   };
 }
@@ -76,6 +73,8 @@ export function ItemPage() {
   const isNew = id === "new";
   const [imagesRevision, setImagesRevision] = useState(0);
   const [barcodesRevision, setBarcodesRevision] = useState(0);
+  const [pricesRevision, setPricesRevision] = useState(0);
+  const [itemDetailRevision, setItemDetailRevision] = useState(0);
   const requestedKind = (searchParams.get("kind") ?? "").toUpperCase();
   const requestedBaseItemId = searchParams.get("baseItemId") ?? "";
   const createKind: "SELLABLE" | "TESTER" = requestedKind === "TESTER" ? "TESTER" : "SELLABLE";
@@ -94,7 +93,7 @@ export function ItemPage() {
 
   const item = useMemo(
     () => (itemsReady && id && !isNew ? itemRepository.getById(id) : undefined),
-    [itemsReady, id, isNew, imagesRevision, barcodesRevision],
+    [itemsReady, id, isNew, imagesRevision, barcodesRevision, pricesRevision, itemDetailRevision],
   );
 
   const [form, setForm] = useState<FormState>(defaultForm);
@@ -106,10 +105,8 @@ export function ItemPage() {
         code: form.code,
         name: form.name,
         uom: form.uom,
-        purchasePrice: form.purchasePrice,
-        salePrice: form.salePrice,
       }),
-    [form.code, form.name, form.uom, form.purchasePrice, form.salePrice],
+    [form.code, form.name, form.uom],
   );
 
   const brandOptions = useMemo(() => {
@@ -136,7 +133,7 @@ export function ItemPage() {
 
   useEffect(() => {
     setActionIssues([]);
-  }, [form.code, form.name, form.uom, form.purchasePrice, form.salePrice]);
+  }, [form.code, form.name, form.uom]);
 
   const combinedIssues = useMemo(
     () => combineIssues(health.issues, actionIssues),
@@ -162,8 +159,6 @@ export function ItemPage() {
             accountingProfile: base.accountingProfile ?? "",
             brandId: base.brandId ?? "",
             categoryId: base.categoryId ?? "",
-            purchasePrice: base.purchasePrice !== undefined ? String(base.purchasePrice) : "",
-            salePrice: base.salePrice !== undefined ? String(base.salePrice) : "",
             baseItemId: base.id,
           });
           return;
@@ -182,8 +177,6 @@ export function ItemPage() {
         accountingProfile: item.accountingProfile ?? "",
         brandId: item.brandId ?? "",
         categoryId: item.categoryId ?? "",
-        purchasePrice: item.purchasePrice !== undefined ? String(item.purchasePrice) : "",
-        salePrice: item.salePrice !== undefined ? String(item.salePrice) : "",
         baseItemId: item.baseItemId ?? "",
       });
     }
@@ -199,18 +192,9 @@ export function ItemPage() {
     item?.accountingProfile,
     item?.brandId,
     item?.categoryId,
-    item?.purchasePrice,
-    item?.salePrice,
     createKind,
     requestedBaseItemId,
   ]);
-
-  const parsePrice = (s: string): number | undefined => {
-    const trimmed = s.trim();
-    if (trimmed === "") return undefined;
-    const n = Number(trimmed);
-    return Number.isNaN(n) ? undefined : n;
-  };
 
   const handleSave = () => {
     setActionIssues([]);
@@ -236,15 +220,17 @@ export function ItemPage() {
           accountingProfile: form.accountingProfile || undefined,
           brandId: form.brandId || undefined,
           categoryId: form.categoryId || undefined,
-          purchasePrice: parsePrice(form.purchasePrice),
-          salePrice: parsePrice(form.salePrice),
           itemKind: itemKindForSave,
           baseItemId: baseItemIdForSave,
         },
         isNew ? undefined : id ?? undefined,
       );
       if (result.success) {
-        navigate(backHref);
+        if (isNew) {
+          navigate(appendReturnTo(`/items/${encodeURIComponent(result.id)}`, currentReturnTo), { replace: true });
+        } else {
+          setItemDetailRevision((n) => n + 1);
+        }
       } else if (!issueListContainsMessage(health.issues, result.error)) {
         setActionIssues([actionIssueFromServiceMessage(result.error)]);
       }
@@ -308,6 +294,7 @@ export function ItemPage() {
   const showTestersTab = isNew ? createKind !== "TESTER" : item!.itemKind === "SELLABLE";
   const tabItems = [
     { value: "main", label: t("master.item.tabMain") },
+    { value: "prices", label: t("master.item.tabPrices") },
     { value: "images", label: t("master.item.tabImages") },
     { value: "barcodes", label: t("master.item.tabBarcodes") },
     ...(showTestersTab ? [{ value: "testers", label: t("master.item.tabTesters") }] : []),
@@ -392,7 +379,7 @@ export function ItemPage() {
           </div>
         </div>
       </div>
-      <Card className="mt-3 w-full max-w-3xl border-0 shadow-none">
+      <Card className="mt-3 w-full max-w-6xl border-0 shadow-none">
         <Tabs.Root value={activeTab} onValueChange={setActiveTab}>
           <CardHeader className="space-y-1 p-1.5 pb-0">
             <Tabs.List
@@ -405,6 +392,7 @@ export function ItemPage() {
                     {index > 0 ? <ButtonGroupSeparator /> : null}
                     <Tabs.Trigger
                       value={tab.value}
+                      data-testid={`item-tab-${tab.value}`}
                       className={cn(
                         "inline-flex h-7 flex-1 items-center justify-center rounded-none border-0 bg-background px-2.5 text-xs font-medium transition-colors sm:flex-initial",
                         "text-foreground hover:bg-accent hover:text-accent-foreground",
@@ -551,32 +539,6 @@ export function ItemPage() {
                       ))}
                     </select>
                   </div>
-                  <div className="flex flex-col gap-0.5">
-                    <Label htmlFor="item-purchasePrice" className="text-xs">{t("doc.columns.purchasePrice")}</Label>
-                    <Input
-                      id="item-purchasePrice"
-                      type="number"
-                      min={0}
-                      step="0.01"
-                      value={form.purchasePrice}
-                      onChange={(e) => setForm((f) => ({ ...f, purchasePrice: e.target.value }))}
-                      placeholder="0.00"
-                      className="h-7 text-xs"
-                    />
-                  </div>
-                  <div className="flex flex-col gap-0.5">
-                    <Label htmlFor="item-salePrice" className="text-xs">{t("doc.columns.salePrice")}</Label>
-                    <Input
-                      id="item-salePrice"
-                      type="number"
-                      min={0}
-                      step="0.01"
-                      value={form.salePrice}
-                      onChange={(e) => setForm((f) => ({ ...f, salePrice: e.target.value }))}
-                      placeholder="0.00"
-                      className="h-7 text-xs"
-                    />
-                  </div>
                   <div className="flex items-center space-x-2 sm:col-span-2">
                     <Checkbox
                       id="item-active"
@@ -630,6 +592,17 @@ export function ItemPage() {
                 </div>
               </div>
               </div>
+            </Tabs.Content>
+            <Tabs.Content value="prices" className="outline-none focus-visible:outline-none">
+              <ItemPricesTab
+                isNew={isNew}
+                itemId={isNew ? undefined : id}
+                revision={pricesRevision}
+                onPricesChanged={() => {
+                  setPricesRevision((n) => n + 1);
+                  setItemDetailRevision((n) => n + 1);
+                }}
+              />
             </Tabs.Content>
             <Tabs.Content value="images" className="outline-none focus-visible:outline-none">
               <ItemImagesCard

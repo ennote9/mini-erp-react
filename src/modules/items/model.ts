@@ -65,6 +65,30 @@ export interface ItemBarcode {
 
 export type ItemKind = "SELLABLE" | "TESTER";
 
+/** Base purchase / sale price history (v1). Source of truth; {@link Item.purchasePrice} / {@link Item.salePrice} are denormalized snapshots. */
+export type ItemPriceType = "purchase" | "sale";
+
+export type ItemPriceReasonCode =
+  | "initial_migration"
+  | "manual_update"
+  | "supplier_change"
+  | "commercial_review"
+  | "correction"
+  | "other";
+
+export interface ItemPriceRecord {
+  id: string;
+  itemId: string;
+  priceType: ItemPriceType;
+  amount: number;
+  validFrom: string;
+  validTo?: string;
+  reasonCode: ItemPriceReasonCode;
+  comment?: string;
+  createdAt: string;
+  cancelledAt?: string;
+}
+
 export interface Item {
   id: string;
   code: string;
@@ -80,8 +104,17 @@ export interface Item {
    * Not authoritative; do not treat as the source of truth for lookups after migration.
    */
   barcode?: string;
+  /**
+   * Denormalized: current effective base purchase price as of "today" in session (see price sync).
+   * Authoritative history is {@link priceHistory}.
+   */
   purchasePrice?: number;
+  /**
+   * Denormalized: current effective base sale price as of "today" in session.
+   */
   salePrice?: number;
+  /** Base price history; when absent, treat as legacy flat-price-only item. */
+  priceHistory?: ItemPriceRecord[];
   images: ItemImage[];
   barcodes: ItemBarcode[];
   itemKind: ItemKind;

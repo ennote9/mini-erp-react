@@ -6,6 +6,7 @@ import { confirm, cancelDocument, createReceipt, saveDraft } from "../service";
 import { supplierRepository } from "../../suppliers/repository";
 import { warehouseRepository } from "../../warehouses/repository";
 import { itemRepository } from "../../items/repository";
+import { getEffectiveItemBasePriceOrZero } from "../../items/itemPriceService";
 import { receiptRepository } from "../../receipts/repository";
 import { listSellableItemsForDocumentLines } from "../../items/orderLineItemsPolicy";
 import { useAppReadModelRevision } from "@/shared/inventoryMasterPageBlocks/useAppReadModelRevision";
@@ -645,8 +646,8 @@ export function PurchaseOrderPage() {
 
   const handleLineEntryItemChange = (itemId: string) => {
     setLineEntryItemId(itemId);
-    const item = itemId ? itemRepository.getById(itemId) : undefined;
-    const price = item?.purchasePrice;
+    const docDate = normalizeDateForPO(form.date);
+    const price = itemId ? getEffectiveItemBasePriceOrZero(itemId, "purchase", docDate) : 0;
     const up = roundMoney(
       typeof price === "number" && !Number.isNaN(price) && price >= 0 ? price : 0,
     );
@@ -1785,11 +1786,7 @@ export function PurchaseOrderPage() {
         items={documentLineItems}
         getDefaultUnitPrice={(item) =>
           roundMoney(
-            typeof item.purchasePrice === "number" &&
-              Number.isFinite(item.purchasePrice) &&
-              item.purchasePrice >= 0
-              ? item.purchasePrice
-              : 0,
+            getEffectiveItemBasePriceOrZero(item.id, "purchase", normalizeDateForPO(form.date)),
           )
         }
         templateFileName="purchase-order-lines-template.xlsx"

@@ -12,6 +12,7 @@ import {
   bridgeLegacyBarcodeValueFromCollection,
   normalizeItemBarcodesCollection,
 } from "./lib/itemBarcodes";
+import { migrateLegacyFlatPricesToHistory, syncItemPriceSnapshotsFromHistory, todayYmdLocal } from "./lib/itemPriceHistory";
 
 export type CreateItemInput = Omit<Item, "id" | "images" | "barcodes"> & {
   images?: ItemImage[];
@@ -91,9 +92,23 @@ function buildCreatedItem(input: CreateItemInput): Item {
 
 async function bootstrapFromDisk(): Promise<void> {
   const { items, nextId: loadedNext } = await loadItemsPersisted(buildSeedItems);
-  store.splice(0, store.length, ...items);
+  const migrationIso = new Date().toISOString();
+  const migrationDateYmd = migrationIso.slice(0, 10);
+  const todayYmd = todayYmdLocal();
+  const processed = items.map((it) => {
+    let x = migrateLegacyFlatPricesToHistory(it, migrationDateYmd, migrationIso);
+    x = syncItemPriceSnapshotsFromHistory(x, todayYmd);
+    return x;
+  });
+  const changed =
+    processed.length !== items.length ||
+    processed.some((it, i) => JSON.stringify(it) !== JSON.stringify(items[i]));
+  store.splice(0, store.length, ...processed);
   nextId = loadedNext;
   itemsReady = true;
+  if (changed) {
+    schedulePersist();
+  }
 }
 
 export function isItemsRepositoryReady(): boolean {
