@@ -94,7 +94,7 @@ export function buildItemPriceHistoryTableSchema(t: TFunction): ItemPriceHistory
       label: t("master.item.prices.colComment"),
       dataType: "string",
       sourceType: "document",
-      sortable: false,
+      sortable: true,
       filterable: true,
       defaultSize: 180,
       minSize: 120,

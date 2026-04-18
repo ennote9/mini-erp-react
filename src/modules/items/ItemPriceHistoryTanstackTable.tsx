@@ -197,21 +197,45 @@ export function ItemPriceHistoryTanstackTable(props: Props) {
   });
 
   const visibleLeafColumns = table.getVisibleLeafColumns();
-  const totalWidth = table.getTotalSize();
+  const rawTotalWidth = table.getTotalSize();
+  /** When table min-width (640px) exceeds TanStack column sum, extra space must be split across all cols — otherwise `table-fixed` assigns the slack to one column (often last), which looks like a hollow «Действия» gutter. */
+  const MIN_TABLE_WIDTH_PX = 640;
+  const tableDisplayWidth = Math.max(rawTotalWidth, MIN_TABLE_WIDTH_PX);
+  const columnWidthsById = new Map<string, number>();
+  if (visibleLeafColumns.length > 0 && rawTotalWidth > 0) {
+    const scale = tableDisplayWidth / rawTotalWidth;
+    const scaled = visibleLeafColumns.map((c) => c.getSize() * scale);
+    const floored = scaled.map((w) => Math.floor(w));
+    let remainder = tableDisplayWidth - floored.reduce((a, b) => a + b, 0);
+    const distributed = [...floored];
+    let i = 0;
+    while (remainder > 0) {
+      distributed[i % distributed.length] += 1;
+      remainder -= 1;
+      i += 1;
+    }
+    visibleLeafColumns.forEach((c, idx) => {
+      columnWidthsById.set(c.id, distributed[idx]!);
+    });
+  } else {
+    visibleLeafColumns.forEach((c) => columnWidthsById.set(c.id, c.getSize()));
+  }
+
+  const cellWidth = (columnId: string, fallback: number) => columnWidthsById.get(columnId) ?? fallback;
 
   return (
     <div
       className="overflow-x-auto rounded-lg border border-border/60 bg-card/20 shadow-sm"
       data-testid="item-prices-history-table"
     >
-      <div className="relative inline-block align-top" style={{ width: Math.max(totalWidth, 640) }}>
+      <div className="relative inline-block align-top" style={{ width: tableDisplayWidth }}>
         <table
-          className="w-full border-collapse table-fixed text-xs leading-tight"
-          style={{ width: Math.max(totalWidth, 640) }}
+          className="border-collapse table-fixed text-xs leading-tight"
+          style={{ width: tableDisplayWidth }}
         >
           <colgroup>
             {visibleLeafColumns.map((column) => (
-              <col key={column.id} style={{ width: column.getSize() }} />
+              <col key={column.id} style={{ width: cellWidth(column.id, column.getSize()) }} />
             ))}
           </colgroup>
           <thead className="bg-muted/35 text-[11px]">
@@ -241,7 +265,10 @@ export function ItemPriceHistoryTanstackTable(props: Props) {
                             ? "text-center"
                             : "text-left",
                       )}
-                      style={{ width: header.getSize(), minWidth: header.column.columnDef.minSize }}
+                      style={{
+                        width: cellWidth(header.column.id, header.getSize()),
+                        minWidth: header.column.columnDef.minSize,
+                      }}
                     >
                       {header.isPlaceholder ? null : (
                         <div className="flex min-w-0 items-center gap-0.5">
@@ -368,7 +395,10 @@ export function ItemPriceHistoryTanstackTable(props: Props) {
                                 ? "text-center"
                                 : "text-left",
                           )}
-                          style={{ width: cell.column.getSize(), minWidth: cell.column.columnDef.minSize }}
+                          style={{
+                            width: cellWidth(cell.column.id, cell.column.getSize()),
+                            minWidth: cell.column.columnDef.minSize,
+                          }}
                         >
                           {flexRender(cell.column.columnDef.cell, cell.getContext())}
                         </td>

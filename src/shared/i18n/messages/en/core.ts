@@ -122,6 +122,18 @@ export const coreEn = {
       previewPlaceholder: "Live preview will appear here.",
       paramsSection: "Print parameters",
       paramsPlaceholder: "Copies, target printer, and layout options will be configured here.",
+      selectTemplate: "Label template",
+      selectTemplatePlaceholder: "Choose a template",
+      selectTemplateAria: "Label template",
+      noTemplates: "No active templates available.",
+      copiesLabel: "Copies",
+      copiesHint: "Preview only — not sent to a printer yet.",
+      preview: {
+        demoHint: "Demo data for preview. Item integration will replace this context.",
+        bindingEmpty: "No value",
+        symbologyUnsupported: "Unsupported symbology",
+        renderFailed: "Could not generate code",
+      },
     },
     operations: {
       pageHeading: "Print operations",

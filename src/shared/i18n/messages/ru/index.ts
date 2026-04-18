@@ -132,6 +132,18 @@ export const ruMessages: MessageTree = {
       previewPlaceholder: "Здесь будет предпросмотр макета.",
       paramsSection: "Параметры печати",
       paramsPlaceholder: "Количество копий, принтер и параметры макета будут настраиваться здесь.",
+      selectTemplate: "Шаблон этикетки",
+      selectTemplatePlaceholder: "Выберите шаблон",
+      selectTemplateAria: "Шаблон этикетки",
+      noTemplates: "Нет доступных активных шаблонов.",
+      copiesLabel: "Копий",
+      copiesHint: "Только предпросмотр — на принтер пока не отправляется.",
+      preview: {
+        demoHint: "Демо-данные для предпросмотра. Интеграция с карточкой товара заменит этот контекст.",
+        bindingEmpty: "Нет значения",
+        symbologyUnsupported: "Симвология не поддерживается",
+        renderFailed: "Не удалось сгенерировать код",
+      },
     },
     operations: {
       pageHeading: "Операции печати",

@@ -98,6 +98,7 @@ export const kkMasterPages: MessageTree = {
       actionAssign: "Тағайындау",
       actionReplace: "Ауыстыру",
       actionRemove: "Алып тастау",
+      rowActionsMenuTitle: "Рөл бойынша қосымша әрекеттер",
       dialogTitle: "Жауаптылықты тағайындау",
       dialogAriaDescription:
         "Әр рөлге бір қызметкер таңдаңыз. Кеңестер бренд немесе санат аймағымен қиылысуды көрсетеді.",

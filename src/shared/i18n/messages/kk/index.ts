@@ -132,6 +132,18 @@ export const kkMessages: MessageTree = {
       previewPlaceholder: "Мұнда макеттің алдын ала қарауы болады.",
       paramsSection: "Басып шығару параметрлері",
       paramsPlaceholder: "Көшірме саны, принтер және макет опциялары мұнда реттеледі.",
+      selectTemplate: "Стикер үлгісі",
+      selectTemplatePlaceholder: "Үлгіні таңдаңыз",
+      selectTemplateAria: "Стикер үлгісі",
+      noTemplates: "Белсенді үлгілер жоқ.",
+      copiesLabel: "Дана",
+      copiesHint: "Тек алдын ала қарау — принтерге әлі жіберілмейді.",
+      preview: {
+        demoHint: "Алдын ала қарау үшін демо деректер. Тауар карточкасымен интеграция осы контекстті ауырады.",
+        bindingEmpty: "Мән жоқ",
+        symbologyUnsupported: "Символика қолдау көрсетілмейді",
+        renderFailed: "Код генерацияланбады",
+      },
     },
     operations: {
       pageHeading: "Басып шығару операциялары",

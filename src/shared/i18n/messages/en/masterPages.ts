@@ -96,6 +96,7 @@ export const masterPagesEn = {
       actionAssign: "Assign",
       actionReplace: "Replace",
       actionRemove: "Remove",
+      rowActionsMenuTitle: "More actions for this role",
       dialogTitle: "Assign responsibility",
       dialogAriaDescription: "Choose one employee per role. Optional hints show scope overlap with the item brand or category.",
       dialogBadgeBrand: "Brand scope",

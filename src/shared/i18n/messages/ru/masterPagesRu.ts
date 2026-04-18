@@ -97,6 +97,7 @@ export const ruMasterPages: MessageTree = {
       actionAssign: "Назначить",
       actionReplace: "Заменить",
       actionRemove: "Снять",
+      rowActionsMenuTitle: "Дополнительные действия по роли",
       dialogTitle: "Назначение ответственного",
       dialogAriaDescription:
         "Выберите одного сотрудника на роль. Подсказки показывают пересечение с брендом или категорией позиции.",
