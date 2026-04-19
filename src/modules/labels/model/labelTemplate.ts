@@ -1,6 +1,13 @@
 import type { LabelElement } from "./labelElement";
 
-export type LabelTemplateKind = "ITEM_LABEL" | "PRICE_TAG" | "QR_LABEL" | "TRANSLATION_STICKER" | "CUSTOM";
+export type LabelTemplateKind =
+  | "ITEM_LABEL"
+  | "PRICE_TAG"
+  | "QR_LABEL"
+  | "TRANSLATION_STICKER"
+  | "KIZ_LABEL"
+  | "DATAMATRIX_LABEL"
+  | "CUSTOM";
 
 export type LabelPaperType = "LABEL" | "A4" | "ROLL" | "CUSTOM";
 

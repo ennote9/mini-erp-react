@@ -24,6 +24,8 @@ function numOr(v: string, fallback: number): number {
   return Number.isFinite(n) ? n : fallback;
 }
 
+const BARCODE_SYMBOLOGY_PRESETS = ["CODE_128", "EAN_13", "GS1_128", "DATAMATRIX", "GS1_DATAMATRIX"] as const;
+
 export function LabelElementPropertiesPanel({ element, onChange, disabled }: Props) {
   const { t } = useTranslation();
 
@@ -188,6 +190,16 @@ export function LabelElementPropertiesPanel({ element, onChange, disabled }: Pro
 
   if (element.type === "barcode") {
     const el = element as LabelBarcodeElement;
+    const rawHint = (el.options?.symbologyHint ?? "").trim();
+    const normalized = rawHint.toUpperCase().replace(/-/g, "_");
+    const matchesPreset =
+      rawHint === "" || BARCODE_SYMBOLOGY_PRESETS.some((p) => p === normalized);
+    const symbologySelectValue = matchesPreset
+      ? rawHint === ""
+        ? "__default__"
+        : normalized
+      : "__custom__";
+
     return (
       <div className="space-y-3">
         {geo}
@@ -200,19 +212,48 @@ export function LabelElementPropertiesPanel({ element, onChange, disabled }: Pro
         />
         <div className="space-y-1">
           <Label className="text-xs text-muted-foreground">{t("labels.editor.properties.symbologyHint")}</Label>
-          <Input
-            className="h-8"
+          <SelectField
+            value={symbologySelectValue}
+            onChange={(v) => {
+              if (v === "__default__") {
+                onChange({ ...el, options: { ...el.options, symbologyHint: undefined } });
+              } else if (v === "__custom__") {
+                onChange({
+                  ...el,
+                  options: {
+                    ...el.options,
+                    symbologyHint: el.options?.symbologyHint?.trim() || "CODE_128",
+                  },
+                });
+              } else {
+                onChange({ ...el, options: { ...el.options, symbologyHint: v } });
+              }
+            }}
+            options={[
+              { value: "__default__", label: t("labels.editor.properties.symbologyDefault") },
+              ...BARCODE_SYMBOLOGY_PRESETS.map((p) => ({ value: p, label: p })),
+              { value: "__custom__", label: t("labels.editor.properties.symbologyCustom") },
+            ]}
+            placeholder=""
             disabled={disabled}
-            value={el.options?.symbologyHint ?? ""}
-            placeholder="CODE_128"
-            onChange={(e) =>
-              onChange({
-                ...el,
-                options: { ...el.options, symbologyHint: e.target.value.trim() || undefined },
-              })
-            }
+            className="w-full max-w-full"
             aria-label={t("labels.editor.properties.symbologyHint")}
           />
+          {symbologySelectValue === "__custom__" ? (
+            <Input
+              className="h-8 font-mono text-xs"
+              disabled={disabled}
+              value={el.options?.symbologyHint ?? ""}
+              placeholder="CODE_128"
+              onChange={(e) =>
+                onChange({
+                  ...el,
+                  options: { ...el.options, symbologyHint: e.target.value.trim() || undefined },
+                })
+              }
+              aria-label={t("labels.editor.properties.symbologyCustomValue")}
+            />
+          ) : null}
         </div>
         <label className="flex items-center gap-2 text-sm">
           <Checkbox

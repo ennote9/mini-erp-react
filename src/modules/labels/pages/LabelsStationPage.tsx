@@ -17,6 +17,7 @@ import {
   saveWorkspacePrintSettings,
 } from "../lib/workspacePrintSettingsStorage";
 import { validateWorkspaceForPrintJob } from "../lib/workspacePrintValidation";
+import { collectLabelDomainIssues } from "../lib/labelDomainValidation";
 import { LABELS_STATION_SOURCE } from "../lib/labelsStationConstants";
 import { LABELS_STATION_QUERY } from "../lib/labelsStationQueryParams";
 import { loadLabelsStationStorage, saveLabelsStationStorage } from "../lib/labelsStationStorage";
@@ -146,6 +147,13 @@ export function LabelsStationPage() {
     () => (templateId ? templates.find((x) => x.id === templateId) : undefined),
     [templates, templateId],
   );
+
+  const domainIssues = useMemo(() => {
+    if (!selected || previewMode !== "item") return [];
+    return collectLabelDomainIssues(selected, previewContext, t);
+  }, [selected, previewMode, previewContext, t]);
+
+  const domainBlocked = domainIssues.length > 0;
 
   const selectOptions = useMemo(
     () => templates.map((tpl) => ({ value: tpl.id, label: tpl.name })),
@@ -280,6 +288,10 @@ export function LabelsStationPage() {
       setFeedback({ kind: "error", message: t(`labels.workspace.validation.${code}`) });
       return;
     }
+    if (domainBlocked) {
+      setFeedback({ kind: "error", message: t("labels.workspace.domainBlocked") });
+      return;
+    }
     if (!selected) return;
     setActionBusy("job");
     try {
@@ -302,7 +314,7 @@ export function LabelsStationPage() {
       setActionBusy(null);
       focusSearch();
     }
-  }, [canOperate, templateId, copies, selected, t, buildJobSnapshots, presetPayload, focusSearch]);
+  }, [canOperate, templateId, copies, selected, t, buildJobSnapshots, presetPayload, focusSearch, domainBlocked]);
 
   const handleSavePdf = useCallback(async () => {
     setFeedback(null);
@@ -313,6 +325,10 @@ export function LabelsStationPage() {
     const code = validateWorkspaceForPrintJob(templateId, copies);
     if (code) {
       setFeedback({ kind: "error", message: t(`labels.workspace.validation.${code}`) });
+      return;
+    }
+    if (domainBlocked) {
+      setFeedback({ kind: "error", message: t("labels.workspace.domainBlocked") });
       return;
     }
     const surface = labelSurfaceRef.current;
@@ -363,7 +379,7 @@ export function LabelsStationPage() {
       setActionBusy(null);
       focusSearch();
     }
-  }, [canOperate, templateId, copies, selected, t, buildJobSnapshots, presetPayload, focusSearch]);
+  }, [canOperate, templateId, copies, selected, t, buildJobSnapshots, presetPayload, focusSearch, domainBlocked]);
 
   const handlePrint = useCallback(async () => {
     setFeedback(null);
@@ -374,6 +390,10 @@ export function LabelsStationPage() {
     const code = validateWorkspaceForPrintJob(templateId, copies);
     if (code) {
       setFeedback({ kind: "error", message: t(`labels.workspace.validation.${code}`) });
+      return;
+    }
+    if (domainBlocked) {
+      setFeedback({ kind: "error", message: t("labels.workspace.domainBlocked") });
       return;
     }
     const surface = labelSurfaceRef.current;
@@ -423,7 +443,7 @@ export function LabelsStationPage() {
       setActionBusy(null);
       focusSearch();
     }
-  }, [canOperate, templateId, copies, selected, t, buildJobSnapshots, presetPayload, focusSearch]);
+  }, [canOperate, templateId, copies, selected, t, buildJobSnapshots, presetPayload, focusSearch, domainBlocked]);
 
   const bannerProps =
     previewMode === "item" && item
@@ -569,6 +589,20 @@ export function LabelsStationPage() {
 
       {bannerProps ? <WorkspaceItemContextBanner {...bannerProps} /> : null}
 
+      {domainBlocked && canOperate ? (
+        <div
+          role="alert"
+          className="rounded-md border border-amber-500/40 bg-amber-500/10 px-2.5 py-2 text-xs text-amber-950 dark:text-amber-100"
+        >
+          <p className="font-medium">{t("labels.workspace.domainIssuesTitle")}</p>
+          <ul className="mt-1 list-inside list-disc space-y-0.5">
+            {domainIssues.map((msg) => (
+              <li key={msg}>{msg}</li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
+
       <div className="grid min-h-[260px] gap-2 lg:grid-cols-12">
         <section className="rounded-md border border-border/80 bg-card/40 p-2.5 lg:col-span-3">
           <h3 className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
@@ -653,7 +687,7 @@ export function LabelsStationPage() {
               type="button"
               size="sm"
               className="h-8 w-full justify-center"
-              disabled={!selected || !canOperate || actionBusy !== null}
+              disabled={!selected || !canOperate || actionBusy !== null || domainBlocked}
                 onClick={() => void handlePrint()}
             >
               {actionBusy === "print" ? t("common.loading") : t("labels.workspace.actions.print")}
@@ -663,7 +697,7 @@ export function LabelsStationPage() {
               size="sm"
               variant="secondary"
               className="h-8 w-full justify-center"
-              disabled={!selected || !canOperate || actionBusy !== null}
+              disabled={!selected || !canOperate || actionBusy !== null || domainBlocked}
                 onClick={() => void handleSavePdf()}
             >
               {actionBusy === "pdf" ? t("common.loading") : t("labels.workspace.actions.savePdf")}
@@ -673,7 +707,7 @@ export function LabelsStationPage() {
               size="sm"
               variant="secondary"
               className="h-8 w-full justify-center"
-              disabled={!selected || !canOperate || actionBusy !== null}
+              disabled={!selected || !canOperate || actionBusy !== null || domainBlocked}
                 onClick={handleCreateJob}
             >
               {actionBusy === "job" ? t("common.loading") : t("labels.workspace.actions.createJob")}

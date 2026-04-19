@@ -21,6 +21,12 @@ export type LabelPreviewBindingContext = {
     purchasePrice?: string;
     brandId?: string;
     categoryId?: string;
+    /** Optional: translation sticker / alternate locale line. */
+    translationName?: string;
+    translationDescription?: string;
+    /** Data payload for DataMatrix / GS1 (not legally validated here). */
+    markingCode?: string;
+    kizCode?: string;
   };
   selectedBarcode: string;
   primaryBarcode: string;
@@ -37,6 +43,10 @@ export const LABEL_PREVIEW_DEMO_CONTEXT: LabelPreviewBindingContext = {
     code: "SKU-DEMO-1042",
     salePrice: "12 500 ₸",
     purchasePrice: "8 900 ₸",
+    translationName: "Demo brake pads",
+    translationDescription: "Qty 1 kit · aftermarket",
+    markingCode: "0105901234123457215ABC123",
+    kizCode: "KIZ-DEMO-0001",
   },
   selectedBarcode: "5901234123457",
   primaryBarcode: "5901234123457",

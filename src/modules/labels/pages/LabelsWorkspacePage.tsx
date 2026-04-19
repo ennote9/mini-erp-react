@@ -17,6 +17,7 @@ import {
   saveWorkspacePrintSettings,
 } from "../lib/workspacePrintSettingsStorage";
 import { validateWorkspaceForPrintJob } from "../lib/workspacePrintValidation";
+import { collectLabelDomainIssues } from "../lib/labelDomainValidation";
 import {
   createPrintJobFromWorkspace,
   getDefaultLabelTemplate,
@@ -138,6 +139,13 @@ export function LabelsWorkspacePage() {
     [templates, templateId],
   );
 
+  const domainIssues = useMemo(() => {
+    if (!selected || previewMode !== "item") return [];
+    return collectLabelDomainIssues(selected, previewContext, t);
+  }, [selected, previewMode, previewContext, t]);
+
+  const domainBlocked = domainIssues.length > 0;
+
   const selectOptions = useMemo(
     () => templates.map((tpl) => ({ value: tpl.id, label: tpl.name })),
     [templates],
@@ -213,6 +221,10 @@ export function LabelsWorkspacePage() {
       setFeedback({ kind: "error", message: t(`labels.workspace.validation.${code}`) });
       return;
     }
+    if (domainBlocked) {
+      setFeedback({ kind: "error", message: t("labels.workspace.domainBlocked") });
+      return;
+    }
     if (!selected) return;
     setActionBusy("job");
     try {
@@ -234,13 +246,17 @@ export function LabelsWorkspacePage() {
     } finally {
       setActionBusy(null);
     }
-  }, [templateId, copies, selected, t, buildJobSnapshots, presetPayload]);
+  }, [templateId, copies, selected, t, buildJobSnapshots, presetPayload, domainBlocked]);
 
   const handleSavePdf = useCallback(async () => {
     setFeedback(null);
     const code = validateWorkspaceForPrintJob(templateId, copies);
     if (code) {
       setFeedback({ kind: "error", message: t(`labels.workspace.validation.${code}`) });
+      return;
+    }
+    if (domainBlocked) {
+      setFeedback({ kind: "error", message: t("labels.workspace.domainBlocked") });
       return;
     }
     const surface = labelSurfaceRef.current;
@@ -290,13 +306,17 @@ export function LabelsWorkspacePage() {
     } finally {
       setActionBusy(null);
     }
-  }, [templateId, copies, selected, t, buildJobSnapshots, presetPayload]);
+  }, [templateId, copies, selected, t, buildJobSnapshots, presetPayload, domainBlocked]);
 
   const handlePrint = useCallback(async () => {
     setFeedback(null);
     const code = validateWorkspaceForPrintJob(templateId, copies);
     if (code) {
       setFeedback({ kind: "error", message: t(`labels.workspace.validation.${code}`) });
+      return;
+    }
+    if (domainBlocked) {
+      setFeedback({ kind: "error", message: t("labels.workspace.domainBlocked") });
       return;
     }
     const surface = labelSurfaceRef.current;
@@ -344,7 +364,7 @@ export function LabelsWorkspacePage() {
     } finally {
       setActionBusy(null);
     }
-  }, [templateId, copies, selected, t, buildJobSnapshots, presetPayload]);
+  }, [templateId, copies, selected, t, buildJobSnapshots, presetPayload, domainBlocked]);
 
   return (
     <div className="labels-page mx-auto max-w-[1600px] space-y-4 p-4 md:p-5" data-module="labels">
@@ -388,6 +408,20 @@ export function LabelsWorkspacePage() {
 
       {bannerProps ? <WorkspaceItemContextBanner {...bannerProps} /> : null}
 
+      {domainBlocked ? (
+        <div
+          role="alert"
+          className="rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs text-amber-950 dark:text-amber-100"
+        >
+          <p className="font-medium">{t("labels.workspace.domainIssuesTitle")}</p>
+          <ul className="mt-1 list-inside list-disc space-y-0.5">
+            {domainIssues.map((msg) => (
+              <li key={msg}>{msg}</li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
+
       <div className="grid min-h-[280px] gap-3 lg:grid-cols-12">
         <section className="rounded-md border border-border/80 bg-card/40 p-3 lg:col-span-4">
           <h3 className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
@@ -422,7 +456,7 @@ export function LabelsWorkspacePage() {
               <Button
                 type="button"
                 size="sm"
-                disabled={!selected || actionBusy !== null}
+                disabled={!selected || actionBusy !== null || domainBlocked}
                 onClick={handleCreateJob}
               >
                 {actionBusy === "job" ? t("common.loading") : t("labels.workspace.actions.createJob")}
@@ -431,7 +465,7 @@ export function LabelsWorkspacePage() {
                 type="button"
                 size="sm"
                 variant="secondary"
-                disabled={!selected || actionBusy !== null}
+                disabled={!selected || actionBusy !== null || domainBlocked}
                 onClick={() => void handleSavePdf()}
               >
                 {actionBusy === "pdf" ? t("common.loading") : t("labels.workspace.actions.savePdf")}
@@ -441,7 +475,7 @@ export function LabelsWorkspacePage() {
                 size="sm"
                 variant="default"
                 className="border border-primary/30"
-                disabled={!selected || actionBusy !== null}
+                disabled={!selected || actionBusy !== null || domainBlocked}
                 onClick={() => void handlePrint()}
               >
                 {actionBusy === "print" ? t("common.loading") : t("labels.workspace.actions.print")}

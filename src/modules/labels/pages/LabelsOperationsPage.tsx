@@ -5,6 +5,7 @@ import { getAppReadModelRevision, subscribeAppReadModelRevision } from "@/shared
 import { LABELS_WORKSPACE_QUERY } from "../lib/workspaceQueryParams";
 import { LABELS_BATCH_SOURCE } from "../lib/labelsBatchConstants";
 import { buildLabelsBatchUrl } from "../lib/labelsBatchQueryParams";
+import { labelTemplateRepository } from "../labelTemplateRepository";
 import { listPrintJobsForDisplay } from "../service";
 import type { PrintJob } from "../model";
 import { LabelsSubnav } from "../components/LabelsSubnav";
@@ -74,6 +75,8 @@ export function LabelsOperationsPage() {
             {jobs.map((job) => {
               const batch = isBatchJob(job);
               const labelsCount = batch && job.totalLabels != null ? job.totalLabels : job.copies;
+              const templateKind =
+                job.templateKindSnapshot ?? labelTemplateRepository.getById(job.templateId)?.kind;
               return (
                 <li
                   key={job.id}
@@ -117,6 +120,14 @@ export function LabelsOperationsPage() {
                     {batch && job.rowsCount != null ? (
                       <span className="ml-1.5 rounded border border-sky-500/35 bg-sky-500/10 px-1 py-0.5 text-[10px] uppercase tracking-wide text-sky-950 dark:text-sky-100">
                         {t("labels.operations.badgeBatch")} · {job.rowsCount}
+                      </span>
+                    ) : null}
+                    {templateKind && templateKind !== "ITEM_LABEL" ? (
+                      <span
+                        className="ml-1.5 inline-block max-w-[10rem] truncate rounded border border-violet-500/35 bg-violet-500/10 px-1 py-0.5 text-[10px] font-medium text-violet-950 dark:text-violet-100"
+                        title={t(`labels.kind.${templateKind}`)}
+                      >
+                        {t(`labels.kind.${templateKind}`)}
                       </span>
                     ) : null}
                   </div>

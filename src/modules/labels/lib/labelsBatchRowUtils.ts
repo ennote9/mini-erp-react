@@ -1,4 +1,6 @@
 import type { Item } from "@/modules/items/model";
+import type { LabelTemplate } from "../model";
+import { collectLabelDomainIssueCodesForItem } from "./labelDomainValidation";
 import { buildItemPreviewBindingContext } from "./itemPreviewContext";
 
 export type LabelBatchTableRow = {
@@ -21,7 +23,7 @@ function pickDefaultBarcodeId(item: Item): string | undefined {
 
 export function buildBatchRowFromItem(
   item: Item,
-  opts: { barcodeId?: string; copies?: number; rowId?: string },
+  opts: { barcodeId?: string; copies?: number; rowId?: string; template?: LabelTemplate },
 ): LabelBatchTableRow {
   const copies = opts.copies != null && opts.copies >= 1 && opts.copies <= 999 ? opts.copies : 1;
   let barcodeId = opts.barcodeId ?? pickDefaultBarcodeId(item) ?? "";
@@ -50,6 +52,14 @@ export function buildBatchRowFromItem(
     validationMessage = "noActiveBarcodes";
   }
 
+  if (isValid && opts.template) {
+    const domainCodes = collectLabelDomainIssueCodesForItem(opts.template, item, barcodeId || undefined);
+    if (domainCodes.length > 0) {
+      isValid = false;
+      validationMessage = "domainDataMissing";
+    }
+  }
+
   return {
     id: opts.rowId ?? crypto.randomUUID(),
     itemId: item.id,
@@ -63,7 +73,11 @@ export function buildBatchRowFromItem(
   };
 }
 
-export function refreshBatchRowFromItem(row: LabelBatchTableRow, item: Item | undefined): LabelBatchTableRow {
+export function refreshBatchRowFromItem(
+  row: LabelBatchTableRow,
+  item: Item | undefined,
+  template?: LabelTemplate,
+): LabelBatchTableRow {
   if (!item) {
     return {
       ...row,
@@ -75,5 +89,6 @@ export function refreshBatchRowFromItem(row: LabelBatchTableRow, item: Item | un
     barcodeId: row.barcodeId,
     copies: row.copies,
     rowId: row.id,
+    template,
   });
 }

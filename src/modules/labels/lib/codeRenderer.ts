@@ -3,11 +3,7 @@
  * All bwip-js usage goes through {@link ./bwipAdapter}.
  */
 import { bwipToSvg, type BwipRenderOptions } from "./bwipAdapter";
-import {
-  linearSymbologyToBcid,
-  parseLinearSymbologyHint,
-  type LabelLinearSymbology,
-} from "./labelSymbology";
+import { parseLabelSymbologyHint } from "./labelSymbology";
 
 export type CodeRenderFailureCode = "empty" | "unsupported" | "render";
 
@@ -16,7 +12,8 @@ export type CodeRenderResult =
   | { ok: false; code: CodeRenderFailureCode; message: string };
 
 export type RenderBarcodeSvgParams = {
-  symbology: LabelLinearSymbology;
+  /** bwip-js barcode type id, e.g. `code128`, `datamatrix`. */
+  bcid: string;
   text: string;
   /** Visual scale (bwip-js `scale`). */
   scale?: number;
@@ -24,21 +21,20 @@ export type RenderBarcodeSvgParams = {
 };
 
 /**
- * Linear barcode (CODE_128, EAN-13) → SVG.
+ * Linear / matrix barcode → SVG (any bwip-supported `bcid`).
  */
 export function renderBarcodeSvg(params: RenderBarcodeSvgParams): CodeRenderResult {
   const t = params.text.trim();
   if (!t) {
     return { ok: false, code: "empty", message: "No barcode data" };
   }
-  const bcid = linearSymbologyToBcid(params.symbology);
   const scale = params.scale ?? 2;
   const result = bwipToSvg({
-    bcid,
+    bcid: params.bcid,
     text: t,
     scale,
     includetext: params.includetext ?? false,
-  });
+  } as BwipRenderOptions);
   if (!result.ok) {
     return { ok: false, code: "render", message: result.message };
   }
@@ -91,18 +87,28 @@ export function renderBarcodeFromElementOptions(params: {
   scale?: number;
   showHumanReadableText?: boolean;
 }): CodeRenderResult {
-  const parsed = parseLinearSymbologyHint(params.symbologyHint);
-  if (parsed === "unsupported") {
+  const parsed = parseLabelSymbologyHint(params.symbologyHint);
+  if (!parsed.ok) {
     return {
       ok: false,
       code: "unsupported",
       message: `Symbology not supported in this release: ${params.symbologyHint ?? ""}`,
     };
   }
-  return renderBarcodeSvg({
-    symbology: parsed,
-    text: params.text,
-    scale: params.scale,
-    includetext: params.showHumanReadableText ?? false,
-  });
+  const t = params.text.trim();
+  if (!t) {
+    return { ok: false, code: "empty", message: "No barcode data" };
+  }
+  const scale = params.scale ?? 2;
+  const includetext = params.showHumanReadableText ?? parsed.includetextDefault;
+  const result = bwipToSvg({
+    bcid: parsed.bcid,
+    text: t,
+    scale,
+    includetext,
+  } as BwipRenderOptions);
+  if (!result.ok) {
+    return { ok: false, code: "render", message: result.message };
+  }
+  return { ok: true, svg: result.svg };
 }

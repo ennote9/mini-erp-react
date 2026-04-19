@@ -110,7 +110,15 @@ export const coreEn = {
       PRICE_TAG: "Price tag",
       QR_LABEL: "QR sticker",
       TRANSLATION_STICKER: "Translation sticker",
+      KIZ_LABEL: "KIZ / marking (informative)",
+      DATAMATRIX_LABEL: "DataMatrix label",
       CUSTOM: "Custom",
+    },
+    domainIssues: {
+      translationNameMissing: "Translation name is missing for this item.",
+      kizMarkingMissing: "Marking code or KIZ field is empty — add data before printing.",
+      markingCodeMissing: "Marking payload is missing for DataMatrix.",
+      matrixBindingEmpty: "A DataMatrix element has no value from its binding.",
     },
     paper: {
       LABEL: "Label stock",
@@ -169,6 +177,9 @@ export const coreEn = {
         alignCenter: "Center",
         alignRight: "Right",
         symbologyHint: "Symbology hint",
+        symbologyDefault: "Default (CODE 128)",
+        symbologyCustom: "Custom…",
+        symbologyCustomValue: "Custom symbology hint",
         showHumanReadable: "Human-readable text",
         qrErrorCorrection: "Error correction",
         imageSrc: "Image URL",
@@ -251,6 +262,8 @@ export const coreEn = {
         TEMPLATE_ARCHIVED: "This template is archived and cannot be used.",
         COPIES_INVALID: "Copies must be between 1 and 999.",
       },
+      domainIssuesTitle: "Label data checks",
+      domainBlocked: "Fix the issues listed above before printing or saving PDF.",
       preview: {
         demoHint: "Demo data for preview. Item integration will replace this context.",
         bindingEmpty: "No value",
@@ -358,6 +371,7 @@ export const coreEn = {
         noActiveBarcodes: "No active barcode",
         noBarcode: "Pick a barcode",
         itemMissing: "Item missing",
+        domainDataMissing: "Missing data for this template (e.g. translation or marking code).",
       },
       feedback: {
         restored: "Batch list restored from the job.",

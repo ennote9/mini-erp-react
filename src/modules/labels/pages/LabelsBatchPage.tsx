@@ -21,6 +21,7 @@ import { findStationSearchResult } from "../lib/labelsStationSearch";
 import { LABELS_BATCH_QUERY } from "../lib/labelsBatchQueryParams";
 import { loadLabelsBatchStorage, saveLabelsBatchStorage } from "../lib/labelsBatchStorage";
 import { parseBatchRowsSnapshot, serializeBatchRowsSnapshot } from "../lib/labelsBatchSnapshot";
+import { collectLabelDomainIssuesForItem } from "../lib/labelDomainValidation";
 import {
   buildBatchRowFromItem,
   refreshBatchRowFromItem,
@@ -119,10 +120,10 @@ export function LabelsBatchPage() {
     setRows((prev) =>
       prev.map((row) => {
         const item = itemRepository.getById(row.itemId);
-        return refreshBatchRowFromItem(row, item);
+        return refreshBatchRowFromItem(row, item, selectedTemplate);
       }),
     );
-  }, [revision]);
+  }, [revision, selectedTemplate]);
 
   const restoreApplied = useRef(false);
   const pendingRestoreTemplateId = useRef<string | null>(null);
@@ -140,6 +141,7 @@ export function LabelsBatchPage() {
       } else if (tplId) {
         pendingRestoreTemplateId.current = tplId;
       }
+      const tpl = tplId ? templates.find((x) => x.id === tplId) : undefined;
       const built: LabelBatchTableRow[] = [];
       for (const r of list) {
         const item = itemRepository.getById(r.itemId);
@@ -148,6 +150,7 @@ export function LabelsBatchPage() {
           buildBatchRowFromItem(item, {
             barcodeId: r.barcodeId,
             copies: r.copies,
+            template: tpl,
           }),
         );
       }
@@ -207,6 +210,16 @@ export function LabelsBatchPage() {
     return { context: b.context, mode: "item" as const };
   }, [previewItem, selectedRow, revision]);
 
+  const previewDomainIssues = useMemo(() => {
+    if (!selectedTemplate || !previewItem || !selectedRow || previewBuilt.mode !== "item") return [];
+    return collectLabelDomainIssuesForItem(
+      selectedTemplate,
+      previewItem,
+      selectedRow.barcodeId || undefined,
+      t,
+    );
+  }, [selectedTemplate, previewItem, selectedRow, previewBuilt.mode, t]);
+
   const paperOptions = useMemo(
     () => [
       { value: "AUTO", label: t("labels.workspace.presets.paper.AUTO") },
@@ -229,13 +242,13 @@ export function LabelsBatchPage() {
 
   const addItemToRows = useCallback(
     (item: Item, barcodeId?: string) => {
-      const next = buildBatchRowFromItem(item, { barcodeId });
+      const next = buildBatchRowFromItem(item, { barcodeId, template: selectedTemplate });
       setRows((r) => [...r, next]);
       setSelectedRowId(next.id);
       setSearchDraft("");
       setPickCandidates(null);
     },
-    [],
+    [selectedTemplate],
   );
 
   const tryAddFromSearch = useCallback(() => {
@@ -264,28 +277,44 @@ export function LabelsBatchPage() {
     setPickCandidates(null);
   }, []);
 
-  const updateRowBarcode = useCallback((rowId: string, barcodeId: string) => {
-    setRows((prev) =>
-      prev.map((row) => {
-        if (row.id !== rowId) return row;
-        const item = itemRepository.getById(row.itemId);
-        if (!item) return { ...row, isValid: false, validationMessage: "itemMissing" };
-        return buildBatchRowFromItem(item, { barcodeId, copies: row.copies, rowId: row.id });
-      }),
-    );
-  }, []);
+  const updateRowBarcode = useCallback(
+    (rowId: string, barcodeId: string) => {
+      setRows((prev) =>
+        prev.map((row) => {
+          if (row.id !== rowId) return row;
+          const item = itemRepository.getById(row.itemId);
+          if (!item) return { ...row, isValid: false, validationMessage: "itemMissing" };
+          return buildBatchRowFromItem(item, {
+            barcodeId,
+            copies: row.copies,
+            rowId: row.id,
+            template: selectedTemplate,
+          });
+        }),
+      );
+    },
+    [selectedTemplate],
+  );
 
-  const updateRowCopies = useCallback((rowId: string, copies: number) => {
-    const n = Math.min(999, Math.max(1, copies));
-    setRows((prev) =>
-      prev.map((row) => {
-        if (row.id !== rowId) return row;
-        const item = itemRepository.getById(row.itemId);
-        if (!item) return { ...row, copies: n, isValid: false, validationMessage: "itemMissing" };
-        return buildBatchRowFromItem(item, { barcodeId: row.barcodeId, copies: n, rowId: row.id });
-      }),
-    );
-  }, []);
+  const updateRowCopies = useCallback(
+    (rowId: string, copies: number) => {
+      const n = Math.min(999, Math.max(1, copies));
+      setRows((prev) =>
+        prev.map((row) => {
+          if (row.id !== rowId) return row;
+          const item = itemRepository.getById(row.itemId);
+          if (!item) return { ...row, copies: n, isValid: false, validationMessage: "itemMissing" };
+          return buildBatchRowFromItem(item, {
+            barcodeId: row.barcodeId,
+            copies: n,
+            rowId: row.id,
+            template: selectedTemplate,
+          });
+        }),
+      );
+    },
+    [selectedTemplate],
+  );
 
   const applyMassCopies = useCallback(() => {
     const n = Math.min(999, Math.max(1, massCopies));
@@ -293,10 +322,15 @@ export function LabelsBatchPage() {
       prev.map((row) => {
         const item = itemRepository.getById(row.itemId);
         if (!item) return { ...row, copies: n, isValid: false, validationMessage: "itemMissing" };
-        return buildBatchRowFromItem(item, { barcodeId: row.barcodeId, copies: n, rowId: row.id });
+        return buildBatchRowFromItem(item, {
+          barcodeId: row.barcodeId,
+          copies: n,
+          rowId: row.id,
+          template: selectedTemplate,
+        });
       }),
     );
-  }, [massCopies]);
+  }, [massCopies, selectedTemplate]);
 
   const removeRow = useCallback((rowId: string) => {
     setRows((prev) => {
@@ -781,6 +815,19 @@ export function LabelsBatchPage() {
 
         <div className="rounded-md border border-border/80 bg-card/40 p-2.5 lg:col-span-5">
           <h3 className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">{t("labels.batch.previewTitle")}</h3>
+          {previewDomainIssues.length > 0 ? (
+            <div
+              role="alert"
+              className="mt-2 rounded-md border border-amber-500/40 bg-amber-500/10 px-2 py-1.5 text-[11px] text-amber-950 dark:text-amber-100"
+            >
+              <p className="font-medium">{t("labels.workspace.domainIssuesTitle")}</p>
+              <ul className="mt-0.5 list-inside list-disc">
+                {previewDomainIssues.map((msg, i) => (
+                  <li key={`${i}-${msg}`}>{msg}</li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
           <div className="mt-2 min-h-[200px] overflow-auto rounded border border-dashed border-border/70 bg-muted/10 p-2">
             {selectedTemplate && previewBuilt.mode === "item" ? (
               <LabelTemplatePreview

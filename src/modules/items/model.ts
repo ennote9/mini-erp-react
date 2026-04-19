@@ -145,4 +145,15 @@ export interface Item {
   testerCodeNextSeq?: number;
   /** Direct nominations on this item; brand/category context is read-only elsewhere. */
   responsibleAssignments?: ItemResponsibleAssignment[];
+  /** Localized / alternate display name for translation stickers (optional). */
+  translationName?: string;
+  /** Extra translation copy (optional). */
+  translationDescription?: string;
+  /**
+   * Generic marking / traceability payload (e.g. DataMatrix content, GS1 string).
+   * Not validated against government schemas in-app.
+   */
+  markingCode?: string;
+  /** КИЗ / identification placeholder for label workflows (optional). */
+  kizCode?: string;
 }

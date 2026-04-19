@@ -120,7 +120,15 @@ export const ruMessages: MessageTree = {
       PRICE_TAG: "Ценник",
       QR_LABEL: "QR-наклейка",
       TRANSLATION_STICKER: "Перевод",
+      KIZ_LABEL: "КИЗ / маркировка (справочно)",
+      DATAMATRIX_LABEL: "DataMatrix этикетка",
       CUSTOM: "Пользовательский",
+    },
+    domainIssues: {
+      translationNameMissing: "Для товара не заполнено переводное наименование.",
+      kizMarkingMissing: "Нет кода маркировки или КИЗ — укажите данные перед печатью.",
+      markingCodeMissing: "Нет данных для DataMatrix (код маркировки).",
+      matrixBindingEmpty: "Для элемента DataMatrix привязка не даёт значения.",
     },
     paper: {
       LABEL: "Этикетка",
@@ -179,6 +187,9 @@ export const ruMessages: MessageTree = {
         alignCenter: "По центру",
         alignRight: "Справа",
         symbologyHint: "Подсказка символогии",
+        symbologyDefault: "По умолчанию (CODE 128)",
+        symbologyCustom: "Своя…",
+        symbologyCustomValue: "Своя подсказка символогии",
         showHumanReadable: "Печать человекочитаемого текста",
         qrErrorCorrection: "Коррекция ошибок (QR)",
         imageSrc: "URL изображения",
@@ -262,6 +273,8 @@ export const ruMessages: MessageTree = {
         TEMPLATE_ARCHIVED: "Этот шаблон в архиве и не может использоваться.",
         COPIES_INVALID: "Количество копий должно быть от 1 до 999.",
       },
+      domainIssuesTitle: "Проверка данных этикетки",
+      domainBlocked: "Устраните перечисленные проблемы перед печатью или сохранением PDF.",
       preview: {
         demoHint: "Демо-данные для предпросмотра. Интеграция с карточкой товара заменит этот контекст.",
         bindingEmpty: "Нет значения",
@@ -369,6 +382,7 @@ export const ruMessages: MessageTree = {
         noActiveBarcodes: "Нет активного ШК",
         noBarcode: "Выберите ШК",
         itemMissing: "Нет позиции",
+        domainDataMissing: "Нет данных для этого шаблона (перевод, маркировка и т. п.).",
       },
       feedback: {
         restored: "Список восстановлен из задания.",

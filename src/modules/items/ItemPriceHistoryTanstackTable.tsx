@@ -28,8 +28,8 @@ const MIN_TABLE_WIDTH_PX = 640;
 const ABS_MIN_WIDTH_BY_ID: Record<string, number> = {
   priceType: 64,
   amount: 64,
-  validFrom: 78,
-  validTo: 78,
+  validFrom: 86,
+  validTo: 86,
   status: 88,
   reasonCode: 92,
   comment: 72,
@@ -296,9 +296,9 @@ export function ItemPriceHistoryTanstackTable(props: Props) {
               <col key={column.id} style={{ width: colPercent(column.id, column.getSize()) }} />
             ))}
           </colgroup>
-          <thead className="sticky top-0 z-[2] bg-card text-[11px] shadow-[0_1px_0_0_hsl(var(--border))]">
+          <thead className="sticky top-0 z-[2] bg-card shadow-[0_1px_0_0_hsl(var(--border))]">
             {table.getHeaderGroups().map((headerGroup) => (
-              <tr key={headerGroup.id} className="border-b border-border/60">
+              <tr key={headerGroup.id} className="border-b border-border">
                 {headerGroup.headers.map((header) => {
                   const canSort = header.column.getCanSort();
                   const sortState = header.column.getIsSorted();
@@ -313,7 +313,7 @@ export function ItemPriceHistoryTanstackTable(props: Props) {
                     <th
                       key={header.id}
                       className={cn(
-                        "group relative h-9 max-h-9 select-none whitespace-nowrap px-2 align-middle py-1.5",
+                        "group relative h-7 select-none bg-card px-2 text-[10px] font-medium uppercase tracking-wide text-muted-foreground",
                         !isLastHeaderCell && "border-r border-border/50",
                         meta?.align === "right"
                           ? "text-right"
@@ -323,29 +323,24 @@ export function ItemPriceHistoryTanstackTable(props: Props) {
                       )}
                       style={{
                         width: colPercent(header.column.id, header.getSize()),
+                        minWidth: header.column.columnDef.minSize,
                       }}
                     >
                       {header.isPlaceholder ? null : (
-                        <div
-                          className={cn(
-                            "flex min-w-0 items-center gap-1",
-                            meta?.align === "right" && "justify-end",
-                            meta?.align === "center" && "justify-center",
-                          )}
-                        >
+                        <div className="flex min-w-0 items-center gap-0.5">
                           {canSort ? (
                             <button
                               type="button"
                               data-testid={`item-prices-history-sort-${header.column.id}`}
                               className={cn(
-                                "flex min-h-0 min-w-0 max-w-full items-center gap-1 rounded-sm px-0.5 py-0.5 text-left text-[10px] font-semibold uppercase leading-none tracking-wide text-muted-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring",
-                                meta?.align === "right" && "justify-end text-right",
-                                meta?.align === "center" && "justify-center text-center",
+                                "flex min-w-0 flex-1 items-center gap-0.5 rounded-sm px-1 py-px leading-none text-left text-inherit transition-colors hover:bg-muted/60 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring",
+                                meta?.align === "right" && "justify-end",
+                                meta?.align === "center" && "justify-center",
                               )}
                               title={String(header.column.columnDef.header ?? "")}
                               onClick={header.column.getToggleSortingHandler()}
                             >
-                              <span className="shrink-0 whitespace-nowrap">
+                              <span className="min-w-0 flex-1 truncate">
                                 {flexRender(header.column.columnDef.header, header.getContext())}
                               </span>
                               <span
@@ -368,12 +363,13 @@ export function ItemPriceHistoryTanstackTable(props: Props) {
                           ) : (
                             <div
                               className={cn(
-                                "flex min-h-0 items-center px-0.5 py-0.5 text-[10px] font-semibold uppercase leading-none tracking-wide text-muted-foreground",
-                                meta?.align === "right" && "justify-end text-right",
-                                meta?.align === "center" && "justify-center text-center",
+                                "flex min-w-0 flex-1 items-center px-1 py-px leading-none",
+                                meta?.align === "right" && "justify-end",
+                                meta?.align === "center" && "justify-center",
                               )}
+                              title={String(header.column.columnDef.header ?? "")}
                             >
-                              <span className="shrink-0 whitespace-nowrap">
+                              <span className="min-w-0 flex-1 truncate">
                                 {flexRender(header.column.columnDef.header, header.getContext())}
                               </span>
                             </div>
@@ -382,7 +378,7 @@ export function ItemPriceHistoryTanstackTable(props: Props) {
                             <button
                               type="button"
                               className={cn(
-                                "relative z-10 shrink-0 rounded-sm p-0.5 transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring",
+                                "relative z-10 shrink-0 rounded-sm p-0.5 transition-colors hover:bg-muted/60 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring",
                                 hasActiveFilter
                                   ? "text-primary opacity-100"
                                   : isOpenFilterField

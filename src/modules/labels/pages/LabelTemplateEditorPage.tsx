@@ -29,6 +29,8 @@ const KINDS: LabelTemplateKind[] = [
   "PRICE_TAG",
   "QR_LABEL",
   "TRANSLATION_STICKER",
+  "KIZ_LABEL",
+  "DATAMATRIX_LABEL",
   "CUSTOM",
 ];
 

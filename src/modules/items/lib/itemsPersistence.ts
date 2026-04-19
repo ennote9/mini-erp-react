@@ -246,6 +246,10 @@ function normalizeItem(raw: unknown): Item | null {
   const responsibleAssignments: ItemResponsibleAssignment[] = Array.isArray(raRaw)
     ? raRaw.map(normalizeItemResponsibleAssignment).filter((x): x is ItemResponsibleAssignment => x !== null)
     : [];
+  const translationName = typeof o.translationName === "string" ? o.translationName : undefined;
+  const translationDescription = typeof o.translationDescription === "string" ? o.translationDescription : undefined;
+  const markingCode = typeof o.markingCode === "string" ? o.markingCode : undefined;
+  const kizCode = typeof o.kizCode === "string" ? o.kizCode : undefined;
   return {
     id: o.id,
     code: o.code,
@@ -266,6 +270,10 @@ function normalizeItem(raw: unknown): Item | null {
     baseItemId,
     testerCodeNextSeq,
     responsibleAssignments,
+    translationName,
+    translationDescription,
+    markingCode,
+    kizCode,
   };
 }
 

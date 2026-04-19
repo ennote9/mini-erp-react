@@ -1,3 +1,5 @@
+import type { LabelTemplateKind } from "./labelTemplate";
+
 export type PrintJobMode = "preview" | "print" | "pdf";
 
 export type PrintJobStatus = "draft" | "queued" | "submitted" | "completed" | "failed";
@@ -7,6 +9,8 @@ export interface PrintJob {
   templateId: string;
   /** Denormalized for operations list without joining templates. */
   templateNameSnapshot?: string;
+  /** Template kind at print time (domain workflows). */
+  templateKindSnapshot?: LabelTemplateKind;
   itemIds: string[];
   /** Optional catalog context when job was created from workspace. */
   barcodeId?: string;

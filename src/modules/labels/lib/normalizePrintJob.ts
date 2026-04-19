@@ -1,4 +1,15 @@
 import type { PrintJob, PrintJobMode, PrintJobStatus } from "../model";
+import type { LabelTemplateKind } from "../model/labelTemplate";
+
+const TEMPLATE_KINDS = new Set<string>([
+  "ITEM_LABEL",
+  "PRICE_TAG",
+  "QR_LABEL",
+  "TRANSLATION_STICKER",
+  "KIZ_LABEL",
+  "DATAMATRIX_LABEL",
+  "CUSTOM",
+]);
 
 const MODES = new Set<PrintJobMode>(["preview", "print", "pdf"]);
 const STATUSES = new Set<PrintJobStatus>(["draft", "queued", "submitted", "completed", "failed"]);
@@ -57,6 +68,10 @@ export function normalizePrintJob(raw: unknown): PrintJob | null {
     totalLabels: optPositiveInt(o.totalLabels),
     batchSummarySnapshot: optString(o.batchSummarySnapshot),
     batchRowsSnapshot: optString(o.batchRowsSnapshot),
+    templateKindSnapshot:
+      typeof o.templateKindSnapshot === "string" && TEMPLATE_KINDS.has(o.templateKindSnapshot)
+        ? (o.templateKindSnapshot as LabelTemplateKind)
+        : undefined,
     createdAt,
     updatedAt,
   };

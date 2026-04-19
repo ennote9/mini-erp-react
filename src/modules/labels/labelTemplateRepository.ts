@@ -60,6 +60,20 @@ async function bootstrapFromDisk(): Promise<void> {
     console.warn(loaded.diagnostics);
   }
   store.splice(0, store.length, ...loaded.records);
+
+  const seeds = buildDefaultLabelTemplates();
+  const have = new Set(store.map((x) => x.id));
+  let mergedNewSystem = false;
+  for (const s of seeds) {
+    if (!have.has(s.id)) {
+      store.push(s);
+      have.add(s.id);
+      mergedNewSystem = true;
+    }
+  }
+  if (mergedNewSystem) {
+    schedulePersist();
+  }
 }
 
 export const labelTemplateRepository = {

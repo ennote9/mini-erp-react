@@ -109,6 +109,7 @@ export function createPrintJobFromBatch(input: CreateBatchPrintJobInput): PrintJ
   const payload: CreatePrintJobInput = {
     templateId: input.templateId,
     templateNameSnapshot: tpl.name,
+    templateKindSnapshot: tpl.kind,
     itemIds: input.itemIds,
     copies: input.copies,
     mode: input.mode,
@@ -155,6 +156,7 @@ export function createPrintJobFromWorkspace(input: CreateWorkspacePrintJobInput)
   const payload: CreatePrintJobInput = {
     templateId: input.templateId,
     templateNameSnapshot: tpl.name,
+    templateKindSnapshot: tpl.kind,
     itemIds: input.itemIds,
     barcodeId: input.barcodeId,
     copies: input.copies,

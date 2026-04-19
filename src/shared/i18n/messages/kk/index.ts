@@ -120,7 +120,15 @@ export const kkMessages: MessageTree = {
       PRICE_TAG: "Баға белгішесі",
       QR_LABEL: "QR стикері",
       TRANSLATION_STICKER: "Аудару",
+      KIZ_LABEL: "КИЗ / маркировка (ақпараттық)",
+      DATAMATRIX_LABEL: "DataMatrix стикері",
       CUSTOM: "Пайдаланушы",
+    },
+    domainIssues: {
+      translationNameMissing: "Тауар үшін аудару атауы толтырылмаған.",
+      kizMarkingMissing: "Маркировка немесе КИЗ жоқ — басып шығармас бұрын деректерді енгізіңіз.",
+      markingCodeMissing: "DataMatrix үшін маркировка коды жоқ.",
+      matrixBindingEmpty: "DataMatrix элементіне байланыстан мән келмейді.",
     },
     paper: {
       LABEL: "Стикер",
@@ -179,6 +187,9 @@ export const kkMessages: MessageTree = {
         alignCenter: "Ортаға",
         alignRight: "Оңға",
         symbologyHint: "Символика көмегі",
+        symbologyDefault: "Әдепкі (CODE 128)",
+        symbologyCustom: "Өзіңіздік…",
+        symbologyCustomValue: "Символика көмегінің өз мәтіні",
         showHumanReadable: "Адам оқитын мәтін",
         qrErrorCorrection: "QR қате түзету",
         imageSrc: "Сурет URL",
@@ -262,6 +273,8 @@ export const kkMessages: MessageTree = {
         TEMPLATE_ARCHIVED: "Бұл үлгі мұрағатта және қолданылмайды.",
         COPIES_INVALID: "Дана саны 1–999 аралығында болуы керек.",
       },
+      domainIssuesTitle: "Стикер деректерін тексеру",
+      domainBlocked: "Басып шығару немесе PDF сақтамас бұрын жоғарыдағы мәселелерді жойыңыз.",
       preview: {
         demoHint: "Алдын ала қарау үшін демо деректер. Тауар карточкасымен интеграция осы контекстті ауырады.",
         bindingEmpty: "Мән жоқ",
@@ -369,6 +382,7 @@ export const kkMessages: MessageTree = {
         noActiveBarcodes: "Белсенді ШК жоқ",
         noBarcode: "ШК таңдаңыз",
         itemMissing: "Жол жоқ",
+        domainDataMissing: "Осы үлгі үшін деректер жоқ (аудару, маркировка т. б.).",
       },
       feedback: {
         restored: "Тізім тапсырыстан қалпына келтірілді.",
