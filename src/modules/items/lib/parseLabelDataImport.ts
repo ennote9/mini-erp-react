@@ -20,12 +20,15 @@ const HEADER_ALIASES: Record<string, keyof ItemLabelDataDraft | "code" | "barcod
   itemcode: "code",
   sku: "code",
   item_code: "code",
+  articlenumber: "code",
   barcode: "barcode",
   ean: "barcode",
   gtin: "barcode",
+  upc: "barcode",
   /** Exported for convenience; not applied on import */
   name: "__ignore__",
   itemname: "__ignore__",
+  productname: "__ignore__",
   primarybarcode: "__ignore__",
   translationname: "translationName",
   translationdescription: "translationDescription",
@@ -40,7 +43,43 @@ const HEADER_ALIASES: Record<string, keyof ItemLabelDataDraft | "code" | "barcod
   datamatrix: "dataMatrixPayload",
   gs1datamatrixpayload: "gs1DataMatrixPayload",
   gs1datamatrix: "gs1DataMatrixPayload",
+  gs1dm: "gs1DataMatrixPayload",
   markingcomment: "markingComment",
+};
+
+/** Full-header aliases (trimmed lower) including spaced English / Russian labels */
+const HEADER_ALIASES_FULL: Record<string, keyof ItemLabelDataDraft | "code" | "barcode" | "__ignore__"> = {
+  ...HEADER_ALIASES,
+  "translation name": "translationName",
+  "description purpose": "translationDescription",
+  "composition": "translationComposition",
+  "country of origin": "translationCountry",
+  "importer distributor": "translationImporter",
+  "additional text": "translationExtraText",
+  "marking code": "markingCode",
+  "kiz": "kizCode",
+  "datamatrix payload": "dataMatrixPayload",
+  "gs1 datamatrix payload": "gs1DataMatrixPayload",
+  "gs1 datamatrix": "gs1DataMatrixPayload",
+  "comment": "markingComment",
+  код: "code",
+  артикул: "code",
+  штрихкод: "barcode",
+  наименование: "__ignore__",
+  название: "__ignore__",
+  основнойштрихкод: "__ignore__",
+  "имяперевода": "translationName",
+  "наименованиеперевода": "translationName",
+  описание: "translationDescription",
+  состав: "translationComposition",
+  страна: "translationCountry",
+  импортер: "translationImporter",
+  "доптекст": "translationExtraText",
+  кодмаркировки: "markingCode",
+  киз: "kizCode",
+  датаматрикс: "dataMatrixPayload",
+  комментарий: "markingComment",
+  "имя перевода": "translationName",
 };
 
 function normalizeHeader(h: string): string {
@@ -48,7 +87,18 @@ function normalizeHeader(h: string): string {
     .trim()
     .toLowerCase()
     .replace(/\s+/g, "")
-    .replace(/[^a-z0-9_]/g, "");
+    .replace(/[^a-z0-9_а-яё]/gi, "");
+}
+
+function resolveHeaderAlias(raw: string): keyof ItemLabelDataDraft | "code" | "barcode" | "__ignore__" | undefined {
+  const t = raw.trim();
+  if (!t) return undefined;
+  const full = t.toLowerCase();
+  const fullMapped = HEADER_ALIASES_FULL[full];
+  if (fullMapped !== undefined) return fullMapped;
+  const n = normalizeHeader(t);
+  if (!n) return undefined;
+  return HEADER_ALIASES[n];
 }
 
 function splitLines(text: string): string[] {
@@ -71,6 +121,89 @@ export type ParseLabelDataTextOptions = {
   delimiter?: "\t" | ",";
 };
 
+function buildColumnMapping(headersRaw: string[]): {
+  mapped: (keyof ItemLabelDataDraft | "code" | "barcode" | "__ignore__" | null)[];
+  unknownHeaders: string[];
+} {
+  const mapped: (keyof ItemLabelDataDraft | "code" | "barcode" | "__ignore__" | null)[] = [];
+  const unknownHeaders: string[] = [];
+
+  for (const h of headersRaw) {
+    const trimmed = h.trim();
+    if (!trimmed) {
+      mapped.push(null);
+      continue;
+    }
+    const alias = resolveHeaderAlias(trimmed);
+    if (alias === undefined) {
+      unknownHeaders.push(trimmed);
+      mapped.push(null);
+    } else {
+      mapped.push(alias);
+    }
+  }
+
+  return { mapped, unknownHeaders: [...new Set(unknownHeaders)] };
+}
+
+function parseRowCells(
+  mapped: (keyof ItemLabelDataDraft | "code" | "barcode" | "__ignore__" | null)[],
+  cells: string[],
+  lineIndex: number,
+): ParsedImportRow | null {
+  let rawCode: string | undefined;
+  let rawBarcode: string | undefined;
+  const fields: Partial<ItemLabelDataDraft> = {};
+
+  for (let c = 0; c < mapped.length; c++) {
+    const key = mapped[c];
+    const val = (cells[c] ?? "").trim();
+    if (key === null || key === undefined) continue;
+    if (key === "__ignore__") continue;
+    if (key === "code") {
+      rawCode = val;
+      continue;
+    }
+    if (key === "barcode") {
+      rawBarcode = val;
+      continue;
+    }
+    fields[key] = val;
+  }
+
+  if (!rawCode?.trim() && !rawBarcode?.trim()) return null;
+
+  return {
+    lineIndex,
+    rawCode: rawCode?.trim(),
+    rawBarcode: rawBarcode?.trim(),
+    fields,
+  };
+}
+
+/**
+ * Parse a header row + data rows (e.g. from XLSX or structured paste). `firstDataLineIndex` = 1-based sheet/file line of first data row.
+ */
+export function parseLabelDataFromGrid(
+  headerRow: string[],
+  dataRows: string[][],
+  firstDataLineIndex: number,
+): ParseLabelDataImportResult {
+  const headersRaw = headerRow.map((h) => String(h ?? "").trim());
+  const { mapped, unknownHeaders } = buildColumnMapping(headersRaw);
+  const rows: ParsedImportRow[] = [];
+
+  for (let i = 0; i < dataRows.length; i++) {
+    const cells = dataRows[i] ?? [];
+    if (cells.every((c) => !String(c ?? "").trim())) continue;
+    const lineIndex = firstDataLineIndex + i;
+    const parsed = parseRowCells(mapped, cells.map((c) => String(c ?? "")), lineIndex);
+    if (parsed) rows.push(parsed);
+  }
+
+  return { headers: headersRaw, unknownHeaders, rows };
+}
+
 /**
  * Parse TSV/CSV-like text (paste or file contents). First non-empty line = headers.
  */
@@ -81,61 +214,13 @@ export function parseLabelDataText(text: string, options?: ParseLabelDataTextOpt
   }
   const delim = options?.delimiter ?? detectDelimiter(lines[0]);
   const headerCells = splitRow(lines[0], delim);
-  const headersRaw = headerCells.map((h) => h.trim());
-  const mapped: (keyof ItemLabelDataDraft | "code" | "barcode" | "__ignore__" | null)[] = [];
-  const unknownHeaders: string[] = [];
-
-  for (const h of headersRaw) {
-    const n = normalizeHeader(h);
-    if (!n) {
-      mapped.push(null);
-      continue;
-    }
-    const alias = HEADER_ALIASES[n];
-    if (alias === undefined) {
-      if (n.length > 0) unknownHeaders.push(h);
-      mapped.push(null);
-    } else {
-      mapped.push(alias);
-    }
-  }
-
-  const rows: ParsedImportRow[] = [];
+  const dataRows: string[][] = [];
   for (let i = 1; i < lines.length; i++) {
     const line = lines[i];
     if (!line.trim()) continue;
-    const cells = splitRow(line, delim);
-    let rawCode: string | undefined;
-    let rawBarcode: string | undefined;
-    const fields: Partial<ItemLabelDataDraft> = {};
-
-    for (let c = 0; c < mapped.length; c++) {
-      const key = mapped[c];
-      const val = cells[c]?.trim() ?? "";
-      if (key === null || key === undefined) continue;
-      if (key === "__ignore__") continue;
-      if (key === "code") {
-        rawCode = val;
-        continue;
-      }
-      if (key === "barcode") {
-        rawBarcode = val;
-        continue;
-      }
-      fields[key] = val;
-    }
-
-    if (!rawCode?.trim() && !rawBarcode?.trim()) continue;
-
-    rows.push({
-      lineIndex: i + 1,
-      rawCode: rawCode?.trim(),
-      rawBarcode: rawBarcode?.trim(),
-      fields,
-    });
+    dataRows.push(splitRow(line, delim));
   }
-
-  return { headers: headersRaw, unknownHeaders: [...new Set(unknownHeaders)], rows };
+  return parseLabelDataFromGrid(headerCells.map((h) => h.trim()), dataRows, 2);
 }
 
 /** @deprecated use {@link parseLabelDataText} */
@@ -258,6 +343,31 @@ export function mergeImportRowFields(rows: ParsedImportRow[]): {
   return { merged };
 }
 
+/** Last non-empty value per field wins (by row order). */
+export function mergeImportRowFieldsLastWins(rows: ParsedImportRow[]): Partial<ItemLabelDataDraft> {
+  const sorted = [...rows].sort((a, b) => a.lineIndex - b.lineIndex);
+  const merged: Partial<ItemLabelDataDraft> = {};
+  for (const row of sorted) {
+    for (const k of LABEL_DATA_FIELD_KEYS) {
+      const v = row.fields[k]?.trim() ?? "";
+      if (v) merged[k] = v;
+    }
+  }
+  return merged;
+}
+
+/** For each match key (`code` or `barcode`), keep the row with the greatest line index. */
+export function collapseDuplicateKeysKeepLast(rows: ParsedImportRow[]): ParsedImportRow[] {
+  const byKey = new Map<string, ParsedImportRow>();
+  for (const row of rows) {
+    const k = importRowMatchKey(row);
+    if (!k) continue;
+    const prev = byKey.get(k);
+    if (!prev || row.lineIndex > prev.lineIndex) byKey.set(k, row);
+  }
+  return [...byKey.values()].sort((a, b) => a.lineIndex - b.lineIndex);
+}
+
 export type LabelDataImportConflict = {
   item: Item;
   lineIndices: number[];
@@ -270,6 +380,7 @@ export type LabelDataImportAnalysis = {
   unknownHeaderCount: number;
   unknownHeaders: string[];
   duplicateKeyRowCount: number;
+  /** Lines skipped as duplicate keys (all such lines when excluding; non-“winning” lines when keep-last) */
   duplicateKeyLineIndices: number[];
   ambiguousRowCount: number;
   ambiguous: { row: ParsedImportRow; candidates: Item[] }[];
@@ -279,7 +390,55 @@ export type LabelDataImportAnalysis = {
   conflicts: LabelDataImportConflict[];
   /** Items that will receive merged import values */
   applicable: { item: Item; mergedFields: Partial<ItemLabelDataDraft>; sourceRows: ParsedImportRow[] }[];
+  /** File rows that will be applied (sum of source rows per applicable item) */
+  applicableRowCount: number;
+  /** Rows not applied (duplicates + not found + ambiguous + conflict lines) */
+  skippedRowCount: number;
+  /** Ambiguous rows still without a manual item pick */
+  unresolvedAmbiguousCount: number;
 };
+
+export type AnalyzeLabelDataImportOptions = {
+  duplicateKeyPolicy?: "exclude_all" | "keep_last";
+  mergePolicy?: "strict" | "last_wins";
+  ambiguousResolution?: ReadonlyMap<number, string> | Record<number, string | undefined>;
+};
+
+function readAmbiguousResolution(
+  opt: AnalyzeLabelDataImportOptions["ambiguousResolution"],
+  lineIndex: number,
+): string | undefined {
+  if (!opt) return undefined;
+  if (opt instanceof Map) return opt.get(lineIndex);
+  const rec = opt as Record<number, string | undefined>;
+  const v = rec[lineIndex];
+  return typeof v === "string" ? v : undefined;
+}
+
+function computeDuplicateSkippedLineIndices(
+  allRows: ParsedImportRow[],
+  policy: "exclude_all" | "keep_last",
+): number[] {
+  const keyToRows = new Map<string, ParsedImportRow[]>();
+  for (const row of allRows) {
+    const k = importRowMatchKey(row);
+    if (!k) continue;
+    keyToRows.set(k, [...(keyToRows.get(k) ?? []), row]);
+  }
+  const out: number[] = [];
+  for (const [, list] of keyToRows) {
+    if (list.length <= 1) continue;
+    if (policy === "exclude_all") {
+      for (const r of list) out.push(r.lineIndex);
+    } else {
+      const last = list.reduce((a, b) => (a.lineIndex > b.lineIndex ? a : b));
+      for (const r of list) {
+        if (r.lineIndex !== last.lineIndex) out.push(r.lineIndex);
+      }
+    }
+  }
+  return out.sort((a, b) => a - b);
+}
 
 /**
  * Full import analysis: duplicate keys in file, match, ambiguity, merge conflicts.
@@ -288,26 +447,26 @@ export type LabelDataImportAnalysis = {
 export function analyzeLabelDataImport(
   parsed: Pick<ParseLabelDataImportResult, "rows" | "unknownHeaders">,
   items: readonly Item[],
+  options?: AnalyzeLabelDataImportOptions,
 ): LabelDataImportAnalysis {
-  const rows = parsed.rows;
+  const dupPolicy = options?.duplicateKeyPolicy ?? "exclude_all";
+  const mergePolicy = options?.mergePolicy ?? "strict";
+
+  const duplicateSkippedLineIndices = computeDuplicateSkippedLineIndices(parsed.rows, dupPolicy);
+  const dupSkip = new Set(duplicateSkippedLineIndices);
+
+  let rowsForMatch: ParsedImportRow[];
+  if (dupPolicy === "keep_last") {
+    rowsForMatch = collapseDuplicateKeysKeepLast(parsed.rows);
+  } else {
+    rowsForMatch = parsed.rows.filter((r) => !dupSkip.has(r.lineIndex));
+  }
+
   const byCode = buildItemLookup(items).byCode;
   const barcodeToItems = buildBarcodeToItemsMap(items);
+  const byId = new Map(items.map((it) => [it.id, it] as const));
 
-  const keyToRows = new Map<string, ParsedImportRow[]>();
-  for (const row of rows) {
-    const k = importRowMatchKey(row);
-    if (!k) continue;
-    keyToRows.set(k, [...(keyToRows.get(k) ?? []), row]);
-  }
-
-  const duplicateLineIndices = new Set<number>();
-  for (const [, list] of keyToRows) {
-    if (list.length > 1) {
-      for (const r of list) duplicateLineIndices.add(r.lineIndex);
-    }
-  }
-
-  const remaining = rows.filter((r) => !duplicateLineIndices.has(r.lineIndex));
+  const remaining = rowsForMatch;
 
   const notFound: ParsedImportRow[] = [];
   const ambiguous: { row: ParsedImportRow; candidates: Item[] }[] = [];
@@ -320,6 +479,15 @@ export function analyzeLabelDataImport(
       continue;
     }
     if (m.kind === "ambiguous") {
+      const pickId = readAmbiguousResolution(options?.ambiguousResolution, row.lineIndex);
+      const picked = pickId ? byId.get(pickId) : undefined;
+      if (picked && m.candidates.some((c) => c.id === picked.id)) {
+        const item = picked;
+        const g = byItemId.get(item.id) ?? { item, rows: [] };
+        g.rows.push(row);
+        byItemId.set(item.id, g);
+        continue;
+      }
       ambiguous.push({
         row,
         candidates: m.candidates,
@@ -336,6 +504,11 @@ export function analyzeLabelDataImport(
   const applicable: LabelDataImportAnalysis["applicable"] = [];
 
   for (const { item, rows: groupRows } of byItemId.values()) {
+    if (mergePolicy === "last_wins") {
+      const merged = mergeImportRowFieldsLastWins(groupRows);
+      applicable.push({ item, mergedFields: merged, sourceRows: groupRows });
+      continue;
+    }
     const { merged, conflict } = mergeImportRowFields(groupRows);
     if (conflict) {
       conflicts.push({
@@ -349,12 +522,20 @@ export function analyzeLabelDataImport(
     applicable.push({ item, mergedFields: merged, sourceRows: groupRows });
   }
 
+  const applicableRowCount = applicable.reduce((n, a) => n + a.sourceRows.length, 0);
+  const unresolvedAmbiguousCount = ambiguous.length;
+  const skippedRowCount =
+    duplicateSkippedLineIndices.length +
+    notFound.length +
+    ambiguous.length +
+    conflicts.reduce((n, c) => n + c.lineIndices.length, 0);
+
   return {
-    sourceRowCount: rows.length,
+    sourceRowCount: parsed.rows.length,
     unknownHeaderCount: parsed.unknownHeaders.length,
     unknownHeaders: parsed.unknownHeaders,
-    duplicateKeyRowCount: duplicateLineIndices.size,
-    duplicateKeyLineIndices: [...duplicateLineIndices].sort((a, b) => a - b),
+    duplicateKeyRowCount: duplicateSkippedLineIndices.length,
+    duplicateKeyLineIndices: duplicateSkippedLineIndices,
     ambiguousRowCount: ambiguous.length,
     ambiguous,
     notFoundRowCount: notFound.length,
@@ -362,6 +543,9 @@ export function analyzeLabelDataImport(
     conflictRowCount: conflicts.reduce((n, c) => n + c.lineIndices.length, 0),
     conflicts,
     applicable,
+    applicableRowCount,
+    skippedRowCount,
+    unresolvedAmbiguousCount,
   };
 }
 
@@ -405,6 +589,79 @@ export function mergeImportIntoDraft(
     }
   }
   return next;
+}
+
+export type ImportReviewRowStatus = "applicable" | "duplicate" | "not_found" | "ambiguous" | "conflict";
+
+export type ImportReviewRow = {
+  lineIndex: number;
+  key: string;
+  status: ImportReviewRowStatus;
+  targetCode?: string;
+  targetName?: string;
+  summary: string;
+};
+
+export function buildImportReviewRows(
+  parsed: ParseLabelDataImportResult,
+  analysis: LabelDataImportAnalysis,
+): ImportReviewRow[] {
+  const dupSkip = new Set(analysis.duplicateKeyLineIndices);
+  const notFoundSet = new Set(analysis.notFound.map((r) => r.lineIndex));
+  const ambiguousSet = new Set(analysis.ambiguous.map((a) => a.row.lineIndex));
+  const conflictLineToItem = new Map<number, Item>();
+  for (const c of analysis.conflicts) {
+    for (const li of c.lineIndices) conflictLineToItem.set(li, c.item);
+  }
+  const applicableLineMeta = new Map<number, { code: string; name: string }>();
+  for (const a of analysis.applicable) {
+    for (const r of a.sourceRows) {
+      applicableLineMeta.set(r.lineIndex, { code: a.item.code, name: a.item.name });
+    }
+  }
+
+  return parsed.rows.map((row) => {
+    const key = row.rawCode?.trim() || row.rawBarcode?.trim() || "—";
+    const parts: string[] = [];
+    for (const k of LABEL_DATA_FIELD_KEYS) {
+      const v = row.fields[k]?.trim();
+      if (v) parts.push(`${String(k)}:${v}`);
+      if (parts.length >= 4) break;
+    }
+    const summary = parts.join(" · ") || "—";
+
+    if (dupSkip.has(row.lineIndex)) {
+      return { lineIndex: row.lineIndex, key, status: "duplicate", summary };
+    }
+    const app = applicableLineMeta.get(row.lineIndex);
+    if (app) {
+      return {
+        lineIndex: row.lineIndex,
+        key,
+        status: "applicable",
+        targetCode: app.code,
+        targetName: app.name,
+        summary,
+      };
+    }
+    const cf = conflictLineToItem.get(row.lineIndex);
+    if (cf) {
+      return {
+        lineIndex: row.lineIndex,
+        key,
+        status: "conflict",
+        targetCode: cf.code,
+        summary,
+      };
+    }
+    if (notFoundSet.has(row.lineIndex)) {
+      return { lineIndex: row.lineIndex, key, status: "not_found", summary };
+    }
+    if (ambiguousSet.has(row.lineIndex)) {
+      return { lineIndex: row.lineIndex, key, status: "ambiguous", summary };
+    }
+    return { lineIndex: row.lineIndex, key, status: "not_found", summary };
+  });
 }
 
 export function exportTemplateTsvHeader(): string {

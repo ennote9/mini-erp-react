@@ -23,13 +23,22 @@ import {
 } from "../lib/itemLabelDataBulk";
 import {
   analyzeLabelDataImport,
+  buildImportReviewRows,
   buildLabelDataExportTsv,
   buildLabelDataTemplateFileContent,
   delimiterHintFromFilename,
   mergeImportIntoDraft,
   parseLabelDataText,
+  type AnalyzeLabelDataImportOptions,
+  type ImportReviewRow,
   type LabelDataImportAnalysis,
+  type ParseLabelDataImportResult,
 } from "../lib/parseLabelDataImport";
+import {
+  buildLabelDataExportXlsxBuffer,
+  buildLabelDataTemplateXlsxBuffer,
+  parseLabelDataXlsx,
+} from "../lib/labelDataImportXlsx";
 
 type ViewMode = "all" | "translation" | "marking";
 
@@ -42,6 +51,21 @@ function downloadTextFile(filename: string, content: string, mime: string) {
   a.click();
   URL.revokeObjectURL(url);
 }
+
+function downloadBlob(filename: string, blob: Blob) {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+type DuplicatePolicy = NonNullable<AnalyzeLabelDataImportOptions["duplicateKeyPolicy"]>;
+type MergePolicy = NonNullable<AnalyzeLabelDataImportOptions["mergePolicy"]>;
+type ReviewSection = "all" | "applicable" | "skipped";
+
+const XLSX_MIME = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
 
 export function ItemsLabelDataPage() {
   const { t } = useTranslation();
@@ -60,7 +84,12 @@ export function ItemsLabelDataPage() {
   const [importOpen, setImportOpen] = useState(false);
   const [importText, setImportText] = useState("");
   const [lastImportedFileName, setLastImportedFileName] = useState<string | null>(null);
-  const [importAnalysis, setImportAnalysis] = useState<LabelDataImportAnalysis | null>(null);
+  const [importParsedSnapshot, setImportParsedSnapshot] = useState<ParseLabelDataImportResult | null>(null);
+  const [xlsxBuffer, setXlsxBuffer] = useState<ArrayBuffer | null>(null);
+  const [duplicatePolicy, setDuplicatePolicy] = useState<DuplicatePolicy>("exclude_all");
+  const [mergePolicy, setMergePolicy] = useState<MergePolicy>("strict");
+  const [ambiguousPickByLine, setAmbiguousPickByLine] = useState<Record<number, string>>({});
+  const [reviewSection, setReviewSection] = useState<ReviewSection>("all");
   const [importSkippedIds, setImportSkippedIds] = useState<Set<string>>(() => new Set());
   const importFileInputRef = useRef<HTMLInputElement>(null);
 
@@ -116,6 +145,26 @@ export function ItemsLabelDataPage() {
       }),
     [searchedItems, filter, dirtyIds, importSkippedIds, draftById],
   );
+
+  const importAnalysis = useMemo((): LabelDataImportAnalysis | null => {
+    if (!importParsedSnapshot) return null;
+    return analyzeLabelDataImport(importParsedSnapshot, allItems, {
+      duplicateKeyPolicy: duplicatePolicy,
+      mergePolicy: mergePolicy,
+      ambiguousResolution: ambiguousPickByLine,
+    });
+  }, [importParsedSnapshot, allItems, duplicatePolicy, mergePolicy, ambiguousPickByLine]);
+
+  const importReviewRows = useMemo((): ImportReviewRow[] => {
+    if (!importParsedSnapshot || !importAnalysis) return [];
+    return buildImportReviewRows(importParsedSnapshot, importAnalysis);
+  }, [importParsedSnapshot, importAnalysis]);
+
+  const filteredReviewRows = useMemo(() => {
+    if (reviewSection === "all") return importReviewRows;
+    if (reviewSection === "applicable") return importReviewRows.filter((r) => r.status === "applicable");
+    return importReviewRows.filter((r) => r.status !== "applicable");
+  }, [importReviewRows, reviewSection]);
 
   const toggleSelect = useCallback((id: string) => {
     setSelectedIds((prev) => {
@@ -212,7 +261,9 @@ export function ItemsLabelDataPage() {
     setImportOpen(false);
     setImportText("");
     setLastImportedFileName(null);
-    setImportAnalysis(null);
+    setImportParsedSnapshot(null);
+    setXlsxBuffer(null);
+    setAmbiguousPickByLine({});
     setFeedback({
       kind: "success",
       message: t("master.itemsLabelData.importAppliedDetail", {
@@ -222,31 +273,59 @@ export function ItemsLabelDataPage() {
     });
   }, [importAnalysis, persistedById, t]);
 
-  const parseImportPreview = useCallback(() => {
+  const runImportPreview = useCallback(async () => {
     setFeedback(null);
-    const hint = lastImportedFileName ? delimiterHintFromFilename(lastImportedFileName) : undefined;
-    const parsed = parseLabelDataText(importText, hint ? { delimiter: hint } : undefined);
-    if (parsed.rows.length === 0) {
-      setFeedback({ kind: "error", message: t("master.itemsLabelData.importEmpty") });
-      setImportAnalysis(null);
+    let parsed: ParseLabelDataImportResult;
+    try {
+      if (xlsxBuffer) {
+        parsed = await parseLabelDataXlsx(xlsxBuffer);
+      } else {
+        const hint = lastImportedFileName ? delimiterHintFromFilename(lastImportedFileName) : undefined;
+        parsed = parseLabelDataText(importText, hint ? { delimiter: hint } : undefined);
+      }
+    } catch (e) {
+      setFeedback({
+        kind: "error",
+        message: e instanceof Error ? e.message : t("master.itemsLabelData.importParseError"),
+      });
       return;
     }
-    setImportAnalysis(analyzeLabelDataImport(parsed, allItems));
-  }, [importText, lastImportedFileName, allItems, t]);
+    if (parsed.rows.length === 0) {
+      setFeedback({ kind: "error", message: t("master.itemsLabelData.importEmpty") });
+      setImportParsedSnapshot(null);
+      return;
+    }
+    setImportParsedSnapshot(parsed);
+    setAmbiguousPickByLine({});
+  }, [xlsxBuffer, lastImportedFileName, importText, t]);
 
-  const onImportFileSelected = useCallback((e: ChangeEvent<HTMLInputElement>) => {
+  const onImportFileSelected = useCallback(async (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     e.target.value = "";
     if (!file) return;
     setLastImportedFileName(file.name);
-    setImportAnalysis(null);
+    setImportParsedSnapshot(null);
     setFeedback(null);
+    const lower = file.name.toLowerCase();
+    if (lower.endsWith(".xlsx")) {
+      try {
+        setXlsxBuffer(await file.arrayBuffer());
+        setImportText("");
+      } catch (err) {
+        setFeedback({
+          kind: "error",
+          message: err instanceof Error ? err.message : t("master.itemsLabelData.importParseError"),
+        });
+      }
+      return;
+    }
+    setXlsxBuffer(null);
     const reader = new FileReader();
     reader.onload = () => {
       setImportText(String(reader.result ?? ""));
     };
     reader.readAsText(file);
-  }, []);
+  }, [t]);
 
   const applyBulk = useCallback(() => {
     if (selectedIds.size === 0) return;
@@ -354,6 +433,18 @@ export function ItemsLabelDataPage() {
     );
   }, []);
 
+  const exportTemplateXlsx = useCallback(async () => {
+    try {
+      const buf = await buildLabelDataTemplateXlsxBuffer();
+      downloadBlob("label-data-template.xlsx", new Blob([buf], { type: XLSX_MIME }));
+    } catch (e) {
+      setFeedback({
+        kind: "error",
+        message: e instanceof Error ? e.message : t("master.itemsLabelData.exportFailed"),
+      });
+    }
+  }, [t]);
+
   const exportCurrentData = useCallback(() => {
     const rows =
       selectedIds.size > 0 ? filteredItems.filter((i) => selectedIds.has(i.id)) : filteredItems;
@@ -364,6 +455,25 @@ export function ItemsLabelDataPage() {
     const tsv = buildLabelDataExportTsv(rows, draftById);
     downloadTextFile("label-data-export.tsv", tsv, "text/tab-separated-values;charset=utf-8");
     setFeedback({ kind: "success", message: t("master.itemsLabelData.exportDone", { n: rows.length }) });
+  }, [selectedIds, filteredItems, draftById, t]);
+
+  const exportCurrentDataXlsx = useCallback(async () => {
+    const rows =
+      selectedIds.size > 0 ? filteredItems.filter((i) => selectedIds.has(i.id)) : filteredItems;
+    if (rows.length === 0) {
+      setFeedback({ kind: "error", message: t("master.itemsLabelData.exportNothing") });
+      return;
+    }
+    try {
+      const buf = await buildLabelDataExportXlsxBuffer(rows, draftById);
+      downloadBlob("label-data-export.xlsx", new Blob([buf], { type: XLSX_MIME }));
+      setFeedback({ kind: "success", message: t("master.itemsLabelData.exportDoneXlsx", { n: rows.length }) });
+    } catch (e) {
+      setFeedback({
+        kind: "error",
+        message: e instanceof Error ? e.message : t("master.itemsLabelData.exportFailed"),
+      });
+    }
   }, [selectedIds, filteredItems, draftById, t]);
 
   return (
@@ -441,8 +551,14 @@ export function ItemsLabelDataPage() {
           <Button type="button" size="sm" variant="outline" className="h-8" onClick={exportTemplate}>
             {t("master.itemsLabelData.exportTemplate")}
           </Button>
+          <Button type="button" size="sm" variant="outline" className="h-8" onClick={() => void exportTemplateXlsx()}>
+            {t("master.itemsLabelData.exportTemplateXlsx")}
+          </Button>
           <Button type="button" size="sm" variant="outline" className="h-8" onClick={exportCurrentData}>
             {t("master.itemsLabelData.exportData")}
+          </Button>
+          <Button type="button" size="sm" variant="outline" className="h-8" onClick={() => void exportCurrentDataXlsx()}>
+            {t("master.itemsLabelData.exportDataXlsx")}
           </Button>
           <Button type="button" size="sm" variant="outline" className="h-8" disabled={selectedIds.size === 0} onClick={() => setBulkOpen(true)}>
             {t("master.itemsLabelData.bulkFill")}
@@ -555,14 +671,19 @@ export function ItemsLabelDataPage() {
         onOpenChange={(open) => {
           setImportOpen(open);
           if (!open) {
-            setImportAnalysis(null);
+            setImportParsedSnapshot(null);
             setLastImportedFileName(null);
+            setXlsxBuffer(null);
+            setAmbiguousPickByLine({});
+            setDuplicatePolicy("exclude_all");
+            setMergePolicy("strict");
+            setReviewSection("all");
           }
         }}
       >
         <Dialog.Portal>
           <Dialog.Overlay className="fixed inset-0 z-50 bg-black/50 backdrop-blur-[1px]" />
-          <Dialog.Content className="fixed left-1/2 top-1/2 z-50 flex max-h-[min(90vh,720px)] w-[min(92vw,640px)] -translate-x-1/2 -translate-y-1/2 flex-col gap-2 overflow-y-auto rounded-lg border border-border bg-background p-3 shadow-lg focus:outline-none">
+          <Dialog.Content className="fixed left-1/2 top-1/2 z-50 flex max-h-[min(92vh,820px)] w-[min(96vw,900px)] -translate-x-1/2 -translate-y-1/2 flex-col gap-2 overflow-y-auto rounded-lg border border-border bg-background p-3 shadow-lg focus:outline-none">
             <Dialog.Title className="text-sm font-semibold">{t("master.itemsLabelData.importTitle")}</Dialog.Title>
             <Dialog.Description className="text-xs text-muted-foreground">
               {t("master.itemsLabelData.importHelp")}
@@ -571,7 +692,7 @@ export function ItemsLabelDataPage() {
               <input
                 ref={importFileInputRef}
                 type="file"
-                accept=".tsv,.csv,text/tab-separated-values,text/csv,text/plain"
+                accept=".tsv,.csv,.xlsx,text/tab-separated-values,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/plain"
                 className="sr-only"
                 aria-hidden
                 onChange={onImportFileSelected}
@@ -588,30 +709,78 @@ export function ItemsLabelDataPage() {
               {lastImportedFileName ? (
                 <span className="text-[11px] text-muted-foreground">{lastImportedFileName}</span>
               ) : null}
+              {xlsxBuffer ? (
+                <span className="text-[11px] text-amber-800 dark:text-amber-200">{t("master.itemsLabelData.xlsxLoadedHint")}</span>
+              ) : null}
             </div>
             <Textarea
-              className="min-h-[180px] font-mono text-xs"
+              className="min-h-[160px] font-mono text-xs"
               value={importText}
               onChange={(e) => {
                 setImportText(e.target.value);
-                setImportAnalysis(null);
+                setImportParsedSnapshot(null);
+                setXlsxBuffer(null);
                 setLastImportedFileName(null);
               }}
               placeholder={t("master.itemsLabelData.importPlaceholder")}
+              disabled={!!xlsxBuffer}
             />
-            <Button type="button" size="sm" variant="secondary" className="w-fit" onClick={parseImportPreview}>
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-[11px] text-muted-foreground">{t("master.itemsLabelData.duplicatePolicyLabel")}</span>
+              <Button
+                type="button"
+                size="sm"
+                variant={duplicatePolicy === "exclude_all" ? "secondary" : "outline"}
+                className="h-7 text-xs"
+                onClick={() => setDuplicatePolicy("exclude_all")}
+              >
+                {t("master.itemsLabelData.duplicatePolicyExclude")}
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                variant={duplicatePolicy === "keep_last" ? "secondary" : "outline"}
+                className="h-7 text-xs"
+                onClick={() => setDuplicatePolicy("keep_last")}
+              >
+                {t("master.itemsLabelData.duplicatePolicyLast")}
+              </Button>
+              <span className="text-[11px] text-muted-foreground">{t("master.itemsLabelData.mergePolicyLabel")}</span>
+              <Button
+                type="button"
+                size="sm"
+                variant={mergePolicy === "strict" ? "secondary" : "outline"}
+                className="h-7 text-xs"
+                onClick={() => setMergePolicy("strict")}
+              >
+                {t("master.itemsLabelData.mergePolicyStrict")}
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                variant={mergePolicy === "last_wins" ? "secondary" : "outline"}
+                className="h-7 text-xs"
+                onClick={() => setMergePolicy("last_wins")}
+              >
+                {t("master.itemsLabelData.mergePolicyLast")}
+              </Button>
+            </div>
+            <Button type="button" size="sm" variant="secondary" className="w-fit" onClick={() => void runImportPreview()}>
               {t("master.itemsLabelData.importPreview")}
             </Button>
             {importAnalysis ? (
               <div className="space-y-2 rounded-md border border-border/60 bg-muted/20 p-2 text-xs">
-                <ul className="grid gap-0.5 sm:grid-cols-2">
+                <ul className="grid gap-0.5 sm:grid-cols-2 lg:grid-cols-3">
                   <li>{t("master.itemsLabelData.report.sourceRows", { n: importAnalysis.sourceRowCount })}</li>
                   <li>{t("master.itemsLabelData.report.unknownHeaders", { n: importAnalysis.unknownHeaderCount })}</li>
                   <li>{t("master.itemsLabelData.report.duplicateKeys", { n: importAnalysis.duplicateKeyRowCount })}</li>
                   <li>{t("master.itemsLabelData.report.notFound", { n: importAnalysis.notFoundRowCount })}</li>
                   <li>{t("master.itemsLabelData.report.ambiguous", { n: importAnalysis.ambiguousRowCount })}</li>
                   <li>{t("master.itemsLabelData.report.conflicts", { n: importAnalysis.conflictRowCount })}</li>
-                  <li className="sm:col-span-2 font-medium text-foreground">
+                  <li>{t("master.itemsLabelData.report.applicableRows", { n: importAnalysis.applicableRowCount })}</li>
+                  <li>{t("master.itemsLabelData.report.skippedRows", { n: importAnalysis.skippedRowCount })}</li>
+                  <li>{t("master.itemsLabelData.report.unresolvedAmbiguous", { n: importAnalysis.unresolvedAmbiguousCount })}</li>
+                  <li className="sm:col-span-2 lg:col-span-3 font-medium text-foreground">
                     {t("master.itemsLabelData.report.willApply", { n: importAnalysis.applicable.length })}
                   </li>
                 </ul>
@@ -671,6 +840,79 @@ export function ItemsLabelDataPage() {
                     ))}
                   </ul>
                 ) : null}
+                <div className="flex flex-wrap items-center gap-2 border-t border-border/50 pt-2">
+                  <span className="text-[11px] text-muted-foreground">{t("master.itemsLabelData.reviewFilterLabel")}</span>
+                  <SelectField
+                    value={reviewSection}
+                    onChange={(v) => setReviewSection(v as ReviewSection)}
+                    options={[
+                      { value: "all", label: t("master.itemsLabelData.reviewSectionAll") },
+                      { value: "applicable", label: t("master.itemsLabelData.reviewSectionApplicable") },
+                      { value: "skipped", label: t("master.itemsLabelData.reviewSectionSkipped") },
+                    ]}
+                    placeholder=""
+                    className="h-8 w-[min(100%,11rem)] text-xs"
+                    aria-label={t("master.itemsLabelData.reviewFilterLabel")}
+                  />
+                </div>
+                <div className="max-h-[min(40vh,280px)] overflow-auto rounded border border-border/50">
+                  <table className="w-full min-w-[640px] border-collapse text-[11px]">
+                    <thead>
+                      <tr className="border-b border-border/60 bg-muted/40 text-left text-[10px] uppercase text-muted-foreground">
+                        <th className="px-1.5 py-1">{t("master.itemsLabelData.reviewColLine")}</th>
+                        <th className="px-1.5 py-1">{t("master.itemsLabelData.reviewColStatus")}</th>
+                        <th className="px-1.5 py-1">{t("master.itemsLabelData.reviewColKey")}</th>
+                        <th className="px-1.5 py-1">{t("master.itemsLabelData.reviewColTarget")}</th>
+                        <th className="px-1.5 py-1">{t("master.itemsLabelData.reviewColSummary")}</th>
+                        <th className="px-1.5 py-1">{t("master.itemsLabelData.reviewColResolve")}</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {filteredReviewRows.map((rr) => {
+                        const amb = importAnalysis.ambiguous.find((x) => x.row.lineIndex === rr.lineIndex);
+                        return (
+                          <tr key={rr.lineIndex} className="border-b border-border/30">
+                            <td className="whitespace-nowrap px-1.5 py-0.5 font-mono">{rr.lineIndex}</td>
+                            <td className="px-1.5 py-0.5">
+                              {t(`master.itemsLabelData.reviewStatus.${rr.status}` as "master.itemsLabelData.reviewStatus.applicable")}
+                            </td>
+                            <td className="max-w-[8rem] truncate font-mono px-1.5 py-0.5" title={rr.key}>
+                              {rr.key}
+                            </td>
+                            <td className="max-w-[10rem] truncate px-1.5 py-0.5" title={rr.targetCode}>
+                              {rr.targetCode ? `${rr.targetCode}${rr.targetName ? ` · ${rr.targetName}` : ""}` : "—"}
+                            </td>
+                            <td className="max-w-[14rem] truncate text-muted-foreground" title={rr.summary}>
+                              {rr.summary}
+                            </td>
+                            <td className="min-w-[10rem] px-0.5 py-0.5">
+                              {amb ? (
+                                <SelectField
+                                  value={ambiguousPickByLine[rr.lineIndex] ?? ""}
+                                  onChange={(v) =>
+                                    setAmbiguousPickByLine((prev) => ({ ...prev, [rr.lineIndex]: v }))
+                                  }
+                                  options={[
+                                    { value: "", label: t("master.itemsLabelData.ambiguousPickPlaceholder") },
+                                    ...amb.candidates.map((it) => ({
+                                      value: it.id,
+                                      label: `${it.code} — ${it.name}`,
+                                    })),
+                                  ]}
+                                  placeholder=""
+                                  className="h-7 w-full max-w-[220px] text-[10px]"
+                                  aria-label={t("master.itemsLabelData.reviewColResolve")}
+                                />
+                              ) : (
+                                "—"
+                              )}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
               </div>
             ) : null}
             <div className="mt-1 flex flex-wrap justify-end gap-2 border-t border-border/60 pt-2">
