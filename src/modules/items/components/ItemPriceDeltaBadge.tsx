@@ -1,4 +1,4 @@
-import { ArrowDown, ArrowUp } from "lucide-react";
+import { ArrowDownRight, ArrowUpRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { PriceDeltaVsPrevious } from "../lib/itemPriceHistory";
 
@@ -24,7 +24,7 @@ export function ItemPriceDeltaBadge({ delta, formatMoney, className }: Props) {
     );
   }
 
-  const Icon = delta.direction === "up" ? ArrowUp : ArrowDown;
+  const Icon = delta.direction === "up" ? ArrowUpRight : ArrowDownRight;
   const tone =
     delta.direction === "up" ? "text-emerald-600/90 dark:text-emerald-400/90" : "text-rose-600/90 dark:text-rose-400/90";
 

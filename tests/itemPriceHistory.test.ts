@@ -126,7 +126,7 @@ describe("itemPriceHistory", () => {
     const prev = getPreviousActiveRecord(item, "purchase", active!, d);
     expect(prev?.id).toBe("earlier");
     expect(prev?.amount).toBe(10);
-    expect(getLastNHistoricalPriceAmounts(item, "purchase", d, 5)).toEqual([10, 12]);
+    expect(getLastNHistoricalPriceAmounts(item, "purchase", d, 7)).toEqual([10, 12]);
   });
 
   it("chain order matches history table: validFrom desc then createdAt desc", () => {

@@ -874,6 +874,7 @@ test.describe("Item card — Prices tab (acceptance)", () => {
     await expect(purchaseCurrent.locator('[data-testid="item-price-delta"]')).toHaveAttribute("data-delta-direction", "up");
 
     const purchaseValueRow = purchaseCurrent.getByTestId("item-price-summary-value-row");
+    const purchaseDateRow = purchaseCurrent.getByTestId("item-price-summary-date-row");
     const purchaseReasonRow = purchaseCurrent.getByTestId("item-price-summary-reason-row");
     await expect(purchaseValueRow.locator('[data-testid="item-price-trend-sparkline"]')).toBeVisible();
     const purchaseChartArea = purchaseCurrent.getByTestId("item-price-trend-chart-area");
@@ -882,7 +883,8 @@ test.describe("Item card — Prices tab (acceptance)", () => {
     expect(purchaseChartBox).toBeTruthy();
     expect(purchaseChartBox!.height).toBeGreaterThanOrEqual(52);
     expect(purchaseChartBox!.width).toBeGreaterThanOrEqual(168);
-    await expect(purchaseReasonRow.locator('[data-testid="item-price-delta"]')).toBeVisible();
+    await expect(purchaseDateRow.locator('[data-testid="item-price-delta"]')).toBeVisible();
+    await expect(purchaseReasonRow.locator('[data-testid="item-price-delta-hint"]')).toBeVisible();
     const purchaseValueGeom = await purchaseValueRow.evaluate((row) => {
       const priceEl = row.children[0];
       const spark = row.querySelector('[data-testid="item-price-trend-sparkline"]');
@@ -894,17 +896,28 @@ test.describe("Item card — Prices tab (acceptance)", () => {
     });
     expect(purchaseValueGeom).toBeTruthy();
     expect(purchaseValueGeom!.sparkLeft).toBeGreaterThanOrEqual(purchaseValueGeom!.priceRight - 1);
-    const purchaseReasonGeom = await purchaseReasonRow.evaluate((row) => {
-      const reasonEl = row.children[0];
+    const purchaseDateGeom = await purchaseDateRow.evaluate((row) => {
+      const dateEl = row.children[0];
       const delta = row.querySelector('[data-testid="item-price-delta"]');
-      if (!reasonEl || !delta) return null;
+      if (!dateEl || !delta) return null;
       return {
-        reasonRight: reasonEl.getBoundingClientRect().right,
+        dateRight: dateEl.getBoundingClientRect().right,
         deltaLeft: delta.getBoundingClientRect().left,
       };
     });
+    expect(purchaseDateGeom).toBeTruthy();
+    expect(purchaseDateGeom!.deltaLeft).toBeGreaterThanOrEqual(purchaseDateGeom!.dateRight - 1);
+    const purchaseReasonGeom = await purchaseReasonRow.evaluate((row) => {
+      const reasonEl = row.children[0];
+      const hint = row.querySelector('[data-testid="item-price-delta-hint"]');
+      if (!reasonEl || !hint) return null;
+      return {
+        reasonRight: reasonEl.getBoundingClientRect().right,
+        hintLeft: hint.getBoundingClientRect().left,
+      };
+    });
     expect(purchaseReasonGeom).toBeTruthy();
-    expect(purchaseReasonGeom!.deltaLeft).toBeGreaterThanOrEqual(purchaseReasonGeom!.reasonRight - 1);
+    expect(purchaseReasonGeom!.hintLeft).toBeGreaterThanOrEqual(purchaseReasonGeom!.reasonRight - 1);
 
     await page.getByTestId("item-prices-add-sale").click();
     await expect(page.getByTestId("item-price-edit-dialog")).toBeVisible({ timeout: 10_000 });
@@ -927,6 +940,7 @@ test.describe("Item card — Prices tab (acceptance)", () => {
     await expect(saleCurrent.locator('[data-testid="item-price-delta"]')).toHaveAttribute("data-delta-direction", "down");
 
     const saleValueRow = saleCurrent.getByTestId("item-price-summary-value-row");
+    const saleDateRow = saleCurrent.getByTestId("item-price-summary-date-row");
     const saleReasonRow = saleCurrent.getByTestId("item-price-summary-reason-row");
     await expect(saleValueRow.locator('[data-testid="item-price-trend-sparkline"]')).toBeVisible();
     const saleChartArea = saleCurrent.getByTestId("item-price-trend-chart-area");
@@ -935,7 +949,8 @@ test.describe("Item card — Prices tab (acceptance)", () => {
     expect(saleChartBox).toBeTruthy();
     expect(saleChartBox!.height).toBeGreaterThanOrEqual(52);
     expect(saleChartBox!.width).toBeGreaterThanOrEqual(168);
-    await expect(saleReasonRow.locator('[data-testid="item-price-delta"]')).toBeVisible();
+    await expect(saleDateRow.locator('[data-testid="item-price-delta"]')).toBeVisible();
+    await expect(saleReasonRow.locator('[data-testid="item-price-delta-hint"]')).toBeVisible();
     const saleValueGeom = await saleValueRow.evaluate((row) => {
       const priceEl = row.children[0];
       const spark = row.querySelector('[data-testid="item-price-trend-sparkline"]');
@@ -947,22 +962,37 @@ test.describe("Item card — Prices tab (acceptance)", () => {
     });
     expect(saleValueGeom).toBeTruthy();
     expect(saleValueGeom!.sparkLeft).toBeGreaterThanOrEqual(saleValueGeom!.priceRight - 1);
-    const saleReasonGeom = await saleReasonRow.evaluate((row) => {
-      const reasonEl = row.children[0];
+    const saleDateGeom = await saleDateRow.evaluate((row) => {
+      const dateEl = row.children[0];
       const delta = row.querySelector('[data-testid="item-price-delta"]');
-      if (!reasonEl || !delta) return null;
+      if (!dateEl || !delta) return null;
       return {
-        reasonRight: reasonEl.getBoundingClientRect().right,
+        dateRight: dateEl.getBoundingClientRect().right,
         deltaLeft: delta.getBoundingClientRect().left,
       };
     });
+    expect(saleDateGeom).toBeTruthy();
+    expect(saleDateGeom!.deltaLeft).toBeGreaterThanOrEqual(saleDateGeom!.dateRight - 1);
+    const saleReasonGeom = await saleReasonRow.evaluate((row) => {
+      const reasonEl = row.children[0];
+      const hint = row.querySelector('[data-testid="item-price-delta-hint"]');
+      if (!reasonEl || !hint) return null;
+      return {
+        reasonRight: reasonEl.getBoundingClientRect().right,
+        hintLeft: hint.getBoundingClientRect().left,
+      };
+    });
     expect(saleReasonGeom).toBeTruthy();
-    expect(saleReasonGeom!.deltaLeft).toBeGreaterThanOrEqual(saleReasonGeom!.reasonRight - 1);
+    expect(saleReasonGeom!.hintLeft).toBeGreaterThanOrEqual(saleReasonGeom!.reasonRight - 1);
 
     await expect(page.getByTestId("item-prices-card-purchase-next").locator('[data-testid="item-price-trend-sparkline"]')).toHaveCount(0);
     await expect(page.getByTestId("item-prices-card-purchase-next").getByTestId("item-price-trend-chart-area")).toHaveCount(0);
+    await expect(page.getByTestId("item-prices-card-purchase-next").locator('[data-testid="item-price-delta"]')).toHaveCount(0);
+    await expect(page.getByTestId("item-prices-card-purchase-next").locator('[data-testid="item-price-delta-hint"]')).toHaveCount(0);
     await expect(page.getByTestId("item-prices-card-sale-next").locator('[data-testid="item-price-trend-sparkline"]')).toHaveCount(0);
     await expect(page.getByTestId("item-prices-card-sale-next").getByTestId("item-price-trend-chart-area")).toHaveCount(0);
+    await expect(page.getByTestId("item-prices-card-sale-next").locator('[data-testid="item-price-delta"]')).toHaveCount(0);
+    await expect(page.getByTestId("item-prices-card-sale-next").locator('[data-testid="item-price-delta-hint"]')).toHaveCount(0);
 
     await page.reload({ waitUntil: "domcontentloaded" });
     await waitItemsRepositoryHydrated(page);

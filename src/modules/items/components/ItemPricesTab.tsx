@@ -50,6 +50,9 @@ import { useTranslation } from "@/shared/i18n/context";
 import { useAppDisplayFormatters } from "@/shared/formatting";
 import { cn } from "@/lib/utils";
 
+/** Latest active-chain prices fed to current purchase/sale sparklines (oldest→newest). */
+const CURRENT_PRICE_SPARKLINE_POINT_COUNT = 7;
+
 type Props = {
   itemId: string | undefined;
   isNew: boolean;
@@ -112,7 +115,7 @@ export function ItemPricesTab({ itemId, isNew, revision, onPricesChanged }: Prop
 
   const purchaseCurrentTrend = useMemo(() => {
     if (!item || !purchaseCurrent) return undefined;
-    const amounts = getLastNHistoricalPriceAmounts(item, "purchase", todayYmd, 5);
+    const amounts = getLastNHistoricalPriceAmounts(item, "purchase", todayYmd, CURRENT_PRICE_SPARKLINE_POINT_COUNT);
     const prev = getPreviousActiveRecord(item, "purchase", purchaseCurrent, todayYmd);
     const delta = computeDeltaVsPrevious(purchaseCurrent.amount, prev?.amount);
     return { amounts, delta };
@@ -120,7 +123,7 @@ export function ItemPricesTab({ itemId, isNew, revision, onPricesChanged }: Prop
 
   const saleCurrentTrend = useMemo(() => {
     if (!item || !saleCurrent) return undefined;
-    const amounts = getLastNHistoricalPriceAmounts(item, "sale", todayYmd, 5);
+    const amounts = getLastNHistoricalPriceAmounts(item, "sale", todayYmd, CURRENT_PRICE_SPARKLINE_POINT_COUNT);
     const prev = getPreviousActiveRecord(item, "sale", saleCurrent, todayYmd);
     const delta = computeDeltaVsPrevious(saleCurrent.amount, prev?.amount);
     return { amounts, delta };
@@ -624,11 +627,19 @@ function SummaryCard({
               </div>
             ) : null}
           </div>
-          <div className="mt-2 text-[11px] text-muted-foreground">
-            <span className="text-[10px] uppercase tracking-wide text-muted-foreground/75">
-              {t("master.item.prices.summaryEffectiveFrom")}
-            </span>
-            <span className="ml-1 tabular-nums">{record.validFrom}</span>
+          <div
+            data-testid="item-price-summary-date-row"
+            className="mt-2 flex min-w-0 items-start justify-between gap-2"
+          >
+            <div className="min-w-0 text-[11px] text-muted-foreground">
+              <span className="text-[10px] uppercase tracking-wide text-muted-foreground/75">
+                {t("master.item.prices.summaryEffectiveFrom")}
+              </span>
+              <span className="ml-1 tabular-nums">{record.validFrom}</span>
+            </div>
+            {showDelta ? (
+              <ItemPriceDeltaBadge className="shrink-0 self-start" delta={deltaVsPrevious!} formatMoney={formatMoney} />
+            ) : null}
           </div>
           <div
             data-testid="item-price-summary-reason-row"
@@ -638,7 +649,12 @@ function SummaryCard({
               {reasonLabel(record.reasonCode)}
             </div>
             {showDelta ? (
-              <ItemPriceDeltaBadge className="pt-px" delta={deltaVsPrevious!} formatMoney={formatMoney} />
+              <span
+                data-testid="item-price-delta-hint"
+                className="max-w-[9rem] shrink-0 text-right text-[10px] leading-snug text-muted-foreground/70"
+              >
+                {t("master.item.prices.deltaVsPreviousHint")}
+              </span>
             ) : null}
           </div>
           {record.comment ? (

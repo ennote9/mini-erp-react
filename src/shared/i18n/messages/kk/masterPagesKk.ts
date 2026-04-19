@@ -196,6 +196,7 @@ export const kkMasterPages: MessageTree = {
       summarySaleCurrent: "Ағымдағы сату бағасы",
       summarySaleNext: "Келесі сату бағасы",
       summaryEffectiveFrom: "Бастап",
+      deltaVsPreviousHint: "алдыңғы бағаға қатысты",
       trendSparklineAriaPurchase: "Сатып алу бағасының динамикасы (соңғы {{count}} деңгей)",
       trendSparklineAriaSale: "Сату бағасының динамикасы (соңғы {{count}} деңгей)",
       sectionHistory: "Баға тарихы",

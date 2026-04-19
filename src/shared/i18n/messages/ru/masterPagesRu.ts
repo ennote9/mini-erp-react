@@ -195,6 +195,7 @@ export const ruMasterPages: MessageTree = {
       summarySaleCurrent: "Текущая цена продажи",
       summarySaleNext: "Следующая цена продажи",
       summaryEffectiveFrom: "С",
+      deltaVsPreviousHint: "к предыдущей цене",
       trendSparklineAriaPurchase: "Динамика закупочной цены (последние {{count}} уровней)",
       trendSparklineAriaSale: "Динамика продажной цены (последние {{count}} уровней)",
       sectionHistory: "История цен",

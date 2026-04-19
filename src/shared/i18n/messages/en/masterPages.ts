@@ -193,6 +193,7 @@ export const masterPagesEn = {
       summarySaleCurrent: "Current sale price",
       summarySaleNext: "Next sale price",
       summaryEffectiveFrom: "From",
+      deltaVsPreviousHint: "vs previous price",
       trendSparklineAriaPurchase: "Recent purchase price trend (last {{count}} levels)",
       trendSparklineAriaSale: "Recent sale price trend (last {{count}} levels)",
       sectionHistory: "Price history",
