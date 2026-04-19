@@ -24,7 +24,7 @@ export type MarkingExternalIntegrationInfo = {
   isMock: boolean;
   mode: MarkingProviderMode;
   isEnabled: boolean;
-  /** What the UI should show: mock / real HTTP skeleton / off. */
+  /** What the UI should show: mock / real HTTP provider / off. */
   effectiveLabel: "mock" | "real" | "disabled";
 };
 

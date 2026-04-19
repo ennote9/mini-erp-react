@@ -75,6 +75,16 @@ export function MarkingProviderSettingsPage() {
     setTestFeedback(null);
   }, []);
 
+  const formatRealHealthError = useCallback(
+    (raw: string | undefined) => {
+      const m = raw?.trim() ?? "";
+      if (m === "not_configured") return t("master.markingProvider.healthErrorNotConfigured");
+      if (m === "api_key_required") return t("master.markingProvider.healthErrorApiKeyRequired");
+      return m;
+    },
+    [t],
+  );
+
   const handleTest = useCallback(async () => {
     setTestBusy(true);
     setTestFeedback(null);
@@ -100,13 +110,15 @@ export function MarkingProviderSettingsPage() {
         setTestFeedback(t("master.markingProvider.testDisabled"));
       } else {
         setTestFeedback(
-          r.ok ? t("master.markingProvider.testOk", { message: r.message ?? "" }) : t("master.markingProvider.testFailed", { message: r.message ?? "" }),
+          r.ok
+            ? t("master.markingProvider.testOk", { message: r.message ?? "" })
+            : t("master.markingProvider.testFailed", { message: formatRealHealthError(r.message) }),
         );
       }
     } finally {
       setTestBusy(false);
     }
-  }, [mode, isEnabled, providerId, baseUrl, apiKey, timeoutMs, t]);
+  }, [mode, isEnabled, providerId, baseUrl, apiKey, timeoutMs, t, formatRealHealthError]);
 
   return (
     <div className="doc-page mx-auto max-w-[920px] space-y-4 p-4 md:p-5">

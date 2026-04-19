@@ -34,7 +34,19 @@ import { ItemBarcodesCard } from "../components/ItemBarcodesCard";
 import { ItemPricesTab } from "../components/ItemPricesTab";
 import { ItemResponsiblesTab } from "../components/ItemResponsiblesTab";
 import { ItemMarkingPoolTab } from "../components/ItemMarkingPoolTab";
-import { Save, X } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
+import {
+  Save,
+  X,
+  LayoutGrid,
+  BadgeDollarSign,
+  Users,
+  Image as ImageIcon,
+  Barcode,
+  Languages,
+  QrCode,
+  TestTube,
+} from "lucide-react";
 import { useTranslation } from "@/shared/i18n/context";
 import { appendReturnTo, buildReturnToValue, readReturnToParam } from "@/shared/navigation/returnTo";
 import { useUrlTabState } from "@/shared/navigation/useUrlTabState";
@@ -357,19 +369,21 @@ export function ItemPage() {
     [isNew, createKind, item?.itemKind],
   );
 
-  const tabItems = useMemo(
-    () => [
-      { value: "main", label: t("master.item.tabMain") },
-      { value: "prices", label: t("master.item.tabPrices") },
-      { value: "responsibles", label: t("master.item.tabResponsibles") },
-      { value: "images", label: t("master.item.tabImages") },
-      { value: "barcodes", label: t("master.item.tabBarcodes") },
-      { value: "labelData", label: t("master.item.tabLabelData") },
-      { value: "markingPool", label: t("master.item.tabMarkingPool") },
-      ...(showTestersTab ? [{ value: "testers" as const, label: t("master.item.tabTesters") }] : []),
-    ],
-    [showTestersTab, t],
-  );
+  const tabItems = useMemo((): { value: string; label: string; icon: LucideIcon }[] => {
+    const base: { value: string; label: string; icon: LucideIcon }[] = [
+      { value: "main", label: t("master.item.tabMain"), icon: LayoutGrid },
+      { value: "prices", label: t("master.item.tabPrices"), icon: BadgeDollarSign },
+      { value: "responsibles", label: t("master.item.tabResponsibles"), icon: Users },
+      { value: "images", label: t("master.item.tabImages"), icon: ImageIcon },
+      { value: "barcodes", label: t("master.item.tabBarcodes"), icon: Barcode },
+      { value: "labelData", label: t("master.item.tabLabelData"), icon: Languages },
+      { value: "markingPool", label: t("master.item.tabMarkingPool"), icon: QrCode },
+    ];
+    if (showTestersTab) {
+      base.push({ value: "testers", label: t("master.item.tabTesters"), icon: TestTube });
+    }
+    return base;
+  }, [showTestersTab, t]);
 
   const availableTabValues = useMemo(() => tabItems.map((tab) => tab.value), [tabItems]);
 
@@ -483,23 +497,27 @@ export function ItemPage() {
               aria-label={t("master.item.tabsAria")}
             >
               <ButtonGroup className="w-full flex-wrap rounded-none border-0 bg-transparent sm:w-auto" aria-label={t("master.item.tabsAria")}>
-                {tabItems.map((tab, index) => (
-                  <div key={tab.value} className="contents">
-                    {index > 0 ? <ButtonGroupSeparator /> : null}
-                    <Tabs.Trigger
-                      value={tab.value}
-                      data-testid={`item-tab-${tab.value}`}
-                      className={cn(
-                        "inline-flex h-7 flex-1 items-center justify-center rounded-none border-0 bg-background px-2.5 text-xs font-medium transition-colors sm:flex-initial",
-                        "text-foreground hover:bg-accent hover:text-accent-foreground",
-                        "data-[state=active]:bg-primary data-[state=active]:text-primary-foreground",
-                        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
-                      )}
-                    >
-                      {tab.label}
-                    </Tabs.Trigger>
-                  </div>
-                ))}
+                {tabItems.map((tab, index) => {
+                  const TabIcon = tab.icon;
+                  return (
+                    <div key={tab.value} className="contents">
+                      {index > 0 ? <ButtonGroupSeparator /> : null}
+                      <Tabs.Trigger
+                        value={tab.value}
+                        data-testid={`item-tab-${tab.value}`}
+                        className={cn(
+                          "inline-flex h-7 flex-1 items-center justify-center gap-1 whitespace-nowrap rounded-none border-0 bg-background px-2 text-xs font-medium transition-colors sm:flex-initial sm:gap-1.5 sm:px-2.5",
+                          "text-foreground hover:bg-accent hover:text-accent-foreground",
+                          "data-[state=active]:bg-primary data-[state=active]:text-primary-foreground",
+                          "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
+                        )}
+                      >
+                        <TabIcon className="h-3.5 w-3.5 shrink-0 opacity-90" aria-hidden />
+                        <span>{tab.label}</span>
+                      </Tabs.Trigger>
+                    </div>
+                  );
+                })}
               </ButtonGroup>
             </Tabs.List>
           </CardHeader>
