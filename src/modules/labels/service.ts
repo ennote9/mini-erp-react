@@ -1,3 +1,4 @@
+import type { ItemMarkingRecordKind, ItemMarkingRecordStatus } from "@/modules/items/model/itemMarkingRecord";
 import type { LabelTemplate, PrintJob, PrintJobMode, PrintJobStatus } from "./model";
 import { LABELS_BATCH_SOURCE } from "./lib/labelsBatchConstants";
 import { LABELS_STATION_SOURCE } from "./lib/labelsStationConstants";
@@ -138,6 +139,10 @@ export type CreateWorkspacePrintJobInput = {
   status?: PrintJobStatus;
   itemIds: string[];
   barcodeId?: string;
+  markingRecordId?: string;
+  markingPayloadSnapshot?: string;
+  markingKindSnapshot?: ItemMarkingRecordKind;
+  markingStatusSnapshot?: ItemMarkingRecordStatus;
   source?: string | null;
   isDemoContext: boolean;
   itemNameSnapshot?: string;
@@ -159,6 +164,10 @@ export function createPrintJobFromWorkspace(input: CreateWorkspacePrintJobInput)
     templateKindSnapshot: tpl.kind,
     itemIds: input.itemIds,
     barcodeId: input.barcodeId,
+    markingRecordId: input.markingRecordId,
+    markingPayloadSnapshot: input.markingPayloadSnapshot,
+    markingKindSnapshot: input.markingKindSnapshot,
+    markingStatusSnapshot: input.markingStatusSnapshot,
     copies: input.copies,
     mode: input.mode,
     status: input.status ?? "draft",

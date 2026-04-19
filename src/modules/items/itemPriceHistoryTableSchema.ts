@@ -23,8 +23,8 @@ export type ItemPriceHistoryColumnSchema = {
 };
 
 /**
- * Width model: compact type/price/dates/created, medium status, wider reason, most flexible comment.
- * Table always fits the card width (no horizontal scroll); overflow is vertical with sticky header.
+ * Width model: baseline column sizes for TanStack resizing; wider reason/comment absorb space.
+ * Scroll is vertical in the table area; horizontal scroll appears when total column width exceeds the container.
  */
 export function buildItemPriceHistoryTableSchema(t: TFunction): ItemPriceHistoryColumnSchema[] {
   return [

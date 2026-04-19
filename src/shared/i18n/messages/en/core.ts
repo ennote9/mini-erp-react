@@ -201,6 +201,8 @@ export const coreEn = {
           primary_barcode: "Primary barcode",
           barcode_by_packaging: "Barcode by packaging level",
           barcode_by_role: "Barcode by role",
+          selected_marking_payload: "Selected marking payload",
+          selected_marking_human_label: "Selected marking label",
         },
         fieldPath: "Path",
         packagingLevel: "Packaging level",
@@ -227,6 +229,10 @@ export const coreEn = {
       noTemplates: "No active templates available.",
       copiesLabel: "Copies",
       copiesHint: "Preview only — not sent to a printer yet.",
+      markingRecordLabel: "Marking code",
+      markingRecordNone: "None (use item fields)",
+      markingRecordPlaceholder: "Select a pool code",
+      markingRecordHint: "For KIZ / DataMatrix templates, pick a code or rely on scalar fields on the item.",
       reprintHint:
         "Restored from history — check template and copies, then print or export PDF.",
       actions: {
@@ -286,6 +292,7 @@ export const coreEn = {
         warningBarcodeNotFound: "Barcode not found — using primary barcode for preview.",
         warningBarcodeInactive: "Barcode is inactive — using primary barcode for preview.",
         warningNoActiveBarcodes: "No active barcodes — code bindings may be empty.",
+        warningMarkingRecordNotFound: "Marking code not found — pick another code or clear the selection.",
       },
     },
     operations: {
@@ -384,6 +391,8 @@ export const coreEn = {
       colCode: "Code",
       colName: "Name",
       colBarcode: "Barcode",
+      colMarking: "Marking",
+      markingNone: "—",
       colCopies: "Copies",
       colStatus: "Status",
       validation: {

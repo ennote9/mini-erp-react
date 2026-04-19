@@ -211,6 +211,8 @@ export const ruMessages: MessageTree = {
           primary_barcode: "Основной штрихкод",
           barcode_by_packaging: "Штрихкод по уровню упаковки",
           barcode_by_role: "Штрихкод по роли",
+          selected_marking_payload: "Выбранный payload маркировки",
+          selected_marking_human_label: "Подпись выбранной маркировки",
         },
         fieldPath: "Путь",
         packagingLevel: "Уровень упаковки",
@@ -237,6 +239,11 @@ export const ruMessages: MessageTree = {
       noTemplates: "Нет доступных активных шаблонов.",
       copiesLabel: "Копий",
       copiesHint: "Только предпросмотр — на принтер пока не отправляется.",
+      markingRecordLabel: "Код маркировки",
+      markingRecordNone: "Нет (поля номенклатуры)",
+      markingRecordPlaceholder: "Выберите код из пула",
+      markingRecordHint:
+        "Для шаблонов КИЗ / DataMatrix выберите код из пула или используйте скалярные поля номенклатуры.",
       reprintHint:
         "Восстановлено из истории — проверьте шаблон и копии, затем печать или PDF.",
       actions: {
@@ -297,6 +304,7 @@ export const ruMessages: MessageTree = {
         warningBarcodeNotFound: "Штрихкод не найден — для предпросмотра используется основной.",
         warningBarcodeInactive: "Штрихкод неактивен — для предпросмотра используется основной.",
         warningNoActiveBarcodes: "Нет активных штрихкодов — привязки кодов могут быть пустыми.",
+        warningMarkingRecordNotFound: "Код маркировки не найден — выберите другой или сбросьте выбор.",
       },
     },
     operations: {
@@ -395,6 +403,8 @@ export const ruMessages: MessageTree = {
       colCode: "Код",
       colName: "Наименование",
       colBarcode: "Штрихкод",
+      colMarking: "Маркировка",
+      markingNone: "—",
       colCopies: "Копий",
       colStatus: "Статус",
       validation: {

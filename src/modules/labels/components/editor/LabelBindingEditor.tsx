@@ -28,6 +28,10 @@ function defaultBindingForKind(kind: LabelBinding["kind"]): LabelBinding {
       return { kind: "barcode_by_packaging", packagingLevel: "UNIT" };
     case "barcode_by_role":
       return { kind: "barcode_by_role", role: "SELLABLE" };
+    case "selected_marking_payload":
+      return { kind: "selected_marking_payload" };
+    case "selected_marking_human_label":
+      return { kind: "selected_marking_human_label" };
     default: {
       const _n: never = kind;
       return _n;
@@ -45,6 +49,8 @@ export function LabelBindingEditor({ value, onChange, optional = false, disabled
     { value: "primary_barcode", label: t("labels.editor.binding.kind.primary_barcode") },
     { value: "barcode_by_packaging", label: t("labels.editor.binding.kind.barcode_by_packaging") },
     { value: "barcode_by_role", label: t("labels.editor.binding.kind.barcode_by_role") },
+    { value: "selected_marking_payload", label: t("labels.editor.binding.kind.selected_marking_payload") },
+    { value: "selected_marking_human_label", label: t("labels.editor.binding.kind.selected_marking_human_label") },
   ];
 
   const selectKindValue =

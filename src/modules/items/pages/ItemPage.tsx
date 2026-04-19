@@ -33,6 +33,7 @@ import { ItemImagesCard } from "../components/ItemImagesCard";
 import { ItemBarcodesCard } from "../components/ItemBarcodesCard";
 import { ItemPricesTab } from "../components/ItemPricesTab";
 import { ItemResponsiblesTab } from "../components/ItemResponsiblesTab";
+import { ItemMarkingPoolTab } from "../components/ItemMarkingPoolTab";
 import { Save, X } from "lucide-react";
 import { useTranslation } from "@/shared/i18n/context";
 import { appendReturnTo, buildReturnToValue, readReturnToParam } from "@/shared/navigation/returnTo";
@@ -364,6 +365,7 @@ export function ItemPage() {
       { value: "images", label: t("master.item.tabImages") },
       { value: "barcodes", label: t("master.item.tabBarcodes") },
       { value: "labelData", label: t("master.item.tabLabelData") },
+      { value: "markingPool", label: t("master.item.tabMarkingPool") },
       ...(showTestersTab ? [{ value: "testers" as const, label: t("master.item.tabTesters") }] : []),
     ],
     [showTestersTab, t],
@@ -464,8 +466,17 @@ export function ItemPage() {
           </div>
         </div>
       </div>
-      <Card className="mt-3 w-full max-w-6xl border-0 shadow-none">
-        <Tabs.Root value={activeTab} onValueChange={setActiveTab}>
+      <Card
+        className={cn(
+          "mt-3 w-full max-w-6xl border-0 shadow-none",
+          activeTab === "prices" && "flex min-h-0 flex-1 flex-col",
+        )}
+      >
+        <Tabs.Root
+          value={activeTab}
+          onValueChange={setActiveTab}
+          className={cn(activeTab === "prices" && "flex min-h-0 flex-1 flex-col")}
+        >
           <CardHeader className="space-y-1 p-1.5 pb-0">
             <Tabs.List
               className="inline-flex min-h-7 w-full max-w-full flex-wrap items-stretch overflow-hidden rounded-md border border-input bg-background sm:w-fit"
@@ -492,7 +503,9 @@ export function ItemPage() {
               </ButtonGroup>
             </Tabs.List>
           </CardHeader>
-          <CardContent className="px-1.5 pb-1.5 pt-[7mm]">
+          <CardContent
+            className={cn("px-1.5 pb-1.5 pt-[7mm]", activeTab === "prices" && "flex min-h-0 flex-1 flex-col")}
+          >
             <Tabs.Content value="main" className="outline-none focus-visible:outline-none">
               <div className="w-full max-w-[33.75rem]">
               <div className="space-y-1.5">
@@ -678,7 +691,10 @@ export function ItemPage() {
               </div>
               </div>
             </Tabs.Content>
-            <Tabs.Content value="prices" className="w-full min-w-0 outline-none focus-visible:outline-none">
+            <Tabs.Content
+              value="prices"
+              className="flex min-h-0 w-full min-w-0 flex-1 flex-col outline-none focus-visible:outline-none"
+            >
               <ItemPricesTab
                 isNew={isNew}
                 itemId={isNew ? undefined : id}
@@ -835,6 +851,15 @@ export function ItemPage() {
                     </div>
                   </div>
                 </div>
+              </div>
+            </Tabs.Content>
+            <Tabs.Content value="markingPool" className="outline-none focus-visible:outline-none">
+              <div className="space-y-1.5 p-1">
+                {itemRecordId ? (
+                  <ItemMarkingPoolTab itemId={itemRecordId} />
+                ) : (
+                  <p className="text-[11px] text-muted-foreground">{t("master.item.markingPool.unsavedHint")}</p>
+                )}
               </div>
             </Tabs.Content>
             {showTestersTab ? (

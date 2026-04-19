@@ -254,11 +254,12 @@ export function ItemPricesTab({ itemId, isNew, revision, onPricesChanged }: Prop
   }
 
   return (
-    <div className="space-y-5">
-      <div
-        data-testid="item-prices-summary-grid"
-        className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4"
-      >
+    <div className="flex h-full min-h-0 flex-col gap-5">
+      <div className="shrink-0 space-y-5">
+        <div
+          data-testid="item-prices-summary-grid"
+          className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4"
+        >
         <SummaryCard
           dataTestId="item-prices-card-purchase-current"
           title={t("master.item.prices.summaryPurchaseCurrent")}
@@ -299,67 +300,68 @@ export function ItemPricesTab({ itemId, isNew, revision, onPricesChanged }: Prop
           formatMoney={formatMoney}
           reasonLabel={reasonLabel}
         />
-      </div>
+        </div>
 
-      <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
-        <Button
-          type="button"
-          size="sm"
-          variant="outline"
-          className="h-7 text-xs"
-          disabled={busy}
-          data-testid="item-prices-add-purchase"
-          onClick={() => openAdd("purchase")}
-        >
-          {t("master.item.prices.addPurchase")}
-        </Button>
-        <Button
-          type="button"
-          size="sm"
-          variant="outline"
-          className="h-7 text-xs"
-          disabled={busy}
-          data-testid="item-prices-add-sale"
-          onClick={() => openAdd("sale")}
-        >
-          {t("master.item.prices.addSale")}
-        </Button>
-        {purchaseNext && (
+        <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
           <Button
             type="button"
             size="sm"
-            variant="secondary"
+            variant="outline"
             className="h-7 text-xs"
             disabled={busy}
-            data-testid="item-prices-cancel-scheduled-purchase"
-            onClick={() => setCancelTarget({ recordId: purchaseNext.id, priceType: "purchase" })}
+            data-testid="item-prices-add-purchase"
+            onClick={() => openAdd("purchase")}
           >
-            {t("master.item.prices.cancelScheduledPurchase")}
+            {t("master.item.prices.addPurchase")}
           </Button>
-        )}
-        {saleNext && (
           <Button
             type="button"
             size="sm"
-            variant="secondary"
+            variant="outline"
             className="h-7 text-xs"
             disabled={busy}
-            data-testid="item-prices-cancel-scheduled-sale"
-            onClick={() => setCancelTarget({ recordId: saleNext.id, priceType: "sale" })}
+            data-testid="item-prices-add-sale"
+            onClick={() => openAdd("sale")}
           >
-            {t("master.item.prices.cancelScheduledSale")}
+            {t("master.item.prices.addSale")}
           </Button>
-        )}
+          {purchaseNext && (
+            <Button
+              type="button"
+              size="sm"
+              variant="secondary"
+              className="h-7 text-xs"
+              disabled={busy}
+              data-testid="item-prices-cancel-scheduled-purchase"
+              onClick={() => setCancelTarget({ recordId: purchaseNext.id, priceType: "purchase" })}
+            >
+              {t("master.item.prices.cancelScheduledPurchase")}
+            </Button>
+          )}
+          {saleNext && (
+            <Button
+              type="button"
+              size="sm"
+              variant="secondary"
+              className="h-7 text-xs"
+              disabled={busy}
+              data-testid="item-prices-cancel-scheduled-sale"
+              onClick={() => setCancelTarget({ recordId: saleNext.id, priceType: "sale" })}
+            >
+              {t("master.item.prices.cancelScheduledSale")}
+            </Button>
+          )}
+        </div>
       </div>
 
-      <div className="border-t border-border/50 pt-5">
-        <div className="mb-3 flex items-baseline justify-between gap-2">
+      <div className="flex min-h-0 flex-1 flex-col border-t border-border/50 pt-5">
+        <div className="mb-3 flex shrink-0 items-baseline justify-between gap-2">
           <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
             {t("master.item.prices.sectionHistory")}
           </h3>
         </div>
 
-        <div className="relative w-full min-w-0">
+        <div className="relative flex min-h-0 min-w-0 flex-1 flex-col">
           <ItemPriceHistoryTanstackTable
             rows={displayHistoryRows}
             schema={priceHistorySchema}

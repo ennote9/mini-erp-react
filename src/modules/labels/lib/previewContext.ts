@@ -35,6 +35,17 @@ export type LabelPreviewBindingContext = {
     gs1DataMatrixPayload?: string;
     markingComment?: string;
   };
+  /**
+   * When a marking pool record is selected, its payload is also merged into `item.*` for the
+   * corresponding kind so legacy `item.kizCode` bindings keep working.
+   */
+  marking?: {
+    selectedId: string;
+    selectedKind: string;
+    selectedPayload: string;
+    selectedHumanLabel?: string;
+    selectedStatus: string;
+  };
   selectedBarcode: string;
   primaryBarcode: string;
   /** When present, enables `barcode_by_packaging` / `barcode_by_role`. */
@@ -61,6 +72,13 @@ export const LABEL_PREVIEW_DEMO_CONTEXT: LabelPreviewBindingContext = {
     dataMatrixPayload: "DM-DEMO-PAYLOAD-001",
     gs1DataMatrixPayload: "(01)05901234123457(21)ABC123",
     markingComment: "Demo marking note",
+  },
+  marking: {
+    selectedId: "demo-mr-1",
+    selectedKind: "KIZ",
+    selectedPayload: "KIZ-DEMO-0001",
+    selectedHumanLabel: "Demo KIZ",
+    selectedStatus: "AVAILABLE",
   },
   selectedBarcode: "5901234123457",
   primaryBarcode: "5901234123457",
@@ -110,6 +128,10 @@ export function resolveLabelBindingValue(
       const v = rows[0]?.codeValue;
       return v?.trim() || null;
     }
+    case "selected_marking_payload":
+      return ctx.marking?.selectedPayload?.trim() || null;
+    case "selected_marking_human_label":
+      return ctx.marking?.selectedHumanLabel?.trim() || null;
     default: {
       const _x: never = binding;
       return _x;
@@ -122,6 +144,7 @@ export function buildPreviewContext(overrides?: Partial<LabelPreviewBindingConte
     ...LABEL_PREVIEW_DEMO_CONTEXT,
     ...overrides,
     item: { ...LABEL_PREVIEW_DEMO_CONTEXT.item, ...overrides?.item },
+    marking: overrides?.marking ?? LABEL_PREVIEW_DEMO_CONTEXT.marking,
     barcodes: overrides?.barcodes ?? LABEL_PREVIEW_DEMO_CONTEXT.barcodes,
   };
 }

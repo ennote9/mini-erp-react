@@ -104,8 +104,9 @@ export function collectLabelDomainIssueCodesForItem(
   template: LabelTemplate,
   item: Item,
   barcodeId: string | undefined,
+  markingRecordId?: string | undefined,
 ): LabelDomainIssueCode[] {
-  const { context } = buildItemPreviewBindingContext(item, { barcodeId });
+  const { context } = buildItemPreviewBindingContext(item, { barcodeId, markingRecordId });
   return collectLabelDomainIssueCodes(template, context);
 }
 
@@ -114,8 +115,9 @@ export function collectLabelDomainIssuesForItem(
   item: Item,
   barcodeId: string | undefined,
   t: (key: string) => string,
+  markingRecordId?: string | undefined,
 ): string[] {
-  return collectLabelDomainIssueCodesForItem(template, item, barcodeId).map((c) =>
+  return collectLabelDomainIssueCodesForItem(template, item, barcodeId, markingRecordId).map((c) =>
     t(`labels.domainIssues.${c}`),
   );
 }

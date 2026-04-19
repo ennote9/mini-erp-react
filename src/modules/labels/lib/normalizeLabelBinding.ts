@@ -15,5 +15,7 @@ export function normalizeLabelBinding(raw: unknown): LabelBinding | null {
   if (kind === "barcode_by_role" && typeof o.role === "string") {
     return { kind: "barcode_by_role", role: o.role };
   }
+  if (kind === "selected_marking_payload") return { kind: "selected_marking_payload" };
+  if (kind === "selected_marking_human_label") return { kind: "selected_marking_human_label" };
   return null;
 }

@@ -211,6 +211,8 @@ export const kkMessages: MessageTree = {
           primary_barcode: "Негізгі ШК",
           barcode_by_packaging: "Қаптау деңгейі бойынша ШК",
           barcode_by_role: "Рөл бойынша ШК",
+          selected_marking_payload: "Таңдалған маркировка payload",
+          selected_marking_human_label: "Таңдалған маркировка атауы",
         },
         fieldPath: "Жол",
         packagingLevel: "Қаптау деңгейі",
@@ -237,6 +239,10 @@ export const kkMessages: MessageTree = {
       noTemplates: "Белсенді үлгілер жоқ.",
       copiesLabel: "Дана",
       copiesHint: "Тек алдын ала қарау — принтерге әлі жіберілмейді.",
+      markingRecordLabel: "Маркировка коды",
+      markingRecordNone: "Жоқ (тауар өрістері)",
+      markingRecordPlaceholder: "Пулдан таңдаңыз",
+      markingRecordHint: "КИЗ / DataMatrix үлгілері үшін пулдан код таңдаңыз немесе тауар өрістерін қолданыңыз.",
       reprintHint:
         "Тарихтан қалпына келтірілді — үлгі мен даналарды тексеріңіз, содан кейін басып шығару немесе PDF.",
       actions: {
@@ -297,6 +303,7 @@ export const kkMessages: MessageTree = {
         warningBarcodeNotFound: "Штрихкод табылмады — алдын ала қарауда негізгі қолданылады.",
         warningBarcodeInactive: "Штрихкод белсенді емес — алдын ала қарауда негізгі қолданылады.",
         warningNoActiveBarcodes: "Белсенді штрихкодтар жоқ — байламдар бос болуы мүмкін.",
+        warningMarkingRecordNotFound: "Маркировка коды табылмады — басқасын таңдаңыз немесе тазалаңыз.",
       },
     },
     operations: {
@@ -395,6 +402,8 @@ export const kkMessages: MessageTree = {
       colCode: "Коды",
       colName: "Атауы",
       colBarcode: "Штрихкод",
+      colMarking: "Маркировка",
+      markingNone: "—",
       colCopies: "Дана",
       colStatus: "Күй",
       validation: {

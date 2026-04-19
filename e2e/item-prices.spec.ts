@@ -691,4 +691,111 @@ test.describe("Item card — Prices tab (acceptance)", () => {
       /Not scheduled|Не запланирована|Жоспарланбаған/i,
     );
   });
+
+  test("13.4 price history layout: internal scroll, sticky header, sort/filter/resize, narrow horizontal scroll", async ({
+    page,
+  }, testInfo) => {
+    test.setTimeout(120_000);
+    await page.setViewportSize({ width: 1280, height: 560 });
+    await openApp(page);
+    const itemId = await firstItemId(page);
+    const today = new Date().toISOString().slice(0, 10);
+    await page.evaluate(
+      async ({ id, t }: { id: string; t: string }) => {
+        const w = (window as Window & { __MINI_ERP_E2E?: E2eApi }).__MINI_ERP_E2E__;
+        for (let i = 0; i < 18; i++) {
+          await w!.applyItemPriceAwaitPersist(id, "purchase", {
+            amount: 1 + i * 0.01,
+            validFromYmd: t,
+            reasonCode: "correction",
+          });
+        }
+        await w!.flushAll();
+      },
+      { id: itemId, t: today },
+    );
+
+    await gotoReady(page, `/items/${encodeURIComponent(itemId)}`);
+    await waitItemTabsVisible(page);
+    await page.getByTestId("item-tab-prices").click();
+    const scroll = page.locator("[data-item-prices-history-scroll]");
+    await scroll.waitFor({ state: "visible", timeout: 30_000 });
+    const table = page.getByTestId("item-prices-history-table");
+    await expect(table).toBeVisible();
+
+    const overflowY = await scroll.evaluate((el) => getComputedStyle(el).overflowY);
+    expect(["auto", "scroll"].includes(overflowY)).toBeTruthy();
+
+    const metrics = await scroll.evaluate((el) => ({
+      scrollHeight: el.scrollHeight,
+      clientHeight: el.clientHeight,
+    }));
+    expect(metrics.scrollHeight).toBeGreaterThan(metrics.clientHeight);
+
+    const beforeSticky = await scroll.evaluate((el) => {
+      const thead = el.querySelector("thead");
+      if (!thead) return null;
+      const er = el.getBoundingClientRect();
+      const tr = thead.getBoundingClientRect();
+      return tr.top - er.top;
+    });
+    expect(beforeSticky != null && beforeSticky >= 0 && beforeSticky < 4).toBeTruthy();
+
+    await scroll.evaluate((el) => {
+      el.scrollTop = 120;
+    });
+    const afterSticky = await scroll.evaluate((el) => {
+      const thead = el.querySelector("thead");
+      if (!thead) return null;
+      const er = el.getBoundingClientRect();
+      const tr = thead.getBoundingClientRect();
+      return tr.top - er.top;
+    });
+    expect(afterSticky != null && afterSticky >= 0 && afterSticky < 4).toBeTruthy();
+
+    await expect(page.getByTestId("item-prices-history-sort-amount")).toBeVisible();
+    await expect(page.getByTestId("item-prices-history-filter-priceType")).toBeVisible();
+
+    const resizeHandles = scroll.locator(".cursor-col-resize");
+    await expect(resizeHandles.first()).toBeVisible();
+
+    const desktopShot = testInfo.outputPath("prices-history-layout-desktop.png");
+    await page.screenshot({ path: desktopShot, fullPage: false });
+    await testInfo.attach("prices-history-desktop", { path: desktopShot, contentType: "image/png" });
+
+    await page.setViewportSize({ width: 480, height: 720 });
+    await page.getByTestId("item-tab-prices").click();
+    await expect(page.getByTestId("item-prices-history-table")).toBeVisible({ timeout: 30_000 });
+    const narrowScroll = page.locator("[data-item-prices-history-scroll]");
+    const narrowMetrics = await narrowScroll.evaluate((el) => ({
+      scrollWidth: el.scrollWidth,
+      clientWidth: el.clientWidth,
+    }));
+    expect(narrowMetrics.scrollWidth).toBeGreaterThan(narrowMetrics.clientWidth);
+
+    const narrowShot = testInfo.outputPath("prices-history-layout-narrow.png");
+    await page.screenshot({ path: narrowShot, fullPage: false });
+    await testInfo.attach("prices-history-narrow", { path: narrowShot, contentType: "image/png" });
+
+    await page.setViewportSize({ width: 1280, height: 720 });
+  });
+
+  test("13.5 price history: compare typography with Items list table (screenshot)", async ({ page }, testInfo) => {
+    await page.setViewportSize({ width: 1280, height: 720 });
+    await openApp(page);
+    await gotoReady(page, "/items");
+    await page.locator(".list-page__content").waitFor({ state: "visible", timeout: 60_000 });
+    const itemsShot = testInfo.outputPath("items-list-table-reference.png");
+    await page.screenshot({ path: itemsShot, fullPage: false });
+    await testInfo.attach("items-list-reference", { path: itemsShot, contentType: "image/png" });
+
+    const itemId = await firstItemId(page);
+    await gotoReady(page, `/items/${encodeURIComponent(itemId)}`);
+    await waitItemTabsVisible(page);
+    await page.getByTestId("item-tab-prices").click();
+    await page.getByTestId("item-prices-history-table").waitFor({ state: "visible", timeout: 30_000 });
+    const pricesShot = testInfo.outputPath("item-prices-history-table.png");
+    await page.screenshot({ path: pricesShot, fullPage: false });
+    await testInfo.attach("item-prices-history", { path: pricesShot, contentType: "image/png" });
+  });
 });
