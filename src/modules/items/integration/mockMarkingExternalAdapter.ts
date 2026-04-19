@@ -1,8 +1,10 @@
+import type { ItemMarkingRecordKind } from "../model/itemMarkingRecord";
 import type {
   MarkingExternalAdapter,
   MarkingExternalBatchAckResult,
   MarkingExternalFetchCodeStatusResult,
   MarkingExternalHealthResult,
+  MarkingExternalRecordRef,
 } from "./markingExternalAdapterTypes";
 
 /** Deterministic non-crypto hash for stable mock outputs. */
@@ -38,7 +40,11 @@ export function createMockMarkingExternalAdapter(): MarkingExternalAdapter {
       recordId: string;
       itemId: string;
       payload: string;
+      kind: ItemMarkingRecordKind;
+      externalCodeRef?: string;
     }): Promise<MarkingExternalFetchCodeStatusResult> {
+      void input.kind;
+      void input.externalCodeRef;
       const h = djb2Hash(`${input.recordId}|${input.payload}|${input.itemId}`);
       const idx = h % EXTERNAL_STATUSES.length;
       let externalStatus = EXTERNAL_STATUSES[idx];
@@ -59,19 +65,21 @@ export function createMockMarkingExternalAdapter(): MarkingExternalAdapter {
       };
     },
 
-    async confirmCodesUsed(recordIds: readonly string[]): Promise<MarkingExternalBatchAckResult> {
+    async confirmCodesUsed(records: readonly MarkingExternalRecordRef[]): Promise<MarkingExternalBatchAckResult> {
       return {
         ok: true,
-        externalReference: `mock-confirm-${recordIds.length}-${Date.now()}`,
+        externalReference: `mock-confirm-${records.length}-${Date.now()}`,
         message: "mock-confirm-used",
+        perRecord: records.map((r) => ({ recordId: r.recordId, ok: true, message: "mock-ok" })),
       };
     },
 
-    async voidCodes(recordIds: readonly string[]): Promise<MarkingExternalBatchAckResult> {
+    async voidCodes(records: readonly MarkingExternalRecordRef[]): Promise<MarkingExternalBatchAckResult> {
       return {
         ok: true,
-        externalReference: `mock-void-${recordIds.length}-${Date.now()}`,
+        externalReference: `mock-void-${records.length}-${Date.now()}`,
         message: "mock-void-ack",
+        perRecord: records.map((r) => ({ recordId: r.recordId, ok: true, message: "mock-ok" })),
       };
     },
   };

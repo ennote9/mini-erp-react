@@ -1,5 +1,6 @@
+import type { MarkingExternalBatchAckResult, MarkingExternalRecordRef, MarkingExternalSyncCallMeta } from "./integration/markingExternalAdapterTypes";
 import type { MarkingProviderMode } from "./model/markingProviderSettings";
-import type { MarkingSyncLogAction, MarkingSyncLogStatus, MarkingSyncPerRecordResult } from "./model/markingExternalSync";
+import type { MarkingSyncHttpCallHint, MarkingSyncLogAction, MarkingSyncLogStatus, MarkingSyncPerRecordResult } from "./model/markingExternalSync";
 import { getActiveMarkingExternalAdapter, invalidateMarkingExternalAdapterCache } from "./integration/markingExternalAdapterRegistry";
 import { stringifySyncLogDetails, parseSyncLogDetails } from "./lib/markingSyncLogPayload";
 import { markingProviderSettingsRepository } from "./markingProviderSettingsRepository";
@@ -30,6 +31,16 @@ export type MarkingExternalIntegrationInfo = {
 function isSyncBlockedBySettings(): boolean {
   const s = markingProviderSettingsRepository.get();
   return !s.isEnabled || s.mode === "disabled";
+}
+
+function metaToLog(m?: MarkingExternalSyncCallMeta): MarkingSyncHttpCallHint | undefined {
+  if (!m) return undefined;
+  return {
+    method: m.method,
+    path: m.path,
+    httpStatus: m.httpStatus,
+    errorCode: m.errorCode,
+  };
 }
 
 function finalizeStatus(perRecord: MarkingSyncPerRecordResult[]): MarkingSyncLogStatus {
@@ -155,6 +166,8 @@ export async function syncMarkingRecords(
       recordId: id,
       itemId: record.itemId,
       payload: record.payload,
+      kind: record.kind,
+      externalCodeRef: record.externalCodeRef,
     });
 
     const finishedOne = new Date().toISOString();
@@ -168,14 +181,19 @@ export async function syncMarkingRecords(
         lastSyncStatus: "SUCCESS",
         lastSyncMessage: res.message ?? "sync_ok",
       });
-      perRecord.push({ recordId: id, ok: true, message: res.message });
+      perRecord.push({ recordId: id, ok: true, message: res.message, http: metaToLog(res.syncMeta) });
     } else {
       markingRecordRepository.update(id, {
         lastSyncAt: finishedOne,
         lastSyncStatus: "FAILED",
         lastSyncMessage: res.message ?? "sync_fetch_failed",
       });
-      perRecord.push({ recordId: id, ok: false, message: res.message ?? "sync_fetch_failed" });
+      perRecord.push({
+        recordId: id,
+        ok: false,
+        message: res.message ?? "sync_fetch_failed",
+        http: metaToLog(res.syncMeta),
+      });
     }
   }
 
@@ -270,23 +288,63 @@ export async function confirmMarkingRecordsUsedExternally(recordIds: readonly st
   const adapter = getActiveMarkingExternalAdapter();
   const startedAt = new Date().toISOString();
   const uniq = [...new Set(recordIds.map((x) => x?.trim()).filter(Boolean))] as string[];
-  const ack = await adapter.confirmCodesUsed(uniq);
+
+  const refs: MarkingExternalRecordRef[] = uniq
+    .map((id) => {
+      const r = getMarkingRecordById(id);
+      if (!r) return null;
+      return {
+        recordId: id,
+        itemId: r.itemId,
+        payload: r.payload,
+        kind: r.kind,
+        externalCodeRef: r.externalCodeRef,
+      };
+    })
+    .filter(Boolean) as MarkingExternalRecordRef[];
+
+  const ack: MarkingExternalBatchAckResult = refs.length ? await adapter.confirmCodesUsed(refs) : { ok: false, message: "no_valid_records" };
+  const ackMap = new Map((ack.perRecord ?? []).map((p) => [p.recordId, p] as const));
   const finishedAt = new Date().toISOString();
-  const perRecord: MarkingSyncPerRecordResult[] = uniq.map((id) => ({
-    recordId: id,
-    ok: ack.ok,
-    message: ack.message,
-  }));
+
+  const perRecord: MarkingSyncPerRecordResult[] = uniq.map((id) => {
+    const rec = getMarkingRecordById(id);
+    if (!rec) {
+      return { recordId: id, ok: false, message: "record_not_found" };
+    }
+    const row = ackMap.get(id);
+    if (row) {
+      return {
+        recordId: id,
+        ok: row.ok,
+        message: row.message,
+        http: metaToLog(row.syncMeta),
+      };
+    }
+    return {
+      recordId: id,
+      ok: ack.ok,
+      message: ack.message,
+      http: metaToLog(ack.syncMeta),
+    };
+  });
+
+  const status = finalizeStatus(perRecord);
 
   const log = markingSyncLogRepository.append({
     provider: adapter.id,
     recordIds: uniq,
     action: "CONFIRM_USED",
-    status: ack.ok ? "SUCCESS" : "FAILED",
+    status,
     startedAt,
     finishedAt,
-    message: `${adapter.isMock ? "[mock] " : ""}${ack.message ?? ""}`,
-    details: stringifySyncLogDetails({ perRecord, isMock: adapter.isMock, input: { recordIds: uniq } }),
+    message: `${adapter.isMock ? "[mock] " : ""}${status} · ${perRecord.filter((p) => p.ok).length}/${perRecord.length} · ${ack.message ?? ""}`,
+    details: stringifySyncLogDetails({
+      perRecord,
+      isMock: adapter.isMock,
+      input: { recordIds: uniq },
+      batchCall: metaToLog(ack.syncMeta),
+    }),
     externalReference: ack.externalReference,
   });
 
@@ -305,23 +363,63 @@ export async function voidMarkingRecordsExternally(recordIds: readonly string[])
   const adapter = getActiveMarkingExternalAdapter();
   const startedAt = new Date().toISOString();
   const uniq = [...new Set(recordIds.map((x) => x?.trim()).filter(Boolean))] as string[];
-  const ack = await adapter.voidCodes(uniq);
+
+  const refs: MarkingExternalRecordRef[] = uniq
+    .map((id) => {
+      const r = getMarkingRecordById(id);
+      if (!r) return null;
+      return {
+        recordId: id,
+        itemId: r.itemId,
+        payload: r.payload,
+        kind: r.kind,
+        externalCodeRef: r.externalCodeRef,
+      };
+    })
+    .filter(Boolean) as MarkingExternalRecordRef[];
+
+  const ack: MarkingExternalBatchAckResult = refs.length ? await adapter.voidCodes(refs) : { ok: false, message: "no_valid_records" };
+  const ackMap = new Map((ack.perRecord ?? []).map((p) => [p.recordId, p] as const));
   const finishedAt = new Date().toISOString();
-  const perRecord: MarkingSyncPerRecordResult[] = uniq.map((id) => ({
-    recordId: id,
-    ok: ack.ok,
-    message: ack.message,
-  }));
+
+  const perRecord: MarkingSyncPerRecordResult[] = uniq.map((id) => {
+    const rec = getMarkingRecordById(id);
+    if (!rec) {
+      return { recordId: id, ok: false, message: "record_not_found" };
+    }
+    const row = ackMap.get(id);
+    if (row) {
+      return {
+        recordId: id,
+        ok: row.ok,
+        message: row.message,
+        http: metaToLog(row.syncMeta),
+      };
+    }
+    return {
+      recordId: id,
+      ok: ack.ok,
+      message: ack.message,
+      http: metaToLog(ack.syncMeta),
+    };
+  });
+
+  const status = finalizeStatus(perRecord);
 
   const log = markingSyncLogRepository.append({
     provider: adapter.id,
     recordIds: uniq,
     action: "VOID_EXTERNAL",
-    status: ack.ok ? "SUCCESS" : "FAILED",
+    status,
     startedAt,
     finishedAt,
-    message: `${adapter.isMock ? "[mock] " : ""}${ack.message ?? ""}`,
-    details: stringifySyncLogDetails({ perRecord, isMock: adapter.isMock, input: { recordIds: uniq } }),
+    message: `${adapter.isMock ? "[mock] " : ""}${status} · ${perRecord.filter((p) => p.ok).length}/${perRecord.length} · ${ack.message ?? ""}`,
+    details: stringifySyncLogDetails({
+      perRecord,
+      isMock: adapter.isMock,
+      input: { recordIds: uniq },
+      batchCall: metaToLog(ack.syncMeta),
+    }),
     externalReference: ack.externalReference,
   });
 

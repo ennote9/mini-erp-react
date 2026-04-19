@@ -194,8 +194,6 @@ export const ruMasterPages: MessageTree = {
       summaryPurchaseNext: "Следующая закупочная цена",
       summarySaleCurrent: "Текущая цена продажи",
       summarySaleNext: "Следующая цена продажи",
-      summaryRoleCurrent: "Текущая",
-      summaryRoleNext: "Следующая",
       summaryEffectiveFrom: "С",
       trendSparklineAriaPurchase: "Динамика закупочной цены (последние {{count}} уровней)",
       trendSparklineAriaSale: "Динамика продажной цены (последние {{count}} уровней)",
@@ -994,7 +992,7 @@ export const ruMasterPages: MessageTree = {
   markingIntegration: {
     disabledBanner: "Внешняя синхронизация маркировки отключена — исходящих вызовов не будет.",
     realReadyBanner:
-      "Режим реального провайдера (HTTP-скелет): проверка доступности base URL возможна; API статуса кода ещё не подключён на этом этапе.",
+      "Режим реального провайдера (Mini ERP HTTP Marking API v1): healthcheck, статус, подтверждение и void идут на ваш base URL с API-ключом. Бэкенд должен отдавать описанные маршруты.",
   },
   markingProvider: {
     title: "Провайдер маркировки",

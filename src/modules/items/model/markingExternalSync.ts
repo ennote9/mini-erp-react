@@ -24,8 +24,17 @@ export interface MarkingSyncLogEntry {
   externalReference?: string;
 }
 
+/** Optional HTTP hint for real provider runs (no secrets). */
+export type MarkingSyncHttpCallHint = {
+  method: string;
+  path: string;
+  httpStatus?: number;
+  errorCode?: string;
+};
+
 export type MarkingSyncPerRecordResult = {
   recordId: string;
   ok: boolean;
   message?: string;
+  http?: MarkingSyncHttpCallHint;
 };

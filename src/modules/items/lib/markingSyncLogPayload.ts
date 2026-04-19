@@ -1,4 +1,4 @@
-import type { MarkingSyncPerRecordResult } from "../model/markingExternalSync";
+import type { MarkingSyncHttpCallHint, MarkingSyncPerRecordResult } from "../model/markingExternalSync";
 
 export type MarkingSyncLogDetailsPayload = {
   perRecord: MarkingSyncPerRecordResult[];
@@ -8,6 +8,8 @@ export type MarkingSyncLogDetailsPayload = {
     batchRef?: string;
     printJobId?: string;
   };
+  /** Single HTTP round-trip for batch confirm/void when useful. */
+  batchCall?: MarkingSyncHttpCallHint;
 };
 
 export function stringifySyncLogDetails(payload: MarkingSyncLogDetailsPayload): string {

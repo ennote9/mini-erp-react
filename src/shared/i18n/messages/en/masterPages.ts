@@ -192,8 +192,6 @@ export const masterPagesEn = {
       summaryPurchaseNext: "Next purchase price",
       summarySaleCurrent: "Current sale price",
       summarySaleNext: "Next sale price",
-      summaryRoleCurrent: "Current",
-      summaryRoleNext: "Next",
       summaryEffectiveFrom: "From",
       trendSparklineAriaPurchase: "Recent purchase price trend (last {{count}} levels)",
       trendSparklineAriaSale: "Recent sale price trend (last {{count}} levels)",
@@ -982,7 +980,7 @@ export const masterPagesEn = {
   markingIntegration: {
     disabledBanner: "External marking sync is disabled — no outbound calls will be made.",
     realReadyBanner:
-      "Real provider mode (HTTP skeleton): healthcheck can reach your base URL; code-status API calls are not implemented until the next integration stage.",
+      "Real provider mode (Mini ERP HTTP Marking API v1): outbound health, status, confirm, and void calls use your base URL and API key. Ensure the backend exposes the documented routes.",
   },
   markingProvider: {
     title: "Marking provider",

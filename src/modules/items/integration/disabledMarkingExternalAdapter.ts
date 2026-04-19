@@ -3,6 +3,7 @@ import type {
   MarkingExternalBatchAckResult,
   MarkingExternalFetchCodeStatusResult,
   MarkingExternalHealthResult,
+  MarkingExternalRecordRef,
 } from "./markingExternalAdapterTypes";
 
 export function createDisabledMarkingExternalAdapter(): MarkingExternalAdapter {
@@ -19,11 +20,11 @@ export function createDisabledMarkingExternalAdapter(): MarkingExternalAdapter {
       return { ok: false, message: "provider_disabled" };
     },
 
-    async confirmCodesUsed(): Promise<MarkingExternalBatchAckResult> {
+    async confirmCodesUsed(_records: readonly MarkingExternalRecordRef[]): Promise<MarkingExternalBatchAckResult> {
       return { ok: false, message: "provider_disabled" };
     },
 
-    async voidCodes(): Promise<MarkingExternalBatchAckResult> {
+    async voidCodes(_records: readonly MarkingExternalRecordRef[]): Promise<MarkingExternalBatchAckResult> {
       return { ok: false, message: "provider_disabled" };
     },
   };

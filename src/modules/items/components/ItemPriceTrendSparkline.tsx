@@ -66,7 +66,7 @@ function safeSvgId(reactId: string, suffix: string): string {
 
 /**
  * Monochrome mini trend chart for current-price cards (last N amounts, oldest → newest).
- * Dark panel, light stroke, soft fill and glow — no Recharts.
+ * Sits on the card surface (no separate panel); light stroke, soft fill and glow — no Recharts.
  */
 export function ItemPriceTrendSparkline({ values, className, ...rest }: Props) {
   const reactId = useId();
@@ -88,16 +88,10 @@ export function ItemPriceTrendSparkline({ values, className, ...rest }: Props) {
   const valuesAttr = values.map((v) => String(v)).join(",");
 
   return (
-    <div
-      className={cn(
-        "relative overflow-hidden rounded-lg border border-white/10 bg-zinc-950/95 shadow-inner",
-        "ring-1 ring-black/20 dark:bg-zinc-950 dark:ring-white/5",
-        className,
-      )}
-    >
+    <div className={cn("relative h-full min-h-0 w-full", className)}>
       <svg
         viewBox={`0 0 ${VIEW_W} ${VIEW_H}`}
-        className="block h-full w-full min-h-[2.75rem] text-zinc-100"
+        className="block h-full w-full min-h-[2.75rem] text-foreground/90"
         preserveAspectRatio="none"
         role="img"
         data-testid="item-price-trend-sparkline"
@@ -106,9 +100,10 @@ export function ItemPriceTrendSparkline({ values, className, ...rest }: Props) {
       >
         <defs>
           <linearGradient id={ids.fillGrad} x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor="rgb(244 244 245)" stopOpacity="0.2" />
-            <stop offset="55%" stopColor="rgb(244 244 245)" stopOpacity="0.06" />
-            <stop offset="100%" stopColor="rgb(244 244 245)" stopOpacity="0" />
+            {/* Match --foreground (#fafafa) for fill; reads on same surface as card / --background */}
+            <stop offset="0%" stopColor="var(--foreground)" stopOpacity="0.14" />
+            <stop offset="55%" stopColor="var(--foreground)" stopOpacity="0.04" />
+            <stop offset="100%" stopColor="var(--foreground)" stopOpacity="0" />
           </linearGradient>
           <filter id={ids.glow} x="-35%" y="-35%" width="170%" height="170%">
             <feGaussianBlur in="SourceGraphic" stdDeviation="1.25" result="b" />
@@ -138,11 +133,11 @@ export function ItemPriceTrendSparkline({ values, className, ...rest }: Props) {
             <path
               d={linePath}
               fill="none"
-              stroke="rgb(228 228 231)"
+              stroke="currentColor"
               strokeWidth={2.25}
               strokeLinecap="round"
               strokeLinejoin="round"
-              className="opacity-95"
+              className="opacity-90"
               filter={`url(#${ids.lineGlow})`}
               vectorEffect="non-scaling-stroke"
             />
@@ -150,11 +145,10 @@ export function ItemPriceTrendSparkline({ values, className, ...rest }: Props) {
               cx={last[0]}
               cy={last[1]}
               r={3}
-              fill="rgb(250 250 250)"
-              stroke="rgb(228 228 231)"
+              fill="currentColor"
+              stroke="currentColor"
               strokeWidth={1.25}
-              className="pointer-events-none"
-              opacity={0.95}
+              className="pointer-events-none opacity-95"
             />
           </>
         ) : (
@@ -163,11 +157,11 @@ export function ItemPriceTrendSparkline({ values, className, ...rest }: Props) {
               cx={pts[0]![0]}
               cy={pts[0]![1]}
               r={4}
-              fill="rgb(250 250 250)"
-              stroke="rgb(200 200 204)"
+              fill="currentColor"
+              stroke="currentColor"
               strokeWidth={1}
+              className="opacity-90"
               filter={`url(#${ids.glow})`}
-              opacity={0.9}
             />
           </>
         )}

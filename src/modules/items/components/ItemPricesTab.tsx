@@ -337,7 +337,6 @@ export function ItemPricesTab({ itemId, isNew, revision, onPricesChanged }: Prop
         <SummaryCard
           dataTestId="item-prices-card-purchase-current"
           title={t("master.item.prices.summaryPurchaseCurrent")}
-          roleHint={t("master.item.prices.summaryRoleCurrent")}
           record={purchaseCurrent}
           empty={t("master.item.prices.notSet")}
           emptyDetail={t("master.item.prices.notSetDetail")}
@@ -352,7 +351,6 @@ export function ItemPricesTab({ itemId, isNew, revision, onPricesChanged }: Prop
         <SummaryCard
           dataTestId="item-prices-card-purchase-next"
           title={t("master.item.prices.summaryPurchaseNext")}
-          roleHint={t("master.item.prices.summaryRoleNext")}
           record={purchaseNext}
           empty={t("master.item.prices.notScheduled")}
           emptyDetail={t("master.item.prices.notScheduledDetail")}
@@ -362,7 +360,6 @@ export function ItemPricesTab({ itemId, isNew, revision, onPricesChanged }: Prop
         <SummaryCard
           dataTestId="item-prices-card-sale-current"
           title={t("master.item.prices.summarySaleCurrent")}
-          roleHint={t("master.item.prices.summaryRoleCurrent")}
           record={saleCurrent}
           empty={t("master.item.prices.notSet")}
           emptyDetail={t("master.item.prices.notSetDetail")}
@@ -377,7 +374,6 @@ export function ItemPricesTab({ itemId, isNew, revision, onPricesChanged }: Prop
         <SummaryCard
           dataTestId="item-prices-card-sale-next"
           title={t("master.item.prices.summarySaleNext")}
-          roleHint={t("master.item.prices.summaryRoleNext")}
           record={saleNext}
           empty={t("master.item.prices.notScheduled")}
           emptyDetail={t("master.item.prices.notScheduledDetail")}
@@ -571,7 +567,6 @@ export function ItemPricesTab({ itemId, isNew, revision, onPricesChanged }: Prop
 
 function SummaryCard({
   title,
-  roleHint,
   record,
   empty,
   emptyDetail,
@@ -583,7 +578,6 @@ function SummaryCard({
   sparklineAriaLabel,
 }: {
   title: string;
-  roleHint: string;
   record: ItemPriceRecord | undefined;
   empty: string;
   emptyDetail: string;
@@ -606,12 +600,7 @@ function SummaryCard({
         record ? "border-border/60" : "border-dashed border-border/60 bg-muted/10",
       )}
     >
-      <div className="flex items-start justify-between gap-2">
-        <div className="min-w-0">
-          <div className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">{title}</div>
-          <div className="mt-0.5 text-[10px] font-semibold text-primary/90">{roleHint}</div>
-        </div>
-      </div>
+      <div className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">{title}</div>
       {!record ? (
         <div className="mt-3 flex flex-1 flex-col justify-center">
           <div className="text-lg font-semibold tabular-nums text-muted-foreground">{empty}</div>

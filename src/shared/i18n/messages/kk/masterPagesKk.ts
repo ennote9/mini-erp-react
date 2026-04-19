@@ -195,8 +195,6 @@ export const kkMasterPages: MessageTree = {
       summaryPurchaseNext: "Келесі сатып алу бағасы",
       summarySaleCurrent: "Ағымдағы сату бағасы",
       summarySaleNext: "Келесі сату бағасы",
-      summaryRoleCurrent: "Ағымдағы",
-      summaryRoleNext: "Келесі",
       summaryEffectiveFrom: "Бастап",
       trendSparklineAriaPurchase: "Сатып алу бағасының динамикасы (соңғы {{count}} деңгей)",
       trendSparklineAriaSale: "Сату бағасының динамикасы (соңғы {{count}} деңгей)",
@@ -993,7 +991,7 @@ export const kkMasterPages: MessageTree = {
   markingIntegration: {
     disabledBanner: "Сыртқы маркировка синхрондауы өшірілген — шығыс шақырулар болмайды.",
     realReadyBanner:
-      "Нақты провайдер режимі (HTTP скелеті): base URL қолжетімділігін тексеру мүмкін; код күйі API келесі кезеңде қосылады.",
+      "Нақты провайдер (Mini ERP HTTP Marking API v1): health, күй, растау және void сіздің base URL және API кілті арқылы жүреді. Сервер көрсетілген маршруттарды қамтамасыз етеді.",
   },
   markingProvider: {
     title: "Маркировка провайдері",
