@@ -1,4 +1,5 @@
 import type { Item } from "@/modules/items/model";
+import { getMarkingRecordById, isMarkingRecordSelectableForPrinting } from "@/modules/items/markingRecordService";
 import type { LabelElement, LabelTemplate } from "../model";
 import type { LabelPreviewBindingContext } from "./previewContext";
 import { resolveLabelBindingValue } from "./previewContext";
@@ -9,7 +10,8 @@ export type LabelDomainIssueCode =
   | "translationContentMissing"
   | "kizMarkingMissing"
   | "datamatrixSourceMissing"
-  | "matrixBindingEmpty";
+  | "matrixBindingEmpty"
+  | "markingRecordUnavailable";
 
 function hasTranslationDisplayContent(item: LabelPreviewBindingContext["item"]): boolean {
   return [item.translationName, item.translationDescription, item.translationComposition, item.translationExtraText].some(
@@ -106,8 +108,15 @@ export function collectLabelDomainIssueCodesForItem(
   barcodeId: string | undefined,
   markingRecordId?: string | undefined,
 ): LabelDomainIssueCode[] {
+  const pre: LabelDomainIssueCode[] = [];
+  if (markingRecordId) {
+    const rec = getMarkingRecordById(markingRecordId);
+    if (!rec || rec.itemId !== item.id || !isMarkingRecordSelectableForPrinting(rec)) {
+      pre.push("markingRecordUnavailable");
+    }
+  }
   const { context } = buildItemPreviewBindingContext(item, { barcodeId, markingRecordId });
-  return collectLabelDomainIssueCodes(template, context);
+  return [...new Set([...pre, ...collectLabelDomainIssueCodes(template, context)])];
 }
 
 export function collectLabelDomainIssuesForItem(

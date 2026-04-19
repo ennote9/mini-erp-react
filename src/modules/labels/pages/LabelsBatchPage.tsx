@@ -8,7 +8,12 @@ import { SelectField } from "@/components/ui/select-field";
 import { useTranslation } from "@/shared/i18n";
 import { getAppReadModelRevision, subscribeAppReadModelRevision } from "@/shared/appReadModelRevision";
 import { itemRepository } from "@/modules/items/repository";
-import { listSelectableMarkingRecordsForItem, markManyMarkingRecordsPrinted } from "@/modules/items/markingRecordService";
+import {
+  abortBatchMarkingPrintSession,
+  beginBatchMarkingPrintSession,
+  listSelectableMarkingRecordsForItem,
+  markManyMarkingRecordsPrinted,
+} from "@/modules/items/markingRecordService";
 import { LABEL_PREVIEW_DEMO_CONTEXT } from "../lib/previewContext";
 import { buildItemPreviewBindingContext } from "../lib/itemPreviewContext";
 import { printBatchLabelSurfaces } from "../lib/printLabelSurface";
@@ -484,13 +489,15 @@ export function LabelsBatchPage() {
       return;
     }
     setActionBusy("pdf");
+    const markingIds = rows.filter((r) => r.isValid && r.markingRecordId).map((r) => r.markingRecordId);
+    const releaseMap = beginBatchMarkingPrintSession(markingIds, "print_batch");
     try {
       const segments = await runExportSegments();
       await saveBatchLabelPdf({
         segments,
         filenameBase: `labels-batch-${selectedTemplate.name}`,
       });
-      createPrintJobFromBatch({
+      const job = createPrintJobFromBatch({
         templateId: selectedTemplate.id,
         copies: segments.reduce((s, g) => s + g.copies, 0),
         mode: "pdf",
@@ -505,11 +512,10 @@ export function LabelsBatchPage() {
         batchSummarySnapshot: summaryText,
         batchRowsSnapshot: buildSnapshotPayload(),
       });
-      markManyMarkingRecordsPrinted(
-        rows.filter((r) => r.isValid && r.markingRecordId).map((r) => r.markingRecordId),
-      );
+      markManyMarkingRecordsPrinted(markingIds, { printJobId: job.id, source: "print_batch" });
       setFeedback({ kind: "success", message: t("labels.workspace.feedback.pdfSaved") });
     } catch (e) {
+      abortBatchMarkingPrintSession(releaseMap, "print_batch");
       const msg = e instanceof Error ? e.message : String(e);
       try {
         createPrintJobFromBatch({
@@ -559,6 +565,8 @@ export function LabelsBatchPage() {
       return;
     }
     setActionBusy("print");
+    const markingIdsPrint = rows.filter((r) => r.isValid && r.markingRecordId).map((r) => r.markingRecordId);
+    const releaseMapPrint = beginBatchMarkingPrintSession(markingIdsPrint, "print_batch");
     let jobId: string | undefined;
     try {
       const segments = await runExportSegments();
@@ -586,13 +594,12 @@ export function LabelsBatchPage() {
 
       await printBatchLabelSurfaces(printSegments);
       if (jobId) markPrintJobSubmitted(jobId);
-      markManyMarkingRecordsPrinted(
-        rows.filter((r) => r.isValid && r.markingRecordId).map((r) => r.markingRecordId),
-      );
+      markManyMarkingRecordsPrinted(markingIdsPrint, { printJobId: jobId, source: "print_batch" });
       setFeedback({ kind: "success", message: t("labels.workspace.feedback.printDialogDone") });
     } catch (e) {
       const msg = (e instanceof Error ? e.message : String(e)).slice(0, 500);
       if (jobId) markPrintJobFailed(jobId, msg);
+      abortBatchMarkingPrintSession(releaseMapPrint, "print_batch");
       setFeedback({
         kind: "error",
         message: `${t("labels.workspace.feedback.printFailed")} ${msg}`,

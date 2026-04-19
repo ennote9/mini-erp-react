@@ -780,8 +780,167 @@ test.describe("Item card — Prices tab (acceptance)", () => {
     await page.setViewportSize({ width: 1280, height: 720 });
   });
 
+  test("13.6 price history: sorting, filters, column sizing persist in localStorage after reload", async ({
+    page,
+  }) => {
+    await openApp(page);
+    const itemId = await firstItemId(page);
+    await gotoReady(page, `/items/${encodeURIComponent(itemId)}`);
+    await waitItemTabsVisible(page);
+    await page.getByTestId("item-tab-prices").click();
+    await page.getByTestId("item-prices-history-table").waitFor({ state: "visible", timeout: 30_000 });
+
+    await page.getByTestId("item-prices-history-sort-amount").click();
+
+    await page.getByTestId("item-prices-history-filter-priceType").click();
+    const panel = page.locator('[data-slot="popover-content"]').last();
+    await panel.locator("select").nth(1).selectOption("purchase");
+    await panel.getByRole("button", { name: /apply|применить|қолдану/i }).click();
+
+    const scroll = page.locator("[data-item-prices-history-scroll]");
+    const resizeHandle = scroll.locator(".cursor-col-resize").nth(1);
+    const box = await resizeHandle.boundingBox();
+    expect(box).toBeTruthy();
+    await page.mouse.move(box!.x + box!.width / 2, box!.y + box!.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(box!.x + box!.width / 2 + 24, box!.y + box!.height / 2);
+    await page.mouse.up();
+
+    const before = await page.evaluate(() => ({
+      sort: window.localStorage.getItem("mini-erp:item-prices-history:sorting:v1"),
+      filters: window.localStorage.getItem("mini-erp:item-prices-history:filters:v1"),
+      sizing: window.localStorage.getItem("mini-erp:item-prices-history:columnSizing:v1"),
+    }));
+    expect(before.sort).toBeTruthy();
+    expect(before.sort).toContain("amount");
+    expect(before.filters).toBeTruthy();
+    expect(before.filters).toContain("purchase");
+    expect(before.sizing).toBeTruthy();
+
+    await page.reload({ waitUntil: "domcontentloaded" });
+    await waitItemsRepositoryHydrated(page);
+    await waitItemTabsVisible(page);
+    await page.getByTestId("item-tab-prices").click();
+    await page.getByTestId("item-prices-history-table").waitFor({ state: "visible", timeout: 30_000 });
+
+    const after = await page.evaluate(() => ({
+      sort: window.localStorage.getItem("mini-erp:item-prices-history:sorting:v1"),
+      filters: window.localStorage.getItem("mini-erp:item-prices-history:filters:v1"),
+      sizing: window.localStorage.getItem("mini-erp:item-prices-history:columnSizing:v1"),
+    }));
+    expect(after.sort).toBe(before.sort);
+    expect(after.filters).toBe(before.filters);
+    expect(after.sizing).toBe(before.sizing);
+
+    await expect(page.getByTestId("item-prices-history-filter-priceType")).toHaveClass(/text-primary/);
+  });
+
+  test("14.1 current purchase/sale cards: sparkline + delta; next cards without trend UI; survives reload", async ({
+    page,
+  }) => {
+    await openApp(page);
+    const code = `E2E-TR-${Date.now()}`;
+    await gotoReady(page, "/items/new");
+    await waitNewItemFormVisible(page);
+    await page.locator("#item-name").fill(`Trend ${code}`);
+    await page.locator("#item-code").fill(code);
+    await page.locator("#item-uom").fill("EA");
+    await page.getByRole("button", { name: /^Save|Сохранить|Сақтау/i }).click();
+    await expect(page).toHaveURL(/\/items\/\d+/, { timeout: 20_000 });
+    await waitItemTabsVisible(page);
+    await page.getByTestId("item-tab-prices").click();
+
+    const todayYmd = new Date().toISOString().slice(0, 10);
+
+    await page.getByTestId("item-prices-add-purchase").click();
+    await expect(page.getByTestId("item-price-edit-dialog")).toBeVisible({ timeout: 10_000 });
+    await page.getByTestId("item-price-amount-input").fill("10.00");
+    await page.getByTestId("item-price-valid-from-input").fill(todayYmd);
+    await page.getByTestId("item-price-reason-select").selectOption("manual_update");
+    await page.getByTestId("item-price-dialog-submit").click();
+    await expect(page.getByTestId("item-price-edit-dialog")).toBeHidden({ timeout: 15_000 });
+
+    await page.getByTestId("item-prices-add-purchase").click();
+    await expect(page.getByTestId("item-price-edit-dialog")).toBeVisible({ timeout: 10_000 });
+    await page.getByTestId("item-price-amount-input").fill("12.50");
+    await page.getByTestId("item-price-valid-from-input").fill(todayYmd);
+    await page.getByTestId("item-price-reason-select").selectOption("correction");
+    await page.getByTestId("item-price-dialog-submit").click();
+    await expect(page.getByTestId("item-price-edit-dialog")).toBeHidden({ timeout: 15_000 });
+
+    const purchaseCurrent = page.getByTestId("item-prices-card-purchase-current");
+    await expect(purchaseCurrent.locator('[data-testid="item-price-trend-sparkline"]')).toBeVisible();
+    await expect(purchaseCurrent.locator('[data-testid="item-price-delta"]')).toBeVisible();
+    await expect(purchaseCurrent.locator('[data-testid="item-price-delta"]')).toHaveAttribute("data-delta-direction", "up");
+
+    await page.getByTestId("item-prices-add-sale").click();
+    await expect(page.getByTestId("item-price-edit-dialog")).toBeVisible({ timeout: 10_000 });
+    await page.getByTestId("item-price-amount-input").fill("20.00");
+    await page.getByTestId("item-price-valid-from-input").fill(todayYmd);
+    await page.getByTestId("item-price-reason-select").selectOption("manual_update");
+    await page.getByTestId("item-price-dialog-submit").click();
+    await expect(page.getByTestId("item-price-edit-dialog")).toBeHidden({ timeout: 15_000 });
+
+    await page.getByTestId("item-prices-add-sale").click();
+    await expect(page.getByTestId("item-price-edit-dialog")).toBeVisible({ timeout: 10_000 });
+    await page.getByTestId("item-price-amount-input").fill("15.00");
+    await page.getByTestId("item-price-valid-from-input").fill(todayYmd);
+    await page.getByTestId("item-price-reason-select").selectOption("correction");
+    await page.getByTestId("item-price-dialog-submit").click();
+    await expect(page.getByTestId("item-price-edit-dialog")).toBeHidden({ timeout: 15_000 });
+
+    const saleCurrent = page.getByTestId("item-prices-card-sale-current");
+    await expect(saleCurrent.locator('[data-testid="item-price-trend-sparkline"]')).toBeVisible();
+    await expect(saleCurrent.locator('[data-testid="item-price-delta"]')).toHaveAttribute("data-delta-direction", "down");
+
+    await expect(page.getByTestId("item-prices-card-purchase-next").locator('[data-testid="item-price-trend-sparkline"]')).toHaveCount(0);
+    await expect(page.getByTestId("item-prices-card-sale-next").locator('[data-testid="item-price-trend-sparkline"]')).toHaveCount(0);
+
+    await page.reload({ waitUntil: "domcontentloaded" });
+    await waitItemsRepositoryHydrated(page);
+    await waitItemTabsVisible(page);
+    await page.getByTestId("item-tab-prices").click();
+    await expect(purchaseCurrent.locator('[data-testid="item-price-trend-sparkline"]')).toBeVisible({ timeout: 15_000 });
+    await expect(saleCurrent.locator('[data-testid="item-price-trend-sparkline"]')).toBeVisible({ timeout: 15_000 });
+  });
+
+  test("14.2 current card delta neutral when price unchanged vs previous active", async ({ page }) => {
+    await openApp(page);
+    const code = `E2E-TRN-${Date.now()}`;
+    await gotoReady(page, "/items/new");
+    await waitNewItemFormVisible(page);
+    await page.locator("#item-name").fill(`Trend neutral ${code}`);
+    await page.locator("#item-code").fill(code);
+    await page.locator("#item-uom").fill("EA");
+    await page.getByRole("button", { name: /^Save|Сохранить|Сақтау/i }).click();
+    await expect(page).toHaveURL(/\/items\/\d+/, { timeout: 20_000 });
+    await waitItemTabsVisible(page);
+    await page.getByTestId("item-tab-prices").click();
+    const todayYmd = new Date().toISOString().slice(0, 10);
+
+    await page.getByTestId("item-prices-add-purchase").click();
+    await expect(page.getByTestId("item-price-edit-dialog")).toBeVisible({ timeout: 10_000 });
+    await page.getByTestId("item-price-amount-input").fill("7.00");
+    await page.getByTestId("item-price-valid-from-input").fill(todayYmd);
+    await page.getByTestId("item-price-reason-select").selectOption("manual_update");
+    await page.getByTestId("item-price-dialog-submit").click();
+    await expect(page.getByTestId("item-price-edit-dialog")).toBeHidden({ timeout: 15_000 });
+
+    await page.getByTestId("item-prices-add-purchase").click();
+    await expect(page.getByTestId("item-price-edit-dialog")).toBeVisible({ timeout: 10_000 });
+    await page.getByTestId("item-price-amount-input").fill("7.00");
+    await page.getByTestId("item-price-valid-from-input").fill(todayYmd);
+    await page.getByTestId("item-price-reason-select").selectOption("correction");
+    await page.getByTestId("item-price-dialog-submit").click();
+    await expect(page.getByTestId("item-price-edit-dialog")).toBeHidden({ timeout: 15_000 });
+
+    await expect(
+      page.getByTestId("item-prices-card-purchase-current").locator('[data-testid="item-price-delta"]'),
+    ).toHaveAttribute("data-delta-direction", "same");
+  });
+
   test("13.5 price history: compare typography with Items list table (screenshot)", async ({ page }, testInfo) => {
-    await page.setViewportSize({ width: 1280, height: 720 });
+    await page.setViewportSize({ width: 1920, height: 900 });
     await openApp(page);
     await gotoReady(page, "/items");
     await page.locator(".list-page__content").waitFor({ state: "visible", timeout: 60_000 });

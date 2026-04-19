@@ -122,6 +122,8 @@ export const coreEn = {
       datamatrixSourceMissing:
         "Fill DataMatrix payload, GS1 DataMatrix payload, or marking code before printing.",
       matrixBindingEmpty: "A DataMatrix element has no value from its binding.",
+      markingRecordUnavailable:
+        "The selected marking code is missing, void, or already used — pick another code or clear the selection.",
     },
     paper: {
       LABEL: "Label stock",
@@ -293,6 +295,8 @@ export const coreEn = {
         warningBarcodeInactive: "Barcode is inactive — using primary barcode for preview.",
         warningNoActiveBarcodes: "No active barcodes — code bindings may be empty.",
         warningMarkingRecordNotFound: "Marking code not found — pick another code or clear the selection.",
+        warningMarkingRecordUnavailable:
+          "Marking code cannot be used for printing (void or used) — pick another code or clear the selection.",
       },
     },
     operations: {
@@ -313,6 +317,7 @@ export const coreEn = {
       columnCopies: "Copies",
       columnItem: "Item",
       columnSource: "Source",
+      markingHint: "Marking",
       openWorkspace: "Open in workspace",
       reprint: "Reopen for reprint",
       openBatch: "Open in batch print",
@@ -416,6 +421,7 @@ export const coreEn = {
     dashboard: "Dashboard",
     items: "Items",
     itemsLabelData: "Label data",
+    itemsMarkingImport: "Marking code import",
     barcodes: "Barcode Registry",
     item: "Catalog item",
     brands: "Brands",

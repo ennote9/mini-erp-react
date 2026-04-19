@@ -1,7 +1,7 @@
 import { Routes, Route } from "react-router-dom";
 import { AppShell } from "./shell/AppShell";
 import { DashboardPage } from "../modules/dashboard";
-import { ItemsListPage, ItemPage, ItemsLabelDataPage } from "../modules/items";
+import { ItemsListPage, ItemPage, ItemsLabelDataPage, ItemsMarkingImportPage } from "../modules/items";
 import { BrandsListPage, BrandPage } from "../modules/brands";
 import { CategoriesListPage, CategoryPage } from "../modules/categories";
 import { SuppliersListPage, SupplierPage } from "../modules/suppliers";
@@ -52,6 +52,7 @@ export function AppRoutes() {
         <Route index element={<DashboardPage />} />
         <Route path="items" element={<ItemsListPage />} />
         <Route path="items/label-data" element={<ItemsLabelDataPage />} />
+        <Route path="items/marking-import" element={<ItemsMarkingImportPage />} />
         <Route path="barcodes" element={<BarcodeRegistryPage />} />
         <Route path="labels/templates/:id" element={<LabelTemplateEditorPage />} />
         <Route path="labels/workspace" element={<LabelsWorkspacePage />} />

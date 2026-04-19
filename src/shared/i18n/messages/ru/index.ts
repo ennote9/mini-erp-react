@@ -132,6 +132,8 @@ export const ruMessages: MessageTree = {
       datamatrixSourceMissing:
         "Укажите payload DataMatrix, GS1 DataMatrix или код маркировки перед печатью.",
       matrixBindingEmpty: "Для элемента DataMatrix привязка не даёт значения.",
+      markingRecordUnavailable:
+        "Выбранный код маркировки недоступен (не найден, аннулирован или уже использован) — выберите другой или сбросьте выбор.",
     },
     paper: {
       LABEL: "Этикетка",
@@ -305,6 +307,8 @@ export const ruMessages: MessageTree = {
         warningBarcodeInactive: "Штрихкод неактивен — для предпросмотра используется основной.",
         warningNoActiveBarcodes: "Нет активных штрихкодов — привязки кодов могут быть пустыми.",
         warningMarkingRecordNotFound: "Код маркировки не найден — выберите другой или сбросьте выбор.",
+        warningMarkingRecordUnavailable:
+          "Код маркировки нельзя использовать для печати (аннулирован или списан) — выберите другой или сбросьте выбор.",
       },
     },
     operations: {
@@ -325,6 +329,7 @@ export const ruMessages: MessageTree = {
       columnCopies: "Копий",
       columnItem: "Товар",
       columnSource: "Источник",
+      markingHint: "Маркировка",
       openWorkspace: "Открыть в рабочем месте",
       reprint: "Повторить в рабочем месте",
       openBatch: "Открыть в пакетной печати",
@@ -428,6 +433,7 @@ export const ruMessages: MessageTree = {
     dashboard: "Панель",
     items: "Номенклатура",
     itemsLabelData: "Этикеточные данные",
+    itemsMarkingImport: "Импорт кодов маркировки",
     barcodes: "Реестр штрихкодов",
     item: "Номенклатура",
     brands: "Бренды",

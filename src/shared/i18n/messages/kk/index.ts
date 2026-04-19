@@ -132,6 +132,8 @@ export const kkMessages: MessageTree = {
       datamatrixSourceMissing:
         "DataMatrix payload, GS1 DataMatrix немесе маркировка кодын енгізіңіз.",
       matrixBindingEmpty: "DataMatrix элементіне байланыстан мән келмейді.",
+      markingRecordUnavailable:
+        "Таңдалған маркировка коды қолжетімсіз (жоқ, жойылған немесе пайдаланылған) — басқасын таңдаңыз немесе тазалаңыз.",
     },
     paper: {
       LABEL: "Стикер",
@@ -304,6 +306,8 @@ export const kkMessages: MessageTree = {
         warningBarcodeInactive: "Штрихкод белсенді емес — алдын ала қарауда негізгі қолданылады.",
         warningNoActiveBarcodes: "Белсенді штрихкодтар жоқ — байламдар бос болуы мүмкін.",
         warningMarkingRecordNotFound: "Маркировка коды табылмады — басқасын таңдаңыз немесе тазалаңыз.",
+        warningMarkingRecordUnavailable:
+          "Маркировка кодын басып шығаруға болмайды (жойылған немесе пайдаланылған) — басқасын таңдаңыз немесе тазалаңыз.",
       },
     },
     operations: {
@@ -324,6 +328,7 @@ export const kkMessages: MessageTree = {
       columnCopies: "Дана",
       columnItem: "Тауар",
       columnSource: "Көз",
+      markingHint: "Маркировка",
       openWorkspace: "Жұмыс орнында ашу",
       reprint: "Қайта ашу (басып шығару)",
       openBatch: "Топтамды басып шығаруда ашу",
@@ -427,6 +432,7 @@ export const kkMessages: MessageTree = {
     dashboard: "Басқару тақтасы",
     items: "Тауарлар",
     itemsLabelData: "Стикер деректері",
+    itemsMarkingImport: "Маркировка кодтарын импорттау",
     barcodes: "Штрихкодтар тізілімі",
     item: "Тауар карточкасы",
     brands: "Брендтер",

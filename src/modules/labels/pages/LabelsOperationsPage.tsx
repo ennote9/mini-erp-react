@@ -170,6 +170,16 @@ export function LabelsOperationsPage() {
                             {job.itemCodeSnapshot}
                           </span>
                         ) : null}
+                        {job.markingRecordId || job.markingPayloadSnapshot ? (
+                          <span
+                            className="mt-0.5 block max-w-full truncate font-mono text-[10px] text-violet-700/90 dark:text-violet-300/90"
+                            title={job.markingPayloadSnapshot ?? job.markingRecordId}
+                          >
+                            {t("labels.operations.markingHint")}:{" "}
+                            {(job.markingPayloadSnapshot ?? job.markingRecordId ?? "").slice(0, 42)}
+                            {(job.markingPayloadSnapshot ?? job.markingRecordId ?? "").length > 42 ? "…" : ""}
+                          </span>
+                        ) : null}
                       </>
                     ) : (
                       <span className="text-muted-foreground/80">—</span>

@@ -1,9 +1,15 @@
 import type { Item, ItemBarcode } from "@/modules/items/model";
 import type { ItemMarkingRecord } from "@/modules/items/model/itemMarkingRecord";
 import { markingRecordRepository } from "@/modules/items/markingRecordRepository";
+import { isMarkingRecordSelectableForPrinting } from "@/modules/items/markingRecordService";
 import type { LabelPreviewBindingContext } from "./previewContext";
 
-export type ItemPreviewWarningCode = "barcodeNotFound" | "barcodeInactive" | "noActiveBarcodes" | "markingRecordNotFound";
+export type ItemPreviewWarningCode =
+  | "barcodeNotFound"
+  | "barcodeInactive"
+  | "noActiveBarcodes"
+  | "markingRecordNotFound"
+  | "markingRecordUnavailable";
 
 function formatPriceAmount(n: number | undefined): string {
   if (n === undefined || !Number.isFinite(n)) return "—";
@@ -12,10 +18,6 @@ function formatPriceAmount(n: number | undefined): string {
 
 function pickPrimaryBarcode(active: ItemBarcode[]): ItemBarcode | undefined {
   return active.find((b) => b.isPrimary) ?? active[0];
-}
-
-function isMarkingRecordSelectableForPreview(r: ItemMarkingRecord): boolean {
-  return r.status === "AVAILABLE" || r.status === "RESERVED" || r.status === "PRINTED";
 }
 
 function applyMarkingRecordToItemSlice(
@@ -121,7 +123,7 @@ export function buildItemPreviewBindingContext(
     const rec = pool.find((r) => r.id === options.markingRecordId && r.itemId === item.id);
     if (!rec) {
       warnings.push("markingRecordNotFound");
-    } else if (isMarkingRecordSelectableForPreview(rec)) {
+    } else if (isMarkingRecordSelectableForPrinting(rec)) {
       resolvedMarkingRecordId = rec.id;
       selectedMarkingRecord = rec;
       markingSlice = {
@@ -131,6 +133,8 @@ export function buildItemPreviewBindingContext(
         selectedHumanLabel: rec.humanLabel,
         selectedStatus: rec.status,
       };
+    } else {
+      warnings.push("markingRecordUnavailable");
     }
   }
 

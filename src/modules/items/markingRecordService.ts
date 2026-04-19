@@ -1,31 +1,133 @@
-import type { ItemMarkingRecord, ItemMarkingRecordKind, ItemMarkingRecordStatus } from "./model/itemMarkingRecord";
+import type {
+  ItemMarkingRecord,
+  ItemMarkingRecordKind,
+  ItemMarkingRecordSource,
+  ItemMarkingRecordStatus,
+} from "./model/itemMarkingRecord";
+import type { ItemMarkingRecordAuditEntry, ItemMarkingRecordAuditSource } from "./model/itemMarkingRecordAudit";
+import { markingRecordAuditRepository } from "./markingRecordAuditRepository";
 import { markingRecordRepository, type CreateItemMarkingRecordInput } from "./markingRecordRepository";
 
 export function listMarkingRecordsByItem(itemId: string): ItemMarkingRecord[] {
   return markingRecordRepository.listByItemId(itemId);
 }
 
-/** Codes that can be selected for printing / preview (excludes void and consumed). */
+/** True when the record may be chosen for label preview / print (excludes consumed and void). */
+export function isMarkingRecordSelectableForPrinting(r: ItemMarkingRecord): boolean {
+  return r.status === "AVAILABLE" || r.status === "RESERVED" || r.status === "PRINTED";
+}
+
+/** Codes that can be selected for printing / preview. */
 export function listSelectableMarkingRecordsForItem(itemId: string): ItemMarkingRecord[] {
-  return listMarkingRecordsByItem(itemId).filter((r) =>
-    ["AVAILABLE", "RESERVED", "PRINTED"].includes(r.status),
-  );
+  return listMarkingRecordsByItem(itemId).filter(isMarkingRecordSelectableForPrinting);
 }
 
 export function getMarkingRecordById(id: string): ItemMarkingRecord | undefined {
   return markingRecordRepository.getById(id);
 }
 
+export function listMarkingRecordAuditByRecordId(markingRecordId: string, limit = 40): ItemMarkingRecordAuditEntry[] {
+  return markingRecordAuditRepository.listByMarkingRecordId(markingRecordId).slice(-limit);
+}
+
+function appendAudit(input: Omit<ItemMarkingRecordAuditEntry, "id" | "createdAt">): void {
+  markingRecordAuditRepository.append(input);
+}
+
+export function canTransitionMarkingStatus(from: ItemMarkingRecordStatus, to: ItemMarkingRecordStatus): boolean {
+  if (from === to) return true;
+  if (from === "USED" || from === "VOID") return false;
+  switch (from) {
+    case "AVAILABLE":
+      return to === "RESERVED" || to === "PRINTED" || to === "VOID";
+    case "RESERVED":
+      return to === "AVAILABLE" || to === "PRINTED" || to === "VOID";
+    case "PRINTED":
+      return to === "USED" || to === "VOID";
+    default:
+      return false;
+  }
+}
+
+export type MarkingTransitionMeta = {
+  source: ItemMarkingRecordAuditSource;
+  reason: string;
+  printJobId?: string;
+  note?: string;
+};
+
+/**
+ * Single entry point for status changes that require audit (except idempotent PRINTED→PRINTED).
+ */
+export function transitionMarkingRecordStatus(
+  id: string,
+  to: ItemMarkingRecordStatus,
+  meta: MarkingTransitionMeta,
+): ItemMarkingRecord | undefined {
+  const r = markingRecordRepository.getById(id);
+  if (!r) return undefined;
+  if (r.status === to) {
+    return r;
+  }
+  if (!canTransitionMarkingStatus(r.status, to)) return undefined;
+  const fromStatus = r.status;
+  const updated = markingRecordRepository.update(id, { status: to });
+  if (updated) {
+    appendAudit({
+      markingRecordId: id,
+      itemId: r.itemId,
+      fromStatus,
+      toStatus: to,
+      reason: meta.reason,
+      source: meta.source,
+      printJobId: meta.printJobId,
+      note: meta.note,
+    });
+  }
+  return updated;
+}
+
 export function createMarkingRecord(input: CreateItemMarkingRecordInput): ItemMarkingRecord {
-  return markingRecordRepository.create(input);
+  const created = markingRecordRepository.create(input);
+  appendAudit({
+    markingRecordId: created.id,
+    itemId: created.itemId,
+    fromStatus: null,
+    toStatus: created.status,
+    reason: "create",
+    source: input.source === "IMPORT" ? "import" : "manual",
+  });
+  return created;
 }
 
-export function updateMarkingRecordStatus(id: string, status: ItemMarkingRecordStatus): ItemMarkingRecord | undefined {
-  return markingRecordRepository.update(id, { status });
-}
-
-export function voidMarkingRecord(id: string): ItemMarkingRecord | undefined {
-  return markingRecordRepository.update(id, { status: "VOID" });
+export function importMarkingPoolBatch(
+  entries: Array<{
+    itemId: string;
+    kind: ItemMarkingRecordKind;
+    payload: string;
+    humanLabel?: string;
+    serial?: string;
+    batchRef?: string;
+    source?: ItemMarkingRecordSource;
+    note?: string;
+  }>,
+): { created: number } {
+  let created = 0;
+  for (const e of entries) {
+    createMarkingRecord({
+      itemId: e.itemId,
+      kind: e.kind,
+      payload: e.payload,
+      humanLabel: e.humanLabel,
+      serial: e.serial,
+      batchRef: e.batchRef,
+      source: e.source ?? "IMPORT",
+      status: "AVAILABLE",
+      note: e.note,
+    });
+    created++;
+  }
+  return { created };
 }
 
 export function removeMarkingRecord(id: string): boolean {
@@ -39,38 +141,155 @@ export function patchMarkingRecord(
   return markingRecordRepository.update(id, patch);
 }
 
-/**
- * Reserve the first matching AVAILABLE record (by kind), or undefined if none.
- */
-export function reserveNextAvailableMarking(itemId: string, kind: ItemMarkingRecordKind): ItemMarkingRecord | undefined {
+export function reserveMarkingRecord(
+  id: string,
+  meta: { source: ItemMarkingRecordAuditSource; reason?: string; printJobId?: string; note?: string },
+): ItemMarkingRecord | undefined {
+  return transitionMarkingRecordStatus(id, "RESERVED", {
+    source: meta.source,
+    reason: meta.reason ?? "reserve",
+    printJobId: meta.printJobId,
+    note: meta.note,
+  });
+}
+
+export function releaseReservedMarking(
+  id: string,
+  meta?: { source?: ItemMarkingRecordAuditSource; reason?: string; note?: string },
+): ItemMarkingRecord | undefined {
+  return transitionMarkingRecordStatus(id, "AVAILABLE", {
+    source: meta?.source ?? "release",
+    reason: meta?.reason ?? "release",
+    note: meta?.note,
+  });
+}
+
+export function reserveNextAvailableMarking(
+  itemId: string,
+  kind: ItemMarkingRecordKind,
+  meta?: { source?: ItemMarkingRecordAuditSource },
+): ItemMarkingRecord | undefined {
   const candidates = markingRecordRepository
     .listByItemId(itemId)
     .filter((r) => r.kind === kind && r.status === "AVAILABLE")
     .sort((a, b) => a.createdAt.localeCompare(b.createdAt));
   const pick = candidates[0];
   if (!pick) return undefined;
-  return markingRecordRepository.update(pick.id, { status: "RESERVED" });
+  return reserveMarkingRecord(pick.id, {
+    source: meta?.source ?? "system",
+    reason: "reserve_next_available",
+  });
 }
 
-export function releaseReservedMarking(id: string): ItemMarkingRecord | undefined {
-  const r = markingRecordRepository.getById(id);
-  if (!r || r.status !== "RESERVED") return undefined;
-  return markingRecordRepository.update(id, { status: "AVAILABLE" });
-}
-
-export function markMarkingRecordPrinted(id: string): ItemMarkingRecord | undefined {
+export function markMarkingRecordPrinted(
+  id: string,
+  meta?: { source?: ItemMarkingRecordAuditSource; reason?: string; printJobId?: string; note?: string },
+): ItemMarkingRecord | undefined {
   const r = markingRecordRepository.getById(id);
   if (!r) return undefined;
-  if (r.status === "VOID" || r.status === "USED") return undefined;
-  return markingRecordRepository.update(id, { status: "PRINTED" });
+  if (r.status === "PRINTED") {
+    return r;
+  }
+  return transitionMarkingRecordStatus(id, "PRINTED", {
+    source: meta?.source ?? "system",
+    reason: meta?.reason ?? "printed",
+    printJobId: meta?.printJobId,
+    note: meta?.note,
+  });
 }
 
-export function markManyMarkingRecordsPrinted(ids: readonly string[]): void {
+export function markManyMarkingRecordsPrinted(
+  ids: readonly string[],
+  opts: { printJobId?: string; source: ItemMarkingRecordAuditSource },
+): void {
   const seen = new Set<string>();
   for (const id of ids) {
     if (!id || seen.has(id)) continue;
     seen.add(id);
-    markMarkingRecordPrinted(id);
+    markMarkingRecordPrinted(id, {
+      printJobId: opts.printJobId,
+      source: opts.source,
+      reason: "print_success",
+    });
+  }
+}
+
+export function markMarkingRecordUsed(
+  id: string,
+  meta?: { source?: ItemMarkingRecordAuditSource; note?: string },
+): ItemMarkingRecord | undefined {
+  return transitionMarkingRecordStatus(id, "USED", {
+    source: meta?.source ?? "manual",
+    reason: "mark_used",
+    note: meta?.note,
+  });
+}
+
+export function voidMarkingRecord(
+  id: string,
+  meta?: { source?: ItemMarkingRecordAuditSource; note?: string },
+): ItemMarkingRecord | undefined {
+  return transitionMarkingRecordStatus(id, "VOID", {
+    source: meta?.source ?? "void",
+    reason: "void",
+    note: meta?.note,
+  });
+}
+
+/** Reserve AVAILABLE → RESERVED before print/PDF; release on abort only if this call performed the reserve. */
+export function beginMarkingPrintSession(
+  markingRecordId: string | undefined,
+  source: ItemMarkingRecordAuditSource,
+): { releaseOnAbort: boolean } {
+  if (!markingRecordId) return { releaseOnAbort: false };
+  const r = getMarkingRecordById(markingRecordId);
+  if (!r) return { releaseOnAbort: false };
+  if (r.status === "AVAILABLE") {
+    const next = reserveMarkingRecord(markingRecordId, { source, reason: "reserve_before_print" });
+    return { releaseOnAbort: next != null };
+  }
+  return { releaseOnAbort: false };
+}
+
+export function abortMarkingPrintSession(
+  markingRecordId: string | undefined,
+  releaseOnAbort: boolean,
+  source: ItemMarkingRecordAuditSource,
+): void {
+  if (!markingRecordId || !releaseOnAbort) return;
+  const r = getMarkingRecordById(markingRecordId);
+  if (r?.status === "RESERVED") {
+    releaseReservedMarking(markingRecordId, { source, reason: "print_aborted" });
+  }
+}
+
+export function completeMarkingPrintSuccess(
+  markingRecordId: string | undefined,
+  printJobId: string | undefined,
+  source: ItemMarkingRecordAuditSource,
+): void {
+  markManyMarkingRecordsPrinted(markingRecordId ? [markingRecordId] : [], { printJobId, source });
+}
+
+export function beginBatchMarkingPrintSession(
+  markingRecordIds: readonly (string | undefined)[],
+  source: ItemMarkingRecordAuditSource,
+): Map<string, boolean> {
+  const releaseMap = new Map<string, boolean>();
+  const seen = new Set<string>();
+  for (const raw of markingRecordIds) {
+    const id = raw?.trim();
+    if (!id || seen.has(id)) continue;
+    seen.add(id);
+    const { releaseOnAbort } = beginMarkingPrintSession(id, source);
+    releaseMap.set(id, releaseOnAbort);
+  }
+  return releaseMap;
+}
+
+export function abortBatchMarkingPrintSession(releaseMap: Map<string, boolean>, source: ItemMarkingRecordAuditSource): void {
+  for (const [id, flag] of releaseMap) {
+    abortMarkingPrintSession(id, flag, source);
   }
 }
 

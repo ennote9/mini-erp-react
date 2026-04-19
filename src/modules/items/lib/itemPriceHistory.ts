@@ -228,3 +228,57 @@ export function replaceScheduledPrice(
   let next = cancelScheduledRecord(item, scheduled.id, cancelledAtIso);
   return applyNewPriceToItem(next, input);
 }
+
+/**
+ * The active price row that was superseded when {@link current} became effective:
+ * matches `validTo === yesterday(current.validFrom)` when the domain closed the prior row,
+ * otherwise the most recent non-cancelled row with `validFrom` strictly before the current row.
+ */
+export function getPreviousActiveRecord(
+  item: Item,
+  priceType: ItemPriceType,
+  current: ItemPriceRecord,
+): ItemPriceRecord | undefined {
+  const records = recordsForType(item, priceType).filter((r) => !r.cancelledAt && r.id !== current.id);
+  const boundary = yesterdayYmd(current.validFrom);
+  const exact = records.filter((r) => r.validTo && compareYmd(r.validTo, boundary) === 0);
+  if (exact.length > 0) {
+    exact.sort((a, b) => compareYmd(b.validFrom, a.validFrom));
+    return exact[0];
+  }
+  const older = records.filter((r) => compareYmd(r.validFrom, current.validFrom) < 0);
+  if (older.length === 0) return undefined;
+  older.sort((a, b) => compareYmd(b.validFrom, a.validFrom));
+  return older[0];
+}
+
+/** Last {@link n} amounts by `validFrom` for rows that have started on/before {@link asOfYmd}, oldest → newest (for sparklines). */
+export function getLastNHistoricalPriceAmounts(
+  item: Item,
+  priceType: ItemPriceType,
+  asOfYmd: string,
+  n: number,
+): number[] {
+  const records = recordsForType(item, priceType).filter(
+    (r) => !r.cancelledAt && compareYmd(r.validFrom, asOfYmd) <= 0,
+  );
+  records.sort((a, b) => compareYmd(b.validFrom, a.validFrom));
+  const slice = records.slice(0, Math.min(n, records.length));
+  slice.reverse();
+  return slice.map((r) => r.amount);
+}
+
+export type PriceDeltaVsPrevious = {
+  delta: number;
+  direction: "up" | "down" | "same";
+};
+
+export function computeDeltaVsPrevious(
+  currentAmount: number,
+  previousAmount: number | undefined,
+): PriceDeltaVsPrevious | null {
+  if (previousAmount === undefined || !Number.isFinite(previousAmount)) return null;
+  const delta = currentAmount - previousAmount;
+  if (Math.abs(delta) < 1e-9) return { delta: 0, direction: "same" };
+  return { delta, direction: delta > 0 ? "up" : "down" };
+}

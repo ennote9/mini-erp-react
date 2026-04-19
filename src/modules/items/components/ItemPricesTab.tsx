@@ -1,6 +1,6 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Dialog } from "radix-ui";
-import { functionalUpdate, type SortingState } from "@tanstack/react-table";
+import { functionalUpdate, type ColumnSizingState, type OnChangeFn, type SortingState } from "@tanstack/react-table";
 import type { Item, ItemPriceReasonCode, ItemPriceRecord, ItemPriceType } from "../model";
 import { itemRepository } from "../repository";
 import {
@@ -9,11 +9,17 @@ import {
 } from "../itemPriceService";
 import {
   buildPriceHistoryRows,
+  computeDeltaVsPrevious,
   getCurrentActiveRecord,
+  getLastNHistoricalPriceAmounts,
   getNextScheduledRecord,
+  getPreviousActiveRecord,
   todayYmdLocal,
+  type PriceDeltaVsPrevious,
   type PriceHistoryRow,
 } from "../lib/itemPriceHistory";
+import { ItemPriceDeltaBadge } from "./ItemPriceDeltaBadge";
+import { ItemPriceTrendSparkline } from "./ItemPriceTrendSparkline";
 import { ItemPriceEditDialog } from "./ItemPriceEditDialog";
 import { ItemPriceHistoryTanstackTable } from "../ItemPriceHistoryTanstackTable";
 import { ItemsHeaderFilterPanel } from "../ItemsHeaderFilterPanel";
@@ -28,6 +34,16 @@ import {
   normalizeDeepFilterRules,
   type ListViewDeepFilterRule,
 } from "@/shared/ui/list-view/listViewConfig";
+import {
+  readPersistedColumnSizing,
+  readPersistedFilters,
+  readPersistedSorting,
+  sanitizeColumnSizing,
+  sanitizeSortingForSchema,
+  writePersistedColumnSizing,
+  writePersistedFilters,
+  writePersistedSorting,
+} from "../lib/itemPriceHistoryTablePersistence";
 import { applyListViewColumnFilters, type ListViewColumnFilterConfig } from "@/shared/ui/list-view";
 import { Button } from "@/components/ui/button";
 import { useTranslation } from "@/shared/i18n/context";
@@ -59,8 +75,9 @@ function statusLabelKey(status: PriceHistoryRow["status"]): string {
 export function ItemPricesTab({ itemId, isNew, revision, onPricesChanged }: Props) {
   const { t, locale } = useTranslation();
   const { formatNumber } = useAppDisplayFormatters();
-  const [sorting, setSorting] = useState<SortingState>([]);
-  const [deepFilterRules, setDeepFilterRules] = useState<ListViewDeepFilterRule[]>([]);
+  const [sorting, setSorting] = useState<SortingState>(() => readPersistedSorting());
+  const [deepFilterRules, setDeepFilterRules] = useState<ListViewDeepFilterRule[]>(() => readPersistedFilters());
+  const [columnSizing, setColumnSizing] = useState<ColumnSizingState>(() => readPersistedColumnSizing());
   const [headerFilterAnchor, setHeaderFilterAnchor] = useState<{
     fieldId: string;
     left: number;
@@ -93,9 +110,62 @@ export function ItemPricesTab({ itemId, isNew, revision, onPricesChanged }: Prop
   const saleCurrent = item ? getCurrentActiveRecord(item, "sale", todayYmd) : undefined;
   const saleNext = item ? getNextScheduledRecord(item, "sale", todayYmd) : undefined;
 
+  const purchaseCurrentTrend = useMemo(() => {
+    if (!item || !purchaseCurrent) return undefined;
+    const amounts = getLastNHistoricalPriceAmounts(item, "purchase", todayYmd, 5);
+    const prev = getPreviousActiveRecord(item, "purchase", purchaseCurrent);
+    const delta = computeDeltaVsPrevious(purchaseCurrent.amount, prev?.amount);
+    return { amounts, delta };
+  }, [item, purchaseCurrent, todayYmd]);
+
+  const saleCurrentTrend = useMemo(() => {
+    if (!item || !saleCurrent) return undefined;
+    const amounts = getLastNHistoricalPriceAmounts(item, "sale", todayYmd, 5);
+    const prev = getPreviousActiveRecord(item, "sale", saleCurrent);
+    const delta = computeDeltaVsPrevious(saleCurrent.amount, prev?.amount);
+    return { amounts, delta };
+  }, [item, saleCurrent, todayYmd]);
+
   const priceHistorySchema = useMemo(() => buildItemPriceHistoryTableSchema(t), [t, locale]);
   const priceHistoryRegistry = useMemo(() => buildItemPriceHistoryFieldRegistry(t), [t, locale]);
   const priceHistoryFilterConfigs = useMemo(() => buildItemPriceHistoryFilterConfigs(t), [t, locale]);
+
+  useEffect(() => {
+    setColumnSizing((current) => {
+      const next = sanitizeColumnSizing(current, priceHistorySchema);
+      const cKeys = Object.keys(current);
+      const nKeys = Object.keys(next);
+      if (
+        cKeys.length === nKeys.length &&
+        cKeys.every((key) => current[key] === next[key])
+      ) {
+        return current;
+      }
+      return next;
+    });
+  }, [priceHistorySchema]);
+
+  useEffect(() => {
+    setSorting((s) => sanitizeSortingForSchema(s, priceHistorySchema));
+  }, [priceHistorySchema]);
+
+  useEffect(() => {
+    setDeepFilterRules((rules) =>
+      normalizeDeepFilterRules({ rules, registry: priceHistoryRegistry }),
+    );
+  }, [priceHistoryRegistry]);
+
+  useEffect(() => {
+    writePersistedSorting(sorting);
+  }, [sorting]);
+
+  useEffect(() => {
+    writePersistedFilters(deepFilterRules);
+  }, [deepFilterRules]);
+
+  useEffect(() => {
+    writePersistedColumnSizing(columnSizing);
+  }, [columnSizing]);
 
   const registryByFieldKey = useMemo(
     () => new Map(priceHistoryRegistry.map((e) => [e.fieldKey, e])),
@@ -186,6 +256,10 @@ export function ItemPricesTab({ itemId, isNew, revision, onPricesChanged }: Prop
     [],
   );
 
+  const handleColumnSizingChange = useCallback<OnChangeFn<ColumnSizingState>>((updater) => {
+    setColumnSizing((old) => functionalUpdate(updater, old));
+  }, []);
+
   const statusLabelForRow = useCallback(
     (status: PriceHistoryRow["status"]) => t(statusLabelKey(status)),
     [t],
@@ -254,7 +328,7 @@ export function ItemPricesTab({ itemId, isNew, revision, onPricesChanged }: Prop
   }
 
   return (
-    <div className="flex h-full min-h-0 flex-col gap-5">
+    <div className="flex h-full min-h-0 w-full min-w-0 flex-col gap-5">
       <div className="shrink-0 space-y-5">
         <div
           data-testid="item-prices-summary-grid"
@@ -269,6 +343,11 @@ export function ItemPricesTab({ itemId, isNew, revision, onPricesChanged }: Prop
           emptyDetail={t("master.item.prices.notSetDetail")}
           formatMoney={formatMoney}
           reasonLabel={reasonLabel}
+          trendSparklineAmounts={purchaseCurrentTrend?.amounts}
+          deltaVsPrevious={purchaseCurrentTrend?.delta ?? undefined}
+          sparklineAriaLabel={t("master.item.prices.trendSparklineAriaPurchase", {
+            count: purchaseCurrentTrend?.amounts.length ?? 0,
+          })}
         />
         <SummaryCard
           dataTestId="item-prices-card-purchase-next"
@@ -289,6 +368,11 @@ export function ItemPricesTab({ itemId, isNew, revision, onPricesChanged }: Prop
           emptyDetail={t("master.item.prices.notSetDetail")}
           formatMoney={formatMoney}
           reasonLabel={reasonLabel}
+          trendSparklineAmounts={saleCurrentTrend?.amounts}
+          deltaVsPrevious={saleCurrentTrend?.delta ?? undefined}
+          sparklineAriaLabel={t("master.item.prices.trendSparklineAriaSale", {
+            count: saleCurrentTrend?.amounts.length ?? 0,
+          })}
         />
         <SummaryCard
           dataTestId="item-prices-card-sale-next"
@@ -354,19 +438,21 @@ export function ItemPricesTab({ itemId, isNew, revision, onPricesChanged }: Prop
         </div>
       </div>
 
-      <div className="flex min-h-0 flex-1 flex-col border-t border-border/50 pt-5">
+      <div className="flex min-h-0 w-full min-w-0 flex-1 flex-col border-t border-border/50 pt-5">
         <div className="mb-3 flex shrink-0 items-baseline justify-between gap-2">
           <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
             {t("master.item.prices.sectionHistory")}
           </h3>
         </div>
 
-        <div className="relative flex min-h-0 min-w-0 flex-1 flex-col">
+        <div className="relative flex min-h-0 min-w-0 w-full flex-1 flex-col">
           <ItemPriceHistoryTanstackTable
             rows={displayHistoryRows}
             schema={priceHistorySchema}
             sorting={sorting}
             onSortingChange={handleTanstackSortingChange}
+            columnSizing={columnSizing}
+            onColumnSizingChange={handleColumnSizingChange}
             onHeaderFilterClick={(fieldId, anchorRect) => setHeaderFilterAnchor({ fieldId, ...anchorRect })}
             headerFilterState={activeHeaderFilterFieldState}
             openHeaderFilterFieldId={activeHeaderFilterField}
@@ -492,6 +578,9 @@ function SummaryCard({
   formatMoney,
   reasonLabel,
   dataTestId,
+  trendSparklineAmounts,
+  deltaVsPrevious,
+  sparklineAriaLabel,
 }: {
   title: string;
   roleHint: string;
@@ -501,8 +590,14 @@ function SummaryCard({
   formatMoney: (n: number | undefined) => string;
   reasonLabel: (c: string) => string;
   dataTestId?: string;
+  trendSparklineAmounts?: number[];
+  deltaVsPrevious?: PriceDeltaVsPrevious | null;
+  sparklineAriaLabel?: string;
 }) {
   const { t } = useTranslation();
+  const showSparkline = Boolean(trendSparklineAmounts && trendSparklineAmounts.length > 0);
+  const showDelta = deltaVsPrevious != null;
+
   return (
     <div
       data-testid={dataTestId}
@@ -523,10 +618,18 @@ function SummaryCard({
           <p className="mt-1 text-[11px] leading-snug text-muted-foreground/90">{emptyDetail}</p>
         </div>
       ) : (
-        <div className="mt-2 flex flex-1 flex-col">
-          <div className="text-2xl font-semibold leading-none tabular-nums tracking-tight text-foreground">
-            {formatMoney(record.amount)}
+        <div className="mt-2 flex min-h-0 flex-1 flex-col">
+          <div className="flex min-w-0 items-start justify-between gap-2">
+            <div className="min-w-0 text-2xl font-semibold leading-none tabular-nums tracking-tight text-foreground">
+              {formatMoney(record.amount)}
+            </div>
+            {showDelta ? <ItemPriceDeltaBadge delta={deltaVsPrevious} formatMoney={formatMoney} /> : null}
           </div>
+          {showSparkline ? (
+            <div className="mt-1.5 min-h-0 w-full min-w-0">
+              <ItemPriceTrendSparkline values={trendSparklineAmounts!} aria-label={sparklineAriaLabel ?? ""} />
+            </div>
+          ) : null}
           <div className="mt-2 text-[11px] text-muted-foreground">
             <span className="text-[10px] uppercase tracking-wide text-muted-foreground/75">
               {t("master.item.prices.summaryEffectiveFrom")}

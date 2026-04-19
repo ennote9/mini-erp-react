@@ -1,6 +1,5 @@
 import {
   flexRender,
-  functionalUpdate,
   getCoreRowModel,
   useReactTable,
   createColumnHelper,
@@ -10,7 +9,7 @@ import {
   type SortingState,
   type Table,
 } from "@tanstack/react-table";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useLayoutEffect, useMemo, useRef, useState } from "react";
 import { ChevronDown, ChevronsUpDown, ChevronUp, Funnel } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { TFunction } from "@/shared/i18n";
@@ -51,15 +50,13 @@ function getColumnResizeGuideLeftPx<T>(table: Table<T>): number | null {
   return header.getStart() + newW;
 }
 
-function buildInitialColumnSizing(schema: ItemPriceHistoryColumnSchema[]): ColumnSizingState {
-  return Object.fromEntries(schema.map((c) => [c.id, c.defaultSize]));
-}
-
 type Props = {
   rows: PriceHistoryRow[];
   schema: ItemPriceHistoryColumnSchema[];
   sorting: SortingState;
   onSortingChange: OnChangeFn<SortingState>;
+  columnSizing: ColumnSizingState;
+  onColumnSizingChange: OnChangeFn<ColumnSizingState>;
   onHeaderFilterClick?: (fieldId: string, anchorRect: { left: number; top: number; width: number; height: number }) => void;
   headerFilterState?: Record<string, boolean>;
   openHeaderFilterFieldId?: string | null;
@@ -76,6 +73,8 @@ export function ItemPriceHistoryTanstackTable(props: Props) {
     schema,
     sorting,
     onSortingChange,
+    columnSizing,
+    onColumnSizingChange,
     onHeaderFilterClick,
     headerFilterState,
     openHeaderFilterFieldId,
@@ -88,15 +87,22 @@ export function ItemPriceHistoryTanstackTable(props: Props) {
 
   const schemaById = useMemo(() => new Map(schema.map((c) => [c.id, c])), [schema]);
 
-  const [columnSizing, setColumnSizing] = useState<ColumnSizingState>(() => buildInitialColumnSizing(schema));
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const [viewportWidth, setViewportWidth] = useState(0);
 
-  useEffect(() => {
-    setColumnSizing(buildInitialColumnSizing(schema));
-  }, [schema]);
-
-  const handleColumnSizingChange = useCallback<OnChangeFn<ColumnSizingState>>((updater) => {
-    setColumnSizing((old) => functionalUpdate(updater, old));
-  }, []);
+  useLayoutEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    const measure = () => {
+      const w = Math.round(el.clientWidth);
+      setViewportWidth((prev) => (prev !== w ? w : prev));
+    };
+    measure();
+    if (typeof ResizeObserver === "undefined") return;
+    const ro = new ResizeObserver(() => measure());
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [rows.length, schema.length]);
 
   const columns = useMemo(() => {
     const defs: ColumnDef<PriceHistoryRow, unknown>[] = [];
@@ -161,26 +167,30 @@ export function ItemPriceHistoryTanstackTable(props: Props) {
     enableMultiSort: true,
     state: { sorting, columnSizing },
     onSortingChange,
-    onColumnSizingChange: handleColumnSizingChange,
+    onColumnSizingChange,
   });
 
   const visibleLeafColumns = table.getVisibleLeafColumns();
   const totalWidth = table.getTotalSize();
   const resizeGuideLeftPx = getColumnResizeGuideLeftPx(table);
 
+  /** Fill workspace width when columns are narrower than the scroll viewport (like a full-width grid). */
+  const layoutWidth = Math.max(totalWidth, viewportWidth || 0);
+
   return (
     <div
       className={cn(
-        "flex min-h-0 min-w-0 flex-1 flex-col rounded-md border border-border bg-background",
+        "flex min-h-0 min-w-0 w-full flex-1 flex-col rounded-md border border-border bg-background",
         className,
       )}
       data-testid="item-prices-history-table"
     >
       <div
-        className="erp-dark-scrollbar min-h-0 min-w-0 flex-1 overflow-auto"
+        ref={scrollRef}
+        className="erp-dark-scrollbar min-h-0 min-w-0 w-full flex-1 overflow-auto"
         data-item-prices-history-scroll
       >
-        <div className="relative inline-block min-w-full align-top" style={{ width: totalWidth }}>
+        <div className="relative inline-block min-w-full align-top" style={{ width: layoutWidth || undefined }}>
           {resizeGuideLeftPx != null ? (
             <div
               aria-hidden
@@ -190,7 +200,7 @@ export function ItemPriceHistoryTanstackTable(props: Props) {
           ) : null}
           <table
             className="w-full border-collapse table-fixed text-[12px] leading-tight"
-            style={{ width: totalWidth }}
+            style={{ width: layoutWidth || totalWidth }}
           >
             <colgroup>
               {visibleLeafColumns.map((column) => (

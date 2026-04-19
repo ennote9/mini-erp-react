@@ -468,8 +468,8 @@ export function ItemPage() {
       </div>
       <Card
         className={cn(
-          "mt-3 w-full max-w-6xl border-0 shadow-none",
-          activeTab === "prices" && "flex min-h-0 flex-1 flex-col",
+          "mt-3 w-full border-0 shadow-none",
+          activeTab === "prices" ? "max-w-none flex min-h-0 flex-1 flex-col" : "max-w-6xl",
         )}
       >
         <Tabs.Root
@@ -504,7 +504,10 @@ export function ItemPage() {
             </Tabs.List>
           </CardHeader>
           <CardContent
-            className={cn("px-1.5 pb-1.5 pt-[7mm]", activeTab === "prices" && "flex min-h-0 flex-1 flex-col")}
+            className={cn(
+              "px-1.5 pb-1.5 pt-[7mm]",
+              activeTab === "prices" && "flex min-h-0 w-full min-w-0 flex-1 flex-col",
+            )}
           >
             <Tabs.Content value="main" className="outline-none focus-visible:outline-none">
               <div className="w-full max-w-[33.75rem]">

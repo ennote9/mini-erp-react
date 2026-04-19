@@ -8,9 +8,11 @@ import { useTranslation } from "@/shared/i18n";
 import { getAppReadModelRevision, subscribeAppReadModelRevision } from "@/shared/appReadModelRevision";
 import { itemRepository } from "@/modules/items/repository";
 import {
+  abortMarkingPrintSession,
+  beginMarkingPrintSession,
   buildMarkingSnapshotFields,
+  completeMarkingPrintSuccess,
   listSelectableMarkingRecordsForItem,
-  markManyMarkingRecordsPrinted,
 } from "@/modules/items/markingRecordService";
 import { LABEL_PREVIEW_DEMO_CONTEXT, type LabelPreviewBindingContext } from "../lib/previewContext";
 import { buildItemPreviewBindingContext, type ItemPreviewWarningCode } from "../lib/itemPreviewContext";
@@ -310,6 +312,7 @@ export function LabelsWorkspacePage() {
 
     setActionBusy("pdf");
     const base = buildJobSnapshots();
+    const { releaseOnAbort } = beginMarkingPrintSession(markingRecordId || undefined, "print_workspace");
     try {
       await saveLabelPdf({
         element: surface,
@@ -317,7 +320,7 @@ export function LabelsWorkspacePage() {
         copies,
         filenameBase: `label-${selected.name}`,
       });
-      createPrintJobFromWorkspace({
+      const job = createPrintJobFromWorkspace({
         templateId: selected.id,
         copies,
         mode: "pdf",
@@ -325,9 +328,10 @@ export function LabelsWorkspacePage() {
         ...base,
         ...presetPayload,
       });
-      markManyMarkingRecordsPrinted(markingRecordId ? [markingRecordId] : []);
+      completeMarkingPrintSuccess(markingRecordId || undefined, job.id, "print_workspace");
       setFeedback({ kind: "success", message: t("labels.workspace.feedback.pdfSaved") });
     } catch (e) {
+      abortMarkingPrintSession(markingRecordId || undefined, releaseOnAbort, "print_workspace");
       const msg = e instanceof Error ? e.message : String(e);
       try {
         createPrintJobFromWorkspace({
@@ -371,6 +375,7 @@ export function LabelsWorkspacePage() {
 
     setActionBusy("print");
     const base = buildJobSnapshots();
+    const { releaseOnAbort } = beginMarkingPrintSession(markingRecordId || undefined, "print_workspace");
     let jobId: string | undefined;
     try {
       const job = createPrintJobFromWorkspace({
@@ -383,6 +388,7 @@ export function LabelsWorkspacePage() {
       });
       jobId = job.id;
     } catch (e) {
+      abortMarkingPrintSession(markingRecordId || undefined, releaseOnAbort, "print_workspace");
       setFeedback({ kind: "error", message: t("labels.workspace.feedback.genericError") });
       if (import.meta.env.DEV) console.error(e);
       setActionBusy(null);
@@ -396,11 +402,12 @@ export function LabelsWorkspacePage() {
         copies,
       });
       if (jobId) markPrintJobSubmitted(jobId);
-      markManyMarkingRecordsPrinted(markingRecordId ? [markingRecordId] : []);
+      completeMarkingPrintSuccess(markingRecordId || undefined, jobId, "print_workspace");
       setFeedback({ kind: "success", message: t("labels.workspace.feedback.printDialogDone") });
     } catch (e) {
       const msg = (e instanceof Error ? e.message : String(e)).slice(0, 500);
       if (jobId) markPrintJobFailed(jobId, msg);
+      abortMarkingPrintSession(markingRecordId || undefined, releaseOnAbort, "print_workspace");
       setFeedback({
         kind: "error",
         message: `${t("labels.workspace.feedback.printFailed")} ${msg}`,
