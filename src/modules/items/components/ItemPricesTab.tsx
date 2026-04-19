@@ -113,7 +113,7 @@ export function ItemPricesTab({ itemId, isNew, revision, onPricesChanged }: Prop
   const purchaseCurrentTrend = useMemo(() => {
     if (!item || !purchaseCurrent) return undefined;
     const amounts = getLastNHistoricalPriceAmounts(item, "purchase", todayYmd, 5);
-    const prev = getPreviousActiveRecord(item, "purchase", purchaseCurrent);
+    const prev = getPreviousActiveRecord(item, "purchase", purchaseCurrent, todayYmd);
     const delta = computeDeltaVsPrevious(purchaseCurrent.amount, prev?.amount);
     return { amounts, delta };
   }, [item, purchaseCurrent, todayYmd]);
@@ -121,7 +121,7 @@ export function ItemPricesTab({ itemId, isNew, revision, onPricesChanged }: Prop
   const saleCurrentTrend = useMemo(() => {
     if (!item || !saleCurrent) return undefined;
     const amounts = getLastNHistoricalPriceAmounts(item, "sale", todayYmd, 5);
-    const prev = getPreviousActiveRecord(item, "sale", saleCurrent);
+    const prev = getPreviousActiveRecord(item, "sale", saleCurrent, todayYmd);
     const delta = computeDeltaVsPrevious(saleCurrent.amount, prev?.amount);
     return { amounts, delta };
   }, [item, saleCurrent, todayYmd]);

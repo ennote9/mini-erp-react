@@ -156,12 +156,18 @@ export function ItemMarkingPoolTab({ itemId }: Props) {
   return (
     <div className="space-y-4">
       <p className="text-[11px] leading-snug text-muted-foreground">{t("master.item.markingPool.hint")}</p>
-      <p className="text-[11px]">
+      <p className="flex flex-wrap gap-x-3 gap-y-1 text-[11px]">
         <Link
           to={`/items/marking-reconciliation?item=${encodeURIComponent(itemId)}`}
           className="text-primary underline-offset-2 hover:underline"
         >
           {t("master.markingReconciliation.openFromItemHint")}
+        </Link>
+        <Link
+          to={`/items/marking-traceability?item=${encodeURIComponent(itemId)}`}
+          className="text-primary underline-offset-2 hover:underline"
+        >
+          {t("master.markingTraceability.openFromItemHint")}
         </Link>
       </p>
 

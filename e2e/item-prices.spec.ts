@@ -993,6 +993,99 @@ test.describe("Item card — Prices tab (acceptance)", () => {
     ).toHaveAttribute("data-delta-direction", "same");
   });
 
+  test("14.3 same-day multiple edits: delta/sparkline chain matches history table; survives reload", async ({
+    page,
+  }, testInfo) => {
+    await page.setViewportSize({ width: 1280, height: 900 });
+    await openApp(page);
+    const code = `E2E-SD-${Date.now()}`;
+    await gotoReady(page, "/items/new");
+    await waitNewItemFormVisible(page);
+    await page.locator("#item-name").fill(`Same-day ${code}`);
+    await page.locator("#item-code").fill(code);
+    await page.locator("#item-uom").fill("EA");
+    await page.getByRole("button", { name: /^Save|Сохранить|Сақтау/i }).click();
+    await expect(page).toHaveURL(/\/items\/\d+/, { timeout: 20_000 });
+    await waitItemTabsVisible(page);
+    await page.getByTestId("item-tab-prices").click();
+
+    const todayYmd = new Date().toISOString().slice(0, 10);
+
+    for (const [amount, reason] of [
+      ["100.00", "manual_update"],
+      ["110.00", "correction"],
+    ] as const) {
+      await page.getByTestId("item-prices-add-purchase").click();
+      await expect(page.getByTestId("item-price-edit-dialog")).toBeVisible({ timeout: 10_000 });
+      await page.getByTestId("item-price-amount-input").fill(amount);
+      await page.getByTestId("item-price-valid-from-input").fill(todayYmd);
+      await page.getByTestId("item-price-reason-select").selectOption(reason);
+      await page.getByTestId("item-price-dialog-submit").click();
+      await expect(page.getByTestId("item-price-edit-dialog")).toBeHidden({ timeout: 15_000 });
+    }
+
+    for (const [amount, reason] of [
+      ["50.00", "manual_update"],
+      ["40.00", "commercial_review"],
+    ] as const) {
+      await page.getByTestId("item-prices-add-sale").click();
+      await expect(page.getByTestId("item-price-edit-dialog")).toBeVisible({ timeout: 10_000 });
+      await page.getByTestId("item-price-amount-input").fill(amount);
+      await page.getByTestId("item-price-valid-from-input").fill(todayYmd);
+      await page.getByTestId("item-price-reason-select").selectOption(reason);
+      await page.getByTestId("item-price-dialog-submit").click();
+      await expect(page.getByTestId("item-price-edit-dialog")).toBeHidden({ timeout: 15_000 });
+    }
+
+    const purchaseCard = page.getByTestId("item-prices-card-purchase-current");
+    const saleCard = page.getByTestId("item-prices-card-sale-current");
+
+    await expect(purchaseCard.locator('[data-testid="item-price-delta"]')).toHaveAttribute("data-delta-direction", "up");
+    await expect(purchaseCard.locator('[data-testid="item-price-trend-sparkline"]')).toHaveAttribute(
+      "data-sparkline-values",
+      "100,110",
+    );
+
+    await expect(saleCard.locator('[data-testid="item-price-delta"]')).toHaveAttribute("data-delta-direction", "down");
+    await expect(saleCard.locator('[data-testid="item-price-trend-sparkline"]')).toHaveAttribute(
+      "data-sparkline-values",
+      "50,40",
+    );
+
+    const rows = page.getByTestId("item-prices-history-row");
+    await expect(rows).toHaveCount(4, { timeout: 15_000 });
+    await expect(rows.nth(0)).toContainText(/sale/i);
+    await expect(rows.nth(0)).toContainText(/40/);
+    await expect(rows.nth(1)).toContainText(/sale/i);
+    await expect(rows.nth(1)).toContainText(/50/);
+    await expect(rows.nth(2)).toContainText(/purchase/i);
+    await expect(rows.nth(2)).toContainText(/110/);
+    await expect(rows.nth(3)).toContainText(/purchase/i);
+    await expect(rows.nth(3)).toContainText(/100/);
+
+    await expect(page.getByTestId("item-prices-card-purchase-next").locator('[data-testid="item-price-trend-sparkline"]')).toHaveCount(
+      0,
+    );
+    await expect(page.getByTestId("item-prices-card-sale-next").locator('[data-testid="item-price-trend-sparkline"]')).toHaveCount(
+      0,
+    );
+
+    await page.reload({ waitUntil: "domcontentloaded" });
+    await waitItemsRepositoryHydrated(page);
+    await waitItemTabsVisible(page);
+    await page.getByTestId("item-tab-prices").click();
+    await expect(purchaseCard.locator('[data-testid="item-price-trend-sparkline"]')).toHaveAttribute(
+      "data-sparkline-values",
+      "100,110",
+      { timeout: 15_000 },
+    );
+    await expect(saleCard.locator('[data-testid="item-price-trend-sparkline"]')).toHaveAttribute("data-sparkline-values", "50,40");
+
+    const sameDayShot = testInfo.outputPath("item-prices-same-day-multichange.png");
+    await page.screenshot({ path: sameDayShot, fullPage: true });
+    await testInfo.attach("item-prices-same-day-multichange", { path: sameDayShot, contentType: "image/png" });
+  });
+
   test("13.5 price history: compare typography with Items list table (screenshot)", async ({ page }, testInfo) => {
     await page.setViewportSize({ width: 1920, height: 900 });
     await openApp(page);

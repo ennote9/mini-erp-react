@@ -42,6 +42,32 @@ function recordsForType(item: Item, priceType: ItemPriceType): ItemPriceRecord[]
   return (item.priceHistory ?? []).filter((r) => r.priceType === priceType);
 }
 
+/**
+ * Descending chronology for price history (newest first): newer `validFrom` first;
+ * when `validFrom` ties, newer `createdAt` first. Matches the history table sort.
+ */
+export function comparePriceHistoryChronologyDesc(a: ItemPriceRecord, b: ItemPriceRecord): number {
+  const c = compareYmd(b.validFrom, a.validFrom);
+  if (c !== 0) return c;
+  return compareYmd(b.createdAt, a.createdAt);
+}
+
+export function sortPriceHistoryRecordsDesc(records: ItemPriceRecord[]): ItemPriceRecord[] {
+  return [...records].sort(comparePriceHistoryChronologyDesc);
+}
+
+/** Non-cancelled rows of this type that have started on or before {@link asOfYmd}, newest first. */
+export function getPriceHistoryChainStartedOnOrBefore(
+  item: Item,
+  priceType: ItemPriceType,
+  asOfYmd: string,
+): ItemPriceRecord[] {
+  const records = recordsForType(item, priceType).filter(
+    (r) => !r.cancelledAt && compareYmd(r.validFrom, asOfYmd) <= 0,
+  );
+  return sortPriceHistoryRecordsDesc(records);
+}
+
 /** Effective base price on a calendar date, or undefined if none applies. */
 export function getEffectiveItemBasePrice(
   item: Item | undefined,
@@ -54,7 +80,7 @@ export function getEffectiveItemBasePrice(
     (r) => compareYmd(r.validFrom, dateYmd) <= 0 && (!r.validTo || compareYmd(r.validTo, dateYmd) >= 0),
   );
   if (candidates.length === 0) return undefined;
-  candidates.sort((a, b) => compareYmd(b.validFrom, a.validFrom));
+  candidates.sort(comparePriceHistoryChronologyDesc);
   return candidates[0].amount;
 }
 
@@ -68,7 +94,8 @@ export function getCurrentActiveRecord(
     (r) =>
       compareYmd(r.validFrom, asOfYmd) <= 0 && (!r.validTo || compareYmd(r.validTo, asOfYmd) >= 0),
   );
-  actives.sort((a, b) => compareYmd(b.validFrom, a.validFrom));
+  if (actives.length === 0) return undefined;
+  actives.sort(comparePriceHistoryChronologyDesc);
   return actives[0];
 }
 
@@ -96,11 +123,7 @@ export function buildPriceHistoryRows(item: Item, asOfYmd: string): PriceHistory
   const list = [...(item.priceHistory ?? [])];
   return list
     .map((r) => ({ ...r, status: computePriceRecordStatus(r, asOfYmd) }))
-    .sort((a, b) => {
-      const c = compareYmd(b.validFrom, a.validFrom);
-      if (c !== 0) return c;
-      return compareYmd(b.createdAt, a.createdAt);
-    });
+    .sort(comparePriceHistoryChronologyDesc);
 }
 
 export function syncItemPriceSnapshotsFromHistory(item: Item, asOfYmd: string): Item {
@@ -230,42 +253,32 @@ export function replaceScheduledPrice(
 }
 
 /**
- * The active price row that was superseded when {@link current} became effective:
- * matches `validTo === yesterday(current.validFrom)` when the domain closed the prior row,
- * otherwise the most recent non-cancelled row with `validFrom` strictly before the current row.
+ * The row immediately before {@link current} in real chronology (newest first within the same type):
+ * same chain as {@link getPriceHistoryChainStartedOnOrBefore}, next older entry.
+ * Correct when multiple edits share the same `validFrom` (uses `createdAt` tie-break).
  */
 export function getPreviousActiveRecord(
   item: Item,
   priceType: ItemPriceType,
   current: ItemPriceRecord,
+  asOfYmd: string,
 ): ItemPriceRecord | undefined {
-  const records = recordsForType(item, priceType).filter((r) => !r.cancelledAt && r.id !== current.id);
-  const boundary = yesterdayYmd(current.validFrom);
-  const exact = records.filter((r) => r.validTo && compareYmd(r.validTo, boundary) === 0);
-  if (exact.length > 0) {
-    exact.sort((a, b) => compareYmd(b.validFrom, a.validFrom));
-    return exact[0];
-  }
-  const older = records.filter((r) => compareYmd(r.validFrom, current.validFrom) < 0);
-  if (older.length === 0) return undefined;
-  older.sort((a, b) => compareYmd(b.validFrom, a.validFrom));
-  return older[0];
+  const chain = getPriceHistoryChainStartedOnOrBefore(item, priceType, asOfYmd);
+  const idx = chain.findIndex((r) => r.id === current.id);
+  if (idx === -1 || idx >= chain.length - 1) return undefined;
+  return chain[idx + 1];
 }
 
-/** Last {@link n} amounts by `validFrom` for rows that have started on/before {@link asOfYmd}, oldest → newest (for sparklines). */
+/** Last {@link n} historical amounts (newest {@link n} in real chronology), oldest → newest for sparklines. */
 export function getLastNHistoricalPriceAmounts(
   item: Item,
   priceType: ItemPriceType,
   asOfYmd: string,
   n: number,
 ): number[] {
-  const records = recordsForType(item, priceType).filter(
-    (r) => !r.cancelledAt && compareYmd(r.validFrom, asOfYmd) <= 0,
-  );
-  records.sort((a, b) => compareYmd(b.validFrom, a.validFrom));
-  const slice = records.slice(0, Math.min(n, records.length));
-  slice.reverse();
-  return slice.map((r) => r.amount);
+  const chain = getPriceHistoryChainStartedOnOrBefore(item, priceType, asOfYmd);
+  const newestFirst = chain.slice(0, Math.min(n, chain.length));
+  return [...newestFirst].reverse().map((r) => r.amount);
 }
 
 export type PriceDeltaVsPrevious = {

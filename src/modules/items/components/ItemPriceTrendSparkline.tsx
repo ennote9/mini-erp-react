@@ -40,6 +40,8 @@ export function ItemPriceTrendSparkline({ values, className, ...rest }: Props) {
   const pts = buildPoints(values);
   const pathD = buildSmoothPath(pts);
 
+  const valuesAttr = values.map((v) => String(v)).join(",");
+
   return (
     <svg
       viewBox={`0 0 ${VIEW_W} ${VIEW_H}`}
@@ -47,6 +49,7 @@ export function ItemPriceTrendSparkline({ values, className, ...rest }: Props) {
       preserveAspectRatio="none"
       role="img"
       data-testid="item-price-trend-sparkline"
+      data-sparkline-values={valuesAttr}
       {...rest}
     >
       {values.length === 1 ? (

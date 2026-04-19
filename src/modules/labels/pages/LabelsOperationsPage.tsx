@@ -201,12 +201,20 @@ export function LabelsOperationsPage() {
                           {t("labels.operations.batchRestore")}
                         </Link>
                         {job.batchRowsSnapshot ? (
-                          <Link
-                            to={`/items/marking-reconciliation?job=${encodeURIComponent(job.id)}`}
-                            className="text-[10px] text-violet-700 underline-offset-2 hover:underline dark:text-violet-300"
-                          >
-                            {t("labels.operations.openMarkingReconciliation")}
-                          </Link>
+                          <>
+                            <Link
+                              to={`/items/marking-reconciliation?job=${encodeURIComponent(job.id)}`}
+                              className="text-[10px] text-violet-700 underline-offset-2 hover:underline dark:text-violet-300"
+                            >
+                              {t("labels.operations.openMarkingReconciliation")}
+                            </Link>
+                            <Link
+                              to={`/items/marking-traceability?job=${encodeURIComponent(job.id)}`}
+                              className="text-[10px] text-violet-700 underline-offset-2 hover:underline dark:text-violet-300"
+                            >
+                              {t("labels.operations.openMarkingTraceability")}
+                            </Link>
+                          </>
                         ) : null}
                       </div>
                     ) : (
@@ -224,12 +232,20 @@ export function LabelsOperationsPage() {
                           {t("labels.operations.reprint")}
                         </Link>
                         {job.markingRecordId || job.markingPayloadSnapshot ? (
-                          <Link
-                            to={`/items/marking-reconciliation?job=${encodeURIComponent(job.id)}`}
-                            className="text-[10px] text-violet-700 underline-offset-2 hover:underline dark:text-violet-300"
-                          >
-                            {t("labels.operations.openMarkingReconciliation")}
-                          </Link>
+                          <>
+                            <Link
+                              to={`/items/marking-reconciliation?job=${encodeURIComponent(job.id)}`}
+                              className="text-[10px] text-violet-700 underline-offset-2 hover:underline dark:text-violet-300"
+                            >
+                              {t("labels.operations.openMarkingReconciliation")}
+                            </Link>
+                            <Link
+                              to={`/items/marking-traceability?job=${encodeURIComponent(job.id)}`}
+                              className="text-[10px] text-violet-700 underline-offset-2 hover:underline dark:text-violet-300"
+                            >
+                              {t("labels.operations.openMarkingTraceability")}
+                            </Link>
+                          </>
                         ) : null}
                       </div>
                     )}

@@ -267,6 +267,17 @@ export function ItemsMarkingReconciliationPage() {
     [items, t],
   );
 
+  const traceabilityHref = useMemo(() => {
+    const q = new URLSearchParams();
+    if (itemFilter) q.set("item", itemFilter);
+    if (printJobFilter.trim()) q.set("job", printJobFilter.trim());
+    if (batchRefFilter.trim()) q.set("batchRef", batchRefFilter.trim());
+    if (kindFilter) q.set("kind", kindFilter);
+    if (printSource) q.set("src", printSource);
+    const s = q.toString();
+    return s ? `/items/marking-traceability?${s}` : "/items/marking-traceability";
+  }, [itemFilter, printJobFilter, batchRefFilter, kindFilter, printSource]);
+
   const jobSummary = useMemo(() => {
     if (!detailRow?.lastPrint?.printJobId) return null;
     return printJobRepository.getById(detailRow.lastPrint.printJobId);
@@ -283,6 +294,11 @@ export function ItemsMarkingReconciliationPage() {
           </p>
           <h1 className="text-base font-semibold tracking-tight">{t("master.markingReconciliation.title")}</h1>
           <p className="mt-1 max-w-3xl text-xs text-muted-foreground">{t("master.markingReconciliation.intro")}</p>
+          <p className="mt-2 text-[11px]">
+            <Link to={traceabilityHref} className="text-primary underline-offset-2 hover:underline">
+              {t("master.markingReconciliation.openTraceabilityHint")}
+            </Link>
+          </p>
         </div>
         <Button type="button" variant="outline" size="sm" className="h-8 text-xs" onClick={() => syncParams()}>
           {t("master.markingReconciliation.saveFiltersToUrl")}

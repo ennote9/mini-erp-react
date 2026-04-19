@@ -7,6 +7,7 @@ import {
   ItemsLabelDataPage,
   ItemsMarkingImportPage,
   ItemsMarkingReconciliationPage,
+  ItemsMarkingTraceabilityPage,
 } from "../modules/items";
 import { BrandsListPage, BrandPage } from "../modules/brands";
 import { CategoriesListPage, CategoryPage } from "../modules/categories";
@@ -60,6 +61,7 @@ export function AppRoutes() {
         <Route path="items/label-data" element={<ItemsLabelDataPage />} />
         <Route path="items/marking-import" element={<ItemsMarkingImportPage />} />
         <Route path="items/marking-reconciliation" element={<ItemsMarkingReconciliationPage />} />
+        <Route path="items/marking-traceability" element={<ItemsMarkingTraceabilityPage />} />
         <Route path="barcodes" element={<BarcodeRegistryPage />} />
         <Route path="labels/templates/:id" element={<LabelTemplateEditorPage />} />
         <Route path="labels/workspace" element={<LabelsWorkspacePage />} />

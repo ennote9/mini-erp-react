@@ -29,6 +29,7 @@ const PAGE_TITLES: Record<string, string> = {
   "/items/label-data": "routes.itemsLabelData",
   "/items/marking-import": "routes.itemsMarkingImport",
   "/items/marking-reconciliation": "routes.itemsMarkingReconciliation",
+  "/items/marking-traceability": "routes.itemsMarkingTraceability",
   "/barcodes": "routes.barcodes",
   "/labels": "routes.labels",
   "/labels/workspace": "routes.labelsWorkspace",
@@ -56,6 +57,7 @@ function getPageTitleKey(pathname: string): string {
   if (pathname === "/items/label-data") return "routes.itemsLabelData";
   if (pathname === "/items/marking-import") return "routes.itemsMarkingImport";
   if (pathname === "/items/marking-reconciliation") return "routes.itemsMarkingReconciliation";
+  if (pathname === "/items/marking-traceability") return "routes.itemsMarkingTraceability";
   if (pathname.match(/^\/items\/[^/]+$/)) return "routes.item";
   if (pathname.match(/^\/brands\/[^/]+$/)) return "routes.brand";
   if (pathname.match(/^\/categories\/[^/]+$/)) return "routes.category";
@@ -94,6 +96,7 @@ function getPageIcon(
     pathname === "/items/label-data" ||
     pathname === "/items/marking-import" ||
     pathname === "/items/marking-reconciliation" ||
+    pathname === "/items/marking-traceability" ||
     pathname.match(/^\/items\/[^/]+$/)
   )
     return Package;
