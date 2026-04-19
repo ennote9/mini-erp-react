@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore, type ChangeEvent } from "react";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -22,11 +22,13 @@ import {
   primaryBarcodeValue,
 } from "../lib/itemLabelDataBulk";
 import {
-  exportTemplateTsvHeader,
-  matchImportRows,
+  analyzeLabelDataImport,
+  buildLabelDataExportTsv,
+  buildLabelDataTemplateFileContent,
+  delimiterHintFromFilename,
   mergeImportIntoDraft,
-  parseLabelDataPaste,
-  type ParsedImportRow,
+  parseLabelDataText,
+  type LabelDataImportAnalysis,
 } from "../lib/parseLabelDataImport";
 
 type ViewMode = "all" | "translation" | "marking";
@@ -57,11 +59,10 @@ export function ItemsLabelDataPage() {
 
   const [importOpen, setImportOpen] = useState(false);
   const [importText, setImportText] = useState("");
-  const [importPreview, setImportPreview] = useState<{
-    matched: { itemId: string; row: ParsedImportRow }[];
-    unmatched: { lineIndex: number; code?: string; barcode?: string }[];
-    unknownHeaders: string[];
-  } | null>(null);
+  const [lastImportedFileName, setLastImportedFileName] = useState<string | null>(null);
+  const [importAnalysis, setImportAnalysis] = useState<LabelDataImportAnalysis | null>(null);
+  const [importSkippedIds, setImportSkippedIds] = useState<Set<string>>(() => new Set());
+  const importFileInputRef = useRef<HTMLInputElement>(null);
 
   const [bulkOpen, setBulkOpen] = useState(false);
   const [bulkField, setBulkField] = useState<keyof ItemLabelDataDraft>("translationName");
@@ -106,7 +107,15 @@ export function ItemsLabelDataPage() {
     return itemRepository.search(q);
   }, [allItems, searchQuery]);
 
-  const filteredItems = useMemo(() => applyLabelDataFilter(searchedItems, filter), [searchedItems, filter]);
+  const filteredItems = useMemo(
+    () =>
+      applyLabelDataFilter(searchedItems, filter, {
+        dirtyIds,
+        importSkippedIds,
+        draftById,
+      }),
+    [searchedItems, filter, dirtyIds, importSkippedIds, draftById],
+  );
 
   const toggleSelect = useCallback((id: string) => {
     setSelectedIds((prev) => {
@@ -178,49 +187,66 @@ export function ItemsLabelDataPage() {
   }, [dirtyIds, draftById, persistedById, t]);
 
   const runImportApply = useCallback(() => {
-    if (!importPreview) return;
-    const matched = importPreview.matched;
+    if (!importAnalysis || importAnalysis.applicable.length === 0) return;
+    const applicable = importAnalysis.applicable;
     setDraftById((prev) => {
       let next = { ...prev };
-      for (const { itemId, row } of matched) {
-        const cur = next[itemId] ?? persistedById[itemId] ?? emptyLabelDataDraft();
-        next = { ...next, [itemId]: mergeImportIntoDraft(cur, row.fields as Partial<ItemLabelDataDraft>) };
+      for (const { item, mergedFields } of applicable) {
+        const cur = next[item.id] ?? persistedById[item.id] ?? emptyLabelDataDraft();
+        next = { ...next, [item.id]: mergeImportIntoDraft(cur, mergedFields) };
       }
       return next;
     });
     setDirtyIds((prev) => {
       const n = new Set(prev);
-      for (const { itemId } of matched) n.add(itemId);
+      for (const { item } of applicable) n.add(item.id);
       return n;
     });
+    const skipped = new Set<string>();
+    for (const c of importAnalysis.conflicts) skipped.add(c.item.id);
+    for (const a of importAnalysis.ambiguous) {
+      for (const it of a.candidates) skipped.add(it.id);
+    }
+    setImportSkippedIds(skipped);
+
     setImportOpen(false);
     setImportText("");
-    setImportPreview(null);
+    setLastImportedFileName(null);
+    setImportAnalysis(null);
     setFeedback({
       kind: "success",
-      message: t("master.itemsLabelData.importApplied", { n: matched.length }),
+      message: t("master.itemsLabelData.importAppliedDetail", {
+        items: applicable.length,
+        rows: applicable.reduce((n, a) => n + a.sourceRows.length, 0),
+      }),
     });
-  }, [importPreview, persistedById, t]);
+  }, [importAnalysis, persistedById, t]);
 
   const parseImportPreview = useCallback(() => {
     setFeedback(null);
-    const parsed = parseLabelDataPaste(importText);
+    const hint = lastImportedFileName ? delimiterHintFromFilename(lastImportedFileName) : undefined;
+    const parsed = parseLabelDataText(importText, hint ? { delimiter: hint } : undefined);
     if (parsed.rows.length === 0) {
       setFeedback({ kind: "error", message: t("master.itemsLabelData.importEmpty") });
-      setImportPreview(null);
+      setImportAnalysis(null);
       return;
     }
-    const { matched, unmatched } = matchImportRows(parsed.rows, allItems);
-    setImportPreview({
-      matched: matched.map((m) => ({ itemId: m.item.id, row: m.row })),
-      unmatched: unmatched.map((u) => ({
-        lineIndex: u.lineIndex,
-        code: u.code,
-        barcode: u.barcode,
-      })),
-      unknownHeaders: parsed.unknownHeaders,
-    });
-  }, [importText, allItems, t]);
+    setImportAnalysis(analyzeLabelDataImport(parsed, allItems));
+  }, [importText, lastImportedFileName, allItems, t]);
+
+  const onImportFileSelected = useCallback((e: ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    setLastImportedFileName(file.name);
+    setImportAnalysis(null);
+    setFeedback(null);
+    const reader = new FileReader();
+    reader.onload = () => {
+      setImportText(String(reader.result ?? ""));
+    };
+    reader.readAsText(file);
+  }, []);
 
   const applyBulk = useCallback(() => {
     if (selectedIds.size === 0) return;
@@ -263,6 +289,8 @@ export function ItemsLabelDataPage() {
       (
         [
           ["all", t("master.itemsLabelData.filter.all")],
+          ["dirty_only", t("master.itemsLabelData.filter.dirty_only")],
+          ["import_skipped", t("master.itemsLabelData.filter.import_skipped")],
           ["no_translation", t("master.itemsLabelData.filter.no_translation")],
           ["no_marking", t("master.itemsLabelData.filter.no_marking")],
           ["no_datamatrix", t("master.itemsLabelData.filter.no_datamatrix")],
@@ -319,9 +347,24 @@ export function ItemsLabelDataPage() {
   );
 
   const exportTemplate = useCallback(() => {
-    const header = exportTemplateTsvHeader();
-    downloadTextFile("label-data-template.tsv", `\uFEFF${header}\n`, "text/tab-separated-values;charset=utf-8");
+    downloadTextFile(
+      "label-data-template.tsv",
+      buildLabelDataTemplateFileContent(),
+      "text/tab-separated-values;charset=utf-8",
+    );
   }, []);
+
+  const exportCurrentData = useCallback(() => {
+    const rows =
+      selectedIds.size > 0 ? filteredItems.filter((i) => selectedIds.has(i.id)) : filteredItems;
+    if (rows.length === 0) {
+      setFeedback({ kind: "error", message: t("master.itemsLabelData.exportNothing") });
+      return;
+    }
+    const tsv = buildLabelDataExportTsv(rows, draftById);
+    downloadTextFile("label-data-export.tsv", tsv, "text/tab-separated-values;charset=utf-8");
+    setFeedback({ kind: "success", message: t("master.itemsLabelData.exportDone", { n: rows.length }) });
+  }, [selectedIds, filteredItems, draftById, t]);
 
   return (
     <div className="mx-auto max-w-[1920px] space-y-3 p-3 md:p-4">
@@ -397,6 +440,9 @@ export function ItemsLabelDataPage() {
           </Button>
           <Button type="button" size="sm" variant="outline" className="h-8" onClick={exportTemplate}>
             {t("master.itemsLabelData.exportTemplate")}
+          </Button>
+          <Button type="button" size="sm" variant="outline" className="h-8" onClick={exportCurrentData}>
+            {t("master.itemsLabelData.exportData")}
           </Button>
           <Button type="button" size="sm" variant="outline" className="h-8" disabled={selectedIds.size === 0} onClick={() => setBulkOpen(true)}>
             {t("master.itemsLabelData.bulkFill")}
@@ -504,7 +550,16 @@ export function ItemsLabelDataPage() {
         ) : null}
       </div>
 
-      <Dialog.Root open={importOpen} onOpenChange={setImportOpen}>
+      <Dialog.Root
+        open={importOpen}
+        onOpenChange={(open) => {
+          setImportOpen(open);
+          if (!open) {
+            setImportAnalysis(null);
+            setLastImportedFileName(null);
+          }
+        }}
+      >
         <Dialog.Portal>
           <Dialog.Overlay className="fixed inset-0 z-50 bg-black/50 backdrop-blur-[1px]" />
           <Dialog.Content className="fixed left-1/2 top-1/2 z-50 flex max-h-[min(90vh,720px)] w-[min(92vw,640px)] -translate-x-1/2 -translate-y-1/2 flex-col gap-2 overflow-y-auto rounded-lg border border-border bg-background p-3 shadow-lg focus:outline-none">
@@ -512,41 +567,109 @@ export function ItemsLabelDataPage() {
             <Dialog.Description className="text-xs text-muted-foreground">
               {t("master.itemsLabelData.importHelp")}
             </Dialog.Description>
+            <div className="flex flex-wrap items-center gap-2">
+              <input
+                ref={importFileInputRef}
+                type="file"
+                accept=".tsv,.csv,text/tab-separated-values,text/csv,text/plain"
+                className="sr-only"
+                aria-hidden
+                onChange={onImportFileSelected}
+              />
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                className="h-8 text-xs"
+                onClick={() => importFileInputRef.current?.click()}
+              >
+                {t("master.itemsLabelData.importFromFile")}
+              </Button>
+              {lastImportedFileName ? (
+                <span className="text-[11px] text-muted-foreground">{lastImportedFileName}</span>
+              ) : null}
+            </div>
             <Textarea
               className="min-h-[180px] font-mono text-xs"
               value={importText}
               onChange={(e) => {
                 setImportText(e.target.value);
-                setImportPreview(null);
+                setImportAnalysis(null);
+                setLastImportedFileName(null);
               }}
               placeholder={t("master.itemsLabelData.importPlaceholder")}
             />
             <Button type="button" size="sm" variant="secondary" className="w-fit" onClick={parseImportPreview}>
               {t("master.itemsLabelData.importPreview")}
             </Button>
-            {importPreview ? (
+            {importAnalysis ? (
               <div className="space-y-2 rounded-md border border-border/60 bg-muted/20 p-2 text-xs">
-                <p>{t("master.itemsLabelData.previewMatched", { n: importPreview.matched.length })}</p>
-                <p>{t("master.itemsLabelData.previewUnmatched", { n: importPreview.unmatched.length })}</p>
-                {importPreview.unmatched.length > 0 ? (
-                  <ul className="max-h-24 list-inside list-disc overflow-y-auto text-destructive">
-                    {importPreview.unmatched.slice(0, 20).map((u) => (
-                      <li key={u.lineIndex}>
+                <ul className="grid gap-0.5 sm:grid-cols-2">
+                  <li>{t("master.itemsLabelData.report.sourceRows", { n: importAnalysis.sourceRowCount })}</li>
+                  <li>{t("master.itemsLabelData.report.unknownHeaders", { n: importAnalysis.unknownHeaderCount })}</li>
+                  <li>{t("master.itemsLabelData.report.duplicateKeys", { n: importAnalysis.duplicateKeyRowCount })}</li>
+                  <li>{t("master.itemsLabelData.report.notFound", { n: importAnalysis.notFoundRowCount })}</li>
+                  <li>{t("master.itemsLabelData.report.ambiguous", { n: importAnalysis.ambiguousRowCount })}</li>
+                  <li>{t("master.itemsLabelData.report.conflicts", { n: importAnalysis.conflictRowCount })}</li>
+                  <li className="sm:col-span-2 font-medium text-foreground">
+                    {t("master.itemsLabelData.report.willApply", { n: importAnalysis.applicable.length })}
+                  </li>
+                </ul>
+                {importAnalysis.unknownHeaders.length > 0 ? (
+                  <p className="text-amber-800 dark:text-amber-200">
+                    {t("master.itemsLabelData.previewUnknownHeaders", {
+                      headers: importAnalysis.unknownHeaders.join(", "),
+                    })}
+                  </p>
+                ) : null}
+                {importAnalysis.duplicateKeyLineIndices.length > 0 ? (
+                  <div>
+                    <p className="text-[11px] font-medium text-destructive">{t("master.itemsLabelData.report.duplicateTitle")}</p>
+                    <p className="font-mono text-[10px] text-muted-foreground">
+                      {importAnalysis.duplicateKeyLineIndices.slice(0, 40).join(", ")}
+                      {importAnalysis.duplicateKeyLineIndices.length > 40 ? "…" : ""}
+                    </p>
+                  </div>
+                ) : null}
+                {importAnalysis.notFound.length > 0 ? (
+                  <ul className="max-h-20 list-inside list-disc overflow-y-auto text-destructive">
+                    {importAnalysis.notFound.slice(0, 15).map((r) => (
+                      <li key={r.lineIndex}>
                         {t("master.itemsLabelData.previewUnmatchedLine", {
-                          line: u.lineIndex,
-                          code: u.code ?? "—",
-                          barcode: u.barcode ?? "—",
+                          line: r.lineIndex,
+                          code: r.rawCode ?? "—",
+                          barcode: r.rawBarcode ?? "—",
                         })}
                       </li>
                     ))}
                   </ul>
                 ) : null}
-                {importPreview.unknownHeaders.length > 0 ? (
-                  <p className="text-amber-800 dark:text-amber-200">
-                    {t("master.itemsLabelData.previewUnknownHeaders", {
-                      headers: importPreview.unknownHeaders.join(", "),
-                    })}
-                  </p>
+                {importAnalysis.ambiguous.length > 0 ? (
+                  <ul className="max-h-20 list-inside list-disc overflow-y-auto text-amber-800 dark:text-amber-200">
+                    {importAnalysis.ambiguous.slice(0, 15).map((a) => (
+                      <li key={a.row.lineIndex}>
+                        {t("master.itemsLabelData.report.ambiguousLine", {
+                          line: a.row.lineIndex,
+                          codes: a.candidates.map((c) => c.code).join(", "),
+                        })}
+                      </li>
+                    ))}
+                  </ul>
+                ) : null}
+                {importAnalysis.conflicts.length > 0 ? (
+                  <ul className="max-h-24 list-inside list-disc overflow-y-auto text-destructive">
+                    {importAnalysis.conflicts.slice(0, 15).map((c, i) => (
+                      <li key={`${c.item.id}-${i}`}>
+                        {t("master.itemsLabelData.report.conflictLine", {
+                          code: c.item.code,
+                          lines: c.lineIndices.join(", "),
+                          field: t(`master.item.labelData.${c.field}` as "master.item.labelData.translationName"),
+                          a: c.values[0],
+                          b: c.values[1],
+                        })}
+                      </li>
+                    ))}
+                  </ul>
                 ) : null}
               </div>
             ) : null}
@@ -554,7 +677,11 @@ export function ItemsLabelDataPage() {
               <Button type="button" variant="outline" onClick={() => setImportOpen(false)}>
                 {t("common.cancel")}
               </Button>
-              <Button type="button" disabled={!importPreview || importPreview.matched.length === 0} onClick={runImportApply}>
+              <Button
+                type="button"
+                disabled={!importAnalysis || importAnalysis.applicable.length === 0}
+                onClick={runImportApply}
+              >
                 {t("master.itemsLabelData.importApply")}
               </Button>
             </div>

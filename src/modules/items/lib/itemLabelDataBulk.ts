@@ -125,21 +125,50 @@ export type LabelDataFilter =
   | "no_marking"
   | "no_datamatrix"
   | "no_kiz_marking"
-  | "issues";
+  | "issues"
+  | "dirty_only"
+  | "import_skipped";
 
-export function applyLabelDataFilter(items: Item[], f: LabelDataFilter): Item[] {
+export type LabelDataFilterContext = {
+  dirtyIds?: Set<string>;
+  /** Items touched by last import apply (conflicts / ambiguous candidates) */
+  importSkippedIds?: Set<string>;
+  /** When set, completeness filters use current draft values for those rows */
+  draftById?: Record<string, ItemLabelDataDraft>;
+};
+
+export function hasTranslationInDraft(d: ItemLabelDataDraft): boolean {
+  return [d.translationName, d.translationDescription, d.translationComposition, d.translationExtraText].some((s) =>
+    s?.trim(),
+  );
+}
+
+export function hasMarkingInDraft(d: ItemLabelDataDraft): boolean {
+  return !!(
+    d.markingCode?.trim() ||
+    d.kizCode?.trim() ||
+    d.dataMatrixPayload?.trim() ||
+    d.gs1DataMatrixPayload?.trim()
+  );
+}
+
+export function applyLabelDataFilter(items: Item[], f: LabelDataFilter, ctx?: LabelDataFilterContext): Item[] {
   if (f === "all") return items;
+  if (f === "dirty_only") return items.filter((i) => ctx?.dirtyIds?.has(i.id));
+  if (f === "import_skipped") return items.filter((i) => ctx?.importSkippedIds?.has(i.id));
+
   return items.filter((item) => {
-    if (f === "no_translation") return !hasTranslationDisplayContent(item);
-    if (f === "no_marking") return !hasMarkingContent(item);
+    const d = ctx?.draftById?.[item.id] ?? itemToLabelDataDraft(item);
+    if (f === "no_translation") return !hasTranslationInDraft(d);
+    if (f === "no_marking") return !hasMarkingInDraft(d);
     if (f === "no_datamatrix") {
-      return !item.dataMatrixPayload?.trim() && !item.gs1DataMatrixPayload?.trim();
+      return !d.dataMatrixPayload?.trim() && !d.gs1DataMatrixPayload?.trim();
     }
     if (f === "no_kiz_marking") {
-      return !item.kizCode?.trim() && !item.markingCode?.trim();
+      return !d.kizCode?.trim() && !d.markingCode?.trim();
     }
     if (f === "issues") {
-      return !hasTranslationDisplayContent(item) || !hasMarkingContent(item);
+      return !hasTranslationInDraft(d) || !hasMarkingInDraft(d);
     }
     return true;
   });
