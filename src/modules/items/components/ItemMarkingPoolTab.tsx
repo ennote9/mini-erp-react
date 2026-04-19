@@ -1,4 +1,5 @@
 import { useMemo, useState, useCallback, useSyncExternalStore } from "react";
+import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -38,6 +39,7 @@ function auditSourceLabelKey(source: ItemMarkingRecordAuditSource): string {
     void: "master.item.markingPool.auditSource.void",
     mark_used: "master.item.markingPool.auditSource.mark_used",
     release: "master.item.markingPool.auditSource.release",
+    reconciliation: "master.item.markingPool.auditSource.reconciliation",
     system: "master.item.markingPool.auditSource.system",
   };
   return map[source] ?? map.system;
@@ -154,6 +156,14 @@ export function ItemMarkingPoolTab({ itemId }: Props) {
   return (
     <div className="space-y-4">
       <p className="text-[11px] leading-snug text-muted-foreground">{t("master.item.markingPool.hint")}</p>
+      <p className="text-[11px]">
+        <Link
+          to={`/items/marking-reconciliation?item=${encodeURIComponent(itemId)}`}
+          className="text-primary underline-offset-2 hover:underline"
+        >
+          {t("master.markingReconciliation.openFromItemHint")}
+        </Link>
+      </p>
 
       <div className="rounded-md border border-border/70 bg-card/40 p-3 space-y-2">
         <p className="text-xs font-medium">{t("master.item.markingPool.addTitle")}</p>

@@ -873,6 +873,33 @@ test.describe("Item card — Prices tab (acceptance)", () => {
     await expect(purchaseCurrent.locator('[data-testid="item-price-delta"]')).toBeVisible();
     await expect(purchaseCurrent.locator('[data-testid="item-price-delta"]')).toHaveAttribute("data-delta-direction", "up");
 
+    const purchaseValueRow = purchaseCurrent.getByTestId("item-price-summary-value-row");
+    const purchaseReasonRow = purchaseCurrent.getByTestId("item-price-summary-reason-row");
+    await expect(purchaseValueRow.locator('[data-testid="item-price-trend-sparkline"]')).toBeVisible();
+    await expect(purchaseReasonRow.locator('[data-testid="item-price-delta"]')).toBeVisible();
+    const purchaseValueGeom = await purchaseValueRow.evaluate((row) => {
+      const priceEl = row.children[0];
+      const spark = row.querySelector('[data-testid="item-price-trend-sparkline"]');
+      if (!priceEl || !spark) return null;
+      return {
+        priceRight: priceEl.getBoundingClientRect().right,
+        sparkLeft: spark.getBoundingClientRect().left,
+      };
+    });
+    expect(purchaseValueGeom).toBeTruthy();
+    expect(purchaseValueGeom!.sparkLeft).toBeGreaterThanOrEqual(purchaseValueGeom!.priceRight - 1);
+    const purchaseReasonGeom = await purchaseReasonRow.evaluate((row) => {
+      const reasonEl = row.children[0];
+      const delta = row.querySelector('[data-testid="item-price-delta"]');
+      if (!reasonEl || !delta) return null;
+      return {
+        reasonRight: reasonEl.getBoundingClientRect().right,
+        deltaLeft: delta.getBoundingClientRect().left,
+      };
+    });
+    expect(purchaseReasonGeom).toBeTruthy();
+    expect(purchaseReasonGeom!.deltaLeft).toBeGreaterThanOrEqual(purchaseReasonGeom!.reasonRight - 1);
+
     await page.getByTestId("item-prices-add-sale").click();
     await expect(page.getByTestId("item-price-edit-dialog")).toBeVisible({ timeout: 10_000 });
     await page.getByTestId("item-price-amount-input").fill("20.00");
@@ -892,6 +919,33 @@ test.describe("Item card — Prices tab (acceptance)", () => {
     const saleCurrent = page.getByTestId("item-prices-card-sale-current");
     await expect(saleCurrent.locator('[data-testid="item-price-trend-sparkline"]')).toBeVisible();
     await expect(saleCurrent.locator('[data-testid="item-price-delta"]')).toHaveAttribute("data-delta-direction", "down");
+
+    const saleValueRow = saleCurrent.getByTestId("item-price-summary-value-row");
+    const saleReasonRow = saleCurrent.getByTestId("item-price-summary-reason-row");
+    await expect(saleValueRow.locator('[data-testid="item-price-trend-sparkline"]')).toBeVisible();
+    await expect(saleReasonRow.locator('[data-testid="item-price-delta"]')).toBeVisible();
+    const saleValueGeom = await saleValueRow.evaluate((row) => {
+      const priceEl = row.children[0];
+      const spark = row.querySelector('[data-testid="item-price-trend-sparkline"]');
+      if (!priceEl || !spark) return null;
+      return {
+        priceRight: priceEl.getBoundingClientRect().right,
+        sparkLeft: spark.getBoundingClientRect().left,
+      };
+    });
+    expect(saleValueGeom).toBeTruthy();
+    expect(saleValueGeom!.sparkLeft).toBeGreaterThanOrEqual(saleValueGeom!.priceRight - 1);
+    const saleReasonGeom = await saleReasonRow.evaluate((row) => {
+      const reasonEl = row.children[0];
+      const delta = row.querySelector('[data-testid="item-price-delta"]');
+      if (!reasonEl || !delta) return null;
+      return {
+        reasonRight: reasonEl.getBoundingClientRect().right,
+        deltaLeft: delta.getBoundingClientRect().left,
+      };
+    });
+    expect(saleReasonGeom).toBeTruthy();
+    expect(saleReasonGeom!.deltaLeft).toBeGreaterThanOrEqual(saleReasonGeom!.reasonRight - 1);
 
     await expect(page.getByTestId("item-prices-card-purchase-next").locator('[data-testid="item-price-trend-sparkline"]')).toHaveCount(0);
     await expect(page.getByTestId("item-prices-card-sale-next").locator('[data-testid="item-price-trend-sparkline"]')).toHaveCount(0);

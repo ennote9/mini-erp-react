@@ -13,6 +13,7 @@ export type ItemMarkingRecordAuditSource =
   | "void"
   | "mark_used"
   | "release"
+  | "reconciliation"
   | "system";
 
 /** Append-only history row for marking record status changes. */

@@ -30,6 +30,95 @@ export function listMarkingRecordAuditByRecordId(markingRecordId: string, limit 
   return markingRecordAuditRepository.listByMarkingRecordId(markingRecordId).slice(-limit);
 }
 
+/** Latest audit row that moved this record to PRINTED with a print job id (for reconciliation traceability). */
+export function getMarkingRecordLastPrintAudit(markingRecordId: string): ItemMarkingRecordAuditEntry | undefined {
+  const entries = markingRecordAuditRepository.listByMarkingRecordId(markingRecordId);
+  const prints = entries.filter((e) => e.toStatus === "PRINTED" && e.printJobId);
+  return prints.length ? prints[prints.length - 1] : undefined;
+}
+
+export function listMarkingRecordIdsByPrintJobId(printJobId: string): string[] {
+  return markingRecordAuditRepository.listMarkingRecordIdsByPrintJobId(printJobId);
+}
+
+export type ReconciliationBatchResult = {
+  updated: number;
+  skipped: number;
+  notApplicable: number;
+};
+
+/** PRINTED → USED; audit reason `reconciliation_used`. */
+export function reconcileBatchConfirmUsed(ids: readonly string[], note?: string): ReconciliationBatchResult {
+  const result: ReconciliationBatchResult = { updated: 0, skipped: 0, notApplicable: 0 };
+  const seen = new Set<string>();
+  for (const raw of ids) {
+    const id = raw?.trim();
+    if (!id || seen.has(id)) continue;
+    seen.add(id);
+    const r = getMarkingRecordById(id);
+    if (!r) {
+      result.skipped++;
+      continue;
+    }
+    if (r.status !== "PRINTED") {
+      result.notApplicable++;
+      continue;
+    }
+    const u = markMarkingRecordUsed(id, { source: "reconciliation", reason: "reconciliation_used", note });
+    if (u) result.updated++;
+    else result.skipped++;
+  }
+  return result;
+}
+
+/** RESERVED → AVAILABLE; audit reason `reconciliation_release`. Does not move PRINTED → AVAILABLE. */
+export function reconcileBatchReleaseToAvailable(ids: readonly string[], note?: string): ReconciliationBatchResult {
+  const result: ReconciliationBatchResult = { updated: 0, skipped: 0, notApplicable: 0 };
+  const seen = new Set<string>();
+  for (const raw of ids) {
+    const id = raw?.trim();
+    if (!id || seen.has(id)) continue;
+    seen.add(id);
+    const r = getMarkingRecordById(id);
+    if (!r) {
+      result.skipped++;
+      continue;
+    }
+    if (r.status !== "RESERVED") {
+      result.notApplicable++;
+      continue;
+    }
+    const u = releaseReservedMarking(id, { source: "reconciliation", reason: "reconciliation_release", note });
+    if (u) result.updated++;
+    else result.skipped++;
+  }
+  return result;
+}
+
+/** RESERVED or PRINTED → VOID; audit reason `reconciliation_void`. */
+export function reconcileBatchVoid(ids: readonly string[], note?: string): ReconciliationBatchResult {
+  const result: ReconciliationBatchResult = { updated: 0, skipped: 0, notApplicable: 0 };
+  const seen = new Set<string>();
+  for (const raw of ids) {
+    const id = raw?.trim();
+    if (!id || seen.has(id)) continue;
+    seen.add(id);
+    const r = getMarkingRecordById(id);
+    if (!r) {
+      result.skipped++;
+      continue;
+    }
+    if (r.status !== "RESERVED" && r.status !== "PRINTED") {
+      result.notApplicable++;
+      continue;
+    }
+    const u = voidMarkingRecord(id, { source: "reconciliation", reason: "reconciliation_void", note });
+    if (u) result.updated++;
+    else result.skipped++;
+  }
+  return result;
+}
+
 function appendAudit(input: Omit<ItemMarkingRecordAuditEntry, "id" | "createdAt">): void {
   markingRecordAuditRepository.append(input);
 }
@@ -216,22 +305,22 @@ export function markManyMarkingRecordsPrinted(
 
 export function markMarkingRecordUsed(
   id: string,
-  meta?: { source?: ItemMarkingRecordAuditSource; note?: string },
+  meta?: { source?: ItemMarkingRecordAuditSource; note?: string; reason?: string },
 ): ItemMarkingRecord | undefined {
   return transitionMarkingRecordStatus(id, "USED", {
     source: meta?.source ?? "manual",
-    reason: "mark_used",
+    reason: meta?.reason ?? "mark_used",
     note: meta?.note,
   });
 }
 
 export function voidMarkingRecord(
   id: string,
-  meta?: { source?: ItemMarkingRecordAuditSource; note?: string },
+  meta?: { source?: ItemMarkingRecordAuditSource; note?: string; reason?: string },
 ): ItemMarkingRecord | undefined {
   return transitionMarkingRecordStatus(id, "VOID", {
     source: meta?.source ?? "void",
-    reason: "void",
+    reason: meta?.reason ?? "void",
     note: meta?.note,
   });
 }

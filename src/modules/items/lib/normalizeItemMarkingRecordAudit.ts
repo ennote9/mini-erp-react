@@ -10,6 +10,7 @@ const SOURCES = new Set<ItemMarkingRecordAuditSource>([
   "void",
   "mark_used",
   "release",
+  "reconciliation",
   "system",
 ]);
 

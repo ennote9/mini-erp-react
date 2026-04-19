@@ -193,12 +193,22 @@ export function LabelsOperationsPage() {
                       {formatSourceLabel(job, t)}
                     </span>
                     {batch ? (
-                      <Link
-                        to={buildLabelsBatchUrl({ restoreJob: job.id })}
-                        className="rounded border border-primary/40 bg-primary/5 px-2 py-1 text-xs font-medium text-primary underline-offset-2 hover:bg-primary/10 hover:underline"
-                      >
-                        {t("labels.operations.batchRestore")}
-                      </Link>
+                      <div className="flex flex-col items-end gap-1">
+                        <Link
+                          to={buildLabelsBatchUrl({ restoreJob: job.id })}
+                          className="rounded border border-primary/40 bg-primary/5 px-2 py-1 text-xs font-medium text-primary underline-offset-2 hover:bg-primary/10 hover:underline"
+                        >
+                          {t("labels.operations.batchRestore")}
+                        </Link>
+                        {job.batchRowsSnapshot ? (
+                          <Link
+                            to={`/items/marking-reconciliation?job=${encodeURIComponent(job.id)}`}
+                            className="text-[10px] text-violet-700 underline-offset-2 hover:underline dark:text-violet-300"
+                          >
+                            {t("labels.operations.openMarkingReconciliation")}
+                          </Link>
+                        ) : null}
+                      </div>
                     ) : (
                       <div className="flex flex-col items-end gap-1">
                         <Link
@@ -213,6 +223,14 @@ export function LabelsOperationsPage() {
                         >
                           {t("labels.operations.reprint")}
                         </Link>
+                        {job.markingRecordId || job.markingPayloadSnapshot ? (
+                          <Link
+                            to={`/items/marking-reconciliation?job=${encodeURIComponent(job.id)}`}
+                            className="text-[10px] text-violet-700 underline-offset-2 hover:underline dark:text-violet-300"
+                          >
+                            {t("labels.operations.openMarkingReconciliation")}
+                          </Link>
+                        ) : null}
                       </div>
                     )}
                   </div>

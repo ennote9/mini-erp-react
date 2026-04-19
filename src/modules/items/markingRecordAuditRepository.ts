@@ -70,6 +70,15 @@ export const markingRecordAuditRepository = {
       .sort((a, b) => a.createdAt.localeCompare(b.createdAt));
   },
 
+  /** Marking record ids that appear in any audit row tied to this print job (e.g. print_success). */
+  listMarkingRecordIdsByPrintJobId(printJobId: string): string[] {
+    const ids = new Set<string>();
+    for (const e of store) {
+      if (e.printJobId === printJobId) ids.add(e.markingRecordId);
+    }
+    return [...ids];
+  },
+
   append(input: CreateItemMarkingRecordAuditInput): ItemMarkingRecordAuditEntry {
     const ts = new Date().toISOString();
     const entity: ItemMarkingRecordAuditEntry = {

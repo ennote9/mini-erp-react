@@ -619,24 +619,36 @@ function SummaryCard({
         </div>
       ) : (
         <div className="mt-2 flex min-h-0 flex-1 flex-col">
-          <div className="flex min-w-0 items-start justify-between gap-2">
-            <div className="min-w-0 text-2xl font-semibold leading-none tabular-nums tracking-tight text-foreground">
+          <div
+            data-testid="item-price-summary-value-row"
+            className="flex min-w-0 items-center justify-between gap-3"
+          >
+            <div className="min-w-0 shrink text-2xl font-semibold leading-none tabular-nums tracking-tight text-foreground">
               {formatMoney(record.amount)}
             </div>
-            {showDelta ? <ItemPriceDeltaBadge delta={deltaVsPrevious} formatMoney={formatMoney} /> : null}
+            {showSparkline ? (
+              <div className="h-5 w-[5.25rem] max-w-[42%] shrink-0 self-center [&_svg]:max-h-5">
+                <ItemPriceTrendSparkline values={trendSparklineAmounts!} aria-label={sparklineAriaLabel ?? ""} />
+              </div>
+            ) : null}
           </div>
-          {showSparkline ? (
-            <div className="mt-1.5 min-h-0 w-full min-w-0">
-              <ItemPriceTrendSparkline values={trendSparklineAmounts!} aria-label={sparklineAriaLabel ?? ""} />
-            </div>
-          ) : null}
           <div className="mt-2 text-[11px] text-muted-foreground">
             <span className="text-[10px] uppercase tracking-wide text-muted-foreground/75">
               {t("master.item.prices.summaryEffectiveFrom")}
             </span>
             <span className="ml-1 tabular-nums">{record.validFrom}</span>
           </div>
-          <div className="mt-1 line-clamp-2 text-[11px] leading-snug text-muted-foreground">{reasonLabel(record.reasonCode)}</div>
+          <div
+            data-testid="item-price-summary-reason-row"
+            className="mt-1 flex min-w-0 items-start justify-between gap-2"
+          >
+            <div className="min-w-0 flex-1 line-clamp-2 text-[11px] leading-snug text-muted-foreground">
+              {reasonLabel(record.reasonCode)}
+            </div>
+            {showDelta ? (
+              <ItemPriceDeltaBadge className="pt-px" delta={deltaVsPrevious!} formatMoney={formatMoney} />
+            ) : null}
+          </div>
           {record.comment ? (
             <div className="mt-1 line-clamp-2 text-[11px] leading-snug text-muted-foreground/85" title={record.comment}>
               {record.comment}

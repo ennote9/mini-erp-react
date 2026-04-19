@@ -28,6 +28,7 @@ const PAGE_TITLES: Record<string, string> = {
   "/items": "routes.items",
   "/items/label-data": "routes.itemsLabelData",
   "/items/marking-import": "routes.itemsMarkingImport",
+  "/items/marking-reconciliation": "routes.itemsMarkingReconciliation",
   "/barcodes": "routes.barcodes",
   "/labels": "routes.labels",
   "/labels/workspace": "routes.labelsWorkspace",
@@ -52,6 +53,9 @@ const PAGE_TITLES: Record<string, string> = {
 };
 
 function getPageTitleKey(pathname: string): string {
+  if (pathname === "/items/label-data") return "routes.itemsLabelData";
+  if (pathname === "/items/marking-import") return "routes.itemsMarkingImport";
+  if (pathname === "/items/marking-reconciliation") return "routes.itemsMarkingReconciliation";
   if (pathname.match(/^\/items\/[^/]+$/)) return "routes.item";
   if (pathname.match(/^\/brands\/[^/]+$/)) return "routes.brand";
   if (pathname.match(/^\/categories\/[^/]+$/)) return "routes.category";
@@ -89,6 +93,7 @@ function getPageIcon(
     pathname === "/items" ||
     pathname === "/items/label-data" ||
     pathname === "/items/marking-import" ||
+    pathname === "/items/marking-reconciliation" ||
     pathname.match(/^\/items\/[^/]+$/)
   )
     return Package;
