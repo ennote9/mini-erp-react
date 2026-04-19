@@ -34,6 +34,12 @@ export function normalizeItemMarkingRecord(raw: unknown): ItemMarkingRecord | nu
   const createdAt = typeof o.createdAt === "string" ? o.createdAt : new Date(0).toISOString();
   const updatedAt = typeof o.updatedAt === "string" ? o.updatedAt : createdAt;
 
+  const lastSyncStatusRaw = o.lastSyncStatus;
+  const lastSyncStatus =
+    lastSyncStatusRaw === "SUCCESS" || lastSyncStatusRaw === "FAILED" || lastSyncStatusRaw === "PARTIAL"
+      ? lastSyncStatusRaw
+      : undefined;
+
   return {
     id,
     itemId,
@@ -45,6 +51,12 @@ export function normalizeItemMarkingRecord(raw: unknown): ItemMarkingRecord | nu
     batchRef: optStr(o.batchRef),
     serial: optStr(o.serial),
     note: optStr(o.note),
+    externalStatus: optStr(o.externalStatus),
+    externalProvider: optStr(o.externalProvider),
+    externalCodeRef: optStr(o.externalCodeRef),
+    lastSyncAt: typeof o.lastSyncAt === "string" ? o.lastSyncAt : undefined,
+    lastSyncStatus,
+    lastSyncMessage: optStr(o.lastSyncMessage),
     createdAt,
     updatedAt,
   };

@@ -212,7 +212,13 @@ export function LabelsOperationsPage() {
                               to={`/items/marking-traceability?job=${encodeURIComponent(job.id)}`}
                               className="text-[10px] text-violet-700 underline-offset-2 hover:underline dark:text-violet-300"
                             >
-                              {t("labels.operations.openMarkingTraceability")}
+                              {t("labels.operations.syncRelatedMarkingCodes")}
+                            </Link>
+                            <Link
+                              to={`/items/marking-sync?job=${encodeURIComponent(job.id)}`}
+                              className="text-[10px] text-violet-700 underline-offset-2 hover:underline dark:text-violet-300"
+                            >
+                              {t("labels.operations.openMarkingSyncConsole")}
                             </Link>
                           </>
                         ) : null}
@@ -243,7 +249,13 @@ export function LabelsOperationsPage() {
                               to={`/items/marking-traceability?job=${encodeURIComponent(job.id)}`}
                               className="text-[10px] text-violet-700 underline-offset-2 hover:underline dark:text-violet-300"
                             >
-                              {t("labels.operations.openMarkingTraceability")}
+                              {t("labels.operations.syncRelatedMarkingCodes")}
+                            </Link>
+                            <Link
+                              to={`/items/marking-sync?job=${encodeURIComponent(job.id)}`}
+                              className="text-[10px] text-violet-700 underline-offset-2 hover:underline dark:text-violet-300"
+                            >
+                              {t("labels.operations.openMarkingSyncConsole")}
                             </Link>
                           </>
                         ) : null}

@@ -22,6 +22,13 @@ export interface ItemMarkingRecord {
   batchRef?: string;
   serial?: string;
   note?: string;
+  /** Snapshot from external marking registry (provider-specific string). Never overwrites internal `status` automatically. */
+  externalStatus?: string;
+  externalProvider?: string;
+  externalCodeRef?: string;
+  lastSyncAt?: string;
+  lastSyncStatus?: "SUCCESS" | "FAILED" | "PARTIAL";
+  lastSyncMessage?: string;
   createdAt: string;
   updatedAt: string;
 }

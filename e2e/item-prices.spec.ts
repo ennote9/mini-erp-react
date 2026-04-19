@@ -876,6 +876,12 @@ test.describe("Item card — Prices tab (acceptance)", () => {
     const purchaseValueRow = purchaseCurrent.getByTestId("item-price-summary-value-row");
     const purchaseReasonRow = purchaseCurrent.getByTestId("item-price-summary-reason-row");
     await expect(purchaseValueRow.locator('[data-testid="item-price-trend-sparkline"]')).toBeVisible();
+    const purchaseChartArea = purchaseCurrent.getByTestId("item-price-trend-chart-area");
+    await expect(purchaseChartArea).toBeVisible();
+    const purchaseChartBox = await purchaseChartArea.boundingBox();
+    expect(purchaseChartBox).toBeTruthy();
+    expect(purchaseChartBox!.height).toBeGreaterThanOrEqual(44);
+    expect(purchaseChartBox!.width).toBeGreaterThanOrEqual(130);
     await expect(purchaseReasonRow.locator('[data-testid="item-price-delta"]')).toBeVisible();
     const purchaseValueGeom = await purchaseValueRow.evaluate((row) => {
       const priceEl = row.children[0];
@@ -923,6 +929,12 @@ test.describe("Item card — Prices tab (acceptance)", () => {
     const saleValueRow = saleCurrent.getByTestId("item-price-summary-value-row");
     const saleReasonRow = saleCurrent.getByTestId("item-price-summary-reason-row");
     await expect(saleValueRow.locator('[data-testid="item-price-trend-sparkline"]')).toBeVisible();
+    const saleChartArea = saleCurrent.getByTestId("item-price-trend-chart-area");
+    await expect(saleChartArea).toBeVisible();
+    const saleChartBox = await saleChartArea.boundingBox();
+    expect(saleChartBox).toBeTruthy();
+    expect(saleChartBox!.height).toBeGreaterThanOrEqual(44);
+    expect(saleChartBox!.width).toBeGreaterThanOrEqual(130);
     await expect(saleReasonRow.locator('[data-testid="item-price-delta"]')).toBeVisible();
     const saleValueGeom = await saleValueRow.evaluate((row) => {
       const priceEl = row.children[0];
@@ -948,7 +960,9 @@ test.describe("Item card — Prices tab (acceptance)", () => {
     expect(saleReasonGeom!.deltaLeft).toBeGreaterThanOrEqual(saleReasonGeom!.reasonRight - 1);
 
     await expect(page.getByTestId("item-prices-card-purchase-next").locator('[data-testid="item-price-trend-sparkline"]')).toHaveCount(0);
+    await expect(page.getByTestId("item-prices-card-purchase-next").getByTestId("item-price-trend-chart-area")).toHaveCount(0);
     await expect(page.getByTestId("item-prices-card-sale-next").locator('[data-testid="item-price-trend-sparkline"]')).toHaveCount(0);
+    await expect(page.getByTestId("item-prices-card-sale-next").getByTestId("item-price-trend-chart-area")).toHaveCount(0);
 
     await page.reload({ waitUntil: "domcontentloaded" });
     await waitItemsRepositoryHydrated(page);

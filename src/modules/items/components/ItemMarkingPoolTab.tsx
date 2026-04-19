@@ -21,6 +21,9 @@ import {
   releaseReservedMarking,
   voidMarkingRecord,
 } from "../markingRecordService";
+import { getMarkingExternalIntegrationInfo, syncMarkingRecords } from "../markingExternalSyncService";
+import { MarkingIntegrationModeBanner } from "./MarkingIntegrationModeBanner";
+import { getSyncProblemKind } from "../lib/markingSyncMismatch";
 
 const KIND_OPTIONS: { value: ItemMarkingRecordKind; labelKey: string }[] = [
   { value: "MARKING", labelKey: "master.item.markingPool.kind.MARKING" },
@@ -59,6 +62,9 @@ export function ItemMarkingPoolTab({ itemId }: Props) {
   }, [itemId, revision]);
 
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [syncBusy, setSyncBusy] = useState(false);
+
+  const selectedRow = useMemo(() => rows.find((r) => r.id === selectedId), [rows, selectedId]);
 
   const auditEntries = useMemo(() => {
     void revision;
@@ -169,7 +175,24 @@ export function ItemMarkingPoolTab({ itemId }: Props) {
         >
           {t("master.markingTraceability.openFromItemHint")}
         </Link>
+        <Link
+          to={
+            rows.length
+              ? `/items/marking-sync?records=${encodeURIComponent(rows.map((r) => r.id).join(","))}`
+              : "/items/marking-sync"
+          }
+          className="text-primary underline-offset-2 hover:underline"
+        >
+          {t("master.item.markingPool.openSyncConsole")}
+        </Link>
+        <Link to="/settings/marking-provider" className="text-primary underline-offset-2 hover:underline">
+          {t("master.item.markingPool.linkProviderSettings")}
+        </Link>
       </p>
+      <MarkingIntegrationModeBanner />
+      {getMarkingExternalIntegrationInfo().effectiveLabel === "mock" ? (
+        <p className="text-[10px] text-muted-foreground">{t("master.markingExternalSync.poolMockHint")}</p>
+      ) : null}
 
       <div className="rounded-md border border-border/70 bg-card/40 p-3 space-y-2">
         <p className="text-xs font-medium">{t("master.item.markingPool.addTitle")}</p>
@@ -287,6 +310,61 @@ export function ItemMarkingPoolTab({ itemId }: Props) {
           </tbody>
         </table>
       </div>
+
+      {selectedId && selectedRow ? (
+        <div className="rounded-md border border-border/50 bg-muted/15 p-3 space-y-2">
+          <p className="text-xs font-medium">{t("master.markingExternalSync.poolExternalTitle")}</p>
+          <dl className="grid gap-1 text-[10px] sm:grid-cols-2">
+            <div>
+              <dt className="text-muted-foreground">{t("master.markingExternalSync.detailIntegrationMode")}</dt>
+              <dd>{t(`master.markingProvider.effective.${getMarkingExternalIntegrationInfo().effectiveLabel}`)}</dd>
+            </div>
+            <div>
+              <dt className="text-muted-foreground">{t("master.markingExternalSync.detailExternalStatus")}</dt>
+              <dd className="font-mono">{selectedRow.externalStatus ?? "—"}</dd>
+            </div>
+            <div>
+              <dt className="text-muted-foreground">{t("master.markingExternalSync.detailLastSync")}</dt>
+              <dd>
+                {selectedRow.lastSyncStatus ?? "—"}
+                {selectedRow.lastSyncAt
+                  ? ` · ${new Date(selectedRow.lastSyncAt).toLocaleString(undefined, { dateStyle: "short", timeStyle: "short" })}`
+                  : ""}
+              </dd>
+            </div>
+            <div className="sm:col-span-2">
+              <dt className="text-muted-foreground">{t("master.markingExternalSync.detailMismatch")}</dt>
+              <dd>
+                {getSyncProblemKind(selectedRow)
+                  ? t(`master.markingExternalSync.syncProblem.${getSyncProblemKind(selectedRow)!}`)
+                  : t("master.markingExternalSync.detailMismatchNone")}
+              </dd>
+            </div>
+          </dl>
+          <div className="flex flex-wrap gap-2">
+            <Button
+              type="button"
+              size="sm"
+              variant="secondary"
+              className="h-8 text-xs"
+              disabled={syncBusy}
+              onClick={async () => {
+                setSyncBusy(true);
+                try {
+                  await syncMarkingRecords([selectedRow.id], "FETCH_STATUS");
+                } finally {
+                  setSyncBusy(false);
+                }
+              }}
+            >
+              {syncBusy ? t("master.markingExternalSync.syncRunning") : t("master.markingExternalSync.poolSyncButton")}
+            </Button>
+            <Button type="button" size="sm" variant="outline" className="h-8 text-xs" asChild>
+              <Link to={`/items/marking-sync?record=${encodeURIComponent(selectedRow.id)}`}>{t("master.item.markingPool.openSyncConsoleRecord")}</Link>
+            </Button>
+          </div>
+        </div>
+      ) : null}
 
       {selectedId ? (
         <div className="rounded-md border border-border/60 bg-card/30 p-3 space-y-2">

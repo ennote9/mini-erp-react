@@ -22,6 +22,9 @@ import {
   type MarkingProblemKind,
 } from "../lib/markingTraceabilityReporting";
 import { listMarkingRecordAuditByRecordId, listMarkingRecordIdsByPrintJobId } from "../markingRecordService";
+import { getMarkingExternalIntegrationInfo, syncByBatchRef, syncByPrintJob, syncMarkingRecords } from "../markingExternalSyncService";
+import { MarkingIntegrationModeBanner } from "../components/MarkingIntegrationModeBanner";
+import { getSyncProblemKind } from "../lib/markingSyncMismatch";
 import { itemRepository } from "../repository";
 
 const KINDS: Array<{ value: "" | ItemMarkingRecord["kind"]; labelKey: string }> = [
@@ -76,6 +79,12 @@ function problemLabel(t: (k: string) => string, k: MarkingProblemKind): string {
   return tr === key ? k : tr;
 }
 
+function syncProblemLabel(t: (k: string) => string, k: NonNullable<ReturnType<typeof getSyncProblemKind>>): string {
+  const key = `master.markingExternalSync.syncProblem.${k}` as const;
+  const tr = t(key);
+  return tr === key ? k : tr;
+}
+
 export function ItemsMarkingTraceabilityPage() {
   const { t } = useTranslation();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -104,10 +113,15 @@ export function ItemsMarkingTraceabilityPage() {
     return "";
   });
   const [problemOnly, setProblemOnly] = useState(() => searchParams.get("problem") === "1");
+  const [extMismatchOnly, setExtMismatchOnly] = useState(() => searchParams.get("extM") === "1");
+  const [extFailedOnly, setExtFailedOnly] = useState(() => searchParams.get("extF") === "1");
+  const [extNeverOnly, setExtNeverOnly] = useState(() => searchParams.get("extN") === "1");
   const [updatedFrom, setUpdatedFrom] = useState(() => searchParams.get("from") ?? "");
   const [updatedTo, setUpdatedTo] = useState(() => searchParams.get("to") ?? "");
 
   const [detailId, setDetailId] = useState<string | null>(() => searchParams.get("record"));
+  const [syncBusy, setSyncBusy] = useState(false);
+  const [syncFeedback, setSyncFeedback] = useState<string | null>(null);
 
   const items = useMemo(() => {
     void revision;
@@ -158,6 +172,11 @@ export function ItemsMarkingTraceabilityPage() {
       }
       if (problemOnly && !problems.hasProblem) return false;
 
+      const sp = getSyncProblemKind(r);
+      if (extMismatchOnly && sp !== "mismatch") return false;
+      if (extFailedOnly && sp !== "sync_failed") return false;
+      if (extNeverOnly && sp !== "never_synced") return false;
+
       if (updatedFrom.trim()) {
         const fromT = new Date(`${updatedFrom.trim()}T00:00:00`).getTime();
         const u = Date.parse(r.updatedAt);
@@ -188,12 +207,102 @@ export function ItemsMarkingTraceabilityPage() {
     auditSource,
     recordSource,
     problemOnly,
+    extMismatchOnly,
+    extFailedOnly,
+    extNeverOnly,
     updatedFrom,
     updatedTo,
     search,
   ]);
 
   const filteredRecords = useMemo(() => filteredRows.map((x) => x.record), [filteredRows]);
+
+  const runSyncSlice = useCallback(async () => {
+    const ids = filteredRecords.map((r) => r.id);
+    if (ids.length === 0) return;
+    setSyncBusy(true);
+    setSyncFeedback(null);
+    try {
+      const r = await syncMarkingRecords(ids, "FETCH_STATUS");
+      setSyncFeedback(
+        t("master.markingExternalSync.traceFeedback", {
+          status: r.status,
+          logId: r.logId,
+          n: r.perRecord.filter((x) => x.ok).length,
+          total: r.perRecord.length,
+        }),
+      );
+    } catch (e) {
+      setSyncFeedback(e instanceof Error ? e.message : String(e));
+    } finally {
+      setSyncBusy(false);
+    }
+  }, [filteredRecords, t]);
+
+  const runSyncJob = useCallback(async () => {
+    const j = printJobFilter.trim();
+    if (!j) return;
+    setSyncBusy(true);
+    setSyncFeedback(null);
+    try {
+      const r = await syncByPrintJob(j);
+      setSyncFeedback(
+        t("master.markingExternalSync.traceFeedback", {
+          status: r.status,
+          logId: r.logId,
+          n: r.perRecord.filter((x) => x.ok).length,
+          total: r.perRecord.length,
+        }),
+      );
+    } catch (e) {
+      setSyncFeedback(e instanceof Error ? e.message : String(e));
+    } finally {
+      setSyncBusy(false);
+    }
+  }, [printJobFilter, t]);
+
+  const runSyncBatch = useCallback(async () => {
+    const b = batchRefFilter.trim();
+    if (!b) return;
+    setSyncBusy(true);
+    setSyncFeedback(null);
+    try {
+      const r = await syncByBatchRef(b);
+      setSyncFeedback(
+        t("master.markingExternalSync.traceFeedback", {
+          status: r.status,
+          logId: r.logId,
+          n: r.perRecord.filter((x) => x.ok).length,
+          total: r.perRecord.length,
+        }),
+      );
+    } catch (e) {
+      setSyncFeedback(e instanceof Error ? e.message : String(e));
+    } finally {
+      setSyncBusy(false);
+    }
+  }, [batchRefFilter, t]);
+
+  const runSyncOne = useCallback(async () => {
+    if (!detailId) return;
+    setSyncBusy(true);
+    setSyncFeedback(null);
+    try {
+      const r = await syncMarkingRecords([detailId], "FETCH_STATUS");
+      setSyncFeedback(
+        t("master.markingExternalSync.traceFeedback", {
+          status: r.status,
+          logId: r.logId,
+          n: r.perRecord.filter((x) => x.ok).length,
+          total: r.perRecord.length,
+        }),
+      );
+    } catch (e) {
+      setSyncFeedback(e instanceof Error ? e.message : String(e));
+    } finally {
+      setSyncBusy(false);
+    }
+  }, [detailId, t]);
 
   const statusCounts = useMemo(() => countMarkingRecordsByStatus(filteredRecords), [filteredRecords]);
 
@@ -210,6 +319,11 @@ export function ItemsMarkingTraceabilityPage() {
     if (!detailId) return null;
     return filteredRows.find((x) => x.record.id === detailId) ?? traceRowsAll.find((x) => x.record.id === detailId) ?? null;
   }, [detailId, filteredRows, traceRowsAll]);
+
+  const detailSyncKind = useMemo(
+    () => (detailRow ? getSyncProblemKind(detailRow.record) : null),
+    [detailRow],
+  );
 
   const detailAudit = useMemo(() => {
     void revision;
@@ -247,6 +361,9 @@ export function ItemsMarkingTraceabilityPage() {
       else setStatusFilter("");
     }
     if (searchParams.has("problem")) setProblemOnly(searchParams.get("problem") === "1");
+    if (searchParams.has("extM")) setExtMismatchOnly(searchParams.get("extM") === "1");
+    if (searchParams.has("extF")) setExtFailedOnly(searchParams.get("extF") === "1");
+    if (searchParams.has("extN")) setExtNeverOnly(searchParams.get("extN") === "1");
     if (searchParams.has("from")) setUpdatedFrom(searchParams.get("from") ?? "");
     if (searchParams.has("to")) setUpdatedTo(searchParams.get("to") ?? "");
     if (searchParams.has("record")) setDetailId(searchParams.get("record"));
@@ -271,6 +388,12 @@ export function ItemsMarkingTraceabilityPage() {
     else next.delete("status");
     if (problemOnly) next.set("problem", "1");
     else next.delete("problem");
+    if (extMismatchOnly) next.set("extM", "1");
+    else next.delete("extM");
+    if (extFailedOnly) next.set("extF", "1");
+    else next.delete("extF");
+    if (extNeverOnly) next.set("extN", "1");
+    else next.delete("extN");
     if (updatedFrom.trim()) next.set("from", updatedFrom.trim());
     else next.delete("from");
     if (updatedTo.trim()) next.set("to", updatedTo.trim());
@@ -291,6 +414,9 @@ export function ItemsMarkingTraceabilityPage() {
     kindFilter,
     statusFilter,
     problemOnly,
+    extMismatchOnly,
+    extFailedOnly,
+    extNeverOnly,
     updatedFrom,
     updatedTo,
     detailId,
@@ -307,6 +433,15 @@ export function ItemsMarkingTraceabilityPage() {
     const s = q.toString();
     return s ? `/items/marking-reconciliation?${s}` : "/items/marking-reconciliation";
   }, [itemFilter, printJobFilter, batchRefFilter, kindFilter, auditSource]);
+
+  const syncConsoleHref = useMemo(() => {
+    const q = new URLSearchParams();
+    if (printJobFilter.trim()) q.set("job", printJobFilter.trim());
+    if (batchRefFilter.trim()) q.set("batchRef", batchRefFilter.trim());
+    if (detailId) q.set("record", detailId);
+    const s = q.toString();
+    return s ? `/items/marking-sync?${s}` : "/items/marking-sync";
+  }, [printJobFilter, batchRefFilter, detailId]);
 
   const itemOptions = useMemo(
     () => [{ value: "", label: t("master.markingTraceability.filterItemAll") }, ...items.map((it) => ({ value: it.id, label: `${it.code} · ${it.name}` }))],
@@ -337,9 +472,13 @@ export function ItemsMarkingTraceabilityPage() {
           </p>
           <h1 className="text-base font-semibold tracking-tight">{t("master.markingTraceability.title")}</h1>
           <p className="mt-1 max-w-3xl text-xs text-muted-foreground">{t("master.markingTraceability.intro")}</p>
-          <p className="mt-2 text-[11px]">
+          <MarkingIntegrationModeBanner />
+          <p className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-[11px]">
             <Link to={reconciliationHref} className="text-primary underline-offset-2 hover:underline">
               {t("master.markingTraceability.openReconciliation")}
+            </Link>
+            <Link to={syncConsoleHref} className="text-primary underline-offset-2 hover:underline">
+              {t("master.markingTraceability.openSyncConsole")}
             </Link>
           </p>
         </div>
@@ -398,6 +537,39 @@ export function ItemsMarkingTraceabilityPage() {
               {auditSourceLabel(t, src as ItemMarkingRecordAuditSource)}: {n}
             </span>
           ))}
+      </section>
+
+      {syncFeedback ? (
+        <div role="status" className="rounded-md border border-border/70 bg-muted/30 px-3 py-2 text-[11px] text-foreground">
+          {syncFeedback}
+        </div>
+      ) : null}
+
+      <section className="flex flex-wrap items-center gap-2 rounded-md border border-violet-500/30 bg-violet-500/5 px-3 py-2">
+        <span className="text-[10px] font-semibold uppercase text-muted-foreground">{t("master.markingExternalSync.syncToolbarTitle")}</span>
+        <Button type="button" size="sm" variant="secondary" className="h-8 text-xs" disabled={syncBusy || filteredRecords.length === 0} onClick={() => void runSyncSlice()}>
+          {syncBusy ? t("master.markingExternalSync.syncRunning") : t("master.markingExternalSync.syncFilteredSlice")}
+        </Button>
+        <Button
+          type="button"
+          size="sm"
+          variant="outline"
+          className="h-8 text-xs"
+          disabled={syncBusy || !printJobFilter.trim()}
+          onClick={() => void runSyncJob()}
+        >
+          {t("master.markingExternalSync.syncByPrintJobFilter")}
+        </Button>
+        <Button
+          type="button"
+          size="sm"
+          variant="outline"
+          className="h-8 text-xs"
+          disabled={syncBusy || !batchRefFilter.trim()}
+          onClick={() => void runSyncBatch()}
+        >
+          {t("master.markingExternalSync.syncByBatchFilter")}
+        </Button>
       </section>
 
       <section className="rounded-md border border-border/80 bg-card/40 p-3 space-y-3">
@@ -480,11 +652,25 @@ export function ItemsMarkingTraceabilityPage() {
             <Label className="text-[11px]">{t("master.markingTraceability.filterUpdatedTo")}</Label>
             <Input type="date" value={updatedTo} onChange={(e) => setUpdatedTo(e.target.value)} className="h-8 text-xs" />
           </div>
-          <div className="flex items-end pb-1">
+          <div className="flex flex-col gap-2 pb-1 sm:col-span-2 lg:col-span-4">
             <label className="flex items-center gap-2 text-[11px]">
               <Checkbox checked={problemOnly} onCheckedChange={(v) => setProblemOnly(v === true)} id="problem-only" />
               <span>{t("master.markingTraceability.problemOnly")}</span>
             </label>
+            <div className="flex flex-wrap gap-x-4 gap-y-2">
+              <label className="flex items-center gap-2 text-[11px]">
+                <Checkbox checked={extMismatchOnly} onCheckedChange={(v) => setExtMismatchOnly(v === true)} id="ext-mismatch" />
+                <span>{t("master.markingExternalSync.filterMismatch")}</span>
+              </label>
+              <label className="flex items-center gap-2 text-[11px]">
+                <Checkbox checked={extFailedOnly} onCheckedChange={(v) => setExtFailedOnly(v === true)} id="ext-failed" />
+                <span>{t("master.markingExternalSync.filterSyncFailed")}</span>
+              </label>
+              <label className="flex items-center gap-2 text-[11px]">
+                <Checkbox checked={extNeverOnly} onCheckedChange={(v) => setExtNeverOnly(v === true)} id="ext-never" />
+                <span>{t("master.markingExternalSync.filterNeverSynced")}</span>
+              </label>
+            </div>
           </div>
         </div>
       </section>
@@ -502,13 +688,16 @@ export function ItemsMarkingTraceabilityPage() {
                 <th className="px-2 py-1.5">{t("master.markingTraceability.colBatchRef")}</th>
                 <th className="px-2 py-1.5">{t("master.markingTraceability.colUpdated")}</th>
                 <th className="px-2 py-1.5">{t("master.markingTraceability.colLastPrintJob")}</th>
+                <th className="px-2 py-1.5">{t("master.markingExternalSync.colExternal")}</th>
+                <th className="px-2 py-1.5">{t("master.markingExternalSync.colSyncState")}</th>
+                <th className="px-2 py-1.5">{t("master.markingExternalSync.colExtMismatch")}</th>
                 <th className="px-2 py-1.5">{t("master.markingTraceability.colProblem")}</th>
               </tr>
             </thead>
             <tbody>
               {filteredRows.length === 0 ? (
                 <tr>
-                  <td colSpan={9} className="px-3 py-8 text-center text-muted-foreground">
+                  <td colSpan={12} className="px-3 py-8 text-center text-muted-foreground">
                     {t("master.markingTraceability.empty")}
                   </td>
                 </tr>
@@ -516,6 +705,7 @@ export function ItemsMarkingTraceabilityPage() {
                 filteredRows.map((row) => {
                   const { record: r, lastPrintAudit, problems } = row;
                   const it = itemById.get(r.itemId);
+                  const syncPk = getSyncProblemKind(r);
                   return (
                     <tr
                       key={r.id}
@@ -556,6 +746,26 @@ export function ItemsMarkingTraceabilityPage() {
                           </Link>
                         ) : (
                           "—"
+                        )}
+                      </td>
+                      <td className="max-w-[7rem] truncate px-2 py-1.5 font-mono text-[10px]" title={r.externalStatus ?? ""}>
+                        {r.externalStatus ?? "—"}
+                      </td>
+                      <td className="px-2 py-1.5 text-[10px] text-muted-foreground">
+                        {r.lastSyncStatus ?? "—"}
+                        {r.lastSyncAt ? (
+                          <div className="text-[9px] opacity-80">
+                            {new Date(r.lastSyncAt).toLocaleString(undefined, { dateStyle: "short", timeStyle: "short" })}
+                          </div>
+                        ) : null}
+                      </td>
+                      <td className="px-2 py-1.5">
+                        {syncPk ? (
+                          <span className="rounded border border-violet-500/40 bg-violet-500/10 px-1 py-0.5 text-[9px] font-semibold uppercase text-violet-950 dark:text-violet-100">
+                            {syncProblemLabel(t, syncPk)}
+                          </span>
+                        ) : (
+                          <span className="text-muted-foreground">—</span>
                         )}
                       </td>
                       <td className="px-2 py-1.5">
@@ -621,39 +831,75 @@ export function ItemsMarkingTraceabilityPage() {
                   <dt className="text-[10px] uppercase text-muted-foreground">{t("master.markingTraceability.detailSerial")}</dt>
                   <dd className="font-mono">{detailRow.record.serial ?? "—"}</dd>
                 </div>
-                {detailRow.lastPrintAudit?.printJobId ? (
+              </dl>
+              <div className="rounded border border-border/60 bg-muted/20 p-2">
+                <p className="mb-1 text-[10px] font-semibold uppercase text-muted-foreground">{t("master.markingExternalSync.detailExternalBlock")}</p>
+                <dl className="space-y-0.5">
                   <div>
-                    <dt className="text-[10px] uppercase text-muted-foreground">{t("master.markingTraceability.detailPrintJob")}</dt>
-                    <dd className="space-y-1">
-                      <div className="font-mono text-[10px]">{detailRow.lastPrintAudit.printJobId}</div>
-                      <div className="text-muted-foreground">
-                        {auditSourceLabel(t, detailRow.lastPrintAudit.source)} ·{" "}
-                        {new Date(detailRow.lastPrintAudit.createdAt).toLocaleString(undefined, { dateStyle: "short", timeStyle: "short" })}
-                      </div>
-                      {jobSummary ? (
-                        <div className="text-[10px] text-muted-foreground">
-                          {jobSummary.templateNameSnapshot ?? jobSummary.templateId} · {jobSummary.mode} · {jobSummary.copies}{" "}
-                          {t("master.markingReconciliation.copiesSuffix")}
-                        </div>
-                      ) : null}
-                      <div className="flex flex-col gap-0.5">
-                        <Link
-                          className="text-primary hover:underline"
-                          to={`/labels/operations`}
-                        >
-                          {t("master.markingTraceability.openLabelsOperations")}
-                        </Link>
-                        <Link
-                          className="text-violet-700 hover:underline dark:text-violet-300"
-                          to={`/items/marking-reconciliation?job=${encodeURIComponent(detailRow.lastPrintAudit.printJobId)}`}
-                        >
-                          {t("master.markingTraceability.openReconciliationForJob")}
-                        </Link>
-                      </div>
+                    <dt className="text-[9px] text-muted-foreground">{t("master.markingExternalSync.detailIntegrationMode")}</dt>
+                    <dd className="text-[10px]">{t(`master.markingProvider.effective.${getMarkingExternalIntegrationInfo().effectiveLabel}`)}</dd>
+                  </div>
+                  <div>
+                    <dt className="text-[9px] text-muted-foreground">{t("master.markingExternalSync.detailExternalStatus")}</dt>
+                    <dd className="break-all font-mono text-[10px]">{detailRow.record.externalStatus ?? "—"}</dd>
+                  </div>
+                  <div>
+                    <dt className="text-[9px] text-muted-foreground">{t("master.markingExternalSync.detailLastSync")}</dt>
+                    <dd className="text-[10px]">
+                      {detailRow.record.lastSyncStatus ?? "—"}
+                      {detailRow.record.lastSyncAt
+                        ? ` · ${new Date(detailRow.record.lastSyncAt).toLocaleString(undefined, { dateStyle: "short", timeStyle: "short" })}`
+                        : ""}
                     </dd>
                   </div>
-                ) : null}
-              </dl>
+                  <div>
+                    <dt className="text-[9px] text-muted-foreground">{t("master.markingExternalSync.detailMismatch")}</dt>
+                    <dd className="text-[10px]">
+                      {detailSyncKind ? syncProblemLabel(t, detailSyncKind) : t("master.markingExternalSync.detailMismatchNone")}
+                    </dd>
+                  </div>
+                </dl>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="secondary"
+                  className="mt-2 h-7 w-full text-[10px]"
+                  disabled={syncBusy}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    void runSyncOne();
+                  }}
+                >
+                  {syncBusy ? t("master.markingExternalSync.syncRunning") : t("master.markingExternalSync.syncThisRecord")}
+                </Button>
+              </div>
+              {detailRow.lastPrintAudit?.printJobId ? (
+                <div className="space-y-1">
+                  <p className="text-[10px] uppercase text-muted-foreground">{t("master.markingTraceability.detailPrintJob")}</p>
+                  <div className="font-mono text-[10px]">{detailRow.lastPrintAudit.printJobId}</div>
+                  <div className="text-muted-foreground">
+                    {auditSourceLabel(t, detailRow.lastPrintAudit.source)} ·{" "}
+                    {new Date(detailRow.lastPrintAudit.createdAt).toLocaleString(undefined, { dateStyle: "short", timeStyle: "short" })}
+                  </div>
+                  {jobSummary ? (
+                    <div className="text-[10px] text-muted-foreground">
+                      {jobSummary.templateNameSnapshot ?? jobSummary.templateId} · {jobSummary.mode} · {jobSummary.copies}{" "}
+                      {t("master.markingReconciliation.copiesSuffix")}
+                    </div>
+                  ) : null}
+                  <div className="flex flex-col gap-0.5">
+                    <Link className="text-primary hover:underline" to={`/labels/operations`}>
+                      {t("master.markingTraceability.openLabelsOperations")}
+                    </Link>
+                    <Link
+                      className="text-violet-700 hover:underline dark:text-violet-300"
+                      to={`/items/marking-reconciliation?job=${encodeURIComponent(detailRow.lastPrintAudit.printJobId)}`}
+                    >
+                      {t("master.markingTraceability.openReconciliationForJob")}
+                    </Link>
+                  </div>
+                </div>
+              ) : null}
               <div>
                 <p className="mb-1 text-[10px] font-semibold uppercase text-muted-foreground">{t("master.markingTraceability.detailAudit")}</p>
                 <ul className="max-h-48 space-y-0.5 overflow-y-auto font-mono text-[10px] leading-snug">

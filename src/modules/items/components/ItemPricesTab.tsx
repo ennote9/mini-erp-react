@@ -621,13 +621,16 @@ function SummaryCard({
         <div className="mt-2 flex min-h-0 flex-1 flex-col">
           <div
             data-testid="item-price-summary-value-row"
-            className="flex min-w-0 items-center justify-between gap-3"
+            className="flex min-w-0 items-stretch justify-between gap-3"
           >
-            <div className="min-w-0 shrink text-2xl font-semibold leading-none tabular-nums tracking-tight text-foreground">
+            <div className="min-w-0 shrink self-center text-2xl font-semibold leading-none tabular-nums tracking-tight text-foreground">
               {formatMoney(record.amount)}
             </div>
             {showSparkline ? (
-              <div className="h-5 w-[5.25rem] max-w-[42%] shrink-0 self-center [&_svg]:max-h-5">
+              <div
+                data-testid="item-price-trend-chart-area"
+                className="flex min-h-[3rem] min-w-[9.5rem] max-w-[min(62%,15.5rem)] flex-1 shrink-0 flex-col justify-center [&_svg]:min-h-[2.75rem]"
+              >
                 <ItemPriceTrendSparkline values={trendSparklineAmounts!} aria-label={sparklineAriaLabel ?? ""} />
               </div>
             ) : null}

@@ -21,6 +21,8 @@ import {
   reconcileBatchReleaseToAvailable,
   reconcileBatchVoid,
 } from "../markingRecordService";
+import { getMarkingExternalIntegrationInfo, syncMarkingRecords } from "../markingExternalSyncService";
+import { MarkingIntegrationModeBanner } from "../components/MarkingIntegrationModeBanner";
 import { itemRepository } from "../repository";
 
 const ALL_STATUSES = ["PRINTED", "RESERVED", "AVAILABLE", "USED", "VOID"] as const;
@@ -82,6 +84,7 @@ export function ItemsMarkingReconciliationPage() {
   const [detailId, setDetailId] = useState<string | null>(null);
   const [voidNote, setVoidNote] = useState("");
   const [feedback, setFeedback] = useState<string | null>(null);
+  const [syncBusy, setSyncBusy] = useState(false);
 
   const items = useMemo(() => {
     void revision;
@@ -247,6 +250,26 @@ export function ItemsMarkingReconciliationPage() {
     setSelected(new Set());
   }, [selectedIds, voidNote, t]);
 
+  const runExternalSync = useCallback(async () => {
+    if (selectedIds.length === 0) return;
+    setSyncBusy(true);
+    setFeedback(null);
+    try {
+      const r = await syncMarkingRecords(selectedIds, "FETCH_STATUS");
+      const line = t("master.markingExternalSync.feedbackAfterSync", {
+        status: r.status,
+        logId: r.logId,
+        ok: r.perRecord.filter((x) => x.ok).length,
+        total: r.perRecord.length,
+      });
+      setFeedback(r.isMock ? `${line} ${t("master.markingExternalSync.mockBadgeShort")}` : line);
+    } catch (e) {
+      setFeedback(t("master.markingExternalSync.syncError", { message: e instanceof Error ? e.message : String(e) }));
+    } finally {
+      setSyncBusy(false);
+    }
+  }, [selectedIds, t]);
+
   const runVoid = useCallback(() => {
     setFeedback(null);
     if (selectedIds.length === 0) return;
@@ -278,6 +301,15 @@ export function ItemsMarkingReconciliationPage() {
     return s ? `/items/marking-traceability?${s}` : "/items/marking-traceability";
   }, [itemFilter, printJobFilter, batchRefFilter, kindFilter, printSource]);
 
+  const syncConsoleHref = useMemo(() => {
+    const q = new URLSearchParams();
+    if (printJobFilter.trim()) q.set("job", printJobFilter.trim());
+    if (batchRefFilter.trim()) q.set("batchRef", batchRefFilter.trim());
+    if (selectedIds.length) q.set("records", selectedIds.join(","));
+    const s = q.toString();
+    return s ? `/items/marking-sync?${s}` : "/items/marking-sync";
+  }, [printJobFilter, batchRefFilter, selectedIds]);
+
   const jobSummary = useMemo(() => {
     if (!detailRow?.lastPrint?.printJobId) return null;
     return printJobRepository.getById(detailRow.lastPrint.printJobId);
@@ -294,9 +326,13 @@ export function ItemsMarkingReconciliationPage() {
           </p>
           <h1 className="text-base font-semibold tracking-tight">{t("master.markingReconciliation.title")}</h1>
           <p className="mt-1 max-w-3xl text-xs text-muted-foreground">{t("master.markingReconciliation.intro")}</p>
-          <p className="mt-2 text-[11px]">
+          <MarkingIntegrationModeBanner />
+          <p className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-[11px]">
             <Link to={traceabilityHref} className="text-primary underline-offset-2 hover:underline">
               {t("master.markingReconciliation.openTraceabilityHint")}
+            </Link>
+            <Link to={syncConsoleHref} className="text-primary underline-offset-2 hover:underline">
+              {t("master.markingReconciliation.openSyncConsole")}
             </Link>
           </p>
         </div>
@@ -391,6 +427,16 @@ export function ItemsMarkingReconciliationPage() {
             <Button type="button" size="sm" variant="destructive" className="h-8 text-xs" onClick={runVoid} disabled={selectedIds.length === 0}>
               {t("master.markingReconciliation.actionVoid")} ({selectedIds.length})
             </Button>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="h-8 border-violet-500/40 text-xs"
+              onClick={() => void runExternalSync()}
+              disabled={selectedIds.length === 0 || syncBusy}
+            >
+              {syncBusy ? t("master.markingExternalSync.syncRunning") : t("master.markingExternalSync.syncSelected")} ({selectedIds.length})
+            </Button>
             <Button type="button" variant="outline" size="sm" className="h-8 text-xs" onClick={selectAllVisible}>
               {t("master.markingReconciliation.selectVisible")}
             </Button>
@@ -412,13 +458,15 @@ export function ItemsMarkingReconciliationPage() {
                 <th className="px-2 py-1.5">{t("master.markingReconciliation.colStatus")}</th>
                 <th className="px-2 py-1.5">{t("master.markingReconciliation.colPayload")}</th>
                 <th className="px-2 py-1.5">{t("master.markingReconciliation.colBatchRef")}</th>
+                <th className="px-2 py-1.5">{t("master.markingExternalSync.colExternal")}</th>
+                <th className="px-2 py-1.5">{t("master.markingExternalSync.colSyncState")}</th>
                 <th className="px-2 py-1.5">{t("master.markingReconciliation.colLastPrint")}</th>
               </tr>
             </thead>
             <tbody>
               {filteredRows.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="px-3 py-8 text-center text-muted-foreground">
+                  <td colSpan={9} className="px-3 py-8 text-center text-muted-foreground">
                     {t("master.markingReconciliation.empty")}
                   </td>
                 </tr>
@@ -454,6 +502,17 @@ export function ItemsMarkingReconciliationPage() {
                       {r.payload}
                     </td>
                     <td className="px-2 py-1.5 font-mono text-[10px]">{r.batchRef ?? "—"}</td>
+                    <td className="max-w-[6rem] truncate px-2 py-1.5 font-mono text-[10px]" title={r.externalStatus}>
+                      {r.externalStatus ?? "—"}
+                    </td>
+                    <td className="px-2 py-1.5 text-[10px] text-muted-foreground">
+                      {r.lastSyncStatus ?? "—"}
+                      {r.lastSyncAt ? (
+                        <div className="text-[9px] opacity-80">
+                          {new Date(r.lastSyncAt).toLocaleString(undefined, { dateStyle: "short", timeStyle: "short" })}
+                        </div>
+                      ) : null}
+                    </td>
                     <td className="px-2 py-1.5 text-[10px]">
                       {lastPrint?.printJobId ? (
                         <span className="font-mono" title={lastPrint.printJobId}>
@@ -517,6 +576,32 @@ export function ItemsMarkingReconciliationPage() {
                 <div>
                   <dt className="text-[10px] uppercase text-muted-foreground">{t("master.markingReconciliation.detailNote")}</dt>
                   <dd>{detailRow.record.note ?? "—"}</dd>
+                </div>
+                <div className="rounded border border-border/60 bg-muted/20 p-2">
+                  <p className="mb-1 text-[10px] font-semibold uppercase text-muted-foreground">{t("master.markingExternalSync.detailExternalBlock")}</p>
+                  <dl className="space-y-0.5">
+                    <div>
+                      <dt className="text-[9px] text-muted-foreground">{t("master.markingExternalSync.detailIntegrationMode")}</dt>
+                      <dd className="text-[10px]">{t(`master.markingProvider.effective.${getMarkingExternalIntegrationInfo().effectiveLabel}`)}</dd>
+                    </div>
+                    <div>
+                      <dt className="text-[9px] text-muted-foreground">{t("master.markingExternalSync.detailExternalStatus")}</dt>
+                      <dd className="break-all font-mono text-[10px]">{detailRow.record.externalStatus ?? "—"}</dd>
+                    </div>
+                    <div>
+                      <dt className="text-[9px] text-muted-foreground">{t("master.markingExternalSync.detailLastSync")}</dt>
+                      <dd className="text-[10px]">
+                        {detailRow.record.lastSyncStatus ?? "—"}
+                        {detailRow.record.lastSyncAt
+                          ? ` · ${new Date(detailRow.record.lastSyncAt).toLocaleString(undefined, { dateStyle: "short", timeStyle: "short" })}`
+                          : ""}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt className="text-[9px] text-muted-foreground">{t("master.markingExternalSync.detailExternalRef")}</dt>
+                      <dd className="font-mono text-[10px]">{detailRow.record.externalCodeRef ?? "—"}</dd>
+                    </div>
+                  </dl>
                 </div>
                 {detailRow.lastPrint?.printJobId ? (
                   <div>

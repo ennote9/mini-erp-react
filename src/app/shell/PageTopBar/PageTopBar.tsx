@@ -30,6 +30,8 @@ const PAGE_TITLES: Record<string, string> = {
   "/items/marking-import": "routes.itemsMarkingImport",
   "/items/marking-reconciliation": "routes.itemsMarkingReconciliation",
   "/items/marking-traceability": "routes.itemsMarkingTraceability",
+  "/items/marking-sync": "routes.itemsMarkingSync",
+  "/settings/marking-provider": "routes.settingsMarkingProvider",
   "/barcodes": "routes.barcodes",
   "/labels": "routes.labels",
   "/labels/workspace": "routes.labelsWorkspace",
@@ -58,6 +60,8 @@ function getPageTitleKey(pathname: string): string {
   if (pathname === "/items/marking-import") return "routes.itemsMarkingImport";
   if (pathname === "/items/marking-reconciliation") return "routes.itemsMarkingReconciliation";
   if (pathname === "/items/marking-traceability") return "routes.itemsMarkingTraceability";
+  if (pathname === "/items/marking-sync") return "routes.itemsMarkingSync";
+  if (pathname === "/settings/marking-provider") return "routes.settingsMarkingProvider";
   if (pathname.match(/^\/items\/[^/]+$/)) return "routes.item";
   if (pathname.match(/^\/brands\/[^/]+$/)) return "routes.brand";
   if (pathname.match(/^\/categories\/[^/]+$/)) return "routes.category";
@@ -97,6 +101,7 @@ function getPageIcon(
     pathname === "/items/marking-import" ||
     pathname === "/items/marking-reconciliation" ||
     pathname === "/items/marking-traceability" ||
+    pathname === "/items/marking-sync" ||
     pathname.match(/^\/items\/[^/]+$/)
   )
     return Package;
@@ -153,7 +158,7 @@ function getPageIcon(
     pathname.match(/^\/markdown-journal\/journals\/[^/]+$/)
   )
     return ScanBarcode;
-  if (pathname === "/settings") return Settings;
+  if (pathname === "/settings" || pathname === "/settings/marking-provider") return Settings;
   return null;
 }
 

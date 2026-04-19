@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
@@ -297,6 +298,11 @@ export function SettingsPage() {
       <div className="shrink-0">
         <h2 className="text-lg font-semibold tracking-tight text-foreground">{t("settings.page.title")}</h2>
         <p className="mt-1 max-w-3xl text-sm text-muted-foreground">{t("settings.page.subtitle")}</p>
+        <p className="mt-2 text-xs">
+          <Link to="/settings/marking-provider" className="text-primary underline-offset-2 hover:underline">
+            {t("routes.settingsMarkingProvider")}
+          </Link>
+        </p>
         {!hydrated && (
           <p className="mt-2 text-xs text-muted-foreground">{t("settings.page.loading")}</p>
         )}
