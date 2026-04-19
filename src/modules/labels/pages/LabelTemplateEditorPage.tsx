@@ -12,6 +12,7 @@ import { persistLabelTemplate } from "../service";
 import type { LabelElement, LabelTemplate, LabelTemplateKind, LabelPaperType } from "../model";
 import { LABEL_PREVIEW_DEMO_CONTEXT } from "../lib/previewContext";
 import { buildItemPreviewBindingContext } from "../lib/itemPreviewContext";
+import { collectLabelDomainIssues } from "../lib/labelDomainValidation";
 import { LABELS_WORKSPACE_QUERY } from "../lib/workspaceQueryParams";
 import { cloneLabelTemplate } from "../lib/cloneLabelTemplate";
 import { createDefaultLabelElement, type NewLabelElementType } from "../lib/createDefaultLabelElement";
@@ -21,6 +22,7 @@ import {
 } from "../lib/validateLabelTemplateDraft";
 import { LabelTemplatePreview } from "../components/preview/LabelTemplatePreview";
 import { LabelsSubnav } from "../components/LabelsSubnav";
+import { LabelDomainIssuesBanner } from "../components/LabelDomainIssuesBanner";
 import { LabelTemplateElementsList } from "../components/editor/LabelTemplateElementsList";
 import { LabelElementPropertiesPanel } from "../components/editor/LabelElementPropertiesPanel";
 
@@ -65,6 +67,11 @@ export function LabelTemplateEditorPage() {
   }, [itemIdQuery, item, barcodeIdQuery]);
 
   const showDemoHint = !itemIdQuery || !item;
+
+  const editorDomainIssues = useMemo(() => {
+    if (!draft || !itemIdQuery || !item) return [];
+    return collectLabelDomainIssues(draft, previewContext, t);
+  }, [draft, itemIdQuery, item, previewContext, t]);
 
   const load = useCallback(() => {
     if (!id) {
@@ -318,6 +325,11 @@ export function LabelTemplateEditorPage() {
           <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
             {t("labels.editor.preview.title")}
           </p>
+          <LabelDomainIssuesBanner
+            show={!showDemoHint && editorDomainIssues.length > 0}
+            issues={editorDomainIssues}
+            testId="labels-editor-domain-issues"
+          />
           <div className="flex min-h-0 flex-1 items-start justify-center overflow-auto rounded-md bg-muted/20 p-3">
             <LabelTemplatePreview
               template={draft}

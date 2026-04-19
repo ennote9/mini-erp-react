@@ -125,9 +125,12 @@ export const kkMessages: MessageTree = {
       CUSTOM: "Пайдаланушы",
     },
     domainIssues: {
-      translationNameMissing: "Тауар үшін аудару атауы толтырылмаған.",
-      kizMarkingMissing: "Маркировка немесе КИЗ жоқ — басып шығармас бұрын деректерді енгізіңіз.",
-      markingCodeMissing: "DataMatrix үшін маркировка коды жоқ.",
+      translationContentMissing:
+        "Осы стикер үшін аудару атауы, сипаттамасы, құрамы немесе қосымша мәтіннің кем дегенде біреуін толтырыңыз.",
+      kizMarkingMissing:
+        "Кем дегенде біреуін енгізіңіз: КИЗ, маркировка коды немесе GS1 DataMatrix.",
+      datamatrixSourceMissing:
+        "DataMatrix payload, GS1 DataMatrix немесе маркировка кодын енгізіңіз.",
       matrixBindingEmpty: "DataMatrix элементіне байланыстан мән келмейді.",
     },
     paper: {
@@ -235,7 +238,7 @@ export const kkMessages: MessageTree = {
       copiesLabel: "Дана",
       copiesHint: "Тек алдын ала қарау — принтерге әлі жіберілмейді.",
       reprintHint:
-        "Өткен операциядан контекст қалпына келтірілді — қажет болса өзгертіңіз, содан кейін Басып шығару немесе PDF.",
+        "Тарихтан қалпына келтірілді — үлгі мен даналарды тексеріңіз, содан кейін басып шығару немесе PDF.",
       actions: {
         sectionTitle: "Басып шығару әрекеттері",
         createJob: "Тапсырыс жасау",
@@ -255,11 +258,11 @@ export const kkMessages: MessageTree = {
         genericError: "Тапсырыс жасалмады.",
       },
       presets: {
-        paperLabel: "Қағаз / тасымал пресеті",
-        mediaLabel: "Медиа пресеті",
-        storedHint: "Соңғы мәндер осы браузерде сақталады.",
+        paperLabel: "Бет өлшемі (басып шығару терезесі)",
+        mediaLabel: "Медиа / беру",
+        storedHint: "Осы құрылғыда келесі сессияға дейін сақталады.",
         paper: {
-          AUTO: "Авто (үлгі бойынша)",
+          AUTO: "Авто — үлгі бойынша",
         },
         media: {
           DEFAULT: "Әдепкі",
@@ -301,6 +304,12 @@ export const kkMessages: MessageTree = {
       intro: "Жұмыс орнынан жасалған соңғы PDF экспорттары мен басып шығару тапсырыстары.",
       emptyTitle: "Тапсырыстар әлі жоқ",
       emptyHint: "Жұмыс орнында тапсырыс жасаңыз немесе PDF сақтаңыз — жазбалар мұнда пайда болады.",
+      emptyHintShort: "Жұмыс орны, стикерлеу немесе топтамнан басып шығару/PDF — жазбалар мұнда пайда болады.",
+      sourceStation: "Стикерлеу",
+      sourceBatch: "Топтамды басып шығару",
+      sourceWorkspace: "Жұмыс орны",
+      sourceFromItemBarcodes: "Карточка · Штрихкодтар",
+      batchRestore: "Топтамды ашу · тізімді қалпына келтіру",
       columnWhen: "Жаңартылды",
       columnMode: "Режим",
       columnStatus: "Күй",
@@ -329,12 +338,16 @@ export const kkMessages: MessageTree = {
     },
     station: {
       pageHeading: "Стикерлеу орны",
-      intro: "Тауарды сканерлеңіз немесе табыңыз, штрихкодты растаңыз және экраннан шықпай басып шығарыңыз.",
+      intro: "Штрихкодты сканерлеңіз немесе тауарды табыңыз — бәрі бір экранда.",
       columnItem: "Тауар",
       primaryBarcode: "Негізгі ШК",
       selectedBarcode: "Таңдалған ШК",
-      barcodesTitle: "Штрихкодтар",
-      noItem: "Стикерді көру үшін тауарды табыңыз.",
+      barcodesTitle: "ШК ауыту",
+      singleBarcodeLabel: "Штрихкод",
+      badgePrimaryBarcode: "Негізгі",
+      noItem: "Әлі ештеңе таңдалмаған.",
+      emptyHint: "Штрихкодты сканерлеңіз немесе код / атау енгізіп, Enter немесе «Табу» басыңыз.",
+      barcodeMatchedHint: "Штрихкод сәйкес келді — тауар таңдалды.",
       noActiveBarcodes: "Белсенді штрихкодтар жоқ — байламдар бос болуы мүмкін.",
       actionsTitle: "Әрекеттер",
       search: {
@@ -345,6 +358,7 @@ export const kkMessages: MessageTree = {
         notFound: "Тауар табылмады.",
         pickPrompt: "Бірнеше нұсқа бар — төменнен таңдаңыз.",
         pickTitle: "Тауарды таңдаңыз",
+        pickSubtitle: "Жолды басыңыз.",
       },
       repeat: {
         button: "Соңғысын қайталау",
@@ -365,10 +379,18 @@ export const kkMessages: MessageTree = {
       clear: "Тізімді тазалау",
       repeatLast: "Соңғы топтамды қайталау",
       applyCopiesAll: "Барлық жолға қолдану",
-      empty: "Жолдар жоқ — жоғарыдан тауар қосыңыз.",
+      empty: "Жолдар жоқ.",
+      emptyHint: "Жоғарыдан тауарды табыңыз және «Қосу» басыңыз, содан кейін үлгі мен жолдық даналарды орнатыңыз.",
+      rowOk: "Ок",
       previewTitle: "Таңдалған жолды алдын ала қарау",
       previewPlaceholder: "Стикерді алдын ала қарау үшін жолды таңдаңыз.",
       summaryLine: "{{rows}} жол · барлығы {{labels}} стикер · жарамсыз: {{invalid}}",
+      summaryDetail: "Жарамды жол: {{valid}} · түзету керек: {{invalid}} · барлық стикер: {{labels}}",
+      chipRowsLabel: "жол",
+      chipLabelsLabel: "стикер",
+      chipInvalidLabel: "түзету",
+      massCopiesHint: "Барлық жолға дана",
+      domainRowsHint: "{{count}} жолда стикер үшін қажетті деректер жоқ — басып шығармас бұрын түзетіңіз немесе жойыңыз.",
       jobName: "Топтамды басып шығару",
       colCode: "Коды",
       colName: "Атауы",
@@ -395,6 +417,7 @@ export const kkMessages: MessageTree = {
   routes: {
     dashboard: "Басқару тақтасы",
     items: "Тауарлар",
+    itemsLabelData: "Стикер деректері",
     barcodes: "Штрихкодтар тізілімі",
     item: "Тауар карточкасы",
     brands: "Брендтер",

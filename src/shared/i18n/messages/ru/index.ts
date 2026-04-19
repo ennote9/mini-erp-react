@@ -125,9 +125,12 @@ export const ruMessages: MessageTree = {
       CUSTOM: "Пользовательский",
     },
     domainIssues: {
-      translationNameMissing: "Для товара не заполнено переводное наименование.",
-      kizMarkingMissing: "Нет кода маркировки или КИЗ — укажите данные перед печатью.",
-      markingCodeMissing: "Нет данных для DataMatrix (код маркировки).",
+      translationContentMissing:
+        "Заполните хотя бы одно переводное поле (название, описание, состав или доп. текст) для этого стикера.",
+      kizMarkingMissing:
+        "Укажите хотя бы одно: КИЗ, код маркировки или GS1 DataMatrix перед печатью.",
+      datamatrixSourceMissing:
+        "Укажите payload DataMatrix, GS1 DataMatrix или код маркировки перед печатью.",
       matrixBindingEmpty: "Для элемента DataMatrix привязка не даёт значения.",
     },
     paper: {
@@ -235,7 +238,7 @@ export const ruMessages: MessageTree = {
       copiesLabel: "Копий",
       copiesHint: "Только предпросмотр — на принтер пока не отправляется.",
       reprintHint:
-        "Контекст восстановлен из прошлой операции — при необходимости измените параметры и нажмите Печать или PDF.",
+        "Восстановлено из истории — проверьте шаблон и копии, затем печать или PDF.",
       actions: {
         sectionTitle: "Действия печати",
         createJob: "Создать задание",
@@ -255,11 +258,11 @@ export const ruMessages: MessageTree = {
         genericError: "Не удалось создать задание.",
       },
       presets: {
-        paperLabel: "Пресет бумаги / носителя",
-        mediaLabel: "Пресет медиа",
-        storedHint: "Последние значения сохраняются в этом браузере.",
+        paperLabel: "Размер страницы (диалог печати)",
+        mediaLabel: "Медиа / подача",
+        storedHint: "Сохраняется на этом устройстве до следующего визита.",
         paper: {
-          AUTO: "Авто (по шаблону)",
+          AUTO: "Авто — как в шаблоне",
         },
         media: {
           DEFAULT: "По умолчанию",
@@ -301,6 +304,12 @@ export const ruMessages: MessageTree = {
       intro: "Недавние экспорты PDF и задания, созданные из рабочего места печати.",
       emptyTitle: "Заданий на печать пока нет",
       emptyHint: "Создайте задание или сохраните PDF в рабочем месте — записи появятся здесь.",
+      emptyHintShort: "Печать или PDF из рабочего места, стикеровки или пакета — записи появятся здесь.",
+      sourceStation: "Стикеровка",
+      sourceBatch: "Пакетная печать",
+      sourceWorkspace: "Рабочее место",
+      sourceFromItemBarcodes: "Карточка · Штрихкоды",
+      batchRestore: "Открыть пакет · восстановить список",
       columnWhen: "Обновлено",
       columnMode: "Режим",
       columnStatus: "Статус",
@@ -329,12 +338,16 @@ export const ruMessages: MessageTree = {
     },
     station: {
       pageHeading: "Стикеровка",
-      intro: "Сканируйте или найдите товар, подтвердите штрихкод и печатайте, не уходя с экрана.",
+      intro: "Сканируйте ШК или найдите товар — печать на одном экране.",
       columnItem: "Товар",
       primaryBarcode: "Основной ШК",
       selectedBarcode: "Выбранный ШК",
-      barcodesTitle: "Штрихкоды",
-      noItem: "Найдите товар, чтобы увидеть этикетку.",
+      barcodesTitle: "Сменить ШК",
+      singleBarcodeLabel: "Штрихкод",
+      badgePrimaryBarcode: "Осн.",
+      noItem: "Пока ничего не выбрано.",
+      emptyHint: "Сканируйте штрихкод или введите код / название, затем Enter или «Найти».",
+      barcodeMatchedHint: "Штрихкод найден — позиция выбрана.",
       noActiveBarcodes: "Нет активных штрихкодов — привязки могут быть пустыми.",
       actionsTitle: "Действия",
       search: {
@@ -345,6 +358,7 @@ export const ruMessages: MessageTree = {
         notFound: "Товар не найден.",
         pickPrompt: "Несколько вариантов — выберите ниже.",
         pickTitle: "Выберите товар",
+        pickSubtitle: "Нажмите на строку.",
       },
       repeat: {
         button: "Повторить последнюю",
@@ -365,10 +379,18 @@ export const ruMessages: MessageTree = {
       clear: "Очистить список",
       repeatLast: "Повторить последний пакет",
       applyCopiesAll: "Применить ко всем строкам",
-      empty: "Строк пока нет — добавьте товары выше.",
+      empty: "Строк пока нет.",
+      emptyHint: "Найдите товар выше и нажмите «Добавить», затем выберите шаблон и копии по строкам.",
+      rowOk: "Ок",
       previewTitle: "Предпросмотр выбранной строки",
       previewPlaceholder: "Выберите строку для предпросмотра этикетки.",
       summaryLine: "{{rows}} строк · {{labels}} этикеток всего · невалидных: {{invalid}}",
+      summaryDetail: "Ок строк: {{valid}} · нужно исправить: {{invalid}} · этикеток всего: {{labels}}",
+      chipRowsLabel: "стр.",
+      chipLabelsLabel: "этик.",
+      chipInvalidLabel: "испр.",
+      massCopiesHint: "Копии для всех строк",
+      domainRowsHint: "В {{count}} строке(ах) не хватает данных для этикетки — исправьте или удалите перед печатью.",
       jobName: "Пакетная печать",
       colCode: "Код",
       colName: "Наименование",
@@ -395,6 +417,7 @@ export const ruMessages: MessageTree = {
   routes: {
     dashboard: "Панель",
     items: "Номенклатура",
+    itemsLabelData: "Этикеточные данные",
     barcodes: "Реестр штрихкодов",
     item: "Номенклатура",
     brands: "Бренды",

@@ -26,6 +26,7 @@ import { useTranslation } from "@/shared/i18n";
 const PAGE_TITLES: Record<string, string> = {
   "/": "routes.dashboard",
   "/items": "routes.items",
+  "/items/label-data": "routes.itemsLabelData",
   "/barcodes": "routes.barcodes",
   "/labels": "routes.labels",
   "/labels/workspace": "routes.labelsWorkspace",
@@ -83,7 +84,8 @@ function getPageIcon(
   pathname: string,
 ): ComponentType<{ className?: string }> | null {
   if (pathname === "/") return LayoutDashboard;
-  if (pathname === "/items" || pathname.match(/^\/items\/[^/]+$/)) return Package;
+  if (pathname === "/items" || pathname === "/items/label-data" || pathname.match(/^\/items\/[^/]+$/))
+    return Package;
   if (pathname === "/barcodes") return ScanBarcode;
   if (pathname.match(/^\/labels\/templates\/[^/]+$/)) return Pencil;
   if (

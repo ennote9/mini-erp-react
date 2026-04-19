@@ -258,7 +258,7 @@ export function buildDefaultLabelTemplates(): LabelTemplate[] {
           yMm: 6,
           widthMm: 16,
           heightMm: 16,
-          binding: { kind: "field", path: "item.markingCode" },
+          binding: { kind: "field", path: "item.gs1DataMatrixPayload" },
           options: { symbologyHint: "GS1_DATAMATRIX", showHumanReadableText: false },
         },
         {
@@ -276,7 +276,7 @@ export function buildDefaultLabelTemplates(): LabelTemplate[] {
     {
       id: "label-tpl-sys-datamatrix",
       name: "DataMatrix этикетка",
-      description: "Название, код, DataMatrix по полю маркировки.",
+      description: "Название, код, DataMatrix по полю dataMatrixPayload (или общий markingCode в проверках).",
       kind: "DATAMATRIX_LABEL",
       paperType: "LABEL",
       sizeMm: { width: 50, height: 40 },
@@ -315,7 +315,7 @@ export function buildDefaultLabelTemplates(): LabelTemplate[] {
           yMm: 3,
           widthMm: 14,
           heightMm: 14,
-          binding: { kind: "field", path: "item.markingCode" },
+          binding: { kind: "field", path: "item.dataMatrixPayload" },
           options: { symbologyHint: "DATAMATRIX", showHumanReadableText: false },
         },
         {

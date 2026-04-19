@@ -979,6 +979,9 @@ export function ItemsListPage() {
             resultCount={displayItems.length}
           />
           <div className="list-page__toolbar-actions-cluster flex max-w-full min-w-0 flex-wrap items-center justify-end gap-2">
+            <Button variant="outline" size="sm" className="h-8 shrink-0 text-xs" asChild>
+              <Link to="/items/label-data">{t("master.itemsLabelData.navLink")}</Link>
+            </Button>
             {brandFilterId != null && (
               <div
                 className="flex h-8 max-w-[min(100%,18rem)] shrink-0 items-center gap-1.5 rounded-md border border-input bg-background px-2 text-xs"

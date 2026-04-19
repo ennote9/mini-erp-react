@@ -6,10 +6,28 @@ import { buildItemPreviewBindingContext } from "./itemPreviewContext";
 import { parseLabelSymbologyHint } from "./labelSymbology";
 
 export type LabelDomainIssueCode =
-  | "translationNameMissing"
+  | "translationContentMissing"
   | "kizMarkingMissing"
-  | "markingCodeMissing"
+  | "datamatrixSourceMissing"
   | "matrixBindingEmpty";
+
+function hasTranslationDisplayContent(item: LabelPreviewBindingContext["item"]): boolean {
+  return [item.translationName, item.translationDescription, item.translationComposition, item.translationExtraText].some(
+    (s) => s?.trim(),
+  );
+}
+
+function hasKizMarkingSource(item: LabelPreviewBindingContext["item"]): boolean {
+  return !!(item.kizCode?.trim() || item.markingCode?.trim() || item.gs1DataMatrixPayload?.trim());
+}
+
+function hasDatamatrixItemSource(item: LabelPreviewBindingContext["item"]): boolean {
+  return !!(
+    item.dataMatrixPayload?.trim() ||
+    item.gs1DataMatrixPayload?.trim() ||
+    item.markingCode?.trim()
+  );
+}
 
 /**
  * Stable codes for domain checks (no i18n). Use for batch row validation and tests.
@@ -22,23 +40,24 @@ export function collectLabelDomainIssueCodes(
   const item = ctx.item;
 
   if (template.kind === "TRANSLATION_STICKER") {
-    if (!item.translationName?.trim()) {
-      codes.push("translationNameMissing");
+    if (!hasTranslationDisplayContent(item)) {
+      codes.push("translationContentMissing");
     }
   }
 
   if (template.kind === "KIZ_LABEL") {
-    if (!item.markingCode?.trim() && !item.kizCode?.trim()) {
+    if (!hasKizMarkingSource(item)) {
       codes.push("kizMarkingMissing");
     }
   }
 
   if (template.kind === "DATAMATRIX_LABEL") {
-    if (!item.markingCode?.trim()) {
-      codes.push("markingCodeMissing");
+    if (!hasDatamatrixItemSource(item)) {
+      codes.push("datamatrixSourceMissing");
     }
   }
 
+  let anyMatrixBindingEmpty = false;
   for (const el of template.elements) {
     if (el.type !== "barcode") continue;
     const hint = el.options?.symbologyHint;
@@ -47,11 +66,19 @@ export function collectLabelDomainIssueCodes(
     if (parsed.bcid !== "datamatrix" && parsed.bcid !== "gs1datamatrix") continue;
     const raw = resolveLabelBindingValue(el.binding, ctx);
     if (raw === null || raw.trim() === "") {
-      codes.push("matrixBindingEmpty");
+      anyMatrixBindingEmpty = true;
     }
+  }
+  if (anyMatrixBindingEmpty) {
+    codes.push("matrixBindingEmpty");
   }
 
   return [...new Set(codes)];
+}
+
+/** True when domain checks fail (print/PDF/job should stay disabled). */
+export function areLabelDomainIssuesBlocking(codes: readonly LabelDomainIssueCode[]): boolean {
+  return codes.length > 0;
 }
 
 /**

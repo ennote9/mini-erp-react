@@ -20,9 +20,11 @@ import { purchaseOrderRepository, flushPendingPurchaseOrderPersist } from "@/mod
 import { salesOrderRepository, flushPendingSalesOrderPersist } from "@/modules/sales-orders/repository";
 import { employeeRepository, flushPendingEmployeePersist } from "@/modules/employees/repository";
 import { flushPendingLabelWrites } from "@/modules/labels/service";
+import { labelTemplateRepository } from "@/modules/labels/labelTemplateRepository";
 
 export type MiniErpE2eApi = {
   itemRepository: typeof itemRepository;
+  labelTemplateRepository: typeof labelTemplateRepository;
   applyItemPriceAwaitPersist: typeof applyItemPriceAwaitPersist;
   cancelScheduledItemPriceAwaitPersist: typeof cancelScheduledItemPriceAwaitPersist;
   getEffectiveItemBasePriceOrZero: typeof getEffectiveItemBasePriceOrZero;
@@ -66,6 +68,7 @@ async function patchItem(id: string, patch: UpdateItemPatch): Promise<void> {
 function attach(): void {
   window.__MINI_ERP_E2E__ = {
     itemRepository,
+    labelTemplateRepository,
     applyItemPriceAwaitPersist,
     cancelScheduledItemPriceAwaitPersist,
     getEffectiveItemBasePriceOrZero,

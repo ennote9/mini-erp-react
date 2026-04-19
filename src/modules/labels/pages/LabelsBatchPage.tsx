@@ -22,6 +22,7 @@ import { LABELS_BATCH_QUERY } from "../lib/labelsBatchQueryParams";
 import { loadLabelsBatchStorage, saveLabelsBatchStorage } from "../lib/labelsBatchStorage";
 import { parseBatchRowsSnapshot, serializeBatchRowsSnapshot } from "../lib/labelsBatchSnapshot";
 import { collectLabelDomainIssuesForItem } from "../lib/labelDomainValidation";
+import { LabelDomainIssuesBanner } from "../components/LabelDomainIssuesBanner";
 import {
   buildBatchRowFromItem,
   refreshBatchRowFromItem,
@@ -40,9 +41,10 @@ import type { LabelTemplate } from "../model";
 import { LabelTemplatePreview } from "../components/preview/LabelTemplatePreview";
 import { LabelsSubnav } from "../components/LabelsSubnav";
 import type { Item } from "@/modules/items/model";
+import { cn } from "@/lib/utils";
 
 type Feedback =
-  | { kind: "success"; message: string }
+  | { kind: "success"; message: string; variant?: "restore" }
   | { kind: "error"; message: string };
 
 function waitNextPaint(): Promise<void> {
@@ -65,6 +67,7 @@ export function LabelsBatchPage() {
   const [massCopies, setMassCopies] = useState(1);
 
   const exportSurfaceRef = useRef<HTMLDivElement>(null);
+  const batchSearchInputRef = useRef<HTMLInputElement>(null);
 
   const [paperPreset, setPaperPreset] = useState(() => loadWorkspacePrintSettings().paperPreset);
   const [mediaPreset, setMediaPreset] = useState(() => loadWorkspacePrintSettings().mediaPreset);
@@ -179,7 +182,7 @@ export function LabelsBatchPage() {
     if (!job?.batchRowsSnapshot || job.source !== "labels-batch") return;
     restoreApplied.current = true;
     if (restoreFromJobSnapshot(job.batchRowsSnapshot, job.templateId)) {
-      setFeedback({ kind: "success", message: t("labels.batch.feedback.restored") });
+      setFeedback({ kind: "success", message: t("labels.batch.feedback.restored"), variant: "restore" });
     }
     const next = new URLSearchParams(searchParams);
     next.delete(LABELS_BATCH_QUERY.restoreJob);
@@ -188,6 +191,11 @@ export function LabelsBatchPage() {
 
   const totalLabels = useMemo(() => rows.reduce((s, r) => s + (r.isValid ? r.copies : 0), 0), [rows]);
   const invalidCount = useMemo(() => rows.filter((r) => !r.isValid).length, [rows]);
+  const validRowCount = useMemo(() => rows.length - invalidCount, [rows.length, invalidCount]);
+  const domainRowCount = useMemo(
+    () => rows.filter((r) => r.validationMessage === "domainDataMissing").length,
+    [rows],
+  );
   const canRunBatch = rows.length > 0 && invalidCount === 0 && !!selectedTemplate;
 
   const effectiveSelectedId = selectedRowId ?? rows[0]?.id ?? null;
@@ -264,10 +272,10 @@ export function LabelsBatchPage() {
     }
     if (result.kind === "pickItem") {
       setPickCandidates(result.items);
-      setFeedback({ kind: "error", message: t("labels.station.search.pickPrompt") });
       return;
     }
     addItemToRows(result.item, result.barcodeId);
+    requestAnimationFrame(() => batchSearchInputRef.current?.focus());
   }, [searchDraft, addItemToRows, t]);
 
   const handleClear = useCallback(() => {
@@ -379,6 +387,15 @@ export function LabelsBatchPage() {
       invalid: invalidCount,
     });
   }, [rows.length, totalLabels, invalidCount, t]);
+
+  const summaryDetailText = useMemo(() => {
+    if (rows.length === 0) return "";
+    return t("labels.batch.summaryDetail", {
+      valid: validRowCount,
+      invalid: invalidCount,
+      labels: totalLabels,
+    });
+  }, [rows.length, validRowCount, invalidCount, totalLabels, t]);
 
   const handleCreateJob = useCallback(() => {
     setFeedback(null);
@@ -572,7 +589,7 @@ export function LabelsBatchPage() {
       return;
     }
     if (restoreFromJobSnapshot(job.batchRowsSnapshot, job.templateId)) {
-      setFeedback({ kind: "success", message: t("labels.batch.feedback.restored") });
+      setFeedback({ kind: "success", message: t("labels.batch.feedback.restored"), variant: "restore" });
     } else {
       setFeedback({ kind: "error", message: t("labels.batch.repeat.none") });
     }
@@ -597,7 +614,7 @@ export function LabelsBatchPage() {
   };
 
   return (
-    <div className="labels-page mx-auto max-w-[1600px] space-y-3 p-3 md:p-4" data-module="labels">
+    <div className="labels-page mx-auto max-w-[1600px] space-y-3 p-3 md:p-4" data-module="labels" data-testid="labels-batch">
       <LabelsSubnav />
 
       <header className="space-y-0.5">
@@ -608,11 +625,14 @@ export function LabelsBatchPage() {
       {feedback ? (
         <div
           role="status"
-          className={`rounded-md border px-2.5 py-1.5 text-xs ${
-            feedback.kind === "success"
-              ? "border-emerald-500/40 bg-emerald-500/10 text-foreground"
-              : "border-destructive/50 bg-destructive/10 text-foreground"
-          }`}
+          className={cn(
+            "rounded-md border px-2 py-1 text-[11px] leading-snug",
+            feedback.kind === "success" && feedback.variant === "restore"
+              ? "border-sky-500/40 bg-sky-500/10 text-foreground"
+              : feedback.kind === "success"
+                ? "border-emerald-500/35 bg-emerald-500/10 text-foreground"
+                : "border-destructive/45 bg-destructive/10 text-foreground",
+          )}
         >
           {feedback.message}
         </div>
@@ -624,6 +644,8 @@ export function LabelsBatchPage() {
             <Label className="text-[11px] text-muted-foreground">{t("labels.batch.searchLabel")}</Label>
             <div className="flex gap-1.5">
               <Input
+                ref={batchSearchInputRef}
+                data-testid="labels-batch-search"
                 value={searchDraft}
                 onChange={(e) => setSearchDraft(e.target.value)}
                 placeholder={t("labels.batch.searchPlaceholder")}
@@ -649,6 +671,8 @@ export function LabelsBatchPage() {
               placeholder={t("labels.workspace.selectTemplatePlaceholder")}
               disabled={templates.length === 0}
               className="w-full max-w-full"
+              aria-label={t("labels.workspace.selectTemplateAria")}
+              data-testid="labels-batch-template-select"
             />
           </div>
           <div className="flex flex-wrap gap-1">
@@ -663,6 +687,7 @@ export function LabelsBatchPage() {
               size="sm"
               variant="secondary"
               className="h-8"
+              data-testid="labels-batch-create-job"
               disabled={!canRunBatch || actionBusy !== null || !selectedTemplate}
               onClick={handleCreateJob}
             >
@@ -673,6 +698,7 @@ export function LabelsBatchPage() {
               size="sm"
               variant="secondary"
               className="h-8"
+              data-testid="labels-batch-save-pdf"
               disabled={!canRunBatch || actionBusy !== null || !selectedTemplate}
               onClick={() => void handleSavePdf()}
             >
@@ -682,6 +708,7 @@ export function LabelsBatchPage() {
               type="button"
               size="sm"
               className="h-8"
+              data-testid="labels-batch-print"
               disabled={!canRunBatch || actionBusy !== null || !selectedTemplate}
               onClick={() => void handlePrint()}
             >
@@ -692,15 +719,19 @@ export function LabelsBatchPage() {
       </section>
 
       {pickCandidates && pickCandidates.length > 0 ? (
-        <div className="rounded-md border border-amber-500/35 bg-amber-500/10 px-2.5 py-2 text-xs">
+        <div className="rounded-md border border-amber-500/30 bg-amber-500/10 px-2 py-1.5 text-[11px]">
           <p className="font-medium">{t("labels.station.search.pickTitle")}</p>
-          <ul className="mt-1.5 max-h-32 space-y-1 overflow-y-auto">
+          <p className="text-[10px] text-muted-foreground">{t("labels.station.search.pickSubtitle")}</p>
+          <ul className="mt-1 max-h-28 space-y-0.5 overflow-y-auto">
             {pickCandidates.map((c) => (
               <li key={c.id}>
                 <button
                   type="button"
-                  className="w-full rounded border border-border/60 bg-background/80 px-2 py-1 text-left text-xs hover:bg-muted/60"
-                  onClick={() => addItemToRows(c)}
+                  className="w-full rounded border border-border/50 bg-background/90 px-2 py-0.5 text-left text-[11px] hover:bg-muted/60"
+                  onClick={() => {
+                    addItemToRows(c);
+                    requestAnimationFrame(() => batchSearchInputRef.current?.focus());
+                  }}
                 >
                   <span className="font-medium">{c.name}</span>
                   <span className="ml-2 font-mono text-muted-foreground">{c.code}</span>
@@ -713,23 +744,63 @@ export function LabelsBatchPage() {
 
       <div className="grid gap-2 lg:grid-cols-12">
         <div className="space-y-2 lg:col-span-7">
-          <div className="flex flex-wrap items-center gap-2 text-xs">
-            <span className="text-muted-foreground">{summaryText}</span>
-            <div className="flex items-center gap-1">
-              <Input
-                type="number"
-                min={1}
-                max={999}
-                className="h-7 w-14"
-                value={massCopies}
-                onChange={(e) => {
-                  const n = Number.parseInt(e.target.value, 10);
-                  if (!Number.isNaN(n)) setMassCopies(Math.min(999, Math.max(1, n)));
-                }}
-              />
-              <Button type="button" size="sm" variant="outline" className="h-7" onClick={applyMassCopies} disabled={rows.length === 0}>
-                {t("labels.batch.applyCopiesAll")}
-              </Button>
+          <div className="flex flex-wrap items-end justify-between gap-2 text-xs">
+            <div className="flex min-w-0 flex-1 flex-col gap-1">
+              <div className="flex flex-wrap items-center gap-1.5">
+                <span className="rounded border border-border/60 bg-muted/20 px-1.5 py-0.5 font-mono tabular-nums text-muted-foreground">
+                  {rows.length}
+                </span>
+                <span className="text-muted-foreground">{t("labels.batch.chipRowsLabel")}</span>
+                <span className="text-muted-foreground">·</span>
+                <span className="rounded border border-border/60 bg-muted/20 px-1.5 py-0.5 font-mono tabular-nums text-muted-foreground">
+                  {totalLabels}
+                </span>
+                <span className="text-muted-foreground">{t("labels.batch.chipLabelsLabel")}</span>
+                {invalidCount > 0 ? (
+                  <>
+                    <span className="text-muted-foreground">·</span>
+                    <span
+                      className="rounded border border-destructive/35 bg-destructive/10 px-1.5 py-0.5 font-mono tabular-nums text-destructive"
+                      data-testid="labels-batch-invalid-chip"
+                    >
+                      {invalidCount}
+                    </span>
+                    <span className="text-destructive">{t("labels.batch.chipInvalidLabel")}</span>
+                  </>
+                ) : null}
+              </div>
+              {rows.length > 0 ? <p className="text-[10px] text-muted-foreground">{summaryDetailText}</p> : null}
+              {domainRowCount > 0 ? (
+                <span className="text-[11px] text-amber-900 dark:text-amber-100" data-testid="labels-batch-domain-rows-hint">
+                  {t("labels.batch.domainRowsHint", { count: domainRowCount })}
+                </span>
+              ) : null}
+            </div>
+            <div className="flex flex-col gap-0.5">
+              <span className="text-[10px] text-muted-foreground">{t("labels.batch.massCopiesHint")}</span>
+              <div className="flex items-center gap-1">
+                <Input
+                  type="number"
+                  min={1}
+                  max={999}
+                  className="h-7 w-14 tabular-nums"
+                  value={massCopies}
+                  onChange={(e) => {
+                    const n = Number.parseInt(e.target.value, 10);
+                    if (!Number.isNaN(n)) setMassCopies(Math.min(999, Math.max(1, n)));
+                  }}
+                />
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  className="h-7"
+                  onClick={applyMassCopies}
+                  disabled={rows.length === 0}
+                >
+                  {t("labels.batch.applyCopiesAll")}
+                </Button>
+              </div>
             </div>
           </div>
 
@@ -748,8 +819,9 @@ export function LabelsBatchPage() {
               <tbody>
                 {rows.length === 0 ? (
                   <tr>
-                    <td colSpan={6} className="px-3 py-6 text-center text-muted-foreground">
-                      {t("labels.batch.empty")}
+                    <td colSpan={6} className="px-3 py-8 text-center">
+                      <p className="text-sm text-muted-foreground">{t("labels.batch.empty")}</p>
+                      <p className="mt-1 text-[11px] leading-snug text-muted-foreground">{t("labels.batch.emptyHint")}</p>
                     </td>
                   </tr>
                 ) : (
@@ -757,14 +829,17 @@ export function LabelsBatchPage() {
                     const item = itemRepository.getById(row.itemId);
                     const active = item?.barcodes.filter((b) => b.isActive) ?? [];
                     const bcOptions = active.map((b) => ({ value: b.id, label: b.codeValue }));
+                    const isRowSelected = row.id === effectiveSelectedId;
                     return (
                       <tr
                         key={row.id}
-                        className={`cursor-pointer border-b border-border/50 ${row.id === effectiveSelectedId ? "bg-muted/40" : "hover:bg-muted/20"}`}
+                        className={`cursor-pointer border-b border-border/50 transition-colors ${
+                          isRowSelected ? "bg-primary/8 ring-1 ring-inset ring-primary/35" : "hover:bg-muted/25"
+                        }`}
                         onClick={() => setSelectedRowId(row.id)}
                       >
                         <td className="px-2 py-1.5 font-mono">{row.itemCode}</td>
-                        <td className="max-w-[12rem] truncate px-2 py-1.5" title={row.itemName}>
+                        <td className="max-w-[12rem] truncate px-2 py-1.5 font-medium" title={row.itemName}>
                           {row.itemName}
                         </td>
                         <td className="px-2 py-1.5" onClick={(e) => e.stopPropagation()}>
@@ -782,7 +857,7 @@ export function LabelsBatchPage() {
                             type="number"
                             min={1}
                             max={999}
-                            className="h-7 w-16"
+                            className="h-7 w-16 tabular-nums"
                             value={row.copies}
                             onChange={(e) => {
                               const n = Number.parseInt(e.target.value, 10);
@@ -790,11 +865,16 @@ export function LabelsBatchPage() {
                             }}
                           />
                         </td>
-                        <td className="px-2 py-1.5">
+                        <td className="max-w-[10rem] px-2 py-1.5">
                           {row.isValid ? (
-                            <span className="text-emerald-700 dark:text-emerald-300">OK</span>
+                            <span className="inline-flex rounded border border-emerald-500/35 bg-emerald-500/10 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-emerald-900 dark:text-emerald-100">
+                              {t("labels.batch.rowOk")}
+                            </span>
                           ) : (
-                            <span className="text-destructive" title={rowValidationLabel(row.validationMessage)}>
+                            <span
+                              className="line-clamp-2 text-[11px] leading-tight text-destructive"
+                              title={rowValidationLabel(row.validationMessage)}
+                            >
                               {rowValidationLabel(row.validationMessage)}
                             </span>
                           )}
@@ -815,19 +895,11 @@ export function LabelsBatchPage() {
 
         <div className="rounded-md border border-border/80 bg-card/40 p-2.5 lg:col-span-5">
           <h3 className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">{t("labels.batch.previewTitle")}</h3>
-          {previewDomainIssues.length > 0 ? (
-            <div
-              role="alert"
-              className="mt-2 rounded-md border border-amber-500/40 bg-amber-500/10 px-2 py-1.5 text-[11px] text-amber-950 dark:text-amber-100"
-            >
-              <p className="font-medium">{t("labels.workspace.domainIssuesTitle")}</p>
-              <ul className="mt-0.5 list-inside list-disc">
-                {previewDomainIssues.map((msg, i) => (
-                  <li key={`${i}-${msg}`}>{msg}</li>
-                ))}
-              </ul>
-            </div>
-          ) : null}
+          <LabelDomainIssuesBanner
+            show={previewDomainIssues.length > 0}
+            issues={previewDomainIssues}
+            className="mt-2 px-2 py-1.5 text-[11px]"
+          />
           <div className="mt-2 min-h-[200px] overflow-auto rounded border border-dashed border-border/70 bg-muted/10 p-2">
             {selectedTemplate && previewBuilt.mode === "item" ? (
               <LabelTemplatePreview

@@ -20,6 +20,7 @@ type SelectFieldProps = {
   disabled?: boolean;
   className?: string;
   "aria-label"?: string;
+  "data-testid"?: string;
 };
 
 export function SelectField({
@@ -31,6 +32,7 @@ export function SelectField({
   disabled,
   className,
   "aria-label": ariaLabel,
+  "data-testid": dataTestId,
 }: SelectFieldProps) {
   const [open, setOpen] = React.useState(false);
   const selected = options.find((o) => o.value === value);
@@ -47,6 +49,7 @@ export function SelectField({
         <button
           type="button"
           id={id}
+          data-testid={dataTestId}
           disabled={disabled}
           aria-label={ariaLabel}
           aria-haspopup="listbox"

@@ -1,4 +1,5 @@
 export { ItemsListPage } from "./pages/ItemsListPage";
+export { ItemsLabelDataPage } from "./pages/ItemsLabelDataPage";
 export { ItemPage } from "./pages/ItemPage";
 export type {
   Item,

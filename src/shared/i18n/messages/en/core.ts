@@ -115,9 +115,12 @@ export const coreEn = {
       CUSTOM: "Custom",
     },
     domainIssues: {
-      translationNameMissing: "Translation name is missing for this item.",
-      kizMarkingMissing: "Marking code or KIZ field is empty — add data before printing.",
-      markingCodeMissing: "Marking payload is missing for DataMatrix.",
+      translationContentMissing:
+        "Fill at least one translation field (name, description, composition, or extra text) for this sticker.",
+      kizMarkingMissing:
+        "Fill at least one of: KIZ, marking code, or GS1 DataMatrix payload before printing.",
+      datamatrixSourceMissing:
+        "Fill DataMatrix payload, GS1 DataMatrix payload, or marking code before printing.",
       matrixBindingEmpty: "A DataMatrix element has no value from its binding.",
     },
     paper: {
@@ -178,7 +181,7 @@ export const coreEn = {
         alignRight: "Right",
         symbologyHint: "Symbology hint",
         symbologyDefault: "Default (CODE 128)",
-        symbologyCustom: "Custom…",
+        symbologyCustom: "Custom",
         symbologyCustomValue: "Custom symbology hint",
         showHumanReadable: "Human-readable text",
         qrErrorCorrection: "Error correction",
@@ -225,7 +228,7 @@ export const coreEn = {
       copiesLabel: "Copies",
       copiesHint: "Preview only — not sent to a printer yet.",
       reprintHint:
-        "Context restored from a previous operation — adjust if needed, then use Print or Save PDF.",
+        "Restored from history — check template and copies, then print or export PDF.",
       actions: {
         sectionTitle: "Print actions",
         createJob: "Create print job",
@@ -244,11 +247,11 @@ export const coreEn = {
         genericError: "Could not create the print job.",
       },
       presets: {
-        paperLabel: "Paper / stock preset",
-        mediaLabel: "Media preset",
-        storedHint: "Last used values are saved in this browser for the next session.",
+        paperLabel: "Page size (print dialog)",
+        mediaLabel: "Media / feed",
+        storedHint: "Remembered on this device for the next visit.",
         paper: {
-          AUTO: "Auto (template default)",
+          AUTO: "Auto — follow template",
         },
         media: {
           DEFAULT: "Default",
@@ -290,6 +293,12 @@ export const coreEn = {
       intro: "Recent label PDF exports and print jobs created from the workspace.",
       emptyTitle: "No print jobs yet",
       emptyHint: "Create a job or save a PDF from the print workspace — entries will appear here.",
+      emptyHintShort: "Print or save a PDF from the workspace, station, or batch — runs show up here.",
+      sourceStation: "Sticker station",
+      sourceBatch: "Batch print",
+      sourceWorkspace: "Workspace",
+      sourceFromItemBarcodes: "Item · Barcodes",
+      batchRestore: "Open batch · restore list",
       columnWhen: "Updated",
       columnMode: "Mode",
       columnStatus: "Status",
@@ -318,12 +327,16 @@ export const coreEn = {
     },
     station: {
       pageHeading: "Sticker station",
-      intro: "Scan or search an item, confirm the barcode, and print without leaving this screen.",
+      intro: "Scan a barcode or search, then print — stay on one screen.",
       columnItem: "Item",
       primaryBarcode: "Primary barcode",
       selectedBarcode: "Selected barcode",
-      barcodesTitle: "Barcodes",
-      noItem: "Find an item to preview the label.",
+      barcodesTitle: "Switch barcode",
+      singleBarcodeLabel: "Barcode",
+      badgePrimaryBarcode: "Primary",
+      noItem: "Nothing selected yet.",
+      emptyHint: "Scan a barcode or search by code / name, then press Enter or Find.",
+      barcodeMatchedHint: "Barcode matched — label selected.",
       noActiveBarcodes: "No active barcodes — bindings may be empty.",
       actionsTitle: "Actions",
       search: {
@@ -334,6 +347,7 @@ export const coreEn = {
         notFound: "No matching item.",
         pickPrompt: "Several items match — pick one below.",
         pickTitle: "Choose an item",
+        pickSubtitle: "Tap a row to load it.",
       },
       repeat: {
         button: "Repeat last",
@@ -354,10 +368,18 @@ export const coreEn = {
       clear: "Clear list",
       repeatLast: "Repeat last batch",
       applyCopiesAll: "Apply to all rows",
-      empty: "No lines yet — add items above.",
+      empty: "No lines yet.",
+      emptyHint: "Search or scan above, then Add — pick a template and set copies per row.",
+      rowOk: "OK",
       previewTitle: "Selected line preview",
       previewPlaceholder: "Select a row to preview its label.",
       summaryLine: "{{rows}} lines · {{labels}} labels total · {{invalid}} invalid",
+      summaryDetail: "{{valid}} valid rows · {{invalid}} need attention · {{labels}} labels total",
+      chipRowsLabel: "lines",
+      chipLabelsLabel: "labels",
+      chipInvalidLabel: "need fix",
+      massCopiesHint: "Copies for every row",
+      domainRowsHint: "{{count}} line(s) missing required label data — fix or remove before printing.",
       jobName: "Batch print",
       colCode: "Code",
       colName: "Name",
@@ -384,6 +406,7 @@ export const coreEn = {
   routes: {
     dashboard: "Dashboard",
     items: "Items",
+    itemsLabelData: "Label data",
     barcodes: "Barcode Registry",
     item: "Catalog item",
     brands: "Brands",

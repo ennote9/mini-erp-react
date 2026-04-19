@@ -18,6 +18,7 @@ import {
 } from "../lib/workspacePrintSettingsStorage";
 import { validateWorkspaceForPrintJob } from "../lib/workspacePrintValidation";
 import { collectLabelDomainIssues } from "../lib/labelDomainValidation";
+import { LabelDomainIssuesBanner } from "../components/LabelDomainIssuesBanner";
 import { LABELS_STATION_SOURCE } from "../lib/labelsStationConstants";
 import { LABELS_STATION_QUERY } from "../lib/labelsStationQueryParams";
 import { loadLabelsStationStorage, saveLabelsStationStorage } from "../lib/labelsStationStorage";
@@ -34,11 +35,12 @@ import type { LabelTemplate } from "../model";
 import { LabelTemplatePreview } from "../components/preview/LabelTemplatePreview";
 import { WorkspaceItemContextBanner } from "../components/WorkspaceItemContextBanner";
 import { LabelsSubnav } from "../components/LabelsSubnav";
+import { cn } from "@/lib/utils";
 
 type PreviewMode = "demo" | "item";
 
 type Feedback =
-  | { kind: "success"; message: string }
+  | { kind: "success"; message: string; variant?: "restore" }
   | { kind: "error"; message: string };
 
 export function LabelsStationPage() {
@@ -51,6 +53,8 @@ export function LabelsStationPage() {
   const [actionBusy, setActionBusy] = useState<"job" | "pdf" | "print" | null>(null);
   const [searchDraft, setSearchDraft] = useState("");
   const [pickCandidates, setPickCandidates] = useState<Item[] | null>(null);
+  /** True when the last successful find matched a barcode scan (single candidate). */
+  const [barcodeMatchHint, setBarcodeMatchHint] = useState(false);
 
   const itemId = searchParams.get(LABELS_STATION_QUERY.itemId) ?? "";
   const barcodeId = searchParams.get(LABELS_STATION_QUERY.barcodeId) ?? "";
@@ -236,6 +240,7 @@ export function LabelsStationPage() {
   const runSearch = useCallback(() => {
     setFeedback(null);
     setPickCandidates(null);
+    setBarcodeMatchHint(false);
     const result = findStationSearchResult(searchDraft);
     if (result.kind === "empty") {
       setFeedback({ kind: "error", message: t("labels.station.search.emptyQuery") });
@@ -247,12 +252,13 @@ export function LabelsStationPage() {
     }
     if (result.kind === "pickItem") {
       setPickCandidates(result.items);
-      setFeedback({ kind: "error", message: t("labels.station.search.pickPrompt") });
       return;
     }
+    setBarcodeMatchHint(Boolean(result.barcodeId));
     applyItemToUrl(result.item.id, result.barcodeId);
     setSearchDraft("");
-  }, [searchDraft, applyItemToUrl, t]);
+    focusSearch();
+  }, [searchDraft, applyItemToUrl, t, focusSearch]);
 
   const handleRepeatLast = useCallback(() => {
     setFeedback(null);
@@ -274,8 +280,9 @@ export function LabelsStationPage() {
     applyItemToUrl(first, job.barcodeId, { templateId: job.templateId, copies: job.copies });
     setPickCandidates(null);
     setSearchDraft("");
-    setFeedback({ kind: "success", message: t("labels.station.repeat.restored") });
-  }, [applyItemToUrl, t]);
+    setFeedback({ kind: "success", message: t("labels.station.repeat.restored"), variant: "restore" });
+    focusSearch();
+  }, [applyItemToUrl, t, focusSearch]);
 
   const handleCreateJob = useCallback(() => {
     setFeedback(null);
@@ -289,7 +296,6 @@ export function LabelsStationPage() {
       return;
     }
     if (domainBlocked) {
-      setFeedback({ kind: "error", message: t("labels.workspace.domainBlocked") });
       return;
     }
     if (!selected) return;
@@ -328,7 +334,6 @@ export function LabelsStationPage() {
       return;
     }
     if (domainBlocked) {
-      setFeedback({ kind: "error", message: t("labels.workspace.domainBlocked") });
       return;
     }
     const surface = labelSurfaceRef.current;
@@ -393,7 +398,6 @@ export function LabelsStationPage() {
       return;
     }
     if (domainBlocked) {
-      setFeedback({ kind: "error", message: t("labels.workspace.domainBlocked") });
       return;
     }
     const surface = labelSurfaceRef.current;
@@ -468,9 +472,15 @@ export function LabelsStationPage() {
 
   const selectCandidate = (picked: Item) => {
     setPickCandidates(null);
+    setBarcodeMatchHint(false);
     applyItemToUrl(picked.id);
     setFeedback(null);
+    focusSearch();
   };
+
+  useEffect(() => {
+    focusSearch();
+  }, [focusSearch]);
 
   return (
     <div className="labels-page mx-auto max-w-[1600px] space-y-3 p-3 md:p-4" data-module="labels">
@@ -484,11 +494,14 @@ export function LabelsStationPage() {
       {feedback ? (
         <div
           role="status"
-          className={`rounded-md border px-2.5 py-1.5 text-xs ${
-            feedback.kind === "success"
-              ? "border-emerald-500/40 bg-emerald-500/10 text-foreground"
-              : "border-destructive/50 bg-destructive/10 text-foreground"
-          }`}
+          className={cn(
+            "rounded-md border px-2 py-1 text-[11px] leading-snug",
+            feedback.kind === "success" && feedback.variant === "restore"
+              ? "border-sky-500/40 bg-sky-500/10 text-foreground"
+              : feedback.kind === "success"
+                ? "border-emerald-500/35 bg-emerald-500/10 text-foreground"
+                : "border-destructive/45 bg-destructive/10 text-foreground",
+          )}
         >
           {feedback.message}
         </div>
@@ -504,8 +517,12 @@ export function LabelsStationPage() {
               <Input
                 ref={searchInputRef}
                 id="labels-station-search"
+                data-testid="labels-station-search"
                 value={searchDraft}
-                onChange={(e) => setSearchDraft(e.target.value)}
+                onChange={(e) => {
+                  setSearchDraft(e.target.value);
+                  setBarcodeMatchHint(false);
+                }}
                 placeholder={t("labels.station.search.placeholder")}
                 className="h-8 font-mono text-xs"
                 onKeyDown={(e) => {
@@ -519,6 +536,9 @@ export function LabelsStationPage() {
                 {t("labels.station.search.find")}
               </Button>
             </div>
+            {barcodeMatchHint && previewMode === "item" && item ? (
+              <p className="text-[10px] text-emerald-800/90 dark:text-emerald-200/90">{t("labels.station.barcodeMatchedHint")}</p>
+            ) : null}
           </div>
           <div className="w-[min(100%,14rem)] space-y-1">
             <Label className="text-[11px] text-muted-foreground">{t("labels.workspace.selectTemplate")}</Label>
@@ -556,17 +576,18 @@ export function LabelsStationPage() {
 
       {pickCandidates && pickCandidates.length > 0 ? (
         <div
-          className="rounded-md border border-amber-500/35 bg-amber-500/10 px-2.5 py-2 text-xs"
+          className="rounded-md border border-amber-500/30 bg-amber-500/10 px-2 py-1.5 text-[11px]"
           role="region"
           aria-label={t("labels.station.search.pickTitle")}
         >
           <p className="font-medium text-foreground">{t("labels.station.search.pickTitle")}</p>
-          <ul className="mt-1.5 max-h-36 space-y-1 overflow-y-auto">
+          <p className="text-[10px] text-muted-foreground">{t("labels.station.search.pickSubtitle")}</p>
+          <ul className="mt-1 max-h-28 space-y-0.5 overflow-y-auto">
             {pickCandidates.map((c) => (
               <li key={c.id}>
                 <button
                   type="button"
-                  className="w-full rounded border border-border/60 bg-background/80 px-2 py-1 text-left text-xs hover:bg-muted/60"
+                  className="w-full rounded border border-border/50 bg-background/90 px-2 py-0.5 text-left text-[11px] hover:bg-muted/60"
                   onClick={() => selectCandidate(c)}
                 >
                   <span className="font-medium">{c.name}</span>
@@ -587,74 +608,57 @@ export function LabelsStationPage() {
         </div>
       ) : null}
 
-      {bannerProps ? <WorkspaceItemContextBanner {...bannerProps} /> : null}
+      {bannerProps ? <WorkspaceItemContextBanner {...bannerProps} compact /> : null}
 
-      {domainBlocked && canOperate ? (
-        <div
-          role="alert"
-          className="rounded-md border border-amber-500/40 bg-amber-500/10 px-2.5 py-2 text-xs text-amber-950 dark:text-amber-100"
-        >
-          <p className="font-medium">{t("labels.workspace.domainIssuesTitle")}</p>
-          <ul className="mt-1 list-inside list-disc space-y-0.5">
-            {domainIssues.map((msg) => (
-              <li key={msg}>{msg}</li>
-            ))}
-          </ul>
-        </div>
-      ) : null}
+      <LabelDomainIssuesBanner show={domainBlocked && canOperate} issues={domainIssues} />
 
-      <div className="grid min-h-[260px] gap-2 lg:grid-cols-12">
+      <div className="grid min-h-[260px] gap-2 lg:grid-cols-12" data-testid="labels-station">
         <section className="rounded-md border border-border/80 bg-card/40 p-2.5 lg:col-span-3">
           <h3 className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
             {t("labels.station.columnItem")}
           </h3>
           {previewMode === "item" && item ? (
             <div className="mt-2 space-y-2 text-xs">
-              <div>
-                <div className="text-[10px] uppercase text-muted-foreground">{t("labels.workspace.contextBanner.itemName")}</div>
-                <div className="truncate font-medium" title={item.name}>
-                  {item.name}
+              {activeBarcodes.length === 0 ? (
+                <p className="text-[11px] text-amber-800 dark:text-amber-100">{t("labels.station.noActiveBarcodes")}</p>
+              ) : activeBarcodes.length === 1 ? (
+                <div>
+                  <div className="text-[10px] uppercase text-muted-foreground">{t("labels.station.singleBarcodeLabel")}</div>
+                  <div className="font-mono text-[12px]">{activeBarcodes[0].codeValue}</div>
                 </div>
-              </div>
-              <div>
-                <div className="text-[10px] uppercase text-muted-foreground">{t("labels.workspace.contextBanner.itemCode")}</div>
-                <div className="font-mono">{item.code}</div>
-              </div>
-              <div>
-                <div className="text-[10px] uppercase text-muted-foreground">{t("labels.station.primaryBarcode")}</div>
-                <div className="font-mono">{previewContext.primaryBarcode || "—"}</div>
-              </div>
-              <div>
-                <div className="text-[10px] uppercase text-muted-foreground">{t("labels.station.selectedBarcode")}</div>
-                <div className="font-mono">{previewContext.selectedBarcode || "—"}</div>
-              </div>
-              {activeBarcodes.length > 1 ? (
-                <div className="border-t border-border/60 pt-2">
+              ) : (
+                <div className="border-t border-border/50 pt-2">
                   <div className="mb-1 text-[10px] uppercase text-muted-foreground">{t("labels.station.barcodesTitle")}</div>
-                  <div className="flex flex-col gap-1">
+                  <div className="flex flex-col gap-0.5">
                     {activeBarcodes.map((b) => {
                       const isSel = b.id === effectiveBarcodeId;
                       return (
                         <button
                           key={b.id}
                           type="button"
-                          className={`rounded border px-2 py-1 text-left font-mono text-[11px] ${
-                            isSel ? "border-primary bg-primary/10" : "border-border/60 hover:bg-muted/50"
+                          className={`flex items-center justify-between gap-2 rounded border px-2 py-1 text-left font-mono text-[11px] ${
+                            isSel ? "border-primary bg-primary/10 shadow-sm" : "border-border/60 hover:bg-muted/50"
                           }`}
                           onClick={() => applyItemToUrl(item.id, b.id)}
                         >
-                          {b.codeValue}
+                          <span className="min-w-0 truncate">{b.codeValue}</span>
+                          {b.isPrimary ? (
+                            <span className="shrink-0 rounded bg-muted px-1 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-muted-foreground">
+                              {t("labels.station.badgePrimaryBarcode")}
+                            </span>
+                          ) : null}
                         </button>
                       );
                     })}
                   </div>
                 </div>
-              ) : activeBarcodes.length === 0 ? (
-                <p className="text-[11px] text-amber-800 dark:text-amber-100">{t("labels.station.noActiveBarcodes")}</p>
-              ) : null}
+              )}
             </div>
           ) : (
-            <p className="mt-3 text-xs text-muted-foreground">{t("labels.station.noItem")}</p>
+            <div className="mt-3 space-y-1 text-xs text-muted-foreground">
+              <p>{t("labels.station.noItem")}</p>
+              <p className="text-[11px] leading-snug">{t("labels.station.emptyHint")}</p>
+            </div>
           )}
         </section>
 
@@ -687,6 +691,7 @@ export function LabelsStationPage() {
               type="button"
               size="sm"
               className="h-8 w-full justify-center"
+              data-testid="labels-station-print"
               disabled={!selected || !canOperate || actionBusy !== null || domainBlocked}
                 onClick={() => void handlePrint()}
             >
@@ -697,6 +702,7 @@ export function LabelsStationPage() {
               size="sm"
               variant="secondary"
               className="h-8 w-full justify-center"
+              data-testid="labels-station-save-pdf"
               disabled={!selected || !canOperate || actionBusy !== null || domainBlocked}
                 onClick={() => void handleSavePdf()}
             >
@@ -707,6 +713,7 @@ export function LabelsStationPage() {
               size="sm"
               variant="secondary"
               className="h-8 w-full justify-center"
+              data-testid="labels-station-create-job"
               disabled={!selected || !canOperate || actionBusy !== null || domainBlocked}
                 onClick={handleCreateJob}
             >

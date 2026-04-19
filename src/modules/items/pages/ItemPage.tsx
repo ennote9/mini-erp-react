@@ -48,6 +48,17 @@ type FormState = {
   brandId: string;
   categoryId: string;
   baseItemId: string;
+  translationName: string;
+  translationDescription: string;
+  translationComposition: string;
+  translationCountry: string;
+  translationImporter: string;
+  translationExtraText: string;
+  markingCode: string;
+  kizCode: string;
+  dataMatrixPayload: string;
+  gs1DataMatrixPayload: string;
+  markingComment: string;
 };
 
 function defaultForm(): FormState {
@@ -61,6 +72,17 @@ function defaultForm(): FormState {
     brandId: "",
     categoryId: "",
     baseItemId: "",
+    translationName: "",
+    translationDescription: "",
+    translationComposition: "",
+    translationCountry: "",
+    translationImporter: "",
+    translationExtraText: "",
+    markingCode: "",
+    kizCode: "",
+    dataMatrixPayload: "",
+    gs1DataMatrixPayload: "",
+    markingComment: "",
   };
 }
 
@@ -166,6 +188,17 @@ export function ItemPage() {
             brandId: base.brandId ?? "",
             categoryId: base.categoryId ?? "",
             baseItemId: base.id,
+            translationName: base.translationName ?? "",
+            translationDescription: base.translationDescription ?? "",
+            translationComposition: base.translationComposition ?? "",
+            translationCountry: base.translationCountry ?? "",
+            translationImporter: base.translationImporter ?? "",
+            translationExtraText: base.translationExtraText ?? "",
+            markingCode: base.markingCode ?? "",
+            kizCode: base.kizCode ?? "",
+            dataMatrixPayload: base.dataMatrixPayload ?? "",
+            gs1DataMatrixPayload: base.gs1DataMatrixPayload ?? "",
+            markingComment: base.markingComment ?? "",
           });
           return;
         }
@@ -184,6 +217,17 @@ export function ItemPage() {
         brandId: item.brandId ?? "",
         categoryId: item.categoryId ?? "",
         baseItemId: item.baseItemId ?? "",
+        translationName: item.translationName ?? "",
+        translationDescription: item.translationDescription ?? "",
+        translationComposition: item.translationComposition ?? "",
+        translationCountry: item.translationCountry ?? "",
+        translationImporter: item.translationImporter ?? "",
+        translationExtraText: item.translationExtraText ?? "",
+        markingCode: item.markingCode ?? "",
+        kizCode: item.kizCode ?? "",
+        dataMatrixPayload: item.dataMatrixPayload ?? "",
+        gs1DataMatrixPayload: item.gs1DataMatrixPayload ?? "",
+        markingComment: item.markingComment ?? "",
       });
     }
   }, [
@@ -198,6 +242,17 @@ export function ItemPage() {
     item?.accountingProfile,
     item?.brandId,
     item?.categoryId,
+    item?.translationName,
+    item?.translationDescription,
+    item?.translationComposition,
+    item?.translationCountry,
+    item?.translationImporter,
+    item?.translationExtraText,
+    item?.markingCode,
+    item?.kizCode,
+    item?.dataMatrixPayload,
+    item?.gs1DataMatrixPayload,
+    item?.markingComment,
     createKind,
     requestedBaseItemId,
   ]);
@@ -228,6 +283,17 @@ export function ItemPage() {
           categoryId: form.categoryId || undefined,
           itemKind: itemKindForSave,
           baseItemId: baseItemIdForSave,
+          translationName: form.translationName || undefined,
+          translationDescription: form.translationDescription || undefined,
+          translationComposition: form.translationComposition || undefined,
+          translationCountry: form.translationCountry || undefined,
+          translationImporter: form.translationImporter || undefined,
+          translationExtraText: form.translationExtraText || undefined,
+          markingCode: form.markingCode || undefined,
+          kizCode: form.kizCode || undefined,
+          dataMatrixPayload: form.dataMatrixPayload || undefined,
+          gs1DataMatrixPayload: form.gs1DataMatrixPayload || undefined,
+          markingComment: form.markingComment || undefined,
         },
         isNew ? undefined : id ?? undefined,
       );
@@ -297,6 +363,7 @@ export function ItemPage() {
       { value: "responsibles", label: t("master.item.tabResponsibles") },
       { value: "images", label: t("master.item.tabImages") },
       { value: "barcodes", label: t("master.item.tabBarcodes") },
+      { value: "labelData", label: t("master.item.tabLabelData") },
       ...(showTestersTab ? [{ value: "testers" as const, label: t("master.item.tabTesters") }] : []),
     ],
     [showTestersTab, t],
@@ -648,6 +715,127 @@ export function ItemPage() {
                 barcodes={item?.barcodes ?? []}
                 onBarcodesChanged={() => setBarcodesRevision((n) => n + 1)}
               />
+            </Tabs.Content>
+            <Tabs.Content value="labelData" className="outline-none focus-visible:outline-none">
+              <div className="w-full max-w-4xl space-y-4">
+                <p className="text-[11px] leading-snug text-muted-foreground">{t("master.item.labelData.hint")}</p>
+                <div className="space-y-2 rounded-md border border-border/70 bg-card/30 p-3">
+                  <CardTitle className="text-sm font-semibold">{t("master.item.labelData.sectionTranslation")}</CardTitle>
+                  <div className="grid gap-2 sm:grid-cols-2">
+                    <div className="flex flex-col gap-0.5 sm:col-span-2">
+                      <Label className="text-xs">{t("master.item.labelData.translationName")}</Label>
+                      <Input
+                        data-testid="item-label-data-translation-name"
+                        value={form.translationName}
+                        onChange={(e) => setForm((f) => ({ ...f, translationName: e.target.value }))}
+                        className="h-7 text-xs"
+                        placeholder={t("master.common.optionalPlaceholder")}
+                      />
+                    </div>
+                    <div className="flex flex-col gap-0.5 sm:col-span-2">
+                      <Label className="text-xs">{t("master.item.labelData.translationDescription")}</Label>
+                      <Textarea
+                        value={form.translationDescription}
+                        onChange={(e) => setForm((f) => ({ ...f, translationDescription: e.target.value }))}
+                        rows={2}
+                        className="min-h-[2.75rem] resize-y text-xs"
+                        placeholder={t("master.common.optionalPlaceholder")}
+                      />
+                    </div>
+                    <div className="flex flex-col gap-0.5 sm:col-span-2">
+                      <Label className="text-xs">{t("master.item.labelData.translationComposition")}</Label>
+                      <Textarea
+                        value={form.translationComposition}
+                        onChange={(e) => setForm((f) => ({ ...f, translationComposition: e.target.value }))}
+                        rows={2}
+                        className="min-h-[2.75rem] resize-y text-xs"
+                        placeholder={t("master.common.optionalPlaceholder")}
+                      />
+                    </div>
+                    <div className="flex flex-col gap-0.5">
+                      <Label className="text-xs">{t("master.item.labelData.translationCountry")}</Label>
+                      <Input
+                        value={form.translationCountry}
+                        onChange={(e) => setForm((f) => ({ ...f, translationCountry: e.target.value }))}
+                        className="h-7 text-xs"
+                        placeholder={t("master.common.optionalPlaceholder")}
+                      />
+                    </div>
+                    <div className="flex flex-col gap-0.5">
+                      <Label className="text-xs">{t("master.item.labelData.translationImporter")}</Label>
+                      <Input
+                        value={form.translationImporter}
+                        onChange={(e) => setForm((f) => ({ ...f, translationImporter: e.target.value }))}
+                        className="h-7 text-xs"
+                        placeholder={t("master.common.optionalPlaceholder")}
+                      />
+                    </div>
+                    <div className="flex flex-col gap-0.5 sm:col-span-2">
+                      <Label className="text-xs">{t("master.item.labelData.translationExtraText")}</Label>
+                      <Textarea
+                        value={form.translationExtraText}
+                        onChange={(e) => setForm((f) => ({ ...f, translationExtraText: e.target.value }))}
+                        rows={2}
+                        className="min-h-[2.75rem] resize-y text-xs"
+                        placeholder={t("master.common.optionalPlaceholder")}
+                      />
+                    </div>
+                  </div>
+                </div>
+                <div className="space-y-2 rounded-md border border-border/70 bg-card/30 p-3">
+                  <CardTitle className="text-sm font-semibold">{t("master.item.labelData.sectionMarking")}</CardTitle>
+                  <div className="grid gap-2 sm:grid-cols-2">
+                    <div className="flex flex-col gap-0.5">
+                      <Label className="text-xs">{t("master.item.labelData.markingCode")}</Label>
+                      <Input
+                        value={form.markingCode}
+                        onChange={(e) => setForm((f) => ({ ...f, markingCode: e.target.value }))}
+                        className="h-7 font-mono text-xs"
+                        placeholder={t("master.common.optionalPlaceholder")}
+                      />
+                    </div>
+                    <div className="flex flex-col gap-0.5">
+                      <Label className="text-xs">{t("master.item.labelData.kizCode")}</Label>
+                      <Input
+                        value={form.kizCode}
+                        onChange={(e) => setForm((f) => ({ ...f, kizCode: e.target.value }))}
+                        className="h-7 font-mono text-xs"
+                        placeholder={t("master.common.optionalPlaceholder")}
+                      />
+                    </div>
+                    <div className="flex flex-col gap-0.5 sm:col-span-2">
+                      <Label className="text-xs">{t("master.item.labelData.dataMatrixPayload")}</Label>
+                      <Textarea
+                        value={form.dataMatrixPayload}
+                        onChange={(e) => setForm((f) => ({ ...f, dataMatrixPayload: e.target.value }))}
+                        rows={2}
+                        className="min-h-[2.75rem] resize-y font-mono text-xs"
+                        placeholder={t("master.common.optionalPlaceholder")}
+                      />
+                    </div>
+                    <div className="flex flex-col gap-0.5 sm:col-span-2">
+                      <Label className="text-xs">{t("master.item.labelData.gs1DataMatrixPayload")}</Label>
+                      <Textarea
+                        value={form.gs1DataMatrixPayload}
+                        onChange={(e) => setForm((f) => ({ ...f, gs1DataMatrixPayload: e.target.value }))}
+                        rows={2}
+                        className="min-h-[2.75rem] resize-y font-mono text-xs"
+                        placeholder={t("master.common.optionalPlaceholder")}
+                      />
+                    </div>
+                    <div className="flex flex-col gap-0.5 sm:col-span-2">
+                      <Label className="text-xs">{t("master.item.labelData.markingComment")}</Label>
+                      <Textarea
+                        value={form.markingComment}
+                        onChange={(e) => setForm((f) => ({ ...f, markingComment: e.target.value }))}
+                        rows={2}
+                        className="min-h-[2.75rem] resize-y text-xs"
+                        placeholder={t("master.common.optionalPlaceholder")}
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
             </Tabs.Content>
             {showTestersTab ? (
               <Tabs.Content value="testers" className="outline-none focus-visible:outline-none">

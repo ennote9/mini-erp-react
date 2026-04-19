@@ -18,6 +18,7 @@ import {
 } from "../lib/workspacePrintSettingsStorage";
 import { validateWorkspaceForPrintJob } from "../lib/workspacePrintValidation";
 import { collectLabelDomainIssues } from "../lib/labelDomainValidation";
+import { LabelDomainIssuesBanner } from "../components/LabelDomainIssuesBanner";
 import {
   createPrintJobFromWorkspace,
   getDefaultLabelTemplate,
@@ -408,21 +409,9 @@ export function LabelsWorkspacePage() {
 
       {bannerProps ? <WorkspaceItemContextBanner {...bannerProps} /> : null}
 
-      {domainBlocked ? (
-        <div
-          role="alert"
-          className="rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs text-amber-950 dark:text-amber-100"
-        >
-          <p className="font-medium">{t("labels.workspace.domainIssuesTitle")}</p>
-          <ul className="mt-1 list-inside list-disc space-y-0.5">
-            {domainIssues.map((msg) => (
-              <li key={msg}>{msg}</li>
-            ))}
-          </ul>
-        </div>
-      ) : null}
+      <LabelDomainIssuesBanner show={domainBlocked} issues={domainIssues} />
 
-      <div className="grid min-h-[280px] gap-3 lg:grid-cols-12">
+      <div className="grid min-h-[280px] gap-3 lg:grid-cols-12" data-testid="labels-workspace">
         <section className="rounded-md border border-border/80 bg-card/40 p-3 lg:col-span-4">
           <h3 className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
             {t("labels.workspace.templateSection")}
@@ -435,15 +424,17 @@ export function LabelsWorkspacePage() {
                 <Label htmlFor="labels-ws-template" className="text-xs text-muted-foreground">
                   {t("labels.workspace.selectTemplate")}
                 </Label>
-                <SelectField
-                  id="labels-ws-template"
-                  value={templateId}
-                  onChange={handleTemplateChange}
-                  options={selectOptions}
-                  placeholder={t("labels.workspace.selectTemplatePlaceholder")}
-                  aria-label={t("labels.workspace.selectTemplateAria")}
-                  className="w-full max-w-full"
-                />
+                <div data-testid="labels-workspace-template-select">
+                  <SelectField
+                    id="labels-ws-template"
+                    value={templateId}
+                    onChange={handleTemplateChange}
+                    options={selectOptions}
+                    placeholder={t("labels.workspace.selectTemplatePlaceholder")}
+                    aria-label={t("labels.workspace.selectTemplateAria")}
+                    className="w-full max-w-full"
+                  />
+                </div>
               </div>
             )}
           </div>
@@ -456,6 +447,7 @@ export function LabelsWorkspacePage() {
               <Button
                 type="button"
                 size="sm"
+                data-testid="labels-workspace-create-job"
                 disabled={!selected || actionBusy !== null || domainBlocked}
                 onClick={handleCreateJob}
               >
@@ -465,6 +457,7 @@ export function LabelsWorkspacePage() {
                 type="button"
                 size="sm"
                 variant="secondary"
+                data-testid="labels-workspace-save-pdf"
                 disabled={!selected || actionBusy !== null || domainBlocked}
                 onClick={() => void handleSavePdf()}
               >
@@ -475,6 +468,7 @@ export function LabelsWorkspacePage() {
                 size="sm"
                 variant="default"
                 className="border border-primary/30"
+                data-testid="labels-workspace-print"
                 disabled={!selected || actionBusy !== null || domainBlocked}
                 onClick={() => void handlePrint()}
               >

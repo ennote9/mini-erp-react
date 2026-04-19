@@ -4,6 +4,7 @@ import { useTranslation } from "@/shared/i18n";
 import { getAppReadModelRevision, subscribeAppReadModelRevision } from "@/shared/appReadModelRevision";
 import { LABELS_WORKSPACE_QUERY } from "../lib/workspaceQueryParams";
 import { LABELS_BATCH_SOURCE } from "../lib/labelsBatchConstants";
+import { LABELS_STATION_SOURCE } from "../lib/labelsStationConstants";
 import { buildLabelsBatchUrl } from "../lib/labelsBatchQueryParams";
 import { labelTemplateRepository } from "../labelTemplateRepository";
 import { listPrintJobsForDisplay } from "../service";
@@ -24,6 +25,13 @@ function workspaceUrlForJob(job: PrintJob, opts?: { reprint?: boolean }): string
 
 function isBatchJob(job: PrintJob): boolean {
   return job.source === LABELS_BATCH_SOURCE;
+}
+
+function formatSourceLabel(job: PrintJob, t: (k: string) => string): string {
+  if (isBatchJob(job)) return t("labels.operations.sourceBatch");
+  if (job.source === LABELS_STATION_SOURCE) return t("labels.operations.sourceStation");
+  if (job.source === "item-barcodes") return t("labels.operations.sourceFromItemBarcodes");
+  return t("labels.operations.sourceWorkspace");
 }
 
 function formatWhen(iso: string, locale: string): string {
@@ -56,9 +64,9 @@ export function LabelsOperationsPage() {
       </header>
 
       {jobs.length === 0 ? (
-        <div className="rounded-md border border-dashed border-border/80 bg-muted/20 px-4 py-10 text-center">
+        <div className="rounded-md border border-dashed border-border/80 bg-muted/20 px-4 py-8 text-center">
           <p className="text-sm font-medium text-foreground">{t("labels.operations.emptyTitle")}</p>
-          <p className="mt-2 text-sm text-muted-foreground">{t("labels.operations.emptyHint")}</p>
+          <p className="mt-1.5 text-xs leading-snug text-muted-foreground">{t("labels.operations.emptyHintShort")}</p>
         </div>
       ) : (
         <div className="overflow-x-auto rounded-md border border-border/80">
@@ -118,7 +126,7 @@ export function LabelsOperationsPage() {
                       </span>
                     ) : null}
                     {batch && job.rowsCount != null ? (
-                      <span className="ml-1.5 rounded border border-sky-500/35 bg-sky-500/10 px-1 py-0.5 text-[10px] uppercase tracking-wide text-sky-950 dark:text-sky-100">
+                      <span className="ml-1.5 rounded border border-sky-500/35 bg-sky-500/10 px-1 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-sky-950 dark:text-sky-100">
                         {t("labels.operations.badgeBatch")} · {job.rowsCount}
                       </span>
                     ) : null}
@@ -129,6 +137,14 @@ export function LabelsOperationsPage() {
                       >
                         {t(`labels.kind.${templateKind}`)}
                       </span>
+                    ) : null}
+                    {batch && job.batchSummarySnapshot ? (
+                      <p
+                        className="mt-1 line-clamp-2 text-[11px] font-normal leading-snug text-muted-foreground"
+                        title={job.batchSummarySnapshot}
+                      >
+                        {job.batchSummarySnapshot}
+                      </p>
                     ) : null}
                   </div>
                   <div className="shrink-0 text-right tabular-nums text-muted-foreground">{labelsCount}</div>
@@ -159,27 +175,22 @@ export function LabelsOperationsPage() {
                       <span className="text-muted-foreground/80">—</span>
                     )}
                   </div>
-                  <div className="flex min-w-0 flex-col items-end gap-1 text-right text-xs text-muted-foreground">
-                    <span className="max-w-full truncate" title={job.source ?? ""}>
-                      {job.source ?? "—"}
+                  <div className="flex min-w-0 flex-col items-end gap-1.5 text-right text-[11px]">
+                    <span
+                      className="max-w-full truncate text-[10px] uppercase tracking-wide text-muted-foreground"
+                      title={formatSourceLabel(job, t)}
+                    >
+                      {formatSourceLabel(job, t)}
                     </span>
                     {batch ? (
-                      <>
-                        <Link
-                          to={buildLabelsBatchUrl({ restoreJob: job.id })}
-                          className="text-primary underline-offset-2 hover:underline"
-                        >
-                          {t("labels.operations.openBatch")}
-                        </Link>
-                        <Link
-                          to={buildLabelsBatchUrl({ restoreJob: job.id })}
-                          className="font-medium text-foreground underline-offset-2 hover:underline"
-                        >
-                          {t("labels.operations.reprintBatch")}
-                        </Link>
-                      </>
+                      <Link
+                        to={buildLabelsBatchUrl({ restoreJob: job.id })}
+                        className="rounded border border-primary/40 bg-primary/5 px-2 py-1 text-xs font-medium text-primary underline-offset-2 hover:bg-primary/10 hover:underline"
+                      >
+                        {t("labels.operations.batchRestore")}
+                      </Link>
                     ) : (
-                      <>
+                      <div className="flex flex-col items-end gap-1">
                         <Link
                           to={workspaceUrlForJob(job)}
                           className="text-primary underline-offset-2 hover:underline"
@@ -192,7 +203,7 @@ export function LabelsOperationsPage() {
                         >
                           {t("labels.operations.reprint")}
                         </Link>
-                      </>
+                      </div>
                     )}
                   </div>
                 </li>

@@ -246,10 +246,22 @@ function normalizeItem(raw: unknown): Item | null {
   const responsibleAssignments: ItemResponsibleAssignment[] = Array.isArray(raRaw)
     ? raRaw.map(normalizeItemResponsibleAssignment).filter((x): x is ItemResponsibleAssignment => x !== null)
     : [];
-  const translationName = typeof o.translationName === "string" ? o.translationName : undefined;
-  const translationDescription = typeof o.translationDescription === "string" ? o.translationDescription : undefined;
-  const markingCode = typeof o.markingCode === "string" ? o.markingCode : undefined;
-  const kizCode = typeof o.kizCode === "string" ? o.kizCode : undefined;
+  const optStr = (v: unknown): string | undefined => {
+    if (typeof v !== "string") return undefined;
+    const t = v.trim();
+    return t.length > 0 ? t : undefined;
+  };
+  const translationName = optStr(o.translationName);
+  const translationDescription = optStr(o.translationDescription);
+  const translationComposition = optStr(o.translationComposition);
+  const translationCountry = optStr(o.translationCountry);
+  const translationImporter = optStr(o.translationImporter);
+  const translationExtraText = optStr(o.translationExtraText);
+  const markingCode = optStr(o.markingCode);
+  const kizCode = optStr(o.kizCode);
+  const dataMatrixPayload = optStr(o.dataMatrixPayload);
+  const gs1DataMatrixPayload = optStr(o.gs1DataMatrixPayload);
+  const markingComment = optStr(o.markingComment);
   return {
     id: o.id,
     code: o.code,
@@ -272,8 +284,15 @@ function normalizeItem(raw: unknown): Item | null {
     responsibleAssignments,
     translationName,
     translationDescription,
+    translationComposition,
+    translationCountry,
+    translationImporter,
+    translationExtraText,
     markingCode,
     kizCode,
+    dataMatrixPayload,
+    gs1DataMatrixPayload,
+    markingComment,
   };
 }
 
