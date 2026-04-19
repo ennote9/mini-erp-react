@@ -28,7 +28,8 @@ import {
 } from "../../../shared/issues";
 import { getCustomerFormHealth } from "../../../shared/masterDataHealth";
 import { DocumentIssueStrip } from "../../../shared/ui/feedback/DocumentIssueStrip";
-import { Save, X } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
+import { FileSignature, LayoutGrid, Paperclip, Save, Truck, X } from "lucide-react";
 import { useTranslation } from "@/shared/i18n/context";
 import { cn } from "@/lib/utils";
 import { Tabs } from "radix-ui";
@@ -241,6 +242,23 @@ export function CustomerPage() {
 
   const displayTitle = isNew ? t("master.customer.titleNew") : t("master.customer.titleWithCode", { code: customer!.code });
 
+  const customerTabItems = useMemo(
+    (): { value: "main" | "delivery" | "agreements" | "attachments"; label: string; icon: LucideIcon }[] => [
+      { value: "main", label: t("master.customer.tabMain"), icon: LayoutGrid },
+      { value: "delivery", label: t("master.customer.tabDefaultDelivery"), icon: Truck },
+      { value: "agreements", label: t("master.customer.tabAgreements"), icon: FileSignature },
+      { value: "attachments", label: t("master.customer.tabAttachments"), icon: Paperclip },
+    ],
+    [t],
+  );
+
+  const tabTriggerClassName = cn(
+    "inline-flex h-8 min-w-0 flex-1 items-center justify-center gap-1 whitespace-nowrap rounded-none border-0 bg-background px-2 text-sm font-medium transition-colors sm:flex-initial sm:gap-1.5 sm:px-3",
+    "text-foreground hover:bg-accent hover:text-accent-foreground",
+    "data-[state=active]:bg-primary data-[state=active]:text-primary-foreground",
+    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
+  );
+
   return (
     <div className="doc-page">
       <div className="doc-page__breadcrumb">
@@ -291,53 +309,18 @@ export function CustomerPage() {
               aria-label={t("master.customer.tabsAria")}
             >
               <ButtonGroup className="w-full flex-wrap rounded-none border-0 bg-transparent sm:w-auto" aria-label={t("master.customer.tabsAria")}>
-                <Tabs.Trigger
-                  value="main"
-                  className={cn(
-                    "inline-flex h-8 flex-1 items-center justify-center rounded-none border-0 bg-background px-3 text-sm font-medium transition-colors sm:flex-initial",
-                    "text-foreground hover:bg-accent hover:text-accent-foreground",
-                    "data-[state=active]:bg-primary data-[state=active]:text-primary-foreground",
-                    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
-                  )}
-                >
-                  {t("master.customer.tabMain")}
-                </Tabs.Trigger>
-                <ButtonGroupSeparator />
-                <Tabs.Trigger
-                  value="delivery"
-                  className={cn(
-                    "inline-flex h-8 flex-1 items-center justify-center rounded-none border-0 bg-background px-3 text-sm font-medium transition-colors sm:flex-initial",
-                    "text-foreground hover:bg-accent hover:text-accent-foreground",
-                    "data-[state=active]:bg-primary data-[state=active]:text-primary-foreground",
-                    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
-                  )}
-                >
-                  {t("master.customer.tabDefaultDelivery")}
-                </Tabs.Trigger>
-                <ButtonGroupSeparator />
-                <Tabs.Trigger
-                  value="agreements"
-                  className={cn(
-                    "inline-flex h-8 flex-1 items-center justify-center rounded-none border-0 bg-background px-3 text-sm font-medium transition-colors sm:flex-initial",
-                    "text-foreground hover:bg-accent hover:text-accent-foreground",
-                    "data-[state=active]:bg-primary data-[state=active]:text-primary-foreground",
-                    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
-                  )}
-                >
-                  {t("master.customer.tabAgreements")}
-                </Tabs.Trigger>
-                <ButtonGroupSeparator />
-                <Tabs.Trigger
-                  value="attachments"
-                  className={cn(
-                    "inline-flex h-8 flex-1 items-center justify-center rounded-none border-0 bg-background px-3 text-sm font-medium transition-colors sm:flex-initial",
-                    "text-foreground hover:bg-accent hover:text-accent-foreground",
-                    "data-[state=active]:bg-primary data-[state=active]:text-primary-foreground",
-                    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
-                  )}
-                >
-                  {t("master.customer.tabAttachments")}
-                </Tabs.Trigger>
+                {customerTabItems.map((tab, index) => {
+                  const TabIcon = tab.icon;
+                  return (
+                    <div key={tab.value} className="contents">
+                      {index > 0 ? <ButtonGroupSeparator /> : null}
+                      <Tabs.Trigger value={tab.value} className={tabTriggerClassName}>
+                        <TabIcon className="h-3.5 w-3.5 shrink-0 opacity-90" aria-hidden />
+                        <span>{tab.label}</span>
+                      </Tabs.Trigger>
+                    </div>
+                  );
+                })}
               </ButtonGroup>
             </Tabs.List>
           </CardHeader>

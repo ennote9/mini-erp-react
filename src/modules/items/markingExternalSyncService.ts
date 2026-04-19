@@ -1,8 +1,16 @@
 import type { MarkingExternalBatchAckResult, MarkingExternalRecordRef, MarkingExternalSyncCallMeta } from "./integration/markingExternalAdapterTypes";
 import type { MarkingProviderMode } from "./model/markingProviderSettings";
+import type { MarkingAutoSyncScope } from "./model/markingAutoSyncSettings";
 import type { MarkingSyncHttpCallHint, MarkingSyncLogAction, MarkingSyncLogStatus, MarkingSyncPerRecordResult } from "./model/markingExternalSync";
 import { getActiveMarkingExternalAdapter, invalidateMarkingExternalAdapterCache } from "./integration/markingExternalAdapterRegistry";
 import { stringifySyncLogDetails, parseSyncLogDetails } from "./lib/markingSyncLogPayload";
+import {
+  tryMarkingFetchSyncAuto,
+  endMarkingFetchSyncAuto,
+  enterMarkingFetchSyncManual,
+  endMarkingFetchSyncManual,
+  setActiveMarkingFetchSyncTrigger,
+} from "./lib/markingSyncFetchGate";
 import { markingProviderSettingsRepository } from "./markingProviderSettingsRepository";
 import { markingRecordRepository } from "./markingRecordRepository";
 import { markingSyncLogRepository } from "./markingSyncLogRepository";
@@ -16,6 +24,8 @@ export type MarkingExternalSyncRunResult = {
   isMock: boolean;
   perRecord: MarkingSyncPerRecordResult[];
   message?: string;
+  /** Present for {@link syncMarkingRecords} runs. */
+  syncTrigger?: "manual" | "auto";
 };
 
 export type MarkingExternalIntegrationInfo = {
@@ -81,6 +91,30 @@ export type SyncLogInputMeta = {
   printJobId?: string;
 };
 
+export type SyncMarkingRecordsOptions = {
+  trigger?: "manual" | "auto";
+  autoScope?: MarkingAutoSyncScope;
+};
+
+function formatFetchSyncMessage(adapter: { isMock: boolean }, body: string, opts?: SyncMarkingRecordsOptions): string {
+  const mock = adapter.isMock ? "[mock] " : "";
+  const trigger = opts?.trigger ?? "manual";
+  const auto = trigger === "auto" ? `[auto${opts?.autoScope ? `·${opts.autoScope}` : ""}] ` : "";
+  return `${mock}${auto}${body}`;
+}
+
+function fetchLogDetails(
+  base: { perRecord: MarkingSyncPerRecordResult[]; isMock: boolean; input?: SyncLogInputMeta },
+  opts?: SyncMarkingRecordsOptions,
+): string {
+  const trigger = opts?.trigger ?? "manual";
+  return stringifySyncLogDetails({
+    ...base,
+    trigger,
+    ...(trigger === "auto" && opts?.autoScope ? { autoScope: opts.autoScope } : {}),
+  });
+}
+
 /**
  * Poll external registry and update optional snapshot fields on records. Does not change internal lifecycle status.
  */
@@ -88,139 +122,176 @@ export async function syncMarkingRecords(
   recordIds: readonly string[],
   action: MarkingSyncLogAction = "FETCH_STATUS",
   logInput?: SyncLogInputMeta,
+  options?: SyncMarkingRecordsOptions,
 ): Promise<MarkingExternalSyncRunResult> {
   const adapter = getActiveMarkingExternalAdapter();
-  const startedAt = new Date().toISOString();
-  const uniq = [...new Set(recordIds.map((x) => x?.trim()).filter(Boolean))] as string[];
+  const trigger = options?.trigger ?? "manual";
 
-  const inputForLog: SyncLogInputMeta = {
-    recordIds: uniq,
-    ...(logInput?.batchRef != null ? { batchRef: logInput.batchRef } : {}),
-    ...(logInput?.printJobId != null ? { printJobId: logInput.printJobId } : {}),
-  };
-
-  if (uniq.length === 0) {
-    const finishedAt = new Date().toISOString();
-    const msg = isSyncBlockedBySettings() ? "provider_disabled" : "no_records";
-    const log = markingSyncLogRepository.append({
-      provider: adapter.id,
-      recordIds: [],
-      action,
-      status: "FAILED",
-      startedAt,
-      finishedAt,
-      message: `${adapter.isMock ? "[mock] " : ""}${msg}`,
-      details: stringifySyncLogDetails({ perRecord: [], isMock: adapter.isMock, input: inputForLog }),
-      externalReference: undefined,
-    });
-    return {
-      logId: log.id,
-      status: "FAILED",
-      action,
-      provider: adapter.id,
-      isMock: adapter.isMock,
-      perRecord: [],
-      message: log.message,
-    };
+    if (trigger === "auto") {
+    if (!tryMarkingFetchSyncAuto()) {
+      return {
+        logId: "",
+        status: "FAILED",
+        action,
+        provider: adapter.id,
+        isMock: adapter.isMock,
+        perRecord: [],
+        message: "skipped_in_flight",
+        syncTrigger: "auto",
+      };
+    }
+  } else {
+    await enterMarkingFetchSyncManual();
   }
 
-  if (isSyncBlockedBySettings()) {
+  setActiveMarkingFetchSyncTrigger(trigger);
+  try {
+    const startedAt = new Date().toISOString();
+    const uniq = [...new Set(recordIds.map((x) => x?.trim()).filter(Boolean))] as string[];
+
+    const inputForLog: SyncLogInputMeta = {
+      recordIds: uniq,
+      ...(logInput?.batchRef != null ? { batchRef: logInput.batchRef } : {}),
+      ...(logInput?.printJobId != null ? { printJobId: logInput.printJobId } : {}),
+    };
+
+    if (uniq.length === 0) {
+      const finishedAt = new Date().toISOString();
+      const msg = isSyncBlockedBySettings() ? "provider_disabled" : "no_records";
+      const log = markingSyncLogRepository.append({
+        provider: adapter.id,
+        recordIds: [],
+        action,
+        status: "FAILED",
+        startedAt,
+        finishedAt,
+        message: formatFetchSyncMessage(adapter, msg, options),
+        details: fetchLogDetails({ perRecord: [], isMock: adapter.isMock, input: inputForLog }, options),
+        externalReference: undefined,
+      });
+      return {
+        logId: log.id,
+        status: "FAILED",
+        action,
+        provider: adapter.id,
+        isMock: adapter.isMock,
+        perRecord: [],
+        message: log.message,
+        syncTrigger: trigger,
+      };
+    }
+
+    if (isSyncBlockedBySettings()) {
+      const finishedAt = new Date().toISOString();
+      const perRecord: MarkingSyncPerRecordResult[] = uniq.map((id) => ({
+        recordId: id,
+        ok: false,
+        message: "provider_disabled",
+      }));
+      const log = markingSyncLogRepository.append({
+        provider: adapter.id,
+        recordIds: uniq,
+        action,
+        status: "FAILED",
+        startedAt,
+        finishedAt,
+        message: formatFetchSyncMessage(adapter, "provider_disabled", options),
+        details: fetchLogDetails({ perRecord, isMock: adapter.isMock, input: inputForLog }, options),
+        externalReference: undefined,
+      });
+      return {
+        logId: log.id,
+        status: "FAILED",
+        action,
+        provider: adapter.id,
+        isMock: adapter.isMock,
+        perRecord,
+        message: log.message,
+        syncTrigger: trigger,
+      };
+    }
+
+    const perRecord: MarkingSyncPerRecordResult[] = [];
+
+    for (const id of uniq) {
+      const record = getMarkingRecordById(id);
+      if (!record) {
+        perRecord.push({ recordId: id, ok: false, message: "record_not_found" });
+        continue;
+      }
+
+      const res = await adapter.fetchCodeStatus({
+        recordId: id,
+        itemId: record.itemId,
+        payload: record.payload,
+        kind: record.kind,
+        externalCodeRef: record.externalCodeRef,
+      });
+
+      const finishedOne = new Date().toISOString();
+
+      if (res.ok && res.externalStatus != null) {
+        markingRecordRepository.update(id, {
+          externalStatus: res.externalStatus,
+          externalCodeRef: res.externalCodeRef,
+          externalProvider: adapter.id,
+          lastSyncAt: finishedOne,
+          lastSyncStatus: "SUCCESS",
+          lastSyncMessage: res.message ?? "sync_ok",
+        });
+        perRecord.push({ recordId: id, ok: true, message: res.message, http: metaToLog(res.syncMeta) });
+      } else {
+        markingRecordRepository.update(id, {
+          lastSyncAt: finishedOne,
+          lastSyncStatus: "FAILED",
+          lastSyncMessage: res.message ?? "sync_fetch_failed",
+        });
+        perRecord.push({
+          recordId: id,
+          ok: false,
+          message: res.message ?? "sync_fetch_failed",
+          http: metaToLog(res.syncMeta),
+        });
+      }
+    }
+
     const finishedAt = new Date().toISOString();
-    const perRecord: MarkingSyncPerRecordResult[] = uniq.map((id) => ({
-      recordId: id,
-      ok: false,
-      message: "provider_disabled",
-    }));
+    const status = finalizeStatus(perRecord);
+
     const log = markingSyncLogRepository.append({
       provider: adapter.id,
       recordIds: uniq,
       action,
-      status: "FAILED",
+      status,
       startedAt,
       finishedAt,
-      message: "provider_disabled",
-      details: stringifySyncLogDetails({ perRecord, isMock: adapter.isMock, input: inputForLog }),
+      message: formatFetchSyncMessage(
+        adapter,
+        `${status} · ${perRecord.filter((p) => p.ok).length}/${perRecord.length}`,
+        options,
+      ),
+      details: fetchLogDetails({ perRecord, isMock: adapter.isMock, input: inputForLog }, options),
       externalReference: undefined,
     });
+
     return {
       logId: log.id,
-      status: "FAILED",
+      status,
       action,
       provider: adapter.id,
       isMock: adapter.isMock,
       perRecord,
       message: log.message,
+      syncTrigger: trigger,
     };
-  }
-
-  const perRecord: MarkingSyncPerRecordResult[] = [];
-
-  for (const id of uniq) {
-    const record = getMarkingRecordById(id);
-    if (!record) {
-      perRecord.push({ recordId: id, ok: false, message: "record_not_found" });
-      continue;
-    }
-
-    const res = await adapter.fetchCodeStatus({
-      recordId: id,
-      itemId: record.itemId,
-      payload: record.payload,
-      kind: record.kind,
-      externalCodeRef: record.externalCodeRef,
-    });
-
-    const finishedOne = new Date().toISOString();
-
-    if (res.ok && res.externalStatus != null) {
-      markingRecordRepository.update(id, {
-        externalStatus: res.externalStatus,
-        externalCodeRef: res.externalCodeRef,
-        externalProvider: adapter.id,
-        lastSyncAt: finishedOne,
-        lastSyncStatus: "SUCCESS",
-        lastSyncMessage: res.message ?? "sync_ok",
-      });
-      perRecord.push({ recordId: id, ok: true, message: res.message, http: metaToLog(res.syncMeta) });
+  } finally {
+    setActiveMarkingFetchSyncTrigger(null);
+    if (trigger === "auto") {
+      endMarkingFetchSyncAuto();
     } else {
-      markingRecordRepository.update(id, {
-        lastSyncAt: finishedOne,
-        lastSyncStatus: "FAILED",
-        lastSyncMessage: res.message ?? "sync_fetch_failed",
-      });
-      perRecord.push({
-        recordId: id,
-        ok: false,
-        message: res.message ?? "sync_fetch_failed",
-        http: metaToLog(res.syncMeta),
-      });
+      endMarkingFetchSyncManual();
     }
   }
-
-  const finishedAt = new Date().toISOString();
-  const status = finalizeStatus(perRecord);
-
-  const log = markingSyncLogRepository.append({
-    provider: adapter.id,
-    recordIds: uniq,
-    action,
-    status,
-    startedAt,
-    finishedAt,
-    message: `${adapter.isMock ? "[mock] " : ""}${status} · ${perRecord.filter((p) => p.ok).length}/${perRecord.length}`,
-    details: stringifySyncLogDetails({ perRecord, isMock: adapter.isMock, input: inputForLog }),
-    externalReference: undefined,
-  });
-
-  return {
-    logId: log.id,
-    status,
-    action,
-    provider: adapter.id,
-    isMock: adapter.isMock,
-    perRecord,
-    message: log.message,
-  };
 }
 
 export async function syncByBatchRef(batchRef: string): Promise<MarkingExternalSyncRunResult> {
@@ -455,7 +526,11 @@ export async function rerunMarkingSyncLogEntry(logId: string): Promise<MarkingEx
     case "VOID_EXTERNAL": {
       const ids = input?.recordIds?.length ? input.recordIds : entry.recordIds;
       if (!ids.length) return null;
-      if (entry.action === "FETCH_STATUS") return syncMarkingRecords(ids, "FETCH_STATUS", {});
+      if (entry.action === "FETCH_STATUS") {
+        const trigger = d?.trigger === "auto" ? "auto" : "manual";
+        const autoScope = d?.autoScope;
+        return syncMarkingRecords(ids, "FETCH_STATUS", {}, { trigger, autoScope });
+      }
       if (entry.action === "CONFIRM_USED") return confirmMarkingRecordsUsedExternally(ids);
       return voidMarkingRecordsExternally(ids);
     }
@@ -468,3 +543,5 @@ export async function rerunMarkingSyncLogEntry(logId: string): Promise<MarkingEx
 export function refreshMarkingExternalAdapterCache(): void {
   invalidateMarkingExternalAdapterCache();
 }
+
+export { getActiveMarkingFetchSyncTrigger } from "./lib/markingSyncFetchGate";

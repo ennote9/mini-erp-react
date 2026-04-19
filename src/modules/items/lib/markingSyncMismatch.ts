@@ -1,40 +1,41 @@
-import type { ItemMarkingRecord, ItemMarkingRecordStatus } from "../model/itemMarkingRecord";
+import type { ItemMarkingRecord } from "../model/itemMarkingRecord";
+import {
+  analyzeMarkingReconciliation,
+  buildReconciliationContext,
+  mapMismatchKindToLegacy,
+  type MarkingIntegrationEffective,
+} from "./markingExternalReconciliation";
+import { getMarkingRecordLastPrintAudit } from "../markingRecordService";
+import { markingProviderSettingsRepository } from "../markingProviderSettingsRepository";
+import { buildVoidCountsByBatchRef, buildVoidCountsByItemId } from "./markingTraceabilityReporting";
+import { markingRecordRepository } from "../markingRecordRepository";
 
 export type MarkingSyncProblemKind = "never_synced" | "sync_failed" | "mismatch";
 
-/** Map external free-form string to closest internal lifecycle bucket for comparison. */
-export function inferSemanticFromExternalStatus(external?: string): ItemMarkingRecordStatus | "UNKNOWN" {
-  if (external == null || external.trim() === "") return "UNKNOWN";
-  const u = external.toUpperCase();
-  if (u.includes("VOID") || u.includes("WITHDRAWN") || u.includes("REVOKED")) return "VOID";
-  if (u.includes("APPLIED") || u.includes("CONSUMED") || u.includes("USED") || u.endsWith("_USED")) return "USED";
-  if (u.includes("PRINTED") || u.includes("EMITTED")) return "PRINTED";
-  if (u.includes("RESERVED") || u.includes("LOCKED")) return "RESERVED";
-  if (u.includes("ACTIVE") || u.includes("AVAILABLE") || u.includes("REGISTERED")) return "AVAILABLE";
-  return "UNKNOWN";
-}
+export { inferSemanticFromExternalStatus, isNeverSynced, isLastSyncFailed, isSyncMismatch } from "./markingExternalSemantics";
 
-export function isNeverSynced(record: ItemMarkingRecord): boolean {
-  return !record.lastSyncAt;
-}
-
-export function isLastSyncFailed(record: ItemMarkingRecord): boolean {
-  return record.lastSyncStatus === "FAILED";
+function integrationEffective(): MarkingIntegrationEffective {
+  const s = markingProviderSettingsRepository.get();
+  if (!s.isEnabled || s.mode === "disabled") return "disabled";
+  return s.mode === "mock" ? "mock" : "real";
 }
 
 /**
- * Internal lifecycle vs last known external semantic disagree (both sides known enough to compare).
+ * Legacy three-bucket sync problem (auto-sync scope, older filters).
+ * Prefer {@link analyzeMarkingReconciliation} for Stage 26+ classification.
  */
-export function isSyncMismatch(record: ItemMarkingRecord): boolean {
-  if (!record.lastSyncAt || record.lastSyncStatus === "FAILED") return false;
-  const ext = inferSemanticFromExternalStatus(record.externalStatus);
-  if (ext === "UNKNOWN") return false;
-  return ext !== record.status;
-}
-
 export function getSyncProblemKind(record: ItemMarkingRecord): MarkingSyncProblemKind | null {
-  if (isNeverSynced(record)) return "never_synced";
-  if (isLastSyncFailed(record)) return "sync_failed";
-  if (isSyncMismatch(record)) return "mismatch";
-  return null;
+  const records = markingRecordRepository.list();
+  const voidByItem = buildVoidCountsByItemId(records);
+  const voidByBatch = buildVoidCountsByBatchRef(records);
+  const ctx = buildReconciliationContext(
+    record,
+    Date.now(),
+    integrationEffective(),
+    getMarkingRecordLastPrintAudit(record.id),
+    voidByItem,
+    voidByBatch,
+  );
+  const a = analyzeMarkingReconciliation(record, ctx);
+  return mapMismatchKindToLegacy(a.kind);
 }

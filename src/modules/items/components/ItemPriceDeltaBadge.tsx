@@ -25,8 +25,8 @@ export function ItemPriceDeltaBadge({ delta, formatMoney, className }: Props) {
   }
 
   const Icon = delta.direction === "up" ? ArrowUpRight : ArrowDownRight;
-  const tone =
-    delta.direction === "up" ? "text-emerald-600/90 dark:text-emerald-400/90" : "text-rose-600/90 dark:text-rose-400/90";
+  /** Unified khaki-yellow for up/down; muted, readable on light cards and dark chrome */
+  const tone = "text-[#5a5238] dark:text-[#cfc6a8]";
 
   return (
     <span

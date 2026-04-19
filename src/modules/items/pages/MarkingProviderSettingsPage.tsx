@@ -9,6 +9,7 @@ import { Switch } from "@/components/ui/switch";
 import { useTranslation } from "@/shared/i18n";
 import { getAppReadModelRevision, subscribeAppReadModelRevision } from "@/shared/appReadModelRevision";
 import type { MarkingProviderMode } from "../model/markingProviderSettings";
+import type { MarkingAutoSyncScope } from "../model/markingAutoSyncSettings";
 import {
   getMarkingProviderSettings,
   resetMarkingProviderSettings,
@@ -16,11 +17,20 @@ import {
   testMarkingProviderConnection,
 } from "../markingProviderSettingsService";
 import { getMarkingExternalIntegrationInfo } from "../markingExternalSyncService";
+import { getMarkingAutoSyncSettings, saveMarkingAutoSyncSettings } from "../markingAutoSyncSettingsService";
+import { getMarkingAutoSyncSchedulerState } from "../markingAutoSyncScheduler";
 
 const MODE_OPTIONS: { value: MarkingProviderMode; labelKey: string }[] = [
   { value: "mock", labelKey: "master.markingProvider.mode.mock" },
   { value: "real", labelKey: "master.markingProvider.mode.real" },
   { value: "disabled", labelKey: "master.markingProvider.mode.disabled" },
+];
+
+const AUTO_SCOPE_OPTIONS: { value: MarkingAutoSyncScope; labelKey: string }[] = [
+  { value: "problem_only", labelKey: "master.markingAutoSync.scopes.problemOnly" },
+  { value: "printed_and_reserved", labelKey: "master.markingAutoSync.scopes.printedReserved" },
+  { value: "recent_activity", labelKey: "master.markingAutoSync.scopes.recentActivity" },
+  { value: "custom", labelKey: "master.markingAutoSync.scopes.custom" },
 ];
 
 export function MarkingProviderSettingsPage() {
@@ -39,6 +49,19 @@ export function MarkingProviderSettingsPage() {
   const [apiKey, setApiKey] = useState(persisted.apiKey ?? "");
   const [timeoutMs, setTimeoutMs] = useState(String(persisted.timeoutMs ?? 15_000));
 
+  const autoPersisted = useMemo(() => {
+    void revision;
+    return getMarkingAutoSyncSettings();
+  }, [revision]);
+
+  const [autoEnabled, setAutoEnabled] = useState(autoPersisted.isEnabled);
+  const [intervalMinutes, setIntervalMinutes] = useState(String(autoPersisted.intervalMinutes));
+  const [autoScope, setAutoScope] = useState<MarkingAutoSyncScope>(autoPersisted.scope);
+  const [maxRecordsPerRun, setMaxRecordsPerRun] = useState(String(autoPersisted.maxRecordsPerRun));
+  const [runOnAppStart, setRunOnAppStart] = useState(autoPersisted.runOnAppStart);
+  const [runOnlyWhenProviderEnabled, setRunOnlyWhenProviderEnabled] = useState(autoPersisted.runOnlyWhenProviderEnabled);
+  const [runOnlyInRealMode, setRunOnlyInRealMode] = useState(autoPersisted.runOnlyInRealMode);
+
   useEffect(() => {
     const s = getMarkingProviderSettings();
     setMode(s.mode);
@@ -47,6 +70,22 @@ export function MarkingProviderSettingsPage() {
     setBaseUrl(s.baseUrl ?? "");
     setApiKey(s.apiKey ?? "");
     setTimeoutMs(String(s.timeoutMs ?? 15_000));
+  }, [revision]);
+
+  useEffect(() => {
+    const a = getMarkingAutoSyncSettings();
+    setAutoEnabled(a.isEnabled);
+    setIntervalMinutes(String(a.intervalMinutes));
+    setAutoScope(a.scope);
+    setMaxRecordsPerRun(String(a.maxRecordsPerRun));
+    setRunOnAppStart(a.runOnAppStart);
+    setRunOnlyWhenProviderEnabled(a.runOnlyWhenProviderEnabled);
+    setRunOnlyInRealMode(a.runOnlyInRealMode);
+  }, [revision]);
+
+  const scheduler = useMemo(() => {
+    void revision;
+    return getMarkingAutoSyncSchedulerState();
   }, [revision]);
 
   const [testBusy, setTestBusy] = useState(false);
@@ -74,6 +113,39 @@ export function MarkingProviderSettingsPage() {
     resetMarkingProviderSettings();
     setTestFeedback(null);
   }, []);
+
+  const handleSaveAutoSync = useCallback(() => {
+    const im = Number(intervalMinutes);
+    const mx = Number(maxRecordsPerRun);
+    saveMarkingAutoSyncSettings({
+      isEnabled: autoEnabled,
+      intervalMinutes: Number.isFinite(im) && im > 0 ? Math.floor(im) : 15,
+      scope: autoScope,
+      maxRecordsPerRun: Number.isFinite(mx) && mx > 0 ? Math.floor(mx) : 50,
+      runOnAppStart,
+      runOnlyWhenProviderEnabled,
+      runOnlyInRealMode,
+    });
+  }, [
+    autoEnabled,
+    intervalMinutes,
+    autoScope,
+    maxRecordsPerRun,
+    runOnAppStart,
+    runOnlyWhenProviderEnabled,
+    runOnlyInRealMode,
+  ]);
+
+  const formatSchedulerDetail = useCallback(
+    (raw: string | null | undefined) => {
+      const m = raw?.trim() ?? "";
+      if (!m) return "—";
+      const key = `master.markingAutoSync.schedulerMsg.${m}` as const;
+      const tr = t(key);
+      return tr !== key ? tr : m;
+    },
+    [t],
+  );
 
   const formatRealHealthError = useCallback(
     (raw: string | undefined) => {
@@ -238,6 +310,112 @@ export function MarkingProviderSettingsPage() {
               {testFeedback}
             </div>
           ) : null}
+        </CardContent>
+      </Card>
+
+      <Card className="border-border/80 bg-card/40">
+        <CardHeader className="pb-2">
+          <CardTitle className="text-sm">{t("master.markingAutoSync.cardTitle")}</CardTitle>
+          <CardDescription className="text-xs">{t("master.markingAutoSync.cardDesc")}</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="rounded-md border border-border/70 bg-muted/20 px-3 py-2 text-[11px] space-y-1">
+            <p className="font-medium">{t("master.markingAutoSync.schedulerStatus")}</p>
+            <p>
+              {t("master.markingAutoSync.schedulerIntervalActive")}:{" "}
+              <span className="font-mono">{scheduler.isRunning ? t("master.markingAutoSync.yes") : t("master.markingAutoSync.no")}</span> ·{" "}
+              {t("master.markingAutoSync.autoSyncEnabledSetting")}:{" "}
+              <span className="font-mono">{scheduler.isEnabled ? t("master.markingAutoSync.yes") : t("master.markingAutoSync.no")}</span> ·{" "}
+              {t("master.markingAutoSync.inFlight")}:{" "}
+              <span className="font-mono">{scheduler.inFlight ? t("master.markingAutoSync.yes") : t("master.markingAutoSync.no")}</span>
+            </p>
+            <p>
+              {t("master.markingAutoSync.lastStatus")}: <span className="font-mono">{scheduler.lastStatus}</span>
+              {scheduler.lastLogId ? (
+                <>
+                  {" "}
+                  · {t("master.markingAutoSync.lastLog")} #{scheduler.lastLogId}
+                </>
+              ) : null}
+            </p>
+            <p>
+              {t("master.markingAutoSync.lastDetail")}: {formatSchedulerDetail(scheduler.lastMessage)}
+            </p>
+            <p>
+              {t("master.markingAutoSync.nextRun")}:{" "}
+              {scheduler.nextPlannedRunAt
+                ? new Date(scheduler.nextPlannedRunAt).toLocaleString(undefined, { dateStyle: "short", timeStyle: "short" })
+                : "—"}{" "}
+              · {t("master.markingAutoSync.skippedTicks")}: {scheduler.skippedTicksCount}
+            </p>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-4">
+            <div className="flex items-center gap-2">
+              <Switch id="mas-enabled" checked={autoEnabled} onCheckedChange={setAutoEnabled} />
+              <Label htmlFor="mas-enabled" className="text-xs">
+                {t("master.markingAutoSync.enabled")}
+              </Label>
+            </div>
+            <div className="flex items-center gap-2">
+              <Switch id="mas-run-start" checked={runOnAppStart} onCheckedChange={setRunOnAppStart} />
+              <Label htmlFor="mas-run-start" className="text-xs">
+                {t("master.markingAutoSync.runOnAppStart")}
+              </Label>
+            </div>
+          </div>
+
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div className="space-y-1">
+              <Label className="text-[11px]">{t("master.markingAutoSync.intervalMinutes")}</Label>
+              <Input
+                value={intervalMinutes}
+                onChange={(e) => setIntervalMinutes(e.target.value)}
+                className="h-8 font-mono text-xs"
+                inputMode="numeric"
+              />
+            </div>
+            <div className="space-y-1">
+              <Label className="text-[11px]">{t("master.markingAutoSync.maxRecords")}</Label>
+              <Input
+                value={maxRecordsPerRun}
+                onChange={(e) => setMaxRecordsPerRun(e.target.value)}
+                className="h-8 font-mono text-xs"
+                inputMode="numeric"
+              />
+            </div>
+            <div className="space-y-1 sm:col-span-2">
+              <Label className="text-[11px]">{t("master.markingAutoSync.selectionScope")}</Label>
+              <SelectField
+                value={autoScope}
+                onChange={(v) => setAutoScope(v as MarkingAutoSyncScope)}
+                options={AUTO_SCOPE_OPTIONS.map((o) => ({ value: o.value, label: t(o.labelKey) }))}
+                placeholder=""
+                className="h-8 text-xs"
+              />
+            </div>
+          </div>
+
+          <div className="flex flex-wrap gap-4">
+            <div className="flex items-center gap-2">
+              <Switch id="mas-provider-enabled" checked={runOnlyWhenProviderEnabled} onCheckedChange={setRunOnlyWhenProviderEnabled} />
+              <Label htmlFor="mas-provider-enabled" className="text-xs">
+                {t("master.markingAutoSync.runOnlyWhenProviderEnabled")}
+              </Label>
+            </div>
+            <div className="flex items-center gap-2">
+              <Switch id="mas-real-only" checked={runOnlyInRealMode} onCheckedChange={setRunOnlyInRealMode} />
+              <Label htmlFor="mas-real-only" className="text-xs">
+                {t("master.markingAutoSync.runOnlyInRealMode")}
+              </Label>
+            </div>
+          </div>
+
+          <div className="text-[10px] text-muted-foreground">{t("master.markingAutoSync.foregroundHint")}</div>
+
+          <Button type="button" size="sm" className="h-8 text-xs" onClick={handleSaveAutoSync}>
+            {t("master.markingAutoSync.save")}
+          </Button>
         </CardContent>
       </Card>
     </div>

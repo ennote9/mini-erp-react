@@ -27,7 +27,8 @@ import {
 } from "../../../shared/issues";
 import { getWarehouseFormHealth } from "../../../shared/masterDataHealth";
 import { DocumentIssueStrip } from "../../../shared/ui/feedback/DocumentIssueStrip";
-import { Save, X } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
+import { MapPinned, Save, Settings2, Warehouse, X } from "lucide-react";
 import { useTranslation } from "@/shared/i18n/context";
 import { cn } from "@/lib/utils";
 import { Tabs } from "radix-ui";
@@ -183,11 +184,14 @@ export function WarehousePage() {
   }
 
   const displayTitle = isNew ? t("master.warehouse.titleNew") : t("master.warehouse.titleWithCode", { code: warehouse!.code });
-  const tabItems = [
-    { value: "main", label: t("master.warehouse.tabMain") },
-    { value: "address", label: t("master.warehouse.tabAddressContacts") },
-    { value: "settings", label: t("master.warehouse.tabSettings") },
-  ];
+  const tabItems = useMemo(
+    (): { value: string; label: string; icon: LucideIcon }[] => [
+      { value: "main", label: t("master.warehouse.tabMain"), icon: Warehouse },
+      { value: "address", label: t("master.warehouse.tabAddressContacts"), icon: MapPinned },
+      { value: "settings", label: t("master.warehouse.tabSettings"), icon: Settings2 },
+    ],
+    [t],
+  );
 
   return (
     <div className="doc-page">
@@ -270,26 +274,33 @@ export function WarehousePage() {
         <Tabs.Root value={activeTab} onValueChange={setActiveTab}>
           <CardHeader className="p-2 pb-0.5 space-y-2">
             <Tabs.List
-              className="inline-flex min-h-8 w-full max-w-full flex-wrap items-stretch overflow-hidden rounded-md border border-input bg-background sm:w-fit"
+              className="inline-flex min-h-8 w-full max-w-full flex-wrap items-stretch overflow-x-auto overflow-y-visible rounded-md border border-input bg-background sm:w-fit"
               aria-label={t("master.warehouse.tabsAria")}
             >
-              <ButtonGroup className="w-full flex-wrap rounded-none border-0 bg-transparent sm:w-auto" aria-label={t("master.warehouse.tabsAria")}>
-                {tabItems.map((tab, index) => (
-                  <div key={tab.value} className="contents">
-                    {index > 0 ? <ButtonGroupSeparator /> : null}
-                    <Tabs.Trigger
-                      value={tab.value}
-                      className={cn(
-                        "inline-flex h-8 flex-1 items-center justify-center rounded-none border-0 bg-background px-3 text-sm font-medium transition-colors sm:flex-initial",
-                        "text-foreground hover:bg-accent hover:text-accent-foreground",
-                        "data-[state=active]:bg-primary data-[state=active]:text-primary-foreground",
-                        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
-                      )}
-                    >
-                      {tab.label}
-                    </Tabs.Trigger>
-                  </div>
-                ))}
+              <ButtonGroup
+                className="w-full min-w-0 flex-wrap overflow-visible rounded-none border-0 bg-transparent sm:w-auto"
+                aria-label={t("master.warehouse.tabsAria")}
+              >
+                {tabItems.map((tab, index) => {
+                  const TabIcon = tab.icon;
+                  return (
+                    <div key={tab.value} className="contents">
+                      {index > 0 ? <ButtonGroupSeparator /> : null}
+                      <Tabs.Trigger
+                        value={tab.value}
+                        className={cn(
+                          "inline-flex h-8 min-w-0 flex-1 items-center justify-center gap-1 whitespace-nowrap rounded-none border-0 bg-background px-2 text-sm font-medium transition-colors sm:flex-initial sm:gap-1.5 sm:px-3",
+                          "text-foreground hover:bg-accent hover:text-accent-foreground",
+                          "data-[state=active]:bg-primary data-[state=active]:text-primary-foreground",
+                          "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
+                        )}
+                      >
+                        <TabIcon className="h-3.5 w-3.5 shrink-0 opacity-90" aria-hidden />
+                        <span>{tab.label}</span>
+                      </Tabs.Trigger>
+                    </div>
+                  );
+                })}
               </ButtonGroup>
             </Tabs.List>
           </CardHeader>

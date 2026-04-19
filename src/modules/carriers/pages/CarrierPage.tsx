@@ -27,7 +27,7 @@ import {
 } from "../../../shared/issues";
 import { getCarrierFormHealth } from "../../../shared/masterDataHealth";
 import { DocumentIssueStrip } from "../../../shared/ui/feedback/DocumentIssueStrip";
-import { Save, X } from "lucide-react";
+import { type LucideIcon, MapPinned, Route, Save, Truck, X } from "lucide-react";
 import { useTranslation } from "@/shared/i18n/context";
 import { cn } from "@/lib/utils";
 import { Tabs } from "radix-ui";
@@ -196,11 +196,14 @@ export function CarrierPage() {
   const displayTitle = isNew
     ? t("master.carrier.titleNew")
     : t("master.carrier.titleWithCode", { code: carrier!.code });
-  const tabItems = [
-    { value: "main", label: t("master.carrier.tabMain") },
-    { value: "address", label: t("master.carrier.tabAddress") },
-    { value: "tracking", label: t("master.carrier.tabTrackingService") },
-  ];
+  const tabItems = useMemo(
+    (): { value: string; label: string; icon: LucideIcon }[] => [
+      { value: "main", label: t("master.carrier.tabMain"), icon: Truck },
+      { value: "address", label: t("master.carrier.tabAddress"), icon: MapPinned },
+      { value: "tracking", label: t("master.carrier.tabTrackingService"), icon: Route },
+    ],
+    [t],
+  );
 
   return (
     <div className="doc-page">
@@ -272,27 +275,31 @@ export function CarrierPage() {
       <Tabs.Root value={activeTab} onValueChange={setActiveTab} className="mt-4 max-w-2xl">
         <Tabs.List
           aria-label={t("master.carrier.tabsAria")}
-          className="inline-flex min-h-8 w-full max-w-full flex-wrap items-stretch overflow-hidden rounded-md border border-input bg-background sm:w-fit"
+          className="inline-flex min-h-8 w-full max-w-full flex-wrap items-stretch overflow-x-auto overflow-y-visible rounded-md border border-input bg-background sm:w-fit"
         >
-          <ButtonGroup>
-            {tabItems.map((tab, index) => (
-              <div key={tab.value} className="contents">
-                <Tabs.Trigger asChild value={tab.value}>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    className={cn(
-                      "inline-flex h-8 flex-1 items-center justify-center rounded-none border-0 bg-background px-3 text-sm font-medium transition-colors sm:flex-initial",
-                      "text-foreground hover:bg-accent hover:text-accent-foreground data-[state=active]:bg-primary data-[state=active]:text-primary-foreground",
-                      "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
-                    )}
-                  >
-                    {tab.label}
-                  </Button>
-                </Tabs.Trigger>
-                {index < tabItems.length - 1 ? <ButtonGroupSeparator /> : null}
-              </div>
-            ))}
+          <ButtonGroup className="w-full min-w-0 flex-wrap overflow-visible rounded-none border-0 bg-transparent sm:w-auto">
+            {tabItems.map((tab, index) => {
+              const TabIcon = tab.icon;
+              return (
+                <div key={tab.value} className="contents">
+                  <Tabs.Trigger asChild value={tab.value}>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      className={cn(
+                        "inline-flex h-8 min-w-0 flex-1 items-center justify-center gap-1 whitespace-nowrap rounded-none border-0 bg-background px-2 text-sm font-medium transition-colors sm:flex-initial sm:gap-1.5 sm:px-3",
+                        "text-foreground hover:bg-accent hover:text-accent-foreground data-[state=active]:bg-primary data-[state=active]:text-primary-foreground",
+                        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
+                      )}
+                    >
+                      <TabIcon className="h-3.5 w-3.5 shrink-0 opacity-90" aria-hidden />
+                      <span>{tab.label}</span>
+                    </Button>
+                  </Tabs.Trigger>
+                  {index < tabItems.length - 1 ? <ButtonGroupSeparator /> : null}
+                </div>
+              );
+            })}
           </ButtonGroup>
         </Tabs.List>
 

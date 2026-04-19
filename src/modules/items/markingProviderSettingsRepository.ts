@@ -11,6 +11,10 @@ let persistChain: Promise<void> = Promise.resolve();
 let persistDepth = 0;
 let lastWriteError: string | null = null;
 
+function notifyAutoSyncSchedulerRestart(): void {
+  void import("./markingAutoSyncScheduler").then((m) => m.restartMarkingAutoSyncScheduler());
+}
+
 function schedulePersist(): void {
   bumpAppReadModelRevision();
   persistDepth++;
@@ -61,6 +65,7 @@ export const markingProviderSettingsRepository = {
     });
     invalidateMarkingExternalAdapterCache();
     schedulePersist();
+    notifyAutoSyncSchedulerRestart();
     return { ...store };
   },
 
@@ -71,6 +76,7 @@ export const markingProviderSettingsRepository = {
     });
     invalidateMarkingExternalAdapterCache();
     schedulePersist();
+    notifyAutoSyncSchedulerRestart();
     return { ...store };
   },
 };

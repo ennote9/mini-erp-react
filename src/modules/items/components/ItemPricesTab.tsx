@@ -49,6 +49,7 @@ import { Button } from "@/components/ui/button";
 import { useTranslation } from "@/shared/i18n/context";
 import { useAppDisplayFormatters } from "@/shared/formatting";
 import { cn } from "@/lib/utils";
+import { ChevronDown, ChevronRight } from "lucide-react";
 
 /** Latest active-chain prices fed to current purchase/sale sparklines (oldest→newest). */
 const CURRENT_PRICE_SPARKLINE_POINT_COUNT = 7;
@@ -100,6 +101,7 @@ export function ItemPricesTab({ itemId, isNew, revision, onPricesChanged }: Prop
     comment?: string;
   } | null>(null);
   const [cancelTarget, setCancelTarget] = useState<{ recordId: string; priceType: ItemPriceType } | null>(null);
+  const [historyExpanded, setHistoryExpanded] = useState(false);
 
   const item: Item | undefined = useMemo(() => {
     if (!itemId) return undefined;
@@ -438,13 +440,33 @@ export function ItemPricesTab({ itemId, isNew, revision, onPricesChanged }: Prop
       </div>
 
       <div className="flex min-h-0 w-full min-w-0 flex-1 flex-col border-t border-border/50 pt-5">
-        <div className="mb-3 flex shrink-0 items-baseline justify-between gap-2">
-          <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+        <button
+          type="button"
+          data-testid="item-prices-history-toggle"
+          aria-expanded={historyExpanded}
+          aria-controls="item-prices-history-panel"
+          className="group mb-3 flex w-full shrink-0 items-center justify-between gap-2 rounded-md border border-transparent px-1 py-0.5 text-left transition-colors hover:bg-muted/35 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+          onClick={() => {
+            setHistoryExpanded((prev) => {
+              if (prev) setHeaderFilterAnchor(null);
+              return !prev;
+            });
+          }}
+        >
+          <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground group-hover:text-foreground/90">
             {t("master.item.prices.sectionHistory")}
-          </h3>
-        </div>
+          </span>
+          {historyExpanded ? (
+            <ChevronDown className="h-3.5 w-3.5 shrink-0 text-muted-foreground/80" aria-hidden />
+          ) : (
+            <ChevronRight className="h-3.5 w-3.5 shrink-0 text-muted-foreground/80" aria-hidden />
+          )}
+        </button>
 
-        <div className="relative flex min-h-0 min-w-0 w-full flex-1 flex-col">
+        <div
+          id="item-prices-history-panel"
+          className={cn("relative flex min-h-0 min-w-0 w-full flex-1 flex-col", !historyExpanded && "hidden")}
+        >
           <ItemPriceHistoryTanstackTable
             rows={displayHistoryRows}
             schema={priceHistorySchema}
@@ -613,15 +635,24 @@ function SummaryCard({
         <div className="mt-2 flex min-h-0 flex-1 flex-col">
           <div
             data-testid="item-price-summary-value-row"
-            className="flex min-w-0 items-stretch justify-between gap-3"
+            className={cn(
+              "grid min-w-0 items-center gap-3",
+              showSparkline ? "grid-cols-[minmax(0,1fr)_12rem]" : "grid-cols-1",
+            )}
           >
-            <div className="min-w-0 shrink self-center text-2xl font-semibold leading-none tabular-nums tracking-tight text-foreground">
-              {formatMoney(record.amount)}
+            <div
+              data-testid="item-price-summary-amount"
+              className="min-w-0 self-center text-2xl font-semibold leading-none tabular-nums tracking-tight text-foreground"
+            >
+              {/* Amount lives in a fluid grid column (minmax 0): does not steal width from the fixed chart column */}
+              <span className="block min-w-0 max-w-full leading-tight [overflow-wrap:anywhere]">
+                {formatMoney(record.amount)}
+              </span>
             </div>
             {showSparkline ? (
               <div
                 data-testid="item-price-trend-chart-area"
-                className="flex min-h-[3.5rem] min-w-[11rem] max-w-[min(68%,17rem)] flex-1 shrink-0 flex-col justify-center"
+                className="flex min-h-[3.5rem] w-full min-w-0 flex-col justify-center"
               >
                 <ItemPriceTrendSparkline values={trendSparklineAmounts!} aria-label={sparklineAriaLabel ?? ""} />
               </div>

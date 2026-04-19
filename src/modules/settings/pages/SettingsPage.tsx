@@ -16,6 +16,7 @@ import {
   type SettingsSectionId,
   type SettingsPersistenceState,
 } from "@/shared/settings";
+import { settingRowIconForEntryId } from "@/shared/settings/settingRowIcons";
 import { NULL_PROFILE_OVERRIDES, isWorkspaceFeatureVisible } from "@/shared/workspace";
 import { useTranslation, settingRegistryIdToI18nKey, type TFunction } from "@/shared/i18n";
 import { WorkspaceProfileSettingsCard } from "../components/WorkspaceProfileSettingsCard";
@@ -376,13 +377,22 @@ export function SettingsPage() {
                 const i18nKey = settingRegistryIdToI18nKey(entry.id);
                 const entryLabel = t(`settings.entries.${i18nKey}.label`);
                 const entryDescription = t(`settings.entries.${i18nKey}.description`);
+                const RowIcon = settingRowIconForEntryId(entry.id);
 
                 if (entry.valueType === "readonly") {
                   return (
                     <div key={entry.id} className="flex flex-col gap-1 py-3 first:pt-0 sm:flex-row sm:items-start sm:justify-between">
                       <div className="min-w-0 flex-1 space-y-1 pr-4">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <Label className="text-sm font-medium text-foreground">{entryLabel}</Label>
+                        <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                          <span className="inline-flex min-w-0 items-center gap-1.5">
+                            {RowIcon ? (
+                              <RowIcon
+                                className="h-3.5 w-3.5 shrink-0 text-muted-foreground/75"
+                                aria-hidden
+                              />
+                            ) : null}
+                            <Label className="text-sm font-medium text-foreground">{entryLabel}</Label>
+                          </span>
                           <ReadinessBadge readiness={entry.readiness} t={t} />
                         </div>
                         <p className="text-xs text-muted-foreground">{entryDescription}</p>
@@ -398,10 +408,18 @@ export function SettingsPage() {
                     className="flex flex-col gap-2 py-3 first:pt-0 sm:flex-row sm:items-center sm:justify-between"
                   >
                     <div className="min-w-0 flex-1 space-y-1 pr-4">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <Label className="text-sm font-medium text-foreground" htmlFor={entry.id}>
-                          {entryLabel}
-                        </Label>
+                      <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                        <span className="inline-flex min-w-0 items-center gap-1.5">
+                          {RowIcon ? (
+                            <RowIcon
+                              className="h-3.5 w-3.5 shrink-0 text-muted-foreground/75"
+                              aria-hidden
+                            />
+                          ) : null}
+                          <Label className="text-sm font-medium text-foreground" htmlFor={entry.id}>
+                            {entryLabel}
+                          </Label>
+                        </span>
                         <ReadinessBadge readiness={entry.readiness} t={t} />
                       </div>
                       <p className="text-xs text-muted-foreground">{entryDescription}</p>

@@ -116,6 +116,16 @@ async function clickAddSingleLineButton(page: Page) {
   await page.locator('button[title*="Alt+A"]').first().click();
 }
 
+/** Price History defaults collapsed; expand so the TanStack table is visible for assertions. */
+async function expandItemPriceHistorySection(page: Page) {
+  const toggle = page.getByTestId("item-prices-history-toggle");
+  await toggle.waitFor({ state: "visible", timeout: 15_000 });
+  if ((await toggle.getAttribute("aria-expanded")) !== "true") {
+    await toggle.click();
+    await page.getByTestId("item-prices-history-table").waitFor({ state: "visible", timeout: 15_000 });
+  }
+}
+
 test.describe("Item card — Prices tab (acceptance)", () => {
   test.describe.configure({ timeout: 90_000 });
   test("6.1 tabs regression: Main / Prices / Images / Barcodes / Testers; main has no legacy price fields; utility buttons", async ({
@@ -193,6 +203,7 @@ test.describe("Item card — Prices tab (acceptance)", () => {
     await page.getByTestId("item-price-reason-select").selectOption("manual_update");
     await page.getByTestId("item-price-dialog-submit").click();
     await expect(page.getByTestId("item-prices-card-purchase-current")).toContainText("12.34");
+    await expandItemPriceHistorySection(page);
     await expect(page.getByTestId("item-prices-history-table")).toContainText(/Active|Активна|Белсенді/i);
 
     const snap = await page.evaluate((id) => {
@@ -233,6 +244,7 @@ test.describe("Item card — Prices tab (acceptance)", () => {
     await page.getByTestId("item-price-dialog-submit").click();
 
     await expect(page.getByTestId("item-prices-card-sale-next")).toContainText("88.90");
+    await expandItemPriceHistorySection(page);
     await expect(page.getByTestId("item-prices-history-table")).toContainText(/Scheduled|Запланирована|Жоспарланған/i);
 
     const saleAfter = await page.evaluate((id) => {
@@ -275,6 +287,7 @@ test.describe("Item card — Prices tab (acceptance)", () => {
     await page.getByTestId("item-price-replace-confirm").click();
 
     await expect(page.getByTestId("item-prices-card-sale-next")).toContainText("60.00");
+    await expandItemPriceHistorySection(page);
     const rows = page.locator('[data-testid="item-prices-history-row"]');
     await expect(rows.filter({ hasText: /Cancelled|Отменена|Болдырылған/i })).toHaveCount(1);
     await expect(rows.filter({ hasText: /Scheduled|Запланирована|Жоспарланған/i })).toHaveCount(1);
@@ -575,11 +588,13 @@ test.describe("Item card — Prices tab (acceptance)", () => {
     await gotoReady(page, `/items/${encodeURIComponent(itemId)}`);
     await waitItemTabsVisible(page);
     await page.getByTestId("item-tab-prices").click();
+    await expandItemPriceHistorySection(page);
     const before = await page.getByTestId("item-prices-history-table").textContent();
     await page.reload({ waitUntil: "domcontentloaded" });
     await waitItemsRepositoryHydrated(page);
     await waitItemTabsVisible(page);
     await page.getByTestId("item-tab-prices").click();
+    await expandItemPriceHistorySection(page);
     const after = await page.getByTestId("item-prices-history-table").textContent();
     expect(after?.length ?? 0).toBeGreaterThan(10);
     expect(before).toEqual(after);
@@ -606,7 +621,7 @@ test.describe("Item card — Prices tab (acceptance)", () => {
     await gotoReady(page, `/items/${encodeURIComponent(itemId)}`);
     await waitItemTabsVisible(page);
     await page.getByTestId("item-tab-prices").click();
-    await page.getByTestId("item-prices-history-table").waitFor({ state: "visible", timeout: 15_000 });
+    await expandItemPriceHistorySection(page);
 
     const readAmounts = () =>
       page.$$eval('[data-testid="item-prices-history-row"]', (rows) =>
@@ -630,7 +645,7 @@ test.describe("Item card — Prices tab (acceptance)", () => {
     await gotoReady(page, `/items/${encodeURIComponent(itemId)}`);
     await waitItemTabsVisible(page);
     await page.getByTestId("item-tab-prices").click();
-    await page.getByTestId("item-prices-history-table").waitFor({ state: "visible" });
+    await expandItemPriceHistorySection(page);
 
     await page.getByTestId("item-prices-history-filter-priceType").click();
     const panel = page.locator('[data-slot="popover-content"]').last();
@@ -652,6 +667,38 @@ test.describe("Item card — Prices tab (acceptance)", () => {
     await expect(page.getByTestId("item-prices-history-filter-priceType")).not.toHaveClass(/text-primary/);
   });
 
+  test("13.2a price history: toggle collapses and expands; sorting state preserved", async ({ page }) => {
+    await openApp(page);
+    const itemId = await firstItemId(page);
+    await gotoReady(page, `/items/${encodeURIComponent(itemId)}`);
+    await waitItemTabsVisible(page);
+    await page.getByTestId("item-tab-prices").click();
+    const toggle = page.getByTestId("item-prices-history-toggle");
+    await expect(toggle).toHaveAttribute("aria-expanded", "false");
+    await expect(page.getByTestId("item-prices-history-table")).toBeHidden();
+
+    await expandItemPriceHistorySection(page);
+    await expect(toggle).toHaveAttribute("aria-expanded", "true");
+
+    await page.getByTestId("item-prices-history-sort-amount").click();
+    const sortAfterChange = await page.evaluate(() =>
+      window.localStorage.getItem("mini-erp:item-prices-history:sorting:v1"),
+    );
+
+    await toggle.click();
+    await expect(toggle).toHaveAttribute("aria-expanded", "false");
+    await expect(page.getByTestId("item-prices-history-table")).toBeHidden();
+
+    await toggle.click();
+    await expect(toggle).toHaveAttribute("aria-expanded", "true");
+    await expect(page.getByTestId("item-prices-history-table")).toBeVisible({ timeout: 15_000 });
+
+    const sortAfterToggle = await page.evaluate(() =>
+      window.localStorage.getItem("mini-erp:item-prices-history:sorting:v1"),
+    );
+    expect(sortAfterToggle).toBe(sortAfterChange);
+  });
+
   test("13.3 history TanStack: cancel scheduled still works after sort", async ({ page }) => {
     await openApp(page);
     const code = `E2E-13-3-${Date.now()}`;
@@ -666,7 +713,7 @@ test.describe("Item card — Prices tab (acceptance)", () => {
     await waitItemTabsVisible(page);
     const future = addDaysYmd(new Date().toISOString().slice(0, 10), 20);
     await page.getByTestId("item-tab-prices").click();
-    await page.getByTestId("item-prices-history-table").waitFor({ state: "visible", timeout: 15_000 });
+    await expandItemPriceHistorySection(page);
     await page.getByTestId("item-prices-add-purchase").click();
     await expect(page.getByTestId("item-price-edit-dialog")).toBeVisible({ timeout: 10_000 });
     await page.getByTestId("item-price-amount-input").fill("5.55");
@@ -718,6 +765,7 @@ test.describe("Item card — Prices tab (acceptance)", () => {
     await gotoReady(page, `/items/${encodeURIComponent(itemId)}`);
     await waitItemTabsVisible(page);
     await page.getByTestId("item-tab-prices").click();
+    await expandItemPriceHistorySection(page);
     const scroll = page.locator("[data-item-prices-history-scroll]");
     await scroll.waitFor({ state: "visible", timeout: 30_000 });
     const table = page.getByTestId("item-prices-history-table");
@@ -765,6 +813,7 @@ test.describe("Item card — Prices tab (acceptance)", () => {
 
     await page.setViewportSize({ width: 480, height: 720 });
     await page.getByTestId("item-tab-prices").click();
+    await expandItemPriceHistorySection(page);
     await expect(page.getByTestId("item-prices-history-table")).toBeVisible({ timeout: 30_000 });
     const narrowScroll = page.locator("[data-item-prices-history-scroll]");
     const narrowMetrics = await narrowScroll.evaluate((el) => ({
@@ -788,7 +837,7 @@ test.describe("Item card — Prices tab (acceptance)", () => {
     await gotoReady(page, `/items/${encodeURIComponent(itemId)}`);
     await waitItemTabsVisible(page);
     await page.getByTestId("item-tab-prices").click();
-    await page.getByTestId("item-prices-history-table").waitFor({ state: "visible", timeout: 30_000 });
+    await expandItemPriceHistorySection(page);
 
     await page.getByTestId("item-prices-history-sort-amount").click();
 
@@ -821,7 +870,7 @@ test.describe("Item card — Prices tab (acceptance)", () => {
     await waitItemsRepositoryHydrated(page);
     await waitItemTabsVisible(page);
     await page.getByTestId("item-tab-prices").click();
-    await page.getByTestId("item-prices-history-table").waitFor({ state: "visible", timeout: 30_000 });
+    await expandItemPriceHistorySection(page);
 
     const after = await page.evaluate(() => ({
       sort: window.localStorage.getItem("mini-erp:item-prices-history:sorting:v1"),
@@ -1002,6 +1051,77 @@ test.describe("Item card — Prices tab (acceptance)", () => {
     await expect(saleCurrent.locator('[data-testid="item-price-trend-sparkline"]')).toBeVisible({ timeout: 15_000 });
   });
 
+  test("14.1b current price cards: chart area width stable when amount length changes", async ({ page }) => {
+    await page.setViewportSize({ width: 1280, height: 900 });
+    await openApp(page);
+    const code = `E2E-LAYOUT-${Date.now()}`;
+    await gotoReady(page, "/items/new");
+    await waitNewItemFormVisible(page);
+    await page.locator("#item-name").fill(`Layout ${code}`);
+    await page.locator("#item-code").fill(code);
+    await page.locator("#item-uom").fill("EA");
+    await page.getByRole("button", { name: /^Save|Сохранить|Сақтау/i }).click();
+    await expect(page).toHaveURL(/\/items\/\d+/, { timeout: 20_000 });
+    await waitItemTabsVisible(page);
+    await page.getByTestId("item-tab-prices").click();
+
+    const todayYmd = new Date().toISOString().slice(0, 10);
+
+    const addPurchase = async (amount: string, reason: string) => {
+      await page.getByTestId("item-prices-add-purchase").click();
+      await expect(page.getByTestId("item-price-edit-dialog")).toBeVisible({ timeout: 10_000 });
+      await page.getByTestId("item-price-amount-input").fill(amount);
+      await page.getByTestId("item-price-valid-from-input").fill(todayYmd);
+      await page.getByTestId("item-price-reason-select").selectOption(reason);
+      await page.getByTestId("item-price-dialog-submit").click();
+      await expect(page.getByTestId("item-price-edit-dialog")).toBeHidden({ timeout: 15_000 });
+    };
+
+    const addSale = async (amount: string, reason: string) => {
+      await page.getByTestId("item-prices-add-sale").click();
+      await expect(page.getByTestId("item-price-edit-dialog")).toBeVisible({ timeout: 10_000 });
+      await page.getByTestId("item-price-amount-input").fill(amount);
+      await page.getByTestId("item-price-valid-from-input").fill(todayYmd);
+      await page.getByTestId("item-price-reason-select").selectOption(reason);
+      await page.getByTestId("item-price-dialog-submit").click();
+      await expect(page.getByTestId("item-price-edit-dialog")).toBeHidden({ timeout: 15_000 });
+    };
+
+    await addPurchase("1.00", "manual_update");
+    await addPurchase("2.00", "correction");
+
+    const purchaseCard = page.getByTestId("item-prices-card-purchase-current");
+    const purchaseChart = purchaseCard.getByTestId("item-price-trend-chart-area");
+    await expect(purchaseChart).toBeVisible();
+    const wPurchaseShort = (await purchaseChart.boundingBox())!.width;
+    expect(wPurchaseShort).toBeGreaterThanOrEqual(168);
+
+    await addPurchase("10000000.00", "correction");
+    const wPurchaseLong = (await purchaseChart.boundingBox())!.width;
+    expect(Math.abs(wPurchaseLong - wPurchaseShort)).toBeLessThanOrEqual(2);
+
+    await addSale("50.00", "manual_update");
+    await addSale("40.00", "correction");
+
+    const saleCard = page.getByTestId("item-prices-card-sale-current");
+    const saleChart = saleCard.getByTestId("item-price-trend-chart-area");
+    await expect(saleChart).toBeVisible();
+    const wSaleShort = (await saleChart.boundingBox())!.width;
+    expect(wSaleShort).toBeGreaterThanOrEqual(168);
+
+    await addSale("9999999.99", "correction");
+    const wSaleLong = (await saleChart.boundingBox())!.width;
+    expect(Math.abs(wSaleLong - wSaleShort)).toBeLessThanOrEqual(2);
+
+    await page.reload({ waitUntil: "domcontentloaded" });
+    await waitItemsRepositoryHydrated(page);
+    await waitItemTabsVisible(page);
+    await page.getByTestId("item-tab-prices").click();
+    await expect(purchaseChart).toBeVisible({ timeout: 15_000 });
+    const wPurchaseReload = (await purchaseChart.boundingBox())!.width;
+    expect(Math.abs(wPurchaseReload - wPurchaseLong)).toBeLessThanOrEqual(2);
+  });
+
   test("14.2 current card delta neutral when price unchanged vs previous active", async ({ page }) => {
     await openApp(page);
     const code = `E2E-TRN-${Date.now()}`;
@@ -1096,6 +1216,7 @@ test.describe("Item card — Prices tab (acceptance)", () => {
       "50,40",
     );
 
+    await expandItemPriceHistorySection(page);
     const rows = page.getByTestId("item-prices-history-row");
     await expect(rows).toHaveCount(4, { timeout: 15_000 });
     await expect(rows.nth(0)).toContainText(/sale/i);
@@ -1143,7 +1264,7 @@ test.describe("Item card — Prices tab (acceptance)", () => {
     await gotoReady(page, `/items/${encodeURIComponent(itemId)}`);
     await waitItemTabsVisible(page);
     await page.getByTestId("item-tab-prices").click();
-    await page.getByTestId("item-prices-history-table").waitFor({ state: "visible", timeout: 30_000 });
+    await expandItemPriceHistorySection(page);
     const pricesShot = testInfo.outputPath("item-prices-history-table.png");
     await page.screenshot({ path: pricesShot, fullPage: false });
     await testInfo.attach("item-prices-history", { path: pricesShot, contentType: "image/png" });

@@ -1,4 +1,7 @@
 import type { MarkingSyncHttpCallHint, MarkingSyncPerRecordResult } from "../model/markingExternalSync";
+import type { MarkingAutoSyncScope } from "../model/markingAutoSyncSettings";
+
+export type MarkingSyncLogTrigger = "manual" | "auto";
 
 export type MarkingSyncLogDetailsPayload = {
   perRecord: MarkingSyncPerRecordResult[];
@@ -10,6 +13,10 @@ export type MarkingSyncLogDetailsPayload = {
   };
   /** Single HTTP round-trip for batch confirm/void when useful. */
   batchCall?: MarkingSyncHttpCallHint;
+  /** Present on new entries; older logs may omit (treated as manual). */
+  trigger?: MarkingSyncLogTrigger;
+  /** When {@link trigger} is `auto`, which scheduler scope selected the records. */
+  autoScope?: MarkingAutoSyncScope;
 };
 
 export function stringifySyncLogDetails(payload: MarkingSyncLogDetailsPayload): string {

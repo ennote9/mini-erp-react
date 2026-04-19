@@ -20,10 +20,18 @@ import {
   countTransitionsByPrintSource,
   listAllMarkingRecordsForReporting,
   type MarkingProblemKind,
+  type TraceabilityEnrichedRow,
 } from "../lib/markingTraceabilityReporting";
 import { listMarkingRecordAuditByRecordId, listMarkingRecordIdsByPrintJobId } from "../markingRecordService";
 import { getMarkingExternalIntegrationInfo, syncByBatchRef, syncByPrintJob, syncMarkingRecords } from "../markingExternalSyncService";
 import { MarkingIntegrationModeBanner } from "../components/MarkingIntegrationModeBanner";
+import {
+  analyzeMarkingReconciliation,
+  buildReconciliationContext,
+  summarizeReconciliationAnalyses,
+  type MarkingMismatchKind,
+  type MarkingReconciliationAnalysis,
+} from "../lib/markingExternalReconciliation";
 import { getSyncProblemKind } from "../lib/markingSyncMismatch";
 import { itemRepository } from "../repository";
 
@@ -79,11 +87,24 @@ function problemLabel(t: (k: string) => string, k: MarkingProblemKind): string {
   return tr === key ? k : tr;
 }
 
-function syncProblemLabel(t: (k: string) => string, k: NonNullable<ReturnType<typeof getSyncProblemKind>>): string {
-  const key = `master.markingExternalSync.syncProblem.${k}` as const;
-  const tr = t(key);
-  return tr === key ? k : tr;
-}
+const MISMATCH_KIND_TRACE_FILTERS: { value: "" | MarkingMismatchKind; labelKey: string }[] = [
+  { value: "", labelKey: "master.markingTraceability.filterMismatchKindAll" },
+  { value: "never_synced", labelKey: "master.markingReconciliation.mismatchKind.never_synced" },
+  { value: "sync_failed", labelKey: "master.markingReconciliation.mismatchKind.sync_failed" },
+  { value: "external_missing", labelKey: "master.markingReconciliation.mismatchKind.external_missing" },
+  { value: "external_unknown", labelKey: "master.markingReconciliation.mismatchKind.external_unknown" },
+  { value: "status_mismatch", labelKey: "master.markingReconciliation.mismatchKind.status_mismatch" },
+  { value: "printed_not_confirmed_externally", labelKey: "master.markingReconciliation.mismatchKind.printed_not_confirmed_externally" },
+  { value: "used_internally_but_not_confirmed_externally", labelKey: "master.markingReconciliation.mismatchKind.used_internally_but_not_confirmed_externally" },
+  { value: "void_internally_but_active_externally", labelKey: "master.markingReconciliation.mismatchKind.void_internally_but_active_externally" },
+  { value: "reserved_too_long", labelKey: "master.markingReconciliation.mismatchKind.reserved_too_long" },
+  { value: "printed_too_long_without_used", labelKey: "master.markingReconciliation.mismatchKind.printed_too_long_without_used" },
+  { value: "provider_conflict", labelKey: "master.markingReconciliation.mismatchKind.provider_conflict" },
+  { value: "stale_external_snapshot", labelKey: "master.markingReconciliation.mismatchKind.stale_external_snapshot" },
+  { value: "provider_unavailable", labelKey: "master.markingReconciliation.mismatchKind.provider_unavailable" },
+];
+
+type TraceabilityRow = TraceabilityEnrichedRow & { analysis: MarkingReconciliationAnalysis };
 
 export function ItemsMarkingTraceabilityPage() {
   const { t } = useTranslation();
@@ -116,6 +137,8 @@ export function ItemsMarkingTraceabilityPage() {
   const [extMismatchOnly, setExtMismatchOnly] = useState(() => searchParams.get("extM") === "1");
   const [extFailedOnly, setExtFailedOnly] = useState(() => searchParams.get("extF") === "1");
   const [extNeverOnly, setExtNeverOnly] = useState(() => searchParams.get("extN") === "1");
+  const [severityFilter, setSeverityFilter] = useState<"" | "info" | "warning" | "error">("");
+  const [mismatchKindFilter, setMismatchKindFilter] = useState<"" | MarkingMismatchKind>("");
   const [updatedFrom, setUpdatedFrom] = useState(() => searchParams.get("from") ?? "");
   const [updatedTo, setUpdatedTo] = useState(() => searchParams.get("to") ?? "");
 
@@ -152,12 +175,33 @@ export function ItemsMarkingTraceabilityPage() {
     [allRecords, voidByItem, voidByBatchRef, revision],
   );
 
+  const integrationEffective = useMemo(() => {
+    void revision;
+    const x = getMarkingExternalIntegrationInfo();
+    if (x.effectiveLabel === "disabled") return "disabled" as const;
+    return x.effectiveLabel === "mock" ? ("mock" as const) : ("real" as const);
+  }, [revision]);
+
+  const traceRowsWithAnalysis = useMemo((): TraceabilityRow[] => {
+    return traceRowsAll.map((row) => {
+      const ctx = buildReconciliationContext(
+        row.record,
+        Date.now(),
+        integrationEffective,
+        row.lastPrintAudit,
+        voidByItem,
+        voidByBatchRef,
+      );
+      return { ...row, analysis: analyzeMarkingReconciliation(row.record, ctx) };
+    });
+  }, [traceRowsAll, integrationEffective, voidByItem, voidByBatchRef]);
+
   const filteredRows = useMemo(() => {
     const q = search.trim().toLowerCase();
     const batchQ = batchRefFilter.trim().toLowerCase();
 
-    return traceRowsAll.filter((row) => {
-      const { record: r, lastPrintAudit, problems } = row;
+    return traceRowsWithAnalysis.filter((row) => {
+      const { record: r, lastPrintAudit, problems, analysis } = row;
       const item = itemById.get(r.itemId);
 
       if (kindFilter && r.kind !== kindFilter) return false;
@@ -170,7 +214,10 @@ export function ItemsMarkingTraceabilityPage() {
         const rs = r.source ?? "OTHER";
         if (rs !== recordSource) return false;
       }
-      if (problemOnly && !problems.hasProblem) return false;
+      if (problemOnly && !problems.hasProblem && !analysis.needsAttention) return false;
+
+      if (severityFilter && analysis.severity !== severityFilter) return false;
+      if (mismatchKindFilter && analysis.kind !== mismatchKindFilter) return false;
 
       const sp = getSyncProblemKind(r);
       if (extMismatchOnly && sp !== "mismatch") return false;
@@ -197,7 +244,7 @@ export function ItemsMarkingTraceabilityPage() {
       return true;
     });
   }, [
-    traceRowsAll,
+    traceRowsWithAnalysis,
     itemById,
     kindFilter,
     statusFilter,
@@ -210,6 +257,8 @@ export function ItemsMarkingTraceabilityPage() {
     extMismatchOnly,
     extFailedOnly,
     extNeverOnly,
+    severityFilter,
+    mismatchKindFilter,
     updatedFrom,
     updatedTo,
     search,
@@ -317,12 +366,15 @@ export function ItemsMarkingTraceabilityPage() {
 
   const detailRow = useMemo(() => {
     if (!detailId) return null;
-    return filteredRows.find((x) => x.record.id === detailId) ?? traceRowsAll.find((x) => x.record.id === detailId) ?? null;
-  }, [detailId, filteredRows, traceRowsAll]);
+    return filteredRows.find((x) => x.record.id === detailId) ?? traceRowsWithAnalysis.find((x) => x.record.id === detailId) ?? null;
+  }, [detailId, filteredRows, traceRowsWithAnalysis]);
 
-  const detailSyncKind = useMemo(
-    () => (detailRow ? getSyncProblemKind(detailRow.record) : null),
-    [detailRow],
+  const reconciliationSummary = useMemo(
+    () =>
+      summarizeReconciliationAnalyses(
+        filteredRows.map((row) => ({ recordId: row.record.id, analysis: row.analysis })),
+      ),
+    [filteredRows],
   );
 
   const detailAudit = useMemo(() => {
@@ -499,6 +551,24 @@ export function ItemsMarkingTraceabilityPage() {
       </section>
 
       <section className="rounded-md border border-border/60 bg-muted/20 px-3 py-2 text-[11px]">
+        <p className="text-[10px] font-semibold uppercase text-muted-foreground">{t("master.markingTraceability.reconciliationMetricsTitle")}</p>
+        <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1">
+          <span>
+            {t("master.markingReconciliation.metricAttention")}: <strong className="tabular-nums">{reconciliationSummary.attentionTotal}</strong>
+          </span>
+          <span>
+            {t("master.markingReconciliation.metricCritical")}: <strong className="tabular-nums text-red-700 dark:text-red-300">{reconciliationSummary.criticalCount}</strong>
+          </span>
+          <span>
+            {t("master.markingReconciliation.metricNeverSynced")}: <strong className="tabular-nums">{reconciliationSummary.neverSynced}</strong>
+          </span>
+          <span>
+            {t("master.markingReconciliation.metricConfirmationGaps")}: <strong className="tabular-nums">{reconciliationSummary.confirmationGaps}</strong>
+          </span>
+        </div>
+      </section>
+
+      <section className="rounded-md border border-border/60 bg-muted/20 px-3 py-2 text-[11px]">
         <p className="text-[10px] font-semibold uppercase text-muted-foreground">{t("master.markingTraceability.metricsTitle")}</p>
         <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1">
           <span>
@@ -671,6 +741,33 @@ export function ItemsMarkingTraceabilityPage() {
                 <span>{t("master.markingExternalSync.filterNeverSynced")}</span>
               </label>
             </div>
+            <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+              <div className="space-y-1">
+                <Label className="text-[11px]">{t("master.markingReconciliation.filterSeverity")}</Label>
+                <SelectField
+                  value={severityFilter}
+                  onChange={(v) => setSeverityFilter(v as "" | "info" | "warning" | "error")}
+                  options={[
+                    { value: "", label: t("master.markingReconciliation.filterSeverityAll") },
+                    { value: "info", label: t("master.markingReconciliation.severity.info") },
+                    { value: "warning", label: t("master.markingReconciliation.severity.warning") },
+                    { value: "error", label: t("master.markingReconciliation.severity.error") },
+                  ]}
+                  placeholder=""
+                  className="h-8 text-xs"
+                />
+              </div>
+              <div className="space-y-1 sm:col-span-2">
+                <Label className="text-[11px]">{t("master.markingReconciliation.filterMismatchKind")}</Label>
+                <SelectField
+                  value={mismatchKindFilter}
+                  onChange={(v) => setMismatchKindFilter(v as "" | MarkingMismatchKind)}
+                  options={MISMATCH_KIND_TRACE_FILTERS.map((o) => ({ value: o.value, label: t(o.labelKey) }))}
+                  placeholder=""
+                  className="h-8 text-xs"
+                />
+              </div>
+            </div>
           </div>
         </div>
       </section>
@@ -690,22 +787,22 @@ export function ItemsMarkingTraceabilityPage() {
                 <th className="px-2 py-1.5">{t("master.markingTraceability.colLastPrintJob")}</th>
                 <th className="px-2 py-1.5">{t("master.markingExternalSync.colExternal")}</th>
                 <th className="px-2 py-1.5">{t("master.markingExternalSync.colSyncState")}</th>
-                <th className="px-2 py-1.5">{t("master.markingExternalSync.colExtMismatch")}</th>
+                <th className="px-2 py-1.5">{t("master.markingReconciliation.colMismatchKind")}</th>
+                <th className="px-2 py-1.5">{t("master.markingReconciliation.colSeverity")}</th>
                 <th className="px-2 py-1.5">{t("master.markingTraceability.colProblem")}</th>
               </tr>
             </thead>
             <tbody>
               {filteredRows.length === 0 ? (
                 <tr>
-                  <td colSpan={12} className="px-3 py-8 text-center text-muted-foreground">
+                  <td colSpan={13} className="px-3 py-8 text-center text-muted-foreground">
                     {t("master.markingTraceability.empty")}
                   </td>
                 </tr>
               ) : (
                 filteredRows.map((row) => {
-                  const { record: r, lastPrintAudit, problems } = row;
+                  const { record: r, lastPrintAudit, problems, analysis } = row;
                   const it = itemById.get(r.itemId);
-                  const syncPk = getSyncProblemKind(r);
                   return (
                     <tr
                       key={r.id}
@@ -759,13 +856,30 @@ export function ItemsMarkingTraceabilityPage() {
                           </div>
                         ) : null}
                       </td>
-                      <td className="px-2 py-1.5">
-                        {syncPk ? (
-                          <span className="rounded border border-violet-500/40 bg-violet-500/10 px-1 py-0.5 text-[9px] font-semibold uppercase text-violet-950 dark:text-violet-100">
-                            {syncProblemLabel(t, syncPk)}
-                          </span>
-                        ) : (
+                      <td className="max-w-[7rem] px-2 py-1.5 text-[9px]">
+                        {analysis.kind === "none" ? (
                           <span className="text-muted-foreground">—</span>
+                        ) : (
+                          <span className="rounded border border-violet-500/40 bg-violet-500/10 px-1 py-0.5 font-medium text-violet-950 dark:text-violet-100">
+                            {t(`master.markingReconciliation.mismatchKind.${analysis.kind}`)}
+                          </span>
+                        )}
+                      </td>
+                      <td className="px-2 py-1.5 text-[9px]">
+                        {analysis.kind === "none" ? (
+                          "—"
+                        ) : (
+                          <span
+                            className={
+                              analysis.severity === "error"
+                                ? "text-red-700 dark:text-red-300"
+                                : analysis.severity === "warning"
+                                  ? "text-amber-800 dark:text-amber-200"
+                                  : "text-sky-800 dark:text-sky-200"
+                            }
+                          >
+                            {t(`master.markingReconciliation.severity.${analysis.severity}`)}
+                          </span>
                         )}
                       </td>
                       <td className="px-2 py-1.5">
@@ -854,8 +968,21 @@ export function ItemsMarkingTraceabilityPage() {
                   </div>
                   <div>
                     <dt className="text-[9px] text-muted-foreground">{t("master.markingExternalSync.detailMismatch")}</dt>
-                    <dd className="text-[10px]">
-                      {detailSyncKind ? syncProblemLabel(t, detailSyncKind) : t("master.markingExternalSync.detailMismatchNone")}
+                    <dd className="text-[10px] space-y-1">
+                      {detailRow.analysis.kind === "none" ? (
+                        t("master.markingExternalSync.detailMismatchNone")
+                      ) : (
+                        <>
+                          <div className="font-medium">{t(`master.markingReconciliation.mismatchKind.${detailRow.analysis.kind}`)}</div>
+                          <div className="text-muted-foreground">{t(`master.markingReconciliation.explanation.${detailRow.analysis.explanationKey}`)}</div>
+                          <div className="text-[9px]">
+                            {t("master.markingReconciliation.detailNextStep")}:{" "}
+                            {detailRow.analysis.recommendedActionIds[0]
+                              ? t(`master.markingReconciliation.actionHint.${detailRow.analysis.recommendedActionIds[0]}`)
+                              : "—"}
+                          </div>
+                        </>
+                      )}
                     </dd>
                   </div>
                 </dl>

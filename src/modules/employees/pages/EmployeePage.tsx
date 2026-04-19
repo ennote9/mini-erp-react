@@ -1,7 +1,8 @@
 import { useMatch, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Tabs } from "radix-ui";
-import { Save, X } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
+import { Building2, ContactRound, Save, UserRound, X } from "lucide-react";
 import { employeeRepository, flushPendingEmployeePersist } from "../repository";
 import { createBlankEmployee, normalizeEmployeeForSave, buildAuditEventsForSave } from "../service";
 import type { Employee } from "../model";
@@ -23,6 +24,12 @@ import { EmployeeMainTab } from "../components/tabs/EmployeeMainTab";
 import { EmployeeOrgTab } from "../components/tabs/EmployeeOrgTab";
 import { EmployeeContactsTab } from "../components/tabs/EmployeeContactsTab";
 import { cn } from "@/lib/utils";
+
+const EMPLOYEE_TAB_ICONS = {
+  main: UserRound,
+  org: Building2,
+  contacts: ContactRound,
+} satisfies Record<EmployeeTabId, LucideIcon>;
 
 function cloneEmployee(e: Employee): Employee {
   return JSON.parse(JSON.stringify(e)) as Employee;
@@ -189,19 +196,23 @@ export function EmployeePage() {
           )}
           aria-label={t("employees.page.tabsAria")}
         >
-          {EMPLOYEE_TAB_IDS.map((tabId) => (
-            <Tabs.Trigger
-              key={tabId}
-              value={tabId}
-              className={cn(
-                "rounded-md px-2.5 py-1.5 text-xs font-medium text-muted-foreground transition-colors",
-                "hover:bg-muted/60 hover:text-foreground",
-                "data-[state=active]:bg-muted data-[state=active]:text-foreground data-[state=active]:shadow-sm",
-              )}
-            >
-              {tabLabel(tabId)}
-            </Tabs.Trigger>
-          ))}
+          {EMPLOYEE_TAB_IDS.map((tabId) => {
+            const TabIcon = EMPLOYEE_TAB_ICONS[tabId];
+            return (
+              <Tabs.Trigger
+                key={tabId}
+                value={tabId}
+                className={cn(
+                  "inline-flex items-center gap-1.5 whitespace-nowrap rounded-md px-2.5 py-1.5 text-xs font-medium text-muted-foreground transition-colors",
+                  "hover:bg-muted/60 hover:text-foreground",
+                  "data-[state=active]:bg-muted data-[state=active]:text-foreground data-[state=active]:shadow-sm",
+                )}
+              >
+                <TabIcon className="h-3.5 w-3.5 shrink-0 opacity-90" aria-hidden />
+                <span>{tabLabel(tabId)}</span>
+              </Tabs.Trigger>
+            );
+          })}
         </Tabs.List>
 
         <Tabs.Content value="main" className="min-h-0 flex-1 outline-none focus-visible:outline-none">

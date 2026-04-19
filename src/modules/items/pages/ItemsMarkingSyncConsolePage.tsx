@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { SelectField } from "@/components/ui/select-field";
@@ -21,6 +22,12 @@ import {
   type MarkingExternalSyncRunResult,
   voidMarkingRecordsExternally,
 } from "../markingExternalSyncService";
+import { getMarkingAutoSyncSchedulerState, runMarkingAutoSyncNow } from "../markingAutoSyncScheduler";
+import type { MarkingSyncLogTrigger } from "../lib/markingSyncLogPayload";
+import { analyzeMarkingReconciliation, buildReconciliationContext } from "../lib/markingExternalReconciliation";
+import { buildVoidCountsByBatchRef, buildVoidCountsByItemId } from "../lib/markingTraceabilityReporting";
+import { getMarkingRecordLastPrintAudit } from "../markingRecordService";
+import { markingRecordRepository } from "../markingRecordRepository";
 
 const ACTIONS: MarkingSyncLogAction[] = ["FETCH_STATUS", "CONFIRM_USED", "VOID_EXTERNAL", "BATCH_BY_REF", "BATCH_BY_JOB"];
 const STATUSES: MarkingSyncLogStatus[] = ["SUCCESS", "PARTIAL", "FAILED"];
@@ -43,14 +50,23 @@ function logMatchesFilters(
     batchQ: string;
     from: string;
     to: string;
+    trigger: "" | MarkingSyncLogTrigger;
+    unresolvedRecordIds: ReadonlySet<string> | null;
   },
 ): boolean {
+  if (f.unresolvedRecordIds && f.unresolvedRecordIds.size > 0) {
+    if (!e.recordIds.some((id) => f.unresolvedRecordIds!.has(id))) return false;
+  }
   if (f.providerQ && !e.provider.toLowerCase().includes(f.providerQ.toLowerCase())) return false;
   if (f.action && e.action !== f.action) return false;
   if (f.status && e.status !== f.status) return false;
 
   const d = parseSyncLogDetails(e.details);
   const input = d?.input;
+  if (f.trigger) {
+    const tr = d?.trigger ?? "manual";
+    if (tr !== f.trigger) return false;
+  }
 
   if (f.recordQ.trim()) {
     const q = f.recordQ.trim().toLowerCase();
@@ -102,6 +118,8 @@ export function ItemsMarkingSyncConsolePage() {
   const [filterBatch, setFilterBatch] = useState("");
   const [filterFrom, setFilterFrom] = useState("");
   const [filterTo, setFilterTo] = useState("");
+  const [filterTrigger, setFilterTrigger] = useState<"" | MarkingSyncLogTrigger>("");
+  const [filterUnresolvedFromLastRun, setFilterUnresolvedFromLastRun] = useState(false);
 
   useEffect(() => {
     const record = searchParams.get("record") ?? "";
@@ -126,6 +144,33 @@ export function ItemsMarkingSyncConsolePage() {
     return markingSyncLogRepository.listRecent(400);
   }, [revision]);
 
+  const integrationEffective = useMemo(() => {
+    void revision;
+    const x = getMarkingExternalIntegrationInfo();
+    if (x.effectiveLabel === "disabled") return "disabled" as const;
+    return x.effectiveLabel === "mock" ? ("mock" as const) : ("real" as const);
+  }, [revision]);
+
+  const lastRunUnresolvedIds = useMemo(() => {
+    if (!lastRun || lastRun.action !== "FETCH_STATUS") return [];
+    const ids = lastRun.perRecord.filter((p) => p.ok).map((p) => p.recordId);
+    if (ids.length === 0) return [];
+    const all = markingRecordRepository.list();
+    const voidByItem = buildVoidCountsByItemId(all);
+    const voidByBatch = buildVoidCountsByBatchRef(all);
+    const unresolved: string[] = [];
+    for (const id of ids) {
+      const r = markingRecordRepository.getById(id);
+      if (!r) continue;
+      const ctx = buildReconciliationContext(r, Date.now(), integrationEffective, getMarkingRecordLastPrintAudit(r.id), voidByItem, voidByBatch);
+      const a = analyzeMarkingReconciliation(r, ctx);
+      if (a.needsAttention) unresolved.push(id);
+    }
+    return unresolved;
+  }, [lastRun, integrationEffective, revision]);
+
+  const unresolvedSet = useMemo(() => new Set(lastRunUnresolvedIds), [lastRunUnresolvedIds]);
+
   const filteredLogs = useMemo(() => {
     return logs.filter((e) =>
       logMatchesFilters(e, {
@@ -137,9 +182,29 @@ export function ItemsMarkingSyncConsolePage() {
         batchQ: filterBatch,
         from: filterFrom,
         to: filterTo,
+        trigger: filterTrigger,
+        unresolvedRecordIds: filterUnresolvedFromLastRun && unresolvedSet.size > 0 ? unresolvedSet : null,
       }),
     );
-  }, [logs, filterProvider, filterAction, filterStatus, filterRecord, filterJob, filterBatch, filterFrom, filterTo]);
+  }, [
+    logs,
+    filterProvider,
+    filterAction,
+    filterStatus,
+    filterRecord,
+    filterJob,
+    filterBatch,
+    filterFrom,
+    filterTo,
+    filterTrigger,
+    filterUnresolvedFromLastRun,
+    unresolvedSet,
+  ]);
+
+  const scheduler = useMemo(() => {
+    void revision;
+    return getMarkingAutoSyncSchedulerState();
+  }, [revision]);
 
   const integration = useMemo(() => {
     void revision;
@@ -177,6 +242,14 @@ export function ItemsMarkingSyncConsolePage() {
     () => [{ value: "", label: t("master.markingSyncConsole.filterStatusAll") }, ...STATUSES.map((s) => ({ value: s, label: s }))],
     [t],
   );
+  const triggerFilterOptions = useMemo(
+    () => [
+      { value: "", label: t("master.markingSyncConsole.filterTriggerAll") },
+      { value: "manual", label: t("master.markingSyncConsole.filterTriggerManual") },
+      { value: "auto", label: t("master.markingSyncConsole.filterTriggerAuto") },
+    ],
+    [t],
+  );
 
   return (
     <div className="doc-page mx-auto max-w-[1600px] space-y-3 p-4 md:p-5">
@@ -208,16 +281,89 @@ export function ItemsMarkingSyncConsolePage() {
         </div>
       </div>
 
+      <div className="rounded-md border border-border/80 bg-muted/20 px-3 py-2 text-[11px] space-y-1" role="region">
+        <p className="font-medium">{t("master.markingSyncConsole.schedulerTitle")}</p>
+        <p>
+          {t("master.markingSyncConsole.schedulerInterval")}:{" "}
+          <span className="font-mono">{scheduler.isRunning ? t("master.markingSyncConsole.yes") : t("master.markingSyncConsole.no")}</span> ·{" "}
+          {t("master.markingSyncConsole.schedulerAutoEnabled")}:{" "}
+          <span className="font-mono">{scheduler.isEnabled ? t("master.markingSyncConsole.yes") : t("master.markingSyncConsole.no")}</span> ·{" "}
+          {t("master.markingSyncConsole.schedulerInFlight")}:{" "}
+          <span className="font-mono">{scheduler.inFlight ? t("master.markingSyncConsole.yes") : t("master.markingSyncConsole.no")}</span>
+        </p>
+        <p>
+          {t("master.markingSyncConsole.schedulerLast")}: <span className="font-mono">{scheduler.lastStatus}</span>
+          {scheduler.lastMessage ? (
+            <>
+              {" "}
+              — {scheduler.lastMessage}
+            </>
+          ) : null}
+        </p>
+        <p>
+          {t("master.markingSyncConsole.schedulerNext")}:{" "}
+          {scheduler.nextPlannedRunAt
+            ? new Date(scheduler.nextPlannedRunAt).toLocaleString(undefined, { dateStyle: "short", timeStyle: "short" })
+            : "—"}
+        </p>
+        <Button
+          type="button"
+          size="sm"
+          variant="secondary"
+          className="h-7 text-[10px]"
+          disabled={busy}
+          onClick={() =>
+            void run(async () => {
+              const r = await runMarkingAutoSyncNow();
+              if ("blocked" in r) {
+                return {
+                  logId: "",
+                  status: "FAILED" as const,
+                  action: "FETCH_STATUS" as const,
+                  provider: integration.adapterId,
+                  isMock: integration.isMock,
+                  perRecord: [],
+                  message: r.message,
+                  syncTrigger: "auto",
+                };
+              }
+              return r;
+            })
+          }
+        >
+          {t("master.markingSyncConsole.runAutoSyncNow")}
+        </Button>
+      </div>
+
       {lastRun ? (
         <div className="rounded-md border border-border/80 bg-muted/25 px-3 py-2 text-xs" role="status">
           <p className="font-medium">
             {t("master.markingSyncConsole.lastRun")}
             {lastRun.logId ? ` #${lastRun.logId}` : ""} · {lastRun.status} · {lastRun.action}
+            {lastRun.syncTrigger ? (
+              <span className="ml-2 rounded border border-border px-1.5 py-0.5 text-[10px] text-muted-foreground">
+                {lastRun.syncTrigger === "auto" ? t("master.markingSyncConsole.badgeAuto") : t("master.markingSyncConsole.badgeManual")}
+              </span>
+            ) : null}
           </p>
           {lastRun.message ? <p className="mt-1 text-muted-foreground">{lastRun.message}</p> : null}
           <p className="mt-1 text-[11px] text-muted-foreground">
             {t("master.markingSyncConsole.lastRunOk", { ok: lastRun.perRecord.filter((p) => p.ok).length, total: lastRun.perRecord.length })}
           </p>
+          {lastRun.action === "FETCH_STATUS" && lastRunUnresolvedIds.length > 0 ? (
+            <div className="mt-2 rounded border border-amber-500/40 bg-amber-500/10 px-2 py-1.5 text-[11px] text-amber-950 dark:text-amber-100">
+              <p>{t("master.markingSyncConsole.unresolvedAfterSync", { n: lastRunUnresolvedIds.length })}</p>
+              <p className="mt-1 text-[10px] text-muted-foreground">{t("master.markingSyncConsole.unresolvedAfterSyncHint")}</p>
+              <Link
+                className="mt-1 inline-block text-primary hover:underline"
+                to={`/items/marking-reconciliation?records=${encodeURIComponent(lastRunUnresolvedIds.join(","))}`}
+              >
+                {t("master.markingSyncConsole.openReconciliationUnresolved")}
+              </Link>
+            </div>
+          ) : lastRun.action === "FETCH_STATUS" && lastRun.status === "SUCCESS" && lastRunUnresolvedIds.length === 0 && lastRun.perRecord.some((p) => p.ok) ? (
+            <p className="mt-2 text-[11px] text-emerald-800 dark:text-emerald-200">{t("master.markingSyncConsole.reconciliationCleanAfterSync")}</p>
+          ) : null}
         </div>
       ) : null}
 
@@ -326,6 +472,27 @@ export function ItemsMarkingSyncConsolePage() {
             <Label className="text-[10px]">{t("master.markingSyncConsole.filterTo")}</Label>
             <Input type="date" value={filterTo} onChange={(e) => setFilterTo(e.target.value)} className="h-8 text-[11px]" />
           </div>
+          <div className="space-y-1">
+            <Label className="text-[10px]">{t("master.markingSyncConsole.filterTrigger")}</Label>
+            <SelectField
+              value={filterTrigger}
+              onChange={(v) => setFilterTrigger(v as "" | MarkingSyncLogTrigger)}
+              options={triggerFilterOptions}
+              placeholder=""
+              className="h-8 text-[11px]"
+            />
+          </div>
+          <div className="flex items-end pb-1 sm:col-span-2">
+            <label className="flex items-center gap-2 text-[11px]">
+              <Checkbox
+                id="filter-unresolved"
+                checked={filterUnresolvedFromLastRun}
+                onCheckedChange={(v) => setFilterUnresolvedFromLastRun(v === true)}
+                disabled={unresolvedSet.size === 0}
+              />
+              <span>{t("master.markingSyncConsole.filterUnresolvedFromLastRun")}</span>
+            </label>
+          </div>
         </div>
 
         <div className="overflow-x-auto rounded border border-border/60">
@@ -356,12 +523,20 @@ export function ItemsMarkingSyncConsolePage() {
                   const d = parseSyncLogDetails(e.details);
                   const pr = d?.perRecord ?? [];
                   const okN = pr.filter((p) => p.ok).length;
+                  const trig = d?.trigger ?? "manual";
                   return (
                     <tr key={e.id} className="border-b border-border/50 align-top">
                       <td className="px-2 py-1 font-mono">{e.id}</td>
                       <td className="px-2 py-1 font-mono">{e.provider}</td>
                       <td className="px-2 py-1">{d?.isMock ? t("master.markingSyncConsole.yes") : t("master.markingSyncConsole.no")}</td>
-                      <td className="px-2 py-1 font-mono">{e.action}</td>
+                      <td className="px-2 py-1 font-mono">
+                        {e.action}
+                        {e.action === "FETCH_STATUS" ? (
+                          <span className="ml-1 text-[9px] text-muted-foreground">
+                            ({trig === "auto" ? t("master.markingSyncConsole.badgeAuto") : t("master.markingSyncConsole.badgeManual")})
+                          </span>
+                        ) : null}
+                      </td>
                       <td className="px-2 py-1">{e.status}</td>
                       <td className="px-2 py-1 tabular-nums">
                         {pr.length ? `${okN}/${pr.length}` : "—"}

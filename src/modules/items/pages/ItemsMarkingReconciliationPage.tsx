@@ -21,7 +21,22 @@ import {
   reconcileBatchReleaseToAvailable,
   reconcileBatchVoid,
 } from "../markingRecordService";
-import { getMarkingExternalIntegrationInfo, syncMarkingRecords } from "../markingExternalSyncService";
+import {
+  analyzeMarkingReconciliation,
+  buildReconciliationContext,
+  partitionBulkByAction,
+  summarizeReconciliationAnalyses,
+  type MarkingReconciliationActionId,
+  type MarkingMismatchKind,
+  type MarkingReconciliationAnalysis,
+} from "../lib/markingExternalReconciliation";
+import { buildVoidCountsByBatchRef, buildVoidCountsByItemId } from "../lib/markingTraceabilityReporting";
+import {
+  confirmMarkingRecordsUsedExternally,
+  getMarkingExternalIntegrationInfo,
+  syncMarkingRecords,
+  voidMarkingRecordsExternally,
+} from "../markingExternalSyncService";
 import { MarkingIntegrationModeBanner } from "../components/MarkingIntegrationModeBanner";
 import { itemRepository } from "../repository";
 
@@ -32,7 +47,25 @@ type EnrichedRow = {
   record: ItemMarkingRecord;
   item: Item | undefined;
   lastPrint: ItemMarkingRecordAuditEntry | undefined;
+  analysis: MarkingReconciliationAnalysis;
 };
+
+const MISMATCH_KIND_FILTERS: { value: "" | MarkingMismatchKind; labelKey: string }[] = [
+  { value: "", labelKey: "master.markingReconciliation.filterMismatchKindAll" },
+  { value: "never_synced", labelKey: "master.markingReconciliation.mismatchKind.never_synced" },
+  { value: "sync_failed", labelKey: "master.markingReconciliation.mismatchKind.sync_failed" },
+  { value: "external_missing", labelKey: "master.markingReconciliation.mismatchKind.external_missing" },
+  { value: "external_unknown", labelKey: "master.markingReconciliation.mismatchKind.external_unknown" },
+  { value: "status_mismatch", labelKey: "master.markingReconciliation.mismatchKind.status_mismatch" },
+  { value: "printed_not_confirmed_externally", labelKey: "master.markingReconciliation.mismatchKind.printed_not_confirmed_externally" },
+  { value: "used_internally_but_not_confirmed_externally", labelKey: "master.markingReconciliation.mismatchKind.used_internally_but_not_confirmed_externally" },
+  { value: "void_internally_but_active_externally", labelKey: "master.markingReconciliation.mismatchKind.void_internally_but_active_externally" },
+  { value: "reserved_too_long", labelKey: "master.markingReconciliation.mismatchKind.reserved_too_long" },
+  { value: "printed_too_long_without_used", labelKey: "master.markingReconciliation.mismatchKind.printed_too_long_without_used" },
+  { value: "provider_conflict", labelKey: "master.markingReconciliation.mismatchKind.provider_conflict" },
+  { value: "stale_external_snapshot", labelKey: "master.markingReconciliation.mismatchKind.stale_external_snapshot" },
+  { value: "provider_unavailable", labelKey: "master.markingReconciliation.mismatchKind.provider_unavailable" },
+];
 
 const PRINT_SOURCES: { value: "" | ItemMarkingRecordAuditSource; labelKey: string }[] = [
   { value: "", labelKey: "master.markingReconciliation.filterSourceAll" },
@@ -85,6 +118,10 @@ export function ItemsMarkingReconciliationPage() {
   const [voidNote, setVoidNote] = useState("");
   const [feedback, setFeedback] = useState<string | null>(null);
   const [syncBusy, setSyncBusy] = useState(false);
+  const [mismatchOnly, setMismatchOnly] = useState(false);
+  const [severityFilter, setSeverityFilter] = useState<"" | "info" | "warning" | "error">("");
+  const [mismatchKindFilter, setMismatchKindFilter] = useState<"" | MarkingMismatchKind>("");
+  const [pendingExternal, setPendingExternal] = useState<null | { kind: "confirm" | "void"; eligible: string[]; skipped: string[] }>(null);
 
   const items = useMemo(() => {
     void revision;
@@ -102,19 +139,32 @@ export function ItemsMarkingReconciliationPage() {
     return new Set(listMarkingRecordIdsByPrintJobId(printJobFilter.trim()));
   }, [printJobFilter, revision]);
 
+  const integrationEffective = useMemo(() => {
+    void revision;
+    const x = getMarkingExternalIntegrationInfo();
+    if (x.effectiveLabel === "disabled") return "disabled" as const;
+    return x.effectiveLabel === "mock" ? ("mock" as const) : ("real" as const);
+  }, [revision]);
+
   const enrichedRows = useMemo((): EnrichedRow[] => {
     void revision;
     const records = markingRecordRepository.list();
+    const voidByItem = buildVoidCountsByItemId(records);
+    const voidByBatch = buildVoidCountsByBatchRef(records);
     const out: EnrichedRow[] = [];
     for (const r of records) {
+      const lastPrint = getMarkingRecordLastPrintAudit(r.id);
+      const ctx = buildReconciliationContext(r, Date.now(), integrationEffective, lastPrint, voidByItem, voidByBatch);
+      const analysis = analyzeMarkingReconciliation(r, ctx);
       out.push({
         record: r,
         item: itemById.get(r.itemId),
-        lastPrint: getMarkingRecordLastPrintAudit(r.id),
+        lastPrint,
+        analysis,
       });
     }
     return out;
-  }, [revision, itemById]);
+  }, [revision, itemById, integrationEffective]);
 
   const activeStatuses = useMemo((): Set<RowStatus> => {
     const s = new Set<RowStatus>();
@@ -126,19 +176,35 @@ export function ItemsMarkingReconciliationPage() {
     return s;
   }, [statusPrinted, statusReserved, statusAvailable, statusUsed, statusVoid]);
 
+  const recordIdFilter = useMemo(() => {
+    const raw = searchParams.get("records");
+    if (!raw?.trim()) return null;
+    return new Set(
+      raw
+        .split(/[\s,;]+/)
+        .map((s) => s.trim())
+        .filter(Boolean),
+    );
+  }, [searchParams]);
+
   const filteredRows = useMemo(() => {
     const q = search.trim().toLowerCase();
     const batchQ = batchRefFilter.trim().toLowerCase();
     const itemQ = itemFilter.trim();
 
     return enrichedRows.filter((row) => {
-      const { record: r, item, lastPrint } = row;
+      const { record: r, item, lastPrint, analysis } = row;
+      if (recordIdFilter && !recordIdFilter.has(r.id)) return false;
       if (!activeStatuses.has(r.status as RowStatus)) return false;
       if (kindFilter && r.kind !== kindFilter) return false;
       if (itemQ && r.itemId !== itemQ) return false;
       if (jobIdsForPrintFilter && !jobIdsForPrintFilter.has(r.id)) return false;
       if (batchQ && !(r.batchRef ?? "").toLowerCase().includes(batchQ)) return false;
       if (printSource && lastPrint?.source !== printSource) return false;
+
+      if (mismatchOnly && !analysis.needsAttention) return false;
+      if (severityFilter && analysis.severity !== severityFilter) return false;
+      if (mismatchKindFilter && analysis.kind !== mismatchKindFilter) return false;
 
       if (q) {
         const code = item?.code?.toLowerCase() ?? "";
@@ -157,6 +223,10 @@ export function ItemsMarkingReconciliationPage() {
     batchRefFilter,
     printSource,
     search,
+    mismatchOnly,
+    severityFilter,
+    mismatchKindFilter,
+    recordIdFilter,
   ]);
 
   const visibleIds = useMemo(() => filteredRows.map((x) => x.record.id), [filteredRows]);
@@ -190,6 +260,32 @@ export function ItemsMarkingReconciliationPage() {
   }, []);
 
   const selectedIds = useMemo(() => [...selected].filter((id) => visibleIds.includes(id)), [selected, visibleIds]);
+
+  const analysisByRecordId = useMemo(() => {
+    const m = new Map<string, MarkingReconciliationAnalysis>();
+    for (const row of enrichedRows) m.set(row.record.id, row.analysis);
+    return m;
+  }, [enrichedRows]);
+
+  const summaryMetrics = useMemo(
+    () =>
+      summarizeReconciliationAnalyses(
+        filteredRows.map((row) => ({ recordId: row.record.id, analysis: row.analysis })),
+      ),
+    [filteredRows],
+  );
+
+  const resolveAnalysis = useCallback(
+    (rec: ItemMarkingRecord): MarkingReconciliationAnalysis =>
+      analysisByRecordId.get(rec.id) ?? enrichedRows.find((x) => x.record.id === rec.id)!.analysis,
+    [analysisByRecordId, enrichedRows],
+  );
+
+  const partitionSelected = useCallback(
+    (action: MarkingReconciliationActionId) =>
+      partitionBulkByAction(selectedIds, (id) => markingRecordRepository.getById(id), resolveAnalysis, action),
+    [selectedIds, resolveAnalysis],
+  );
 
   useEffect(() => {
     if (searchParams.has("item")) setItemFilter(searchParams.get("item") ?? "");
@@ -285,6 +381,65 @@ export function ItemsMarkingReconciliationPage() {
     setSelected(new Set());
   }, [selectedIds, voidNote, t]);
 
+  const proposeBulkConfirmExternal = useCallback(() => {
+    setFeedback(null);
+    if (selectedIds.length === 0) return;
+    const { eligible, skipped } = partitionSelected("confirm_used_externally");
+    if (eligible.length === 0) {
+      setFeedback(t("master.markingReconciliation.feedbackBulkNoneEligible", { n: skipped.length }));
+      return;
+    }
+    setPendingExternal({ kind: "confirm", eligible, skipped });
+  }, [selectedIds, partitionSelected, t]);
+
+  const proposeBulkVoidExternal = useCallback(() => {
+    setFeedback(null);
+    if (selectedIds.length === 0) return;
+    const { eligible, skipped } = partitionSelected("void_externally");
+    if (eligible.length === 0) {
+      setFeedback(t("master.markingReconciliation.feedbackBulkNoneEligible", { n: skipped.length }));
+      return;
+    }
+    setPendingExternal({ kind: "void", eligible, skipped });
+  }, [selectedIds, partitionSelected, t]);
+
+  const executePendingExternal = useCallback(async () => {
+    if (!pendingExternal) return;
+    setSyncBusy(true);
+    setFeedback(null);
+    try {
+      if (pendingExternal.kind === "confirm") {
+        const r = await confirmMarkingRecordsUsedExternally(pendingExternal.eligible);
+        setFeedback(
+          t("master.markingReconciliation.feedbackExternalBatch", {
+            action: t("master.markingReconciliation.actionConfirmExternal"),
+            status: r.status,
+            ok: r.perRecord.filter((x) => x.ok).length,
+            total: r.perRecord.length,
+            skipped: pendingExternal.skipped.length,
+          }),
+        );
+      } else {
+        const r = await voidMarkingRecordsExternally(pendingExternal.eligible);
+        setFeedback(
+          t("master.markingReconciliation.feedbackExternalBatch", {
+            action: t("master.markingReconciliation.actionVoidExternal"),
+            status: r.status,
+            ok: r.perRecord.filter((x) => x.ok).length,
+            total: r.perRecord.length,
+            skipped: pendingExternal.skipped.length,
+          }),
+        );
+      }
+    } catch (e) {
+      setFeedback(t("master.markingExternalSync.syncError", { message: e instanceof Error ? e.message : String(e) }));
+    } finally {
+      setSyncBusy(false);
+      setPendingExternal(null);
+      setSelected(new Set());
+    }
+  }, [pendingExternal, t]);
+
   const itemOptions = useMemo(
     () => [{ value: "", label: t("master.markingReconciliation.filterItemAll") }, ...items.map((it) => ({ value: it.id, label: `${it.code} · ${it.name}` }))],
     [items, t],
@@ -347,6 +502,58 @@ export function ItemsMarkingReconciliationPage() {
         </div>
       ) : null}
 
+      {pendingExternal ? (
+        <div className="rounded-md border border-amber-500/50 bg-amber-500/10 px-3 py-2 text-[11px] space-y-2" role="dialog">
+          <p className="font-medium">
+            {pendingExternal.kind === "confirm"
+              ? t("master.markingReconciliation.pendingConfirmExternal", {
+                  eligible: pendingExternal.eligible.length,
+                  skipped: pendingExternal.skipped.length,
+                })
+              : t("master.markingReconciliation.pendingVoidExternal", {
+                  eligible: pendingExternal.eligible.length,
+                  skipped: pendingExternal.skipped.length,
+                })}
+          </p>
+          <p className="text-muted-foreground">{t("master.markingReconciliation.pendingExternalHint")}</p>
+          <div className="flex flex-wrap gap-2">
+            <Button type="button" size="sm" className="h-8 text-xs" disabled={syncBusy} onClick={() => void executePendingExternal()}>
+              {syncBusy ? t("master.markingExternalSync.syncRunning") : t("master.markingReconciliation.pendingConfirmApply")}
+            </Button>
+            <Button type="button" variant="ghost" size="sm" className="h-8 text-xs" disabled={syncBusy} onClick={() => setPendingExternal(null)}>
+              {t("master.markingReconciliation.pendingCancel")}
+            </Button>
+          </div>
+        </div>
+      ) : null}
+
+      <section className="rounded-md border border-border/60 bg-muted/20 px-3 py-2 text-[11px]">
+        <p className="text-[10px] font-semibold uppercase text-muted-foreground">{t("master.markingReconciliation.metricsTitle")}</p>
+        <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1">
+          <span>
+            {t("master.markingReconciliation.metricAttention")}: <strong className="tabular-nums">{summaryMetrics.attentionTotal}</strong>
+          </span>
+          <span>
+            {t("master.markingReconciliation.metricCritical")}: <strong className="tabular-nums text-red-700 dark:text-red-300">{summaryMetrics.criticalCount}</strong>
+          </span>
+          <span>
+            {t("master.markingReconciliation.metricNeverSynced")}: <strong className="tabular-nums">{summaryMetrics.neverSynced}</strong>
+          </span>
+          <span>
+            {t("master.markingReconciliation.metricSyncFailed")}: <strong className="tabular-nums">{summaryMetrics.syncFailed}</strong>
+          </span>
+          <span>
+            {t("master.markingReconciliation.metricStaleReserved")}: <strong className="tabular-nums">{summaryMetrics.staleReserved}</strong>
+          </span>
+          <span>
+            {t("master.markingReconciliation.metricStalePrinted")}: <strong className="tabular-nums">{summaryMetrics.stalePrinted}</strong>
+          </span>
+          <span>
+            {t("master.markingReconciliation.metricConfirmationGaps")}: <strong className="tabular-nums">{summaryMetrics.confirmationGaps}</strong>
+          </span>
+        </div>
+      </section>
+
       <section className="rounded-md border border-border/80 bg-card/40 p-3 space-y-3">
         <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
           <div className="space-y-1">
@@ -388,6 +595,38 @@ export function ItemsMarkingReconciliationPage() {
               value={printSource}
               onChange={(v) => setPrintSource(v as "" | ItemMarkingRecordAuditSource)}
               options={PRINT_SOURCES.map((o) => ({ value: o.value, label: t(o.labelKey) }))}
+              placeholder=""
+              className="h-8 text-xs"
+            />
+          </div>
+        </div>
+
+        <div className="grid gap-2 border-t border-border/50 pt-2 sm:grid-cols-2 lg:grid-cols-4">
+          <label className="flex items-center gap-2 text-[11px] sm:col-span-2 lg:col-span-1">
+            <Checkbox checked={mismatchOnly} onCheckedChange={(v) => setMismatchOnly(v === true)} id="mismatch-only" />
+            <span>{t("master.markingReconciliation.filterMismatchOnly")}</span>
+          </label>
+          <div className="space-y-1">
+            <Label className="text-[11px]">{t("master.markingReconciliation.filterSeverity")}</Label>
+            <SelectField
+              value={severityFilter}
+              onChange={(v) => setSeverityFilter(v as "" | "info" | "warning" | "error")}
+              options={[
+                { value: "", label: t("master.markingReconciliation.filterSeverityAll") },
+                { value: "info", label: t("master.markingReconciliation.severity.info") },
+                { value: "warning", label: t("master.markingReconciliation.severity.warning") },
+                { value: "error", label: t("master.markingReconciliation.severity.error") },
+              ]}
+              placeholder=""
+              className="h-8 text-xs"
+            />
+          </div>
+          <div className="space-y-1 sm:col-span-2">
+            <Label className="text-[11px]">{t("master.markingReconciliation.filterMismatchKind")}</Label>
+            <SelectField
+              value={mismatchKindFilter}
+              onChange={(v) => setMismatchKindFilter(v as "" | MarkingMismatchKind)}
+              options={MISMATCH_KIND_FILTERS.map((o) => ({ value: o.value, label: t(o.labelKey) }))}
               placeholder=""
               className="h-8 text-xs"
             />
@@ -437,6 +676,26 @@ export function ItemsMarkingReconciliationPage() {
             >
               {syncBusy ? t("master.markingExternalSync.syncRunning") : t("master.markingExternalSync.syncSelected")} ({selectedIds.length})
             </Button>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="h-8 text-xs"
+              disabled={selectedIds.length === 0 || syncBusy}
+              onClick={proposeBulkConfirmExternal}
+            >
+              {t("master.markingReconciliation.actionConfirmExternal")} ({selectedIds.length})
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="h-8 text-xs"
+              disabled={selectedIds.length === 0 || syncBusy}
+              onClick={proposeBulkVoidExternal}
+            >
+              {t("master.markingReconciliation.actionVoidExternal")} ({selectedIds.length})
+            </Button>
             <Button type="button" variant="outline" size="sm" className="h-8 text-xs" onClick={selectAllVisible}>
               {t("master.markingReconciliation.selectVisible")}
             </Button>
@@ -449,13 +708,16 @@ export function ItemsMarkingReconciliationPage() {
 
       <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_minmax(0,22rem)]">
         <div className="overflow-x-auto rounded-md border border-border/70">
-          <table className="w-full min-w-[900px] border-collapse text-[11px]">
+          <table className="w-full min-w-[1100px] border-collapse text-[11px]">
             <thead>
               <tr className="border-b border-border/60 bg-muted/30 text-left text-[10px] font-semibold uppercase text-muted-foreground">
                 <th className="w-10 px-2 py-1.5" />
                 <th className="px-2 py-1.5">{t("master.markingReconciliation.colItem")}</th>
                 <th className="px-2 py-1.5">{t("master.markingReconciliation.colKind")}</th>
                 <th className="px-2 py-1.5">{t("master.markingReconciliation.colStatus")}</th>
+                <th className="px-2 py-1.5">{t("master.markingReconciliation.colMismatchKind")}</th>
+                <th className="px-2 py-1.5">{t("master.markingReconciliation.colSeverity")}</th>
+                <th className="px-2 py-1.5">{t("master.markingReconciliation.colRecommend")}</th>
                 <th className="px-2 py-1.5">{t("master.markingReconciliation.colPayload")}</th>
                 <th className="px-2 py-1.5">{t("master.markingReconciliation.colBatchRef")}</th>
                 <th className="px-2 py-1.5">{t("master.markingExternalSync.colExternal")}</th>
@@ -466,12 +728,12 @@ export function ItemsMarkingReconciliationPage() {
             <tbody>
               {filteredRows.length === 0 ? (
                 <tr>
-                  <td colSpan={9} className="px-3 py-8 text-center text-muted-foreground">
+                  <td colSpan={12} className="px-3 py-8 text-center text-muted-foreground">
                     {t("master.markingReconciliation.empty")}
                   </td>
                 </tr>
               ) : (
-                filteredRows.map(({ record: r, item: it, lastPrint }) => (
+                filteredRows.map(({ record: r, item: it, lastPrint, analysis: a }) => (
                   <tr
                     key={r.id}
                     className={`cursor-pointer border-b border-border/40 ${detailId === r.id ? "bg-muted/25" : ""}`}
@@ -498,6 +760,35 @@ export function ItemsMarkingReconciliationPage() {
                     </td>
                     <td className="px-2 py-1.5 font-mono text-[10px]">{r.kind}</td>
                     <td className="px-2 py-1.5">{t(`master.item.markingPool.status.${r.status}`)}</td>
+                    <td className="max-w-[7rem] px-2 py-1.5 text-[9px]">
+                      {a.kind === "none" ? (
+                        "—"
+                      ) : (
+                        <span className="rounded border border-border px-1 py-0.5 font-mono">{t(`master.markingReconciliation.mismatchKind.${a.kind}`)}</span>
+                      )}
+                    </td>
+                    <td className="px-2 py-1.5">
+                      {a.kind === "none" ? (
+                        "—"
+                      ) : (
+                        <span
+                          className={
+                            a.severity === "error"
+                              ? "rounded border border-red-500/50 bg-red-500/10 px-1 py-0.5 text-[9px] text-red-950 dark:text-red-100"
+                              : a.severity === "warning"
+                                ? "rounded border border-amber-500/50 bg-amber-500/10 px-1 py-0.5 text-[9px] text-amber-950 dark:text-amber-100"
+                                : "rounded border border-sky-500/40 bg-sky-500/10 px-1 py-0.5 text-[9px] text-sky-950 dark:text-sky-100"
+                          }
+                        >
+                          {t(`master.markingReconciliation.severity.${a.severity}`)}
+                        </span>
+                      )}
+                    </td>
+                    <td className="max-w-[8rem] px-2 py-1.5 text-[9px] text-muted-foreground" title={a.recommendedActionIds[0]}>
+                      {a.recommendedActionIds.length
+                        ? t(`master.markingReconciliation.actionHint.${a.recommendedActionIds[0]}`)
+                        : "—"}
+                    </td>
                     <td className="max-w-[12rem] truncate px-2 py-1.5 font-mono text-[10px]" title={r.payload}>
                       {r.payload}
                     </td>
@@ -576,6 +867,30 @@ export function ItemsMarkingReconciliationPage() {
                 <div>
                   <dt className="text-[10px] uppercase text-muted-foreground">{t("master.markingReconciliation.detailNote")}</dt>
                   <dd>{detailRow.record.note ?? "—"}</dd>
+                </div>
+                <div className="rounded border border-violet-500/35 bg-violet-500/5 p-2 space-y-1.5">
+                  <p className="text-[10px] font-semibold uppercase text-muted-foreground">{t("master.markingReconciliation.detailReconciliation")}</p>
+                  {detailRow.analysis.kind === "none" ? (
+                    <p className="text-[10px] text-muted-foreground">{t("master.markingReconciliation.detailReconciliationOk")}</p>
+                  ) : (
+                    <>
+                      <p className="text-[10px] leading-snug">{t(`master.markingReconciliation.explanation.${detailRow.analysis.explanationKey}`)}</p>
+                      <p className="text-[9px] text-muted-foreground">
+                        {t("master.markingReconciliation.detailNextStep")}:{" "}
+                        {detailRow.analysis.recommendedActionIds.length
+                          ? t(`master.markingReconciliation.actionHint.${detailRow.analysis.recommendedActionIds[0]}`)
+                          : "—"}
+                      </p>
+                    </>
+                  )}
+                  <div className="flex flex-col gap-0.5 text-[10px]">
+                    <Link className="text-primary hover:underline" to={`/items/marking-traceability?record=${encodeURIComponent(detailRow.record.id)}`}>
+                      {t("master.markingReconciliation.linkOpenTraceabilityRecord")}
+                    </Link>
+                    <Link className="text-primary hover:underline" to={`/items/marking-sync?record=${encodeURIComponent(detailRow.record.id)}`}>
+                      {t("master.markingReconciliation.linkOpenSyncRecord")}
+                    </Link>
+                  </div>
                 </div>
                 <div className="rounded border border-border/60 bg-muted/20 p-2">
                   <p className="mb-1 text-[10px] font-semibold uppercase text-muted-foreground">{t("master.markingExternalSync.detailExternalBlock")}</p>
