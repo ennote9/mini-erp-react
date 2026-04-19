@@ -629,7 +629,7 @@ function SummaryCard({
             {showSparkline ? (
               <div
                 data-testid="item-price-trend-chart-area"
-                className="flex min-h-[3rem] min-w-[9.5rem] max-w-[min(62%,15.5rem)] flex-1 shrink-0 flex-col justify-center [&_svg]:min-h-[2.75rem]"
+                className="flex min-h-[3.5rem] min-w-[11rem] max-w-[min(68%,17rem)] flex-1 shrink-0 flex-col justify-center"
               >
                 <ItemPriceTrendSparkline values={trendSparklineAmounts!} aria-label={sparklineAriaLabel ?? ""} />
               </div>

@@ -880,8 +880,8 @@ test.describe("Item card — Prices tab (acceptance)", () => {
     await expect(purchaseChartArea).toBeVisible();
     const purchaseChartBox = await purchaseChartArea.boundingBox();
     expect(purchaseChartBox).toBeTruthy();
-    expect(purchaseChartBox!.height).toBeGreaterThanOrEqual(44);
-    expect(purchaseChartBox!.width).toBeGreaterThanOrEqual(130);
+    expect(purchaseChartBox!.height).toBeGreaterThanOrEqual(52);
+    expect(purchaseChartBox!.width).toBeGreaterThanOrEqual(168);
     await expect(purchaseReasonRow.locator('[data-testid="item-price-delta"]')).toBeVisible();
     const purchaseValueGeom = await purchaseValueRow.evaluate((row) => {
       const priceEl = row.children[0];
@@ -933,8 +933,8 @@ test.describe("Item card — Prices tab (acceptance)", () => {
     await expect(saleChartArea).toBeVisible();
     const saleChartBox = await saleChartArea.boundingBox();
     expect(saleChartBox).toBeTruthy();
-    expect(saleChartBox!.height).toBeGreaterThanOrEqual(44);
-    expect(saleChartBox!.width).toBeGreaterThanOrEqual(130);
+    expect(saleChartBox!.height).toBeGreaterThanOrEqual(52);
+    expect(saleChartBox!.width).toBeGreaterThanOrEqual(168);
     await expect(saleReasonRow.locator('[data-testid="item-price-delta"]')).toBeVisible();
     const saleValueGeom = await saleValueRow.evaluate((row) => {
       const priceEl = row.children[0];
