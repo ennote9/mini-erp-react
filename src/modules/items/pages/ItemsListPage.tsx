@@ -62,6 +62,7 @@ import { buildItemsTableListViewState } from "../itemsListViewState";
 import { formatItemsTableValue } from "../itemsTanstackColumns";
 import { ItemsTanstackTable } from "../ItemsTanstackTable";
 import { ItemsHeaderFilterPanel } from "../ItemsHeaderFilterPanel";
+import { ItemsSubnav } from "../components/ItemsSubnav";
 
 const COLUMN_SIZING_STORAGE_KEY = "mini-erp:items:tanstack:columnSizing:v1";
 const MAX_REASONABLE_COLUMN_SIZE = 1200;
@@ -968,7 +969,9 @@ export function ItemsListPage() {
     <ListPageLayout
       header={null}
       controls={
-        <div className="list-page__controls-stack flex w-full min-w-0 flex-wrap items-center justify-between gap-x-4 gap-y-2">
+        <div className="flex w-full min-w-0 flex-col gap-2">
+          <ItemsSubnav />
+          <div className="list-page__controls-stack flex w-full min-w-0 flex-wrap items-center justify-between gap-x-4 gap-y-2">
           <ListPageSearch
             inputRef={listSearchInputRef}
             placeholder={t("ops.list.items.searchPlaceholder")}
@@ -979,24 +982,6 @@ export function ItemsListPage() {
             resultCount={displayItems.length}
           />
           <div className="list-page__toolbar-actions-cluster flex max-w-full min-w-0 flex-wrap items-center justify-end gap-2">
-            <Button variant="outline" size="sm" className="h-8 shrink-0 text-xs" asChild>
-              <Link to="/items/label-data">{t("master.itemsLabelData.navLink")}</Link>
-            </Button>
-            <Button variant="outline" size="sm" className="h-8 shrink-0 text-xs" asChild>
-              <Link to="/items/marking-import">{t("master.markingImport.navLink")}</Link>
-            </Button>
-            <Button variant="outline" size="sm" className="h-8 shrink-0 text-xs" asChild>
-              <Link to="/items/marking-reconciliation">{t("master.markingReconciliation.navLink")}</Link>
-            </Button>
-            <Button variant="outline" size="sm" className="h-8 shrink-0 text-xs" asChild>
-              <Link to="/items/marking-traceability">{t("master.markingTraceability.navLink")}</Link>
-            </Button>
-            <Button variant="outline" size="sm" className="h-8 shrink-0 text-xs" asChild>
-              <Link to="/items/marking-sync">{t("routes.itemsMarkingSync")}</Link>
-            </Button>
-            <Button variant="outline" size="sm" className="h-8 shrink-0 text-xs" asChild>
-              <Link to="/settings/marking-provider">{t("routes.settingsMarkingProvider")}</Link>
-            </Button>
             {brandFilterId != null && (
               <div
                 className="flex h-8 max-w-[min(100%,18rem)] shrink-0 items-center gap-1.5 rounded-md border border-input bg-background px-2 text-xs"
@@ -1186,6 +1171,7 @@ export function ItemsListPage() {
               {t("doc.list.create")}
             </Button>
           </div>
+        </div>
         </div>
       }
     >

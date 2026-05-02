@@ -17,6 +17,7 @@ export const settingsEn = {
     exportWorkspaceBackupWarnings: "Completed with warnings: {{details}}",
     exportWorkspaceBackupFailed: "Backup export failed: {{message}}",
     exportWorkspaceBackupUnknownError: "Unknown error",
+    markingProviderOpen: "Open",
   },
   persistence: {
     filePersisted: "Saved locally (app data folder).",
@@ -128,6 +129,11 @@ export const settingsEn = {
       label: "Reversal only from posted status",
       description:
         "Posted receipts and shipments may be fully reversed once (reason recorded); draft or cancelled documents cannot be reversed. Not configurable in this version.",
+    },
+    inventory__markingProviderSettings: {
+      label: "Marking provider",
+      description:
+        "Configure the marking provider, token, sync, and integration options on a dedicated page.",
     },
     inventory__stockReservationsInfo: {
       label: "Stock reservations",

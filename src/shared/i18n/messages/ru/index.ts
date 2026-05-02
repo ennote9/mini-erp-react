@@ -686,6 +686,7 @@ export const ruMessages: MessageTree = {
       exportWorkspaceBackupWarnings: "Завершено с предупреждениями: {{details}}",
       exportWorkspaceBackupFailed: "Ошибка экспорта резервной копии: {{message}}",
       exportWorkspaceBackupUnknownError: "Неизвестная ошибка",
+      markingProviderOpen: "Открыть",
     },
     persistence: {
       filePersisted: "Сохранено локально (папка данных приложения).",
@@ -1400,4 +1401,13 @@ export const ruMessages: MessageTree = {
   issues: ruIssuesMessages,
   exportExcel: ruExportExcel,
   finance: financeRu as unknown as MessageTree,
+  items: {
+    subnav: {
+      marking: "Маркировка",
+      markingImportShort: "Импорт кодов",
+      markingConfirmationShort: "Подтверждение",
+      markingTraceabilityShort: "Трассировка",
+      markingSyncShort: "Синхронизация",
+    },
+  },
 };

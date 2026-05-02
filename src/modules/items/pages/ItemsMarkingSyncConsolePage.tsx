@@ -28,6 +28,7 @@ import { analyzeMarkingReconciliation, buildReconciliationContext } from "../lib
 import { buildVoidCountsByBatchRef, buildVoidCountsByItemId } from "../lib/markingTraceabilityReporting";
 import { getMarkingRecordLastPrintAudit } from "../markingRecordService";
 import { markingRecordRepository } from "../markingRecordRepository";
+import { ItemsSubnav } from "../components/ItemsSubnav";
 
 const ACTIONS: MarkingSyncLogAction[] = ["FETCH_STATUS", "CONFIRM_USED", "VOID_EXTERNAL", "BATCH_BY_REF", "BATCH_BY_JOB"];
 const STATUSES: MarkingSyncLogStatus[] = ["SUCCESS", "PARTIAL", "FAILED"];
@@ -253,6 +254,7 @@ export function ItemsMarkingSyncConsolePage() {
 
   return (
     <div className="doc-page mx-auto max-w-[1600px] space-y-3 p-4 md:p-5">
+      <ItemsSubnav />
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div>
           <p className="text-[11px] text-muted-foreground">

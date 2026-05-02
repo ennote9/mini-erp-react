@@ -34,6 +34,7 @@ import {
 } from "../lib/markingExternalReconciliation";
 import { getSyncProblemKind } from "../lib/markingSyncMismatch";
 import { itemRepository } from "../repository";
+import { ItemsSubnav } from "../components/ItemsSubnav";
 
 const KINDS: Array<{ value: "" | ItemMarkingRecord["kind"]; labelKey: string }> = [
   { value: "", labelKey: "master.markingTraceability.filterKindAll" },
@@ -515,6 +516,7 @@ export function ItemsMarkingTraceabilityPage() {
 
   return (
     <div className="doc-page mx-auto max-w-[1600px] space-y-3 p-4 md:p-5">
+      <ItemsSubnav />
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div>
           <p className="text-[11px] text-muted-foreground">

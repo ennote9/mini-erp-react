@@ -71,6 +71,11 @@ export const ruSettingsEntriesFull: MessageTree = {
     description:
       "Проведённые поступления и отгрузки можно полностью сторнировать один раз (причина фиксируется); черновики и отменённые сторнировать нельзя. В этой версии не настраивается.",
   },
+  inventory__markingProviderSettings: {
+    label: "Провайдер маркировки",
+    description:
+      "Настройте провайдера маркировки, токен и параметры синхронизации на отдельной странице.",
+  },
   inventory__stockReservationsInfo: {
     label: "Резервы запаса",
     description:

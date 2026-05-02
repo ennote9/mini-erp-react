@@ -683,6 +683,7 @@ export const kkMessages: MessageTree = {
       exportWorkspaceBackupWarnings: "Ескертпелермен аяқталды: {{details}}",
       exportWorkspaceBackupFailed: "Сақтық көшірмені экспорттау қатесі: {{message}}",
       exportWorkspaceBackupUnknownError: "Белгісіз қате",
+      markingProviderOpen: "Ашу",
     },
     persistence: {
       filePersisted: "Жергілікті сақталған (қолданба деректер қалтасы).",
@@ -1396,4 +1397,13 @@ export const kkMessages: MessageTree = {
   issues: kkIssuesMessages,
   exportExcel: kkExportExcel,
   finance: financeKk as unknown as MessageTree,
+  items: {
+    subnav: {
+      marking: "Маркировка",
+      markingImportShort: "Кодтарды импорттау",
+      markingConfirmationShort: "Растау",
+      markingTraceabilityShort: "Трассировка",
+      markingSyncShort: "Синхрондау",
+    },
+  },
 };

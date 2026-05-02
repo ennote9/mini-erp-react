@@ -50,7 +50,6 @@ const nav: ReadonlyArray<{ groupKey: string; links: readonly NavLinkItem[] }> = 
     links: [
       { labelKey: "shell.nav.items", to: "/items", icon: Package },
       { labelKey: "shell.nav.barcodes", to: "/barcodes", icon: ScanBarcode },
-      { labelKey: "shell.nav.labels", to: "/labels", icon: Printer },
       { labelKey: "shell.nav.brands", to: "/brands", icon: Tag, feature: "navBrandsCategories" as const },
       { labelKey: "shell.nav.categories", to: "/categories", icon: FolderOpen, feature: "navBrandsCategories" as const },
       { labelKey: "shell.nav.suppliers", to: "/suppliers", icon: Truck },
@@ -80,6 +79,7 @@ const nav: ReadonlyArray<{ groupKey: string; links: readonly NavLinkItem[] }> = 
       { labelKey: "shell.nav.stockBalances", to: "/stock-balances", icon: Scale },
       { labelKey: "shell.nav.stockMovements", to: "/stock-movements", icon: ArrowLeftRight, feature: "navStockMovements" },
       { labelKey: "shell.nav.markdownJournal", to: "/markdown-journal", icon: ScanBarcode },
+      { labelKey: "shell.nav.labels", to: "/labels", icon: Printer },
     ],
   },
   {

@@ -39,6 +39,7 @@ import {
   buildLabelDataTemplateXlsxBuffer,
   parseLabelDataXlsx,
 } from "../lib/labelDataImportXlsx";
+import { ItemsSubnav } from "../components/ItemsSubnav";
 
 type ViewMode = "all" | "translation" | "marking";
 
@@ -478,6 +479,7 @@ export function ItemsLabelDataPage() {
 
   return (
     <div className="mx-auto max-w-[1920px] space-y-3 p-3 md:p-4">
+      <ItemsSubnav />
       <div className="flex flex-wrap items-start justify-between gap-3 border-b border-border/60 pb-3">
         <div>
           <h1 className="text-base font-semibold tracking-tight">{t("master.itemsLabelData.pageTitle")}</h1>

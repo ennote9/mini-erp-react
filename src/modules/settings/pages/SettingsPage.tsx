@@ -432,6 +432,7 @@ export function SettingsPage() {
 
                 if (entry.valueType === "readonly") {
                   const isBackupRestore = entry.id === "dataAudit.backupRestore";
+                  const isMarkingProviderSettings = entry.id === "inventory.markingProviderSettings";
                   return (
                     <div key={entry.id} className="flex flex-col gap-1 py-3 first:pt-0 sm:flex-row sm:items-start sm:justify-between">
                       <div className="min-w-0 flex-1 space-y-1 pr-4">
@@ -476,6 +477,10 @@ export function SettingsPage() {
                             {backupExportRunning
                               ? t("settings.page.exportWorkspaceBackupInProgress")
                               : t("settings.page.exportWorkspaceBackup")}
+                          </Button>
+                        ) : isMarkingProviderSettings ? (
+                          <Button type="button" variant="outline" size="sm" className="h-8 text-xs" asChild>
+                            <Link to="/settings/marking-provider">{t("settings.page.markingProviderOpen")}</Link>
                           </Button>
                         ) : (
                           <div className="text-xs text-muted-foreground">—</div>
