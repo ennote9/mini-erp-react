@@ -27,6 +27,7 @@ import { getCategoryFormHealth } from "../../../shared/masterDataHealth";
 import { DocumentIssueStrip } from "../../../shared/ui/feedback/DocumentIssueStrip";
 import { Save, X } from "lucide-react";
 import { useTranslation } from "@/shared/i18n/context";
+import { ItemsModuleLayout } from "@/modules/items/components/ItemsModuleLayout";
 
 type FormState = {
   code: string;
@@ -124,25 +125,42 @@ export function CategoryPage() {
 
   if (!id) {
     return (
-      <div className="doc-page doc-page--not-found">
-        <p>{t("master.category.notFound")}</p>
-      </div>
+      <ItemsModuleLayout
+        className="doc-page min-w-0 gap-3"
+        contentVariant="narrow"
+        contentClassName="space-y-4 p-4 md:p-5"
+      >
+        <div className="doc-page--not-found">
+          <p>{t("master.category.notFound")}</p>
+        </div>
+      </ItemsModuleLayout>
     );
   }
 
   if (!isNew && !category) {
     return (
-      <div className="doc-page doc-page--not-found">
-        <p>{t("master.category.notFound")}</p>
-      </div>
+      <ItemsModuleLayout
+        className="doc-page min-w-0 gap-3"
+        contentVariant="narrow"
+        contentClassName="space-y-4 p-4 md:p-5"
+      >
+        <div className="doc-page--not-found">
+          <p>{t("master.category.notFound")}</p>
+        </div>
+      </ItemsModuleLayout>
     );
   }
 
   const displayTitle = isNew ? t("master.category.titleNew") : t("master.category.titleWithCode", { code: category!.code });
 
   return (
-    <div className="doc-page">
-      <div className="doc-page__breadcrumb">
+    <ItemsModuleLayout
+      className="doc-page min-w-0 gap-3"
+      contentVariant="narrow"
+      contentClassName="space-y-4 p-4 md:p-5"
+    >
+      <div className="doc-page">
+        <div className="doc-page__breadcrumb">
         <BackButton to="/categories" aria-label={t("master.category.backToListAria")} />
         {!isNew && category ? (
           <div className="ml-1 flex flex-wrap gap-2">
@@ -266,6 +284,7 @@ export function CategoryPage() {
           </div>
         </CardContent>
       </Card>
-    </div>
+      </div>
+    </ItemsModuleLayout>
   );
 }

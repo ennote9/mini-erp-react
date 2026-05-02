@@ -18,6 +18,7 @@ import { save } from "@tauri-apps/plugin-dialog";
 import { invoke } from "@tauri-apps/api/core";
 import { revealItemInDir } from "@tauri-apps/plugin-opener";
 import type { ItemBarcodeSymbology } from "@/modules/items";
+import { ItemsModuleLayout } from "@/modules/items/components/ItemsModuleLayout";
 import { ListPageLayout } from "@/shared/ui/list/ListPageLayout";
 import {
   applyListViewColumnFilters,
@@ -865,7 +866,12 @@ export function BarcodeRegistryPage() {
   );
 
   return (
-    <ListPageLayout
+    <ItemsModuleLayout
+      className="flex min-h-0 min-w-0 flex-1 flex-col gap-2"
+      contentVariant="full"
+      contentClassName="flex min-h-0 min-w-0 flex-1 flex-col"
+    >
+      <ListPageLayout
       header={null}
       controls={
         <div className="list-page__controls-stack flex w-full min-w-0 flex-wrap items-center justify-between gap-x-4 gap-y-2">
@@ -1005,5 +1011,6 @@ export function BarcodeRegistryPage() {
     >
       {listContent}
     </ListPageLayout>
+    </ItemsModuleLayout>
   );
 }

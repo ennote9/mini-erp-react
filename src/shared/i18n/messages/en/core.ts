@@ -76,6 +76,7 @@ export const coreEn = {
       stockMovements: "Stock Movements",
       markdownJournal: "Markdown Journal",
       labels: "Labels & printing",
+      marking: "Marking",
     },
   },
   labels: {

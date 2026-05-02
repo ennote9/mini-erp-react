@@ -86,6 +86,7 @@ export const kkMessages: MessageTree = {
       stockMovements: "Қозғалыстар",
       markdownJournal: "Уценка журналы",
       labels: "Стикерлер мен басып шығару",
+      marking: "Маркировка",
     },
   },
   labels: {
@@ -1399,6 +1400,10 @@ export const kkMessages: MessageTree = {
   finance: financeKk as unknown as MessageTree,
   items: {
     subnav: {
+      itemReferences: "Тауар анықтамалары",
+      barcodesShort: "Штрихкодтар",
+      brandsShort: "Брендтер",
+      categoriesShort: "Санаттар",
       marking: "Маркировка",
       markingImportShort: "Кодтарды импорттау",
       markingConfirmationShort: "Растау",

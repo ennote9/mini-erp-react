@@ -21,7 +21,7 @@ import {
   type ParseMarkingPoolImportResult,
 } from "../lib/parseMarkingPoolImport";
 import { parseMarkingPoolXlsx, buildMarkingPoolTemplateXlsxBuffer } from "../lib/markingPoolImportXlsx";
-import { ItemsModuleLayout } from "../components/ItemsModuleLayout";
+import { MarkingModuleLayout } from "../components/MarkingModuleLayout";
 import {
   buildMarkingPoolExportCsv,
   buildMarkingPoolExportTsv,
@@ -204,7 +204,7 @@ export function ItemsMarkingImportPage() {
   );
 
   return (
-    <ItemsModuleLayout
+    <MarkingModuleLayout
       className="doc-page min-w-0 gap-4"
       contentVariant="narrow"
       contentClassName="space-y-4 p-4 md:p-5"
@@ -436,6 +436,6 @@ export function ItemsMarkingImportPage() {
           </div>
         </section>
       ) : null}
-    </ItemsModuleLayout>
+    </MarkingModuleLayout>
   );
 }

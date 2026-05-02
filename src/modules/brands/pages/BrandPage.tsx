@@ -27,6 +27,7 @@ import { getBrandFormHealth } from "../../../shared/masterDataHealth";
 import { DocumentIssueStrip } from "../../../shared/ui/feedback/DocumentIssueStrip";
 import { Save, X } from "lucide-react";
 import { useTranslation } from "@/shared/i18n/context";
+import { ItemsModuleLayout } from "@/modules/items/components/ItemsModuleLayout";
 type FormState = {
   code: string;
   name: string;
@@ -123,25 +124,42 @@ export function BrandPage() {
 
   if (!id) {
     return (
-      <div className="doc-page doc-page--not-found">
-        <p>{t("master.brand.notFound")}</p>
-      </div>
+      <ItemsModuleLayout
+        className="doc-page min-w-0 gap-3"
+        contentVariant="narrow"
+        contentClassName="space-y-4 p-4 md:p-5"
+      >
+        <div className="doc-page--not-found">
+          <p>{t("master.brand.notFound")}</p>
+        </div>
+      </ItemsModuleLayout>
     );
   }
 
   if (!isNew && !brand) {
     return (
-      <div className="doc-page doc-page--not-found">
-        <p>{t("master.brand.notFound")}</p>
-      </div>
+      <ItemsModuleLayout
+        className="doc-page min-w-0 gap-3"
+        contentVariant="narrow"
+        contentClassName="space-y-4 p-4 md:p-5"
+      >
+        <div className="doc-page--not-found">
+          <p>{t("master.brand.notFound")}</p>
+        </div>
+      </ItemsModuleLayout>
     );
   }
 
   const displayTitle = isNew ? t("master.brand.titleNew") : t("master.brand.titleWithCode", { code: brand!.code });
 
   return (
-    <div className="doc-page">
-      <div className="doc-page__breadcrumb">
+    <ItemsModuleLayout
+      className="doc-page min-w-0 gap-3"
+      contentVariant="narrow"
+      contentClassName="space-y-4 p-4 md:p-5"
+    >
+      <div className="doc-page">
+        <div className="doc-page__breadcrumb">
         <BackButton to="/brands" aria-label={t("master.brand.backToListAria")} />
         {!isNew && brand ? (
           <div className="ml-1 flex flex-wrap gap-2">
@@ -265,6 +283,7 @@ export function BrandPage() {
           </div>
         </CardContent>
       </Card>
-    </div>
+      </div>
+    </ItemsModuleLayout>
   );
 }

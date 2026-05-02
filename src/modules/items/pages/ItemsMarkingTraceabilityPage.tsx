@@ -34,7 +34,7 @@ import {
 } from "../lib/markingExternalReconciliation";
 import { getSyncProblemKind } from "../lib/markingSyncMismatch";
 import { itemRepository } from "../repository";
-import { ItemsModuleLayout } from "../components/ItemsModuleLayout";
+import { MarkingModuleLayout } from "../components/MarkingModuleLayout";
 
 const KINDS: Array<{ value: "" | ItemMarkingRecord["kind"]; labelKey: string }> = [
   { value: "", labelKey: "master.markingTraceability.filterKindAll" },
@@ -515,7 +515,7 @@ export function ItemsMarkingTraceabilityPage() {
   }, [setSearchParams]);
 
   return (
-    <ItemsModuleLayout
+    <MarkingModuleLayout
       className="doc-page min-w-0 gap-3"
       contentVariant="wide"
       contentClassName="space-y-3 p-4 md:p-5"
@@ -1050,6 +1050,6 @@ export function ItemsMarkingTraceabilityPage() {
       </div>
 
       <p className="text-[10px] text-muted-foreground">{t("master.markingTraceability.footerHint", { visible: filteredRows.length })}</p>
-    </ItemsModuleLayout>
+    </MarkingModuleLayout>
   );
 }

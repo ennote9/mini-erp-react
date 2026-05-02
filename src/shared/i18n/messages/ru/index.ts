@@ -86,6 +86,7 @@ export const ruMessages: MessageTree = {
       stockMovements: "Движения",
       markdownJournal: "Журнал уценки",
       labels: "Этикетки и печать",
+      marking: "Маркировка",
     },
   },
   labels: {
@@ -1403,6 +1404,10 @@ export const ruMessages: MessageTree = {
   finance: financeRu as unknown as MessageTree,
   items: {
     subnav: {
+      itemReferences: "Справочники товара",
+      barcodesShort: "Штрихкоды",
+      brandsShort: "Бренды",
+      categoriesShort: "Категории",
       marking: "Маркировка",
       markingImportShort: "Импорт кодов",
       markingConfirmationShort: "Подтверждение",

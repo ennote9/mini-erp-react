@@ -39,7 +39,7 @@ import {
 } from "../markingExternalSyncService";
 import { MarkingIntegrationModeBanner } from "../components/MarkingIntegrationModeBanner";
 import { itemRepository } from "../repository";
-import { ItemsModuleLayout } from "../components/ItemsModuleLayout";
+import { MarkingModuleLayout } from "../components/MarkingModuleLayout";
 
 const ALL_STATUSES = ["PRINTED", "RESERVED", "AVAILABLE", "USED", "VOID"] as const;
 type RowStatus = (typeof ALL_STATUSES)[number];
@@ -472,7 +472,7 @@ export function ItemsMarkingReconciliationPage() {
   }, [detailRow]);
 
   return (
-    <ItemsModuleLayout
+    <MarkingModuleLayout
       className="doc-page min-w-0 gap-3"
       contentVariant="wide"
       contentClassName="space-y-3 p-4 md:p-5"
@@ -962,6 +962,6 @@ export function ItemsMarkingReconciliationPage() {
       <p className="text-[10px] text-muted-foreground">
         {t("master.markingReconciliation.footerHint", { visible: filteredRows.length })}
       </p>
-    </ItemsModuleLayout>
+    </MarkingModuleLayout>
   );
 }

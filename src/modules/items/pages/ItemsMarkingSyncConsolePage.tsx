@@ -28,7 +28,7 @@ import { analyzeMarkingReconciliation, buildReconciliationContext } from "../lib
 import { buildVoidCountsByBatchRef, buildVoidCountsByItemId } from "../lib/markingTraceabilityReporting";
 import { getMarkingRecordLastPrintAudit } from "../markingRecordService";
 import { markingRecordRepository } from "../markingRecordRepository";
-import { ItemsModuleLayout } from "../components/ItemsModuleLayout";
+import { MarkingModuleLayout } from "../components/MarkingModuleLayout";
 
 const ACTIONS: MarkingSyncLogAction[] = ["FETCH_STATUS", "CONFIRM_USED", "VOID_EXTERNAL", "BATCH_BY_REF", "BATCH_BY_JOB"];
 const STATUSES: MarkingSyncLogStatus[] = ["SUCCESS", "PARTIAL", "FAILED"];
@@ -253,7 +253,7 @@ export function ItemsMarkingSyncConsolePage() {
   );
 
   return (
-    <ItemsModuleLayout
+    <MarkingModuleLayout
       className="doc-page min-w-0 gap-3"
       contentVariant="wide"
       contentClassName="space-y-3 p-4 md:p-5"
@@ -587,6 +587,6 @@ export function ItemsMarkingSyncConsolePage() {
           </table>
         </div>
       </section>
-    </ItemsModuleLayout>
+    </MarkingModuleLayout>
   );
 }
