@@ -1,5 +1,5 @@
 import { salesOrderRepository } from "./repository";
-import { shipmentRepository } from "../shipments/repository";
+import { flushPendingShipmentPersist, shipmentRepository } from "../shipments/repository";
 import { customerRepository } from "../customers/repository";
 import { carrierRepository } from "../carriers/repository";
 import { warehouseRepository } from "../warehouses/repository";
@@ -23,8 +23,14 @@ import {
   zeroPriceReasonCodeForStore,
   type CancelDocumentReasonInput,
 } from "../../shared/reasonCodes";
+import { formatPersistenceFailure } from "../../shared/persistenceFailureMessage";
 import { getAppSettings } from "../../shared/settings/store";
-import { appendAuditEvent } from "../../shared/audit/eventLogRepository";
+import {
+  appendAuditEvent,
+  flushPendingAuditEventPersist,
+  listAuditEventsForEntity,
+  removeAuditEventById,
+} from "../../shared/audit/eventLogRepository";
 import { AUDIT_ACTOR_LOCAL_USER } from "../../shared/audit/eventLogTypes";
 import { auditShipmentDocumentCreated } from "../../shared/audit/factualDocumentAudit";
 import {
@@ -35,7 +41,12 @@ import {
   computeSalesOrderFulfillment,
   isSalesOrderShipmentFulfillmentComplete,
 } from "../../shared/planningFulfillment";
-import { stockReservationRepository } from "../stock-reservations/repository";
+import {
+  captureReservationsSnapshotForSalesOrder,
+  flushPendingStockReservationPersist,
+  replaceReservationsForSalesOrderFromSnapshot,
+  stockReservationRepository,
+} from "../stock-reservations/repository";
 import { stockBalanceRepository } from "../stock-balances/repository";
 import { reconcileSalesOrderReservations } from "../../shared/soReservationReconcile";
 import type { SalesOrder } from "./model";
@@ -92,6 +103,58 @@ function normalizeOptionalSODate(value: string | undefined): string | undefined 
 export type AllocateStockResult =
   | { success: true; linesTouched: number }
   | { success: false; error: string };
+
+async function flushAllocateStockCriticalPersistence(): Promise<void> {
+  const settled = await Promise.allSettled([
+    flushPendingStockReservationPersist(),
+    flushPendingAuditEventPersist(),
+  ]);
+  const failures = settled.flatMap((result) => {
+    if (result.status === "fulfilled") return [];
+    return [result.reason instanceof Error ? result.reason.message : String(result.reason)];
+  });
+  if (failures.length > 0) {
+    throw new Error(failures.join(" | "));
+  }
+}
+
+function removeNewAuditEventsForSalesOrder(
+  salesOrderId: string,
+  preSoAuditIds: ReadonlySet<string>,
+): void {
+  const toRemove = listAuditEventsForEntity("sales_order", salesOrderId)
+    .filter((e) => !preSoAuditIds.has(e.id))
+    .map((e) => e.id);
+  for (const id of toRemove) {
+    removeAuditEventById(id);
+  }
+}
+
+function removeNewAuditEventsForShipment(
+  shipmentId: string,
+  preShAuditIds: ReadonlySet<string>,
+): void {
+  const toRemove = listAuditEventsForEntity("shipment", shipmentId)
+    .filter((e) => !preShAuditIds.has(e.id))
+    .map((e) => e.id);
+  for (const id of toRemove) {
+    removeAuditEventById(id);
+  }
+}
+
+async function flushCreateShipmentCriticalPersistence(): Promise<void> {
+  const settled = await Promise.allSettled([
+    flushPendingShipmentPersist(),
+    flushPendingAuditEventPersist(),
+  ]);
+  const failures = settled.flatMap((result) => {
+    if (result.status === "fulfilled") return [];
+    return [result.reason instanceof Error ? result.reason.message : String(result.reason)];
+  });
+  if (failures.length > 0) {
+    throw new Error(failures.join(" | "));
+  }
+}
 
 function collectPostedShipmentMarkdownCodes(): Set<string> {
   const used = new Set<string>();
@@ -443,7 +506,7 @@ export function confirm(soId: string): ConfirmResult {
   return { success: true };
 }
 
-export function allocateStock(soId: string): AllocateStockResult {
+export async function allocateStock(soId: string): Promise<AllocateStockResult> {
   const so = salesOrderRepository.getById(soId);
   if (!so) return { success: false, error: "Sales order not found." };
   if (so.status !== "confirmed") {
@@ -452,49 +515,75 @@ export function allocateStock(soId: string): AllocateStockResult {
   const warehouseId = normalizeTrim(so.warehouseId);
   if (warehouseId === "") return { success: false, error: "Warehouse is required." };
 
-  reconcileSalesOrderReservations(soId, { reason: "allocate_stock" });
+  const reservationSnapshotBefore = captureReservationsSnapshotForSalesOrder(soId);
+  const preSoAuditIds = new Set(
+    listAuditEventsForEntity("sales_order", soId).map((e) => e.id),
+  );
 
-  const fulfillment = computeSalesOrderFulfillment(soId);
-  let linesTouched = 0;
+  try {
+    await flushAllocateStockCriticalPersistence();
 
-  for (const line of fulfillment.lines) {
-    const R = stockReservationRepository.getActiveQtyForSalesOrderLine(soId, line.lineId);
-    if (line.remainingQty <= 0) {
-      if (R > 0) linesTouched++;
+    reconcileSalesOrderReservations(soId, { reason: "allocate_stock" });
+
+    const fulfillment = computeSalesOrderFulfillment(soId);
+    let linesTouched = 0;
+
+    for (const line of fulfillment.lines) {
+      const R = stockReservationRepository.getActiveQtyForSalesOrderLine(soId, line.lineId);
+      if (line.remainingQty <= 0) {
+        if (R > 0) linesTouched++;
+        stockReservationRepository.upsertActiveForSalesOrderLine({
+          salesOrderId: soId,
+          salesOrderLineId: line.lineId,
+          warehouseId,
+          itemId: line.itemId,
+          qty: 0,
+        });
+        continue;
+      }
+      const T = stockReservationRepository.sumActiveQtyForWarehouseItem(warehouseId, line.itemId);
+      const onHand =
+        stockBalanceRepository.getByItemAndWarehouse(line.itemId, warehouseId)?.qtyOnHand ?? 0;
+      const cap = Math.min(line.remainingQty, Math.max(0, onHand - (T - R)));
+      if (cap !== R) linesTouched++;
       stockReservationRepository.upsertActiveForSalesOrderLine({
         salesOrderId: soId,
         salesOrderLineId: line.lineId,
         warehouseId,
         itemId: line.itemId,
-        qty: 0,
+        qty: cap,
       });
-      continue;
     }
-    const T = stockReservationRepository.sumActiveQtyForWarehouseItem(warehouseId, line.itemId);
-    const onHand =
-      stockBalanceRepository.getByItemAndWarehouse(line.itemId, warehouseId)?.qtyOnHand ?? 0;
-    const cap = Math.min(line.remainingQty, Math.max(0, onHand - (T - R)));
-    if (cap !== R) linesTouched++;
-    stockReservationRepository.upsertActiveForSalesOrderLine({
-      salesOrderId: soId,
-      salesOrderLineId: line.lineId,
-      warehouseId,
-      itemId: line.itemId,
-      qty: cap,
-    });
-  }
 
-  appendAuditEvent({
-    entityType: "sales_order",
-    entityId: soId,
-    eventType: "stock_allocated",
-    actor: AUDIT_ACTOR_LOCAL_USER,
-    payload: {
-      documentNumber: so.number,
-      linesTouched,
-    },
-  });
-  return { success: true, linesTouched };
+    appendAuditEvent({
+      entityType: "sales_order",
+      entityId: soId,
+      eventType: "stock_allocated",
+      actor: AUDIT_ACTOR_LOCAL_USER,
+      payload: {
+        documentNumber: so.number,
+        linesTouched,
+      },
+    });
+
+    await flushAllocateStockCriticalPersistence();
+    return { success: true, linesTouched };
+  } catch (error) {
+    replaceReservationsForSalesOrderFromSnapshot(soId, reservationSnapshotBefore);
+    removeNewAuditEventsForSalesOrder(soId, preSoAuditIds);
+    try {
+      await flushAllocateStockCriticalPersistence();
+    } catch (flushErr) {
+      return {
+        success: false,
+        error: `${formatPersistenceFailure(
+          "Allocate stock was rolled back but saving the rolled-back state failed",
+          flushErr,
+        )} | ${formatPersistenceFailure("Allocate stock failed", error)}`,
+      };
+    }
+    return { success: false, error: formatPersistenceFailure("Allocate stock failed", error) };
+  }
 }
 
 export function cancelDocument(
@@ -559,7 +648,7 @@ function hasDraftShipmentForSo(soId: string): boolean {
     .some((s) => s.salesOrderId === soId && s.status === "draft");
 }
 
-export function createShipment(soId: string): CreateShipmentResult {
+export async function createShipment(soId: string): Promise<CreateShipmentResult> {
   const so = salesOrderRepository.getById(soId);
   if (!so) return { success: false, error: "Sales order not found." };
   if (so.status !== "confirmed")
@@ -662,30 +751,62 @@ export function createShipment(soId: string): CreateShipmentResult {
     }
   }
 
-  const shipment = shipmentRepository.create(
-    {
-      date: so.date,
-      salesOrderId: soId,
-      warehouseId: so.warehouseId,
-      status: "draft",
-      ...(defaultCarrierId !== undefined ? { carrierId: defaultCarrierId } : {}),
-      ...(so.recipientName !== undefined && so.recipientName !== ""
-        ? { recipientName: so.recipientName }
-        : {}),
-      ...(so.recipientPhone !== undefined && so.recipientPhone !== ""
-        ? { recipientPhone: so.recipientPhone }
-        : {}),
-      ...(so.deliveryAddress !== undefined && so.deliveryAddress !== ""
-        ? { deliveryAddress: so.deliveryAddress }
-        : {}),
-      ...(so.deliveryComment !== undefined && so.deliveryComment !== ""
-        ? { deliveryComment: so.deliveryComment }
-        : {}),
-    },
-    shipmentLines,
-  );
-  auditShipmentDocumentCreated(shipment);
-  return { success: true, shipmentId: shipment.id };
+  let createdShipmentId: string | null = null;
+  let preShAuditIds = new Set<string>();
+
+  try {
+    await flushCreateShipmentCriticalPersistence();
+
+    const shipment = shipmentRepository.create(
+      {
+        date: so.date,
+        salesOrderId: soId,
+        warehouseId: so.warehouseId,
+        status: "draft",
+        ...(defaultCarrierId !== undefined ? { carrierId: defaultCarrierId } : {}),
+        ...(so.recipientName !== undefined && so.recipientName !== ""
+          ? { recipientName: so.recipientName }
+          : {}),
+        ...(so.recipientPhone !== undefined && so.recipientPhone !== ""
+          ? { recipientPhone: so.recipientPhone }
+          : {}),
+        ...(so.deliveryAddress !== undefined && so.deliveryAddress !== ""
+          ? { deliveryAddress: so.deliveryAddress }
+          : {}),
+        ...(so.deliveryComment !== undefined && so.deliveryComment !== ""
+          ? { deliveryComment: so.deliveryComment }
+          : {}),
+      },
+      shipmentLines,
+    );
+    createdShipmentId = shipment.id;
+    preShAuditIds = new Set(
+      listAuditEventsForEntity("shipment", shipment.id).map((e) => e.id),
+    );
+
+    auditShipmentDocumentCreated(shipment);
+
+    await flushCreateShipmentCriticalPersistence();
+
+    return { success: true, shipmentId: shipment.id };
+  } catch (error) {
+    if (createdShipmentId !== null) {
+      removeNewAuditEventsForShipment(createdShipmentId, preShAuditIds);
+      shipmentRepository.removeDraftShipmentById(createdShipmentId);
+    }
+    try {
+      await flushCreateShipmentCriticalPersistence();
+    } catch (flushErr) {
+      return {
+        success: false,
+        error: `${formatPersistenceFailure(
+          "Create shipment was rolled back but saving the rolled-back state failed",
+          flushErr,
+        )} | ${formatPersistenceFailure("Create shipment failed", error)}`,
+      };
+    }
+    return { success: false, error: formatPersistenceFailure("Create shipment failed", error) };
+  }
 }
 
 export const salesOrderService = {

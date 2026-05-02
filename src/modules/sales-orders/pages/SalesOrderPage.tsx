@@ -865,19 +865,19 @@ export function SalesOrderPage() {
     setActionIssues([]);
     setCancelReasonDialogOpen(true);
   };
-  const handleCreateShipment = () => {
+  const handleCreateShipment = async () => {
     if (!id || isNew) return;
     setActionIssues([]);
-    const result = createShipment(id);
+    const result = await createShipment(id);
     if (result.success) navigate(`/shipments/${result.shipmentId}`);
     else if (!issueListContainsMessage(health.issues, result.error))
       setActionIssues([actionIssueFromServiceMessage(result.error)]);
   };
 
-  const handleAllocateStock = () => {
+  const handleAllocateStock = async () => {
     if (!id || isNew) return;
     setActionIssues([]);
-    const result = allocateStock(id);
+    const result = await allocateStock(id);
     if (result.success) setRefresh((r) => r + 1);
     else if (!issueListContainsMessage(health.issues, result.error))
       setActionIssues([actionIssueFromServiceMessage(result.error)]);
@@ -1477,7 +1477,9 @@ export function SalesOrderPage() {
       setIsLineImportModalOpen(true);
     },
     allocateStockAvailable: !isNew && isConfirmed && showSalesOrderAllocationUi,
-    onAllocateStock: handleAllocateStock,
+    onAllocateStock: () => {
+      void handleAllocateStock();
+    },
   });
 
   if (!id) {

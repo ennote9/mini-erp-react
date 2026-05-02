@@ -201,6 +201,48 @@ export const stockMovementRepository = {
       schedulePersist();
     }
   },
+
+  /**
+   * Removes outbound `shipment` movements tied to a shipment document (rollback failed post).
+   */
+  removeAllOutboundShipmentMovementsForShipmentDocument(shipmentId: string): void {
+    let removed = false;
+    for (let i = store.length - 1; i >= 0; i--) {
+      const m = store[i]!;
+      if (
+        m.sourceDocumentType === "shipment" &&
+        m.sourceDocumentId === shipmentId &&
+        m.movementType === "shipment"
+      ) {
+        store.splice(i, 1);
+        removed = true;
+      }
+    }
+    if (removed) {
+      schedulePersist();
+    }
+  },
+
+  /**
+   * Removes compensating `shipment_reversal` movements for a shipment (rollback failed reverse).
+   */
+  removeAllReversalMovementsForShipmentDocument(shipmentId: string): void {
+    let removed = false;
+    for (let i = store.length - 1; i >= 0; i--) {
+      const m = store[i]!;
+      if (
+        m.sourceDocumentType === "shipment" &&
+        m.sourceDocumentId === shipmentId &&
+        m.movementType === "shipment_reversal"
+      ) {
+        store.splice(i, 1);
+        removed = true;
+      }
+    }
+    if (removed) {
+      schedulePersist();
+    }
+  },
 };
 
 await bootstrapFromDisk();

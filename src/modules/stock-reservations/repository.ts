@@ -103,6 +103,37 @@ function schedulePersist(): void {
     });
 }
 
+/** Deep copy of all reservation rows for a sales order (failed shipment post rollback). */
+export function captureReservationsSnapshotForSalesOrder(salesOrderId: string): StockReservation[] {
+  return store
+    .filter((r) => r.salesOrderId === salesOrderId)
+    .map((r) => ({ ...r }));
+}
+
+/**
+ * Replace all in-memory reservation rows for the sales order with a prior snapshot.
+ * Preserves ids, qty, status, and linkage fields from the snapshot rows.
+ */
+export function replaceReservationsForSalesOrderFromSnapshot(
+  salesOrderId: string,
+  snapshot: ReadonlyArray<StockReservation>,
+): void {
+  let changed = false;
+  for (let i = store.length - 1; i >= 0; i--) {
+    if (store[i]!.salesOrderId === salesOrderId) {
+      store.splice(i, 1);
+      changed = true;
+    }
+  }
+  for (const row of snapshot) {
+    store.push({ ...row });
+    changed = true;
+  }
+  if (changed) {
+    schedulePersist();
+  }
+}
+
 function nextIdStr(): string {
   return String(nextId++);
 }

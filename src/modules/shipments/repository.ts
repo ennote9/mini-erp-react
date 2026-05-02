@@ -284,6 +284,24 @@ export const shipmentRepository = {
     schedulePersist();
     return newLines;
   },
+
+  /**
+   * Removes a draft shipment header and its lines (e.g. rollback after failed createShipment persistence).
+   * Returns false if the shipment is missing or not in draft status.
+   */
+  removeDraftShipmentById(shipmentId: string): boolean {
+    const doc = headerStore.find((x) => x.id === shipmentId);
+    if (!doc || doc.status !== "draft") return false;
+    const hi = headerStore.findIndex((x) => x.id === shipmentId);
+    if (hi >= 0) headerStore.splice(hi, 1);
+    for (let i = lineStore.length - 1; i >= 0; i--) {
+      if (lineStore[i]!.shipmentId === shipmentId) {
+        lineStore.splice(i, 1);
+      }
+    }
+    schedulePersist();
+    return true;
+  },
 };
 
 await bootstrapFromDisk();

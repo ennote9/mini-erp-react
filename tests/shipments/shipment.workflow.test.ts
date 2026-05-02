@@ -216,12 +216,12 @@ describe.sequential("Shipment workflow", () => {
       [{ itemId: item.id, qty: 4 }],
     );
 
-    expect(modules.allocateSalesOrderStock(so.id)).toEqual({
+    expect(await modules.allocateSalesOrderStock(so.id)).toEqual({
       success: true,
       linesTouched: 1,
     });
 
-    const result = modules.createShipmentFromSalesOrder(so.id);
+    const result = await modules.createShipmentFromSalesOrder(so.id);
     expect(result.success).toBe(true);
     if (!result.success) return;
 
@@ -260,7 +260,7 @@ describe.sequential("Shipment workflow", () => {
       draftSalesOrderHeaderFor(warehouse.id, customer.id),
       [{ itemId: item.id, qty: 10, unitPrice: 15 }],
     );
-    expect(modules.createShipmentFromSalesOrder(draftSo.id)).toEqual({
+    expect(await modules.createShipmentFromSalesOrder(draftSo.id)).toEqual({
       success: false,
       error: "Only confirmed sales orders can have a shipment created.",
     });
@@ -270,7 +270,7 @@ describe.sequential("Shipment workflow", () => {
       [{ itemId: item.id, qty: 10, unitPrice: 15 }],
       { warehouseId: warehouse.id, customerId: customer.id },
     );
-    expect(modules.createShipmentFromSalesOrder(confirmedSo.id)).toEqual({
+    expect(await modules.createShipmentFromSalesOrder(confirmedSo.id)).toEqual({
       success: false,
       error:
         "Each open line must be fully reserved before creating a shipment. Use Allocate stock on the sales order.",
@@ -285,7 +285,7 @@ describe.sequential("Shipment workflow", () => {
       },
       [{ itemId: item.id, qty: 10 }],
     );
-    expect(modules.createShipmentFromSalesOrder(confirmedSo.id)).toEqual({
+    expect(await modules.createShipmentFromSalesOrder(confirmedSo.id)).toEqual({
       success: false,
       error: "Sales order is already fully shipped (posted shipments).",
     });
@@ -304,12 +304,12 @@ describe.sequential("Shipment workflow", () => {
       [{ itemId: item.id, qty: 10, unitPrice: 15 }],
       { warehouseId: warehouse.id, customerId: customer.id },
     );
-    expect(modules.allocateSalesOrderStock(so.id)).toEqual({
+    expect(await modules.allocateSalesOrderStock(so.id)).toEqual({
       success: true,
       linesTouched: 1,
     });
 
-    const createResult = modules.createShipmentFromSalesOrder(so.id);
+    const createResult = await modules.createShipmentFromSalesOrder(so.id);
     expect(createResult.success).toBe(true);
     if (!createResult.success) return;
 
@@ -386,12 +386,12 @@ describe.sequential("Shipment workflow", () => {
       [{ itemId: item.id, qty: 10, unitPrice: 15 }],
       { warehouseId: warehouse.id, customerId: customer.id },
     );
-    expect(modules.allocateSalesOrderStock(so.id)).toEqual({
+    expect(await modules.allocateSalesOrderStock(so.id)).toEqual({
       success: true,
       linesTouched: 1,
     });
 
-    const createResult = modules.createShipmentFromSalesOrder(so.id);
+    const createResult = await modules.createShipmentFromSalesOrder(so.id);
     expect(createResult.success).toBe(true);
     if (!createResult.success) return;
 
@@ -437,12 +437,12 @@ describe.sequential("Shipment workflow", () => {
       [{ itemId: item.id, qty: 10, unitPrice: 15 }],
       { warehouseId: warehouse.id, customerId: customer.id },
     );
-    expect(modules.allocateSalesOrderStock(so.id)).toEqual({
+    expect(await modules.allocateSalesOrderStock(so.id)).toEqual({
       success: true,
       linesTouched: 1,
     });
 
-    const createResult = modules.createShipmentFromSalesOrder(so.id);
+    const createResult = await modules.createShipmentFromSalesOrder(so.id);
     expect(createResult.success).toBe(true);
     if (!createResult.success) return;
 
@@ -498,11 +498,11 @@ describe.sequential("Shipment workflow", () => {
       [{ itemId: reservedItem.id, qty: 10, unitPrice: 10 }],
       { warehouseId: warehouse.id, customerId: customer.id },
     );
-    expect(modules.allocateSalesOrderStock(reservationSo.id)).toEqual({
+    expect(await modules.allocateSalesOrderStock(reservationSo.id)).toEqual({
       success: true,
       linesTouched: 1,
     });
-    const reservationShipmentResult = modules.createShipmentFromSalesOrder(reservationSo.id);
+    const reservationShipmentResult = await modules.createShipmentFromSalesOrder(reservationSo.id);
     expect(reservationShipmentResult.success).toBe(true);
     if (!reservationShipmentResult.success) return;
     modules.stockReservationRepository.releaseAllActiveForSalesOrder(reservationSo.id);
@@ -521,11 +521,11 @@ describe.sequential("Shipment workflow", () => {
       [{ itemId: stockItem.id, qty: 5, unitPrice: 10 }],
       { warehouseId: warehouse.id, customerId: customer.id },
     );
-    expect(modules.allocateSalesOrderStock(stockSo.id)).toEqual({
+    expect(await modules.allocateSalesOrderStock(stockSo.id)).toEqual({
       success: true,
       linesTouched: 1,
     });
-    const stockShipmentResult = modules.createShipmentFromSalesOrder(stockSo.id);
+    const stockShipmentResult = await modules.createShipmentFromSalesOrder(stockSo.id);
     expect(stockShipmentResult.success).toBe(true);
     if (!stockShipmentResult.success) return;
 
@@ -776,12 +776,12 @@ describe.sequential("Shipment workflow", () => {
       [{ itemId: item.id, qty: 10, unitPrice: 15 }],
       { warehouseId: warehouse.id, customerId: customer.id },
     );
-    expect(modules.allocateSalesOrderStock(so.id)).toEqual({
+    expect(await modules.allocateSalesOrderStock(so.id)).toEqual({
       success: true,
       linesTouched: 1,
     });
 
-    const draftCreate = modules.createShipmentFromSalesOrder(so.id);
+    const draftCreate = await modules.createShipmentFromSalesOrder(so.id);
     expect(draftCreate.success).toBe(true);
     if (!draftCreate.success) return;
 
@@ -798,7 +798,7 @@ describe.sequential("Shipment workflow", () => {
     expect(cancelledFulfillment.postedShipmentCount).toBe(0);
     expect(cancelledFulfillment.state).toBe("not_started");
 
-    const postedCreate = modules.createShipmentFromSalesOrder(so.id);
+    const postedCreate = await modules.createShipmentFromSalesOrder(so.id);
     expect(postedCreate.success).toBe(true);
     if (!postedCreate.success) return;
 

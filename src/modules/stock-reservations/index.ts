@@ -4,4 +4,6 @@ export {
   flushPendingStockReservationPersist,
   getStockReservationPersistBusy,
   getLastStockReservationPersistError,
+  captureReservationsSnapshotForSalesOrder,
+  replaceReservationsForSalesOrderFromSnapshot,
 } from "./repository";

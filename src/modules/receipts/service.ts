@@ -23,6 +23,7 @@ import {
   type CancelDocumentReasonInput,
   type ReversalDocumentReasonInput,
 } from "../../shared/reasonCodes";
+import { formatPersistenceFailure } from "../../shared/persistenceFailureMessage";
 import { getAppSettings } from "../../shared/settings/store";
 import {
   appendAuditEvent,
@@ -51,11 +52,6 @@ export type CancelDocumentResult =
 export type ReverseDocumentResult =
   | { success: true }
   | { success: false; error: string };
-
-function persistenceErrorMessage(error: unknown, prefix: string): string {
-  const message = error instanceof Error ? error.message : String(error);
-  return `${prefix}: ${message}`;
-}
 
 async function flushReceiptCriticalPersistence(): Promise<void> {
   const settled = await Promise.allSettled([
@@ -437,18 +433,18 @@ export async function post(receiptId: string): Promise<PostResult> {
         success: false,
         issues: [
           actionIssue(
-            persistenceErrorMessage(
-              flushErr,
+            formatPersistenceFailure(
               "Receipt post was rolled back but saving the rolled-back state failed",
+              flushErr,
             ),
           ),
-          actionIssue(persistenceErrorMessage(error, "Receipt post failed")),
+          actionIssue(formatPersistenceFailure("Receipt post failed", error)),
         ],
       };
     }
     return {
       success: false,
-      issues: [actionIssue(persistenceErrorMessage(error, "Receipt post failed"))],
+      issues: [actionIssue(formatPersistenceFailure("Receipt post failed", error))],
     };
   }
 }
@@ -614,13 +610,13 @@ export async function reverseDocument(
     } catch (flushErr) {
       return {
         success: false,
-        error: persistenceErrorMessage(
-          flushErr,
+        error: formatPersistenceFailure(
           "Receipt reverse was rolled back but saving the rolled-back state failed",
+          flushErr,
         ),
       };
     }
-    return { success: false, error: persistenceErrorMessage(error, "Receipt reverse failed") };
+    return { success: false, error: formatPersistenceFailure("Receipt reverse failed", error) };
   }
 }
 

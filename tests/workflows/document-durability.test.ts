@@ -53,6 +53,7 @@ async function loadShipmentWorkflow() {
   const itemRepositoryModule = await import("../../src/modules/items/repository");
   const warehouseRepositoryModule = await import("../../src/modules/warehouses/repository");
   const customerRepositoryModule = await import("../../src/modules/customers/repository");
+  const markdownRepositoryModule = await import("../../src/modules/markdown-journal/repository");
   const persistenceCoordinator = await import("../../src/shared/persistenceCoordinator");
 
   return {
@@ -69,6 +70,7 @@ async function loadShipmentWorkflow() {
     itemRepository: itemRepositoryModule.itemRepository,
     warehouseRepository: warehouseRepositoryModule.warehouseRepository,
     customerRepository: customerRepositoryModule.customerRepository,
+    markdownRepository: markdownRepositoryModule.markdownRepository,
     flushAllPendingPersistence: persistenceCoordinator.flushAllPendingPersistence,
     mockFs: mockFsModule,
   };
@@ -126,6 +128,15 @@ function seedGoodStock(
     warehouseId,
     qtyOnHand,
   });
+}
+
+/** Stable ordering for comparing reservation rows belonging to one sales order. */
+function listReservationsForSalesOrderSorted(modules: ShipmentModules, salesOrderId: string) {
+  return modules.stockReservationRepository
+    .list()
+    .filter((r) => r.salesOrderId === salesOrderId)
+    .map((r) => ({ ...r }))
+    .sort((a, b) => a.id.localeCompare(b.id));
 }
 
 async function createConfirmedPurchaseOrder(
@@ -280,22 +291,201 @@ describe.sequential("Receipt and Shipment durability failure paths", () => {
     ).not.toContain("document_reversed");
   });
 
-  it("shipment post can partially apply when a later sales-order update throws", async () => {
+  it("receipt reverse rolls back when final persistence flush fails after mutations", async () => {
+    const modules = await loadReceiptWorkflow();
+    const item = createActiveItem(modules);
+    const po = await createConfirmedPurchaseOrder(modules, [{ itemId: item.id, qty: 10, unitPrice: 1 }]);
+    const createResult = modules.createReceiptFromPurchaseOrder(po.id);
+    expect(createResult.success).toBe(true);
+    if (!createResult.success) return;
+    const receiptId = createResult.receiptId;
+    expect(await modules.receiptService.post(receiptId)).toEqual({ success: true });
+
+    await modules.flushAllPendingPersistence();
+
+    const receiptSnapshot = modules.receiptRepository.getById(receiptId)!;
+    const poStatusBeforeReverse = modules.purchaseOrderRepository.getById(po.id)?.status;
+    const balanceBefore =
+      modules.stockBalanceRepository.getByItemWarehouseAndStyle(item.id, po.warehouseId, "GOOD")?.qtyOnHand ?? 0;
+    const receiptReversalCountBefore = modules.stockMovementRepository
+      .list()
+      .filter((m) => m.movementType === "receipt_reversal" && m.sourceDocumentId === receiptId).length;
+    const inboundReceiptMovementCountBefore = modules.stockMovementRepository
+      .list()
+      .filter((m) => m.movementType === "receipt" && m.sourceDocumentType === "receipt" && m.sourceDocumentId === receiptId)
+      .length;
+    const receiptAuditIdsBeforeReverse = [
+      ...modules.listAuditEventsForEntity("receipt", receiptId).map((e) => e.id),
+    ].sort();
+    const poAuditIdsBeforeReverse = [
+      ...modules.listAuditEventsForEntity("purchase_order", po.id).map((e) => e.id),
+    ].sort();
+
+    modules.mockFs.injectWriteFileFailure("inventory/stock-balances.json", {
+      times: 1,
+      message: "Injected balance persist failure on receipt reverse finalize",
+    });
+
+    const revResult = await modules.receiptService.reverseDocument(receiptId, { reversalReasonCode: "OTHER" });
+    expect(revResult.success).toBe(false);
+    if (revResult.success) return;
+    expect(revResult.error).toContain("Injected balance persist failure on receipt reverse finalize");
+
+    expect(modules.receiptRepository.getById(receiptId)?.status).toBe(receiptSnapshot.status);
+    expect(modules.receiptRepository.getById(receiptId)?.reversalReasonCode).toBe(
+      receiptSnapshot.reversalReasonCode,
+    );
+    expect(modules.receiptRepository.getById(receiptId)?.reversalReasonComment).toBe(
+      receiptSnapshot.reversalReasonComment,
+    );
+    expect(modules.purchaseOrderRepository.getById(po.id)?.status).toBe(poStatusBeforeReverse);
+    expect(
+      modules.stockBalanceRepository.getByItemWarehouseAndStyle(item.id, po.warehouseId, "GOOD")?.qtyOnHand ?? 0,
+    ).toBe(balanceBefore);
+    expect(
+      modules.stockMovementRepository
+        .list()
+        .filter((m) => m.movementType === "receipt_reversal" && m.sourceDocumentId === receiptId),
+    ).toHaveLength(receiptReversalCountBefore);
+    expect(
+      modules.stockMovementRepository
+        .list()
+        .filter((m) => m.movementType === "receipt" && m.sourceDocumentType === "receipt" && m.sourceDocumentId === receiptId),
+    ).toHaveLength(inboundReceiptMovementCountBefore);
+    expect(
+      modules.listAuditEventsForEntity("receipt", receiptId).map((e) => e.eventType),
+    ).not.toContain("document_reversed");
+    expect([...modules.listAuditEventsForEntity("receipt", receiptId).map((e) => e.id)].sort()).toEqual(
+      receiptAuditIdsBeforeReverse,
+    );
+    expect([...modules.listAuditEventsForEntity("purchase_order", po.id).map((e) => e.id)].sort()).toEqual(
+      poAuditIdsBeforeReverse,
+    );
+
+    await expect(modules.flushAllPendingPersistence()).resolves.toBeUndefined();
+    expect(
+      await modules.receiptService.reverseDocument(receiptId, { reversalReasonCode: "OTHER" }),
+    ).toEqual({ success: true });
+
+    expect(modules.receiptRepository.getById(receiptId)?.status).toBe("reversed");
+    expect(modules.purchaseOrderRepository.getById(po.id)?.status).toBe("confirmed");
+    expect(
+      modules.stockBalanceRepository.getByItemWarehouseAndStyle(item.id, po.warehouseId, "GOOD")?.qtyOnHand ?? 0,
+    ).toBe(0);
+    expect(
+      modules.stockMovementRepository.list().filter((m) => m.sourceDocumentId === receiptId),
+    ).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ movementType: "receipt", qtyDelta: 10 }),
+        expect.objectContaining({ movementType: "receipt_reversal", qtyDelta: -10 }),
+      ]),
+    );
+    expect(
+      modules.listAuditEventsForEntity("receipt", receiptId).map((e) => e.eventType),
+    ).toContain("document_reversed");
+  });
+
+  it("allocate stock rolls back when final persistence flush fails after mutations", async () => {
     const modules = await loadShipmentWorkflow();
     const item = createActiveItem(modules);
     const so = await createConfirmedSalesOrder(modules, [{ itemId: item.id, qty: 10, unitPrice: 5 }]);
     seedGoodStock(modules, item.id, so.warehouseId, 10);
-    expect(modules.allocateSalesOrderStock(so.id)).toEqual({ success: true, linesTouched: 1 });
+    await modules.flushAllPendingPersistence();
 
-    const createResult = modules.createShipmentFromSalesOrder(so.id);
+    const reservationsBefore = listReservationsForSalesOrderSorted(modules, so.id);
+    const soAuditIdsBefore = [...modules.listAuditEventsForEntity("sales_order", so.id).map((e) => e.id)].sort();
+
+    modules.mockFs.injectWriteFileFailure("inventory/stock-reservations.json", {
+      times: 1,
+      message: "Injected stock reservations persist failure on allocate finalize",
+    });
+
+    const allocResult = await modules.allocateSalesOrderStock(so.id);
+    expect(allocResult.success).toBe(false);
+    if (allocResult.success) return;
+    expect(allocResult.error).toContain("Injected stock reservations persist failure on allocate finalize");
+
+    expect(listReservationsForSalesOrderSorted(modules, so.id)).toEqual(reservationsBefore);
+    expect([...modules.listAuditEventsForEntity("sales_order", so.id).map((e) => e.id)].sort()).toEqual(
+      soAuditIdsBefore,
+    );
+    expect(
+      modules.listAuditEventsForEntity("sales_order", so.id).map((e) => e.eventType),
+    ).not.toContain("stock_allocated");
+
+    await expect(modules.flushAllPendingPersistence()).resolves.toBeUndefined();
+    expect(await modules.allocateSalesOrderStock(so.id)).toEqual({ success: true, linesTouched: 1 });
+    expect(
+      modules.stockReservationRepository.sumActiveQtyForSalesOrderItem(so.id, item.id, so.warehouseId),
+    ).toBe(10);
+    expect(
+      modules.listAuditEventsForEntity("sales_order", so.id).map((e) => e.eventType),
+    ).toContain("stock_allocated");
+  });
+
+  it("create shipment rolls back when final persistence flush fails after mutations", async () => {
+    const modules = await loadShipmentWorkflow();
+    const item = createActiveItem(modules);
+    const so = await createConfirmedSalesOrder(modules, [{ itemId: item.id, qty: 10, unitPrice: 5 }]);
+    seedGoodStock(modules, item.id, so.warehouseId, 10);
+    expect(await modules.allocateSalesOrderStock(so.id)).toEqual({ success: true, linesTouched: 1 });
+    await modules.flushAllPendingPersistence();
+
+    const shipmentIdsBefore = new Set(modules.shipmentRepository.list().map((s) => s.id));
+
+    modules.mockFs.injectWriteFileFailure("documents/shipments.json.tmp", {
+      times: 1,
+      message: "Injected shipment persist failure on create shipment finalize",
+    });
+
+    const createResult = await modules.createShipmentFromSalesOrder(so.id);
+    expect(createResult.success).toBe(false);
+    if (createResult.success) return;
+    expect(createResult.error).toContain("Injected shipment persist failure on create shipment finalize");
+
+    expect(new Set(modules.shipmentRepository.list().map((s) => s.id))).toEqual(shipmentIdsBefore);
+
+    await expect(modules.flushAllPendingPersistence()).resolves.toBeUndefined();
+    const retry = await modules.createShipmentFromSalesOrder(so.id);
+    expect(retry.success).toBe(true);
+    if (!retry.success) return;
+    expect(modules.shipmentRepository.getById(retry.shipmentId)?.status).toBe("draft");
+  });
+
+  it("shipment post rolls back fully when a later sales-order update throws", async () => {
+    const modules = await loadShipmentWorkflow();
+    const item = createActiveItem(modules);
+    const so = await createConfirmedSalesOrder(modules, [{ itemId: item.id, qty: 10, unitPrice: 5 }]);
+    seedGoodStock(modules, item.id, so.warehouseId, 10);
+    expect(await modules.allocateSalesOrderStock(so.id)).toEqual({ success: true, linesTouched: 1 });
+
+    const createResult = await modules.createShipmentFromSalesOrder(so.id);
     expect(createResult.success).toBe(true);
     if (!createResult.success) return;
     const shipmentId = createResult.shipmentId;
 
+    const soStatusBefore = modules.salesOrderRepository.getById(so.id)?.status;
+    const balanceBefore =
+      modules.stockBalanceRepository.getByItemWarehouseAndStyle(item.id, so.warehouseId, "GOOD")?.qtyOnHand ?? 0;
+    const reservedBefore = modules.stockReservationRepository.sumActiveQtyForSalesOrderItem(
+      so.id,
+      item.id,
+      so.warehouseId,
+    );
+    const outboundShipmentMovementsBefore = modules.stockMovementRepository
+      .list()
+      .filter((m) => m.movementType === "shipment" && m.sourceDocumentType === "shipment").length;
+
+    const originalSoUpdate = modules.salesOrderRepository.update.bind(modules.salesOrderRepository);
+    let isFirstSalesOrderUpdate = true;
     const soUpdateSpy = vi
       .spyOn(modules.salesOrderRepository, "update")
-      .mockImplementation(() => {
-        throw new Error("sales order update exploded");
+      .mockImplementation((id, patch) => {
+        if (isFirstSalesOrderUpdate) {
+          isFirstSalesOrderUpdate = false;
+          throw new Error("sales order update exploded");
+        }
+        return originalSoUpdate(id, patch);
       });
 
     const postResult = await modules.shipmentService.post(shipmentId);
@@ -310,50 +500,302 @@ describe.sequential("Receipt and Shipment durability failure paths", () => {
       ]),
     );
 
-    expect(modules.shipmentRepository.getById(shipmentId)?.status).toBe("posted");
+    expect(modules.shipmentRepository.getById(shipmentId)?.status).toBe("draft");
+    expect(modules.salesOrderRepository.getById(so.id)?.status).toBe(soStatusBefore);
     expect(
       modules.stockBalanceRepository.getByItemWarehouseAndStyle(item.id, so.warehouseId, "GOOD")?.qtyOnHand ?? 0,
-    ).toBe(0);
+    ).toBe(balanceBefore);
     expect(
       modules.stockMovementRepository
         .list()
         .filter(
           (row) => row.sourceDocumentType === "shipment" && row.sourceDocumentId === shipmentId,
         ),
-    ).toEqual([
-      expect.objectContaining({
-        movementType: "shipment",
-        itemId: item.id,
-        warehouseId: so.warehouseId,
-        qtyDelta: -10,
-      }),
-    ]);
+    ).toEqual([]);
     expect(
       modules.stockReservationRepository.sumActiveQtyForSalesOrderItem(so.id, item.id, so.warehouseId),
-    ).toBe(0);
-    expect(modules.salesOrderRepository.getById(so.id)?.status).toBe("confirmed");
-
-    const soAudit = modules.listAuditEventsForEntity("sales_order", so.id).map((row) => row.eventType);
-    expect(soAudit).toContain("reservation_consumed");
+    ).toBe(reservedBefore);
+    expect(
+      modules.listAuditEventsForEntity("sales_order", so.id).some((row) => row.eventType === "reservation_consumed"),
+    ).toBe(false);
     expect(
       modules.listAuditEventsForEntity("shipment", shipmentId).map((row) => row.eventType),
     ).not.toContain("document_posted");
+    expect(
+      modules.stockMovementRepository
+        .list()
+        .filter((m) => m.movementType === "shipment" && m.sourceDocumentType === "shipment"),
+    ).toHaveLength(outboundShipmentMovementsBefore);
+    expect(
+      modules.stockMovementRepository
+        .list()
+        .some((m) => m.movementType === "shipment_reversal" && m.sourceDocumentId === shipmentId),
+    ).toBe(false);
   });
 
-  it("shipment reverse can partially apply when a compensating balance adjustment throws", async () => {
+  it("shipment post rolls back MARKDOWN-style stock when SO update throws after mutations", async () => {
+    const modules = await loadShipmentWorkflow();
+    const warehouse = createActiveWarehouse(modules);
+    const customer = createActiveCustomer(modules);
+    const item = createActiveItem(modules);
+    const md = modules.markdownRepository.create({
+      itemId: item.id,
+      markdownPrice: 5,
+      reasonCode: "OTHER",
+      status: "ACTIVE",
+      createdAt: "2026-03-30T00:00:00.000Z",
+      createdBy: "test",
+      warehouseId: warehouse.id,
+      style: "MARKDOWN",
+      printCount: 0,
+    });
+    const so = modules.salesOrderRepository.create(
+      {
+        date: "2026-03-30",
+        customerId: customer.id,
+        warehouseId: warehouse.id,
+        status: "draft",
+        comment: "",
+      },
+      [{ itemId: item.id, qty: 1, unitPrice: 15, markdownCode: md.markdownCode }],
+    );
+    expect(modules.confirmSalesOrder(so.id)).toEqual({ success: true });
+    const confirmedSo = modules.salesOrderRepository.getById(so.id)!;
+    seedGoodStock(modules, item.id, warehouse.id, 1);
+    modules.stockBalanceRepository.upsert({
+      itemId: item.id,
+      warehouseId: warehouse.id,
+      style: "MARKDOWN",
+      qtyOnHand: 1,
+    });
+    const allocResult = await modules.allocateSalesOrderStock(confirmedSo.id);
+    expect(allocResult.success).toBe(true);
+    const createResult = await modules.createShipmentFromSalesOrder(confirmedSo.id);
+    expect(createResult.success).toBe(true);
+    if (!createResult.success) return;
+    const shipmentId = createResult.shipmentId;
+
+    const markdownBalanceBefore =
+      modules.stockBalanceRepository.getByItemWarehouseAndStyle(item.id, warehouse.id, "MARKDOWN")
+        ?.qtyOnHand ?? 0;
+    expect(markdownBalanceBefore).toBe(1);
+
+    const originalSoUpdate = modules.salesOrderRepository.update.bind(modules.salesOrderRepository);
+    let isFirstSalesOrderUpdate = true;
+    vi.spyOn(modules.salesOrderRepository, "update").mockImplementation((id, patch) => {
+      if (isFirstSalesOrderUpdate) {
+        isFirstSalesOrderUpdate = false;
+        throw new Error("sales order update exploded (markdown line)");
+      }
+      return originalSoUpdate(id, patch);
+    });
+
+    const postResult = await modules.shipmentService.post(shipmentId);
+    expect(postResult.success).toBe(false);
+    if (postResult.success) return;
+
+    expect(
+      modules.stockBalanceRepository.getByItemWarehouseAndStyle(item.id, warehouse.id, "MARKDOWN")
+        ?.qtyOnHand ?? 0,
+    ).toBe(markdownBalanceBefore);
+    expect(modules.shipmentRepository.getById(shipmentId)?.status).toBe("draft");
+  });
+
+  it("shipment post rolls back when final persistence flush fails after mutations", async () => {
     const modules = await loadShipmentWorkflow();
     const item = createActiveItem(modules);
     const so = await createConfirmedSalesOrder(modules, [{ itemId: item.id, qty: 10, unitPrice: 5 }]);
     seedGoodStock(modules, item.id, so.warehouseId, 10);
-    expect(modules.allocateSalesOrderStock(so.id)).toEqual({ success: true, linesTouched: 1 });
-    const createResult = modules.createShipmentFromSalesOrder(so.id);
+    expect(await modules.allocateSalesOrderStock(so.id)).toEqual({ success: true, linesTouched: 1 });
+    const createResult = await modules.createShipmentFromSalesOrder(so.id);
+    expect(createResult.success).toBe(true);
+    if (!createResult.success) return;
+    const shipmentId = createResult.shipmentId;
+
+    await modules.flushAllPendingPersistence();
+
+    const balanceBefore =
+      modules.stockBalanceRepository.getByItemWarehouseAndStyle(item.id, so.warehouseId, "GOOD")?.qtyOnHand ?? 0;
+    const reservedBefore = modules.stockReservationRepository.sumActiveQtyForSalesOrderItem(
+      so.id,
+      item.id,
+      so.warehouseId,
+    );
+    const outboundMovementCountBefore = modules.stockMovementRepository
+      .list()
+      .filter((m) => m.movementType === "shipment" && m.sourceDocumentType === "shipment").length;
+
+    modules.mockFs.injectWriteFileFailure("inventory/stock-balances.json", {
+      times: 1,
+      message: "Injected balance persist failure on finalize",
+    });
+
+    const postResult = await modules.shipmentService.post(shipmentId);
+    expect(postResult.success).toBe(false);
+    if (postResult.success) return;
+    expect(postResult.issues).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          message: expect.stringContaining("Injected balance persist failure on finalize"),
+        }),
+      ]),
+    );
+
+    expect(modules.shipmentRepository.getById(shipmentId)?.status).toBe("draft");
+    expect(
+      modules.stockBalanceRepository.getByItemWarehouseAndStyle(item.id, so.warehouseId, "GOOD")?.qtyOnHand ?? 0,
+    ).toBe(balanceBefore);
+    expect(
+      modules.stockReservationRepository.sumActiveQtyForSalesOrderItem(so.id, item.id, so.warehouseId),
+    ).toBe(reservedBefore);
+    expect(
+      modules.stockMovementRepository
+        .list()
+        .filter(
+          (m) =>
+            m.sourceDocumentType === "shipment" &&
+            m.sourceDocumentId === shipmentId &&
+            m.movementType === "shipment",
+        ),
+    ).toEqual([]);
+    expect(
+      modules.stockMovementRepository
+        .list()
+        .filter((m) => m.movementType === "shipment" && m.sourceDocumentType === "shipment"),
+    ).toHaveLength(outboundMovementCountBefore);
+    expect(
+      modules.listAuditEventsForEntity("shipment", shipmentId).some((e) => e.eventType === "document_posted"),
+    ).toBe(false);
+    expect(
+      modules.listAuditEventsForEntity("sales_order", so.id).some((e) => e.eventType === "reservation_consumed"),
+    ).toBe(false);
+
+    await expect(modules.flushAllPendingPersistence()).resolves.toBeUndefined();
+    expect(await modules.shipmentService.post(shipmentId)).toEqual({ success: true });
+  });
+
+  it("shipment post rolls back earlier reservation consumption when a later line cannot consume reservations", async () => {
+    const modules = await loadShipmentWorkflow();
+    const itemA = createActiveItem(modules);
+    const itemB = createActiveItem(modules);
+    const so = await createConfirmedSalesOrder(modules, [
+      { itemId: itemA.id, qty: 5, unitPrice: 5 },
+      { itemId: itemB.id, qty: 5, unitPrice: 5 },
+    ]);
+    seedGoodStock(modules, itemA.id, so.warehouseId, 10);
+    seedGoodStock(modules, itemB.id, so.warehouseId, 10);
+    expect(await modules.allocateSalesOrderStock(so.id)).toEqual({ success: true, linesTouched: 2 });
+
+    const reservedA0 = modules.stockReservationRepository.sumActiveQtyForSalesOrderItem(
+      so.id,
+      itemA.id,
+      so.warehouseId,
+    );
+    const reservedB0 = modules.stockReservationRepository.sumActiveQtyForSalesOrderItem(
+      so.id,
+      itemB.id,
+      so.warehouseId,
+    );
+    expect(reservedA0).toBe(5);
+    expect(reservedB0).toBe(5);
+
+    const createResult = await modules.createShipmentFromSalesOrder(so.id);
+    expect(createResult.success).toBe(true);
+    if (!createResult.success) return;
+    const shipmentId = createResult.shipmentId;
+
+    const origTry =
+      modules.stockReservationRepository.tryConsumeActiveForSalesOrderItem.bind(
+        modules.stockReservationRepository,
+      );
+    let consumeCalls = 0;
+    vi.spyOn(modules.stockReservationRepository, "tryConsumeActiveForSalesOrderItem").mockImplementation(
+      (salesOrderId, itemId, shipQty, warehouseId) => {
+        consumeCalls += 1;
+        if (consumeCalls >= 2) return false;
+        return origTry(salesOrderId, itemId, shipQty, warehouseId);
+      },
+    );
+
+    const balanceA0 =
+      modules.stockBalanceRepository.getByItemWarehouseAndStyle(itemA.id, so.warehouseId, "GOOD")?.qtyOnHand ?? 0;
+    const balanceB0 =
+      modules.stockBalanceRepository.getByItemWarehouseAndStyle(itemB.id, so.warehouseId, "GOOD")?.qtyOnHand ?? 0;
+
+    const postResult = await modules.shipmentService.post(shipmentId);
+    expect(postResult.success).toBe(false);
+    if (postResult.success) return;
+    expect(postResult.issues).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ i18nKey: "issues.shipment.reservationConsumeFailed" }),
+      ]),
+    );
+
+    expect(
+      modules.stockReservationRepository.sumActiveQtyForSalesOrderItem(so.id, itemA.id, so.warehouseId),
+    ).toBe(reservedA0);
+    expect(
+      modules.stockReservationRepository.sumActiveQtyForSalesOrderItem(so.id, itemB.id, so.warehouseId),
+    ).toBe(reservedB0);
+    expect(
+      modules.stockBalanceRepository.getByItemWarehouseAndStyle(itemA.id, so.warehouseId, "GOOD")?.qtyOnHand ?? 0,
+    ).toBe(balanceA0);
+    expect(
+      modules.stockBalanceRepository.getByItemWarehouseAndStyle(itemB.id, so.warehouseId, "GOOD")?.qtyOnHand ?? 0,
+    ).toBe(balanceB0);
+    expect(
+      modules.stockMovementRepository
+        .list()
+        .filter(
+          (row) => row.sourceDocumentType === "shipment" && row.sourceDocumentId === shipmentId,
+        ),
+    ).toEqual([]);
+    expect(modules.shipmentRepository.getById(shipmentId)?.status).toBe("draft");
+  });
+
+  it("shipment reverse rolls back fully when a compensating balance adjustment throws", async () => {
+    const modules = await loadShipmentWorkflow();
+    const item = createActiveItem(modules);
+    const so = await createConfirmedSalesOrder(modules, [{ itemId: item.id, qty: 10, unitPrice: 5 }]);
+    seedGoodStock(modules, item.id, so.warehouseId, 10);
+    expect(await modules.allocateSalesOrderStock(so.id)).toEqual({ success: true, linesTouched: 1 });
+    const createResult = await modules.createShipmentFromSalesOrder(so.id);
     expect(createResult.success).toBe(true);
     if (!createResult.success) return;
     const shipmentId = createResult.shipmentId;
     expect(await modules.shipmentService.post(shipmentId)).toEqual({ success: true });
 
-    vi.spyOn(modules.stockBalanceRepository, "adjustQty").mockImplementation(() => {
-      throw new Error("shipment reversal balance exploded");
+    const shipmentBefore = modules.shipmentRepository.getById(shipmentId)!;
+    const soStatusBefore = modules.salesOrderRepository.getById(so.id)?.status;
+    const balanceBefore =
+      modules.stockBalanceRepository.getByItemWarehouseAndStyle(item.id, so.warehouseId, "GOOD")?.qtyOnHand ?? 0;
+    const reservedBefore = modules.stockReservationRepository.sumActiveQtyForSalesOrderItem(
+      so.id,
+      item.id,
+      so.warehouseId,
+    );
+    const outboundReversalCountBefore = modules.stockMovementRepository
+      .list()
+      .filter((m) => m.movementType === "shipment_reversal" && m.sourceDocumentId === shipmentId).length;
+    const outboundShipmentMovementCountBefore = modules.stockMovementRepository
+      .list()
+      .filter((m) => m.movementType === "shipment" && m.sourceDocumentType === "shipment").length;
+    const receiptMovementCountBefore = modules.stockMovementRepository.list().filter((m) => m.movementType === "receipt")
+      .length;
+    const receiptReversalMovementCountBefore = modules.stockMovementRepository.list()
+      .filter((m) => m.movementType === "receipt_reversal").length;
+    const soAuditIdsBeforeReverse = [
+      ...modules.listAuditEventsForEntity("sales_order", so.id).map((e) => e.id),
+    ].sort();
+
+    const originalAdjustQty = modules.stockBalanceRepository.adjustQty.bind(modules.stockBalanceRepository);
+    let isFirstAdjustAfterPost = true;
+    vi.spyOn(modules.stockBalanceRepository, "adjustQty").mockImplementation((input) => {
+      if (isFirstAdjustAfterPost) {
+        isFirstAdjustAfterPost = false;
+        throw new Error("shipment reversal balance exploded");
+      }
+      return originalAdjustQty(input);
     });
 
     expect(
@@ -364,21 +806,366 @@ describe.sequential("Receipt and Shipment durability failure paths", () => {
     });
 
     expect(modules.shipmentRepository.getById(shipmentId)?.status).toBe("posted");
+    expect(modules.shipmentRepository.getById(shipmentId)?.reversalReasonCode).toBe(
+      shipmentBefore.reversalReasonCode,
+    );
+    expect(modules.shipmentRepository.getById(shipmentId)?.reversalReasonComment).toBe(
+      shipmentBefore.reversalReasonComment,
+    );
+    expect(modules.salesOrderRepository.getById(so.id)?.status).toBe(soStatusBefore);
     expect(
       modules.stockBalanceRepository.getByItemWarehouseAndStyle(item.id, so.warehouseId, "GOOD")?.qtyOnHand ?? 0,
-    ).toBe(0);
+    ).toBe(balanceBefore);
+    expect(
+      modules.stockReservationRepository.sumActiveQtyForSalesOrderItem(so.id, item.id, so.warehouseId),
+    ).toBe(reservedBefore);
     expect(
       modules.stockMovementRepository.list().filter((row) => row.sourceDocumentId === shipmentId),
-    ).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({ movementType: "shipment", qtyDelta: -10 }),
-        expect.objectContaining({ movementType: "shipment_reversal", qtyDelta: 10 }),
-      ]),
+    ).toEqual([expect.objectContaining({ movementType: "shipment", qtyDelta: -10 })]);
+    expect(
+      modules.stockMovementRepository
+        .list()
+        .filter((m) => m.movementType === "shipment_reversal" && m.sourceDocumentId === shipmentId),
+    ).toHaveLength(outboundReversalCountBefore);
+    expect(
+      modules.stockMovementRepository
+        .list()
+        .filter((m) => m.movementType === "shipment" && m.sourceDocumentType === "shipment"),
+    ).toHaveLength(outboundShipmentMovementCountBefore);
+    expect(modules.stockMovementRepository.list().filter((m) => m.movementType === "receipt")).toHaveLength(
+      receiptMovementCountBefore,
     );
-    expect(modules.salesOrderRepository.getById(so.id)?.status).toBe("closed");
+    expect(modules.stockMovementRepository.list().filter((m) => m.movementType === "receipt_reversal")).toHaveLength(
+      receiptReversalMovementCountBefore,
+    );
     expect(
       modules.listAuditEventsForEntity("shipment", shipmentId).map((row) => row.eventType),
     ).not.toContain("document_reversed");
+    expect(
+      [...modules.listAuditEventsForEntity("sales_order", so.id).map((e) => e.id)].sort(),
+    ).toEqual(soAuditIdsBeforeReverse);
+  });
+
+  it("shipment reverse rolls back when final persistence flush fails after mutations", async () => {
+    const modules = await loadShipmentWorkflow();
+    const item = createActiveItem(modules);
+    const so = await createConfirmedSalesOrder(modules, [{ itemId: item.id, qty: 10, unitPrice: 5 }]);
+    seedGoodStock(modules, item.id, so.warehouseId, 10);
+    expect(await modules.allocateSalesOrderStock(so.id)).toEqual({ success: true, linesTouched: 1 });
+    const createResult = await modules.createShipmentFromSalesOrder(so.id);
+    expect(createResult.success).toBe(true);
+    if (!createResult.success) return;
+    const shipmentId = createResult.shipmentId;
+    expect(await modules.shipmentService.post(shipmentId)).toEqual({ success: true });
+
+    await modules.flushAllPendingPersistence();
+
+    const shipmentSnapshot = modules.shipmentRepository.getById(shipmentId)!;
+    const soStatusBefore = modules.salesOrderRepository.getById(so.id)?.status;
+    const balanceBefore =
+      modules.stockBalanceRepository.getByItemWarehouseAndStyle(item.id, so.warehouseId, "GOOD")?.qtyOnHand ?? 0;
+    const reservedBefore = modules.stockReservationRepository.sumActiveQtyForSalesOrderItem(
+      so.id,
+      item.id,
+      so.warehouseId,
+    );
+    const reversalCountBefore = modules.stockMovementRepository
+      .list()
+      .filter((m) => m.movementType === "shipment_reversal" && m.sourceDocumentId === shipmentId).length;
+    const outboundShipmentMovementCountBefore = modules.stockMovementRepository
+      .list()
+      .filter((m) => m.movementType === "shipment" && m.sourceDocumentType === "shipment").length;
+    const receiptReversalMovementCountBefore = modules.stockMovementRepository.list()
+      .filter((m) => m.movementType === "receipt_reversal").length;
+    const soAuditIdsBeforeReverse = [
+      ...modules.listAuditEventsForEntity("sales_order", so.id).map((e) => e.id),
+    ].sort();
+
+    modules.mockFs.injectWriteFileFailure("inventory/stock-balances.json", {
+      times: 1,
+      message: "Injected balance persist failure on reverse finalize",
+    });
+
+    const revResult = await modules.shipmentService.reverseDocument(shipmentId, { reversalReasonCode: "OTHER" });
+    expect(revResult.success).toBe(false);
+    if (revResult.success) return;
+    expect(revResult.error).toContain("Injected balance persist failure on reverse finalize");
+
+    expect(modules.shipmentRepository.getById(shipmentId)?.status).toBe(shipmentSnapshot.status);
+    expect(modules.salesOrderRepository.getById(so.id)?.status).toBe(soStatusBefore);
+    expect(
+      modules.stockBalanceRepository.getByItemWarehouseAndStyle(item.id, so.warehouseId, "GOOD")?.qtyOnHand ?? 0,
+    ).toBe(balanceBefore);
+    expect(
+      modules.stockReservationRepository.sumActiveQtyForSalesOrderItem(so.id, item.id, so.warehouseId),
+    ).toBe(reservedBefore);
+    expect(
+      modules.stockMovementRepository
+        .list()
+        .filter((m) => m.movementType === "shipment_reversal" && m.sourceDocumentId === shipmentId),
+    ).toHaveLength(reversalCountBefore);
+    expect(
+      modules.listAuditEventsForEntity("shipment", shipmentId).map((e) => e.eventType),
+    ).not.toContain("document_reversed");
+    expect(
+      modules.stockMovementRepository
+        .list()
+        .filter((m) => m.movementType === "shipment" && m.sourceDocumentType === "shipment"),
+    ).toHaveLength(outboundShipmentMovementCountBefore);
+    expect(
+      [...modules.listAuditEventsForEntity("sales_order", so.id).map((e) => e.id)].sort(),
+    ).toEqual(soAuditIdsBeforeReverse);
+    expect(modules.stockMovementRepository.list().filter((m) => m.movementType === "receipt_reversal")).toHaveLength(
+      receiptReversalMovementCountBefore,
+    );
+
+    await expect(modules.flushAllPendingPersistence()).resolves.toBeUndefined();
+    expect(
+      await modules.shipmentService.reverseDocument(shipmentId, { reversalReasonCode: "OTHER" }),
+    ).toEqual({ success: true });
+  });
+
+  it("shipment reverse rolls back when sales order update throws after shipment is marked reversed", async () => {
+    const modules = await loadShipmentWorkflow();
+    const item = createActiveItem(modules);
+    const so = await createConfirmedSalesOrder(modules, [{ itemId: item.id, qty: 10, unitPrice: 5 }]);
+    seedGoodStock(modules, item.id, so.warehouseId, 10);
+    expect(await modules.allocateSalesOrderStock(so.id)).toEqual({ success: true, linesTouched: 1 });
+    const createResult = await modules.createShipmentFromSalesOrder(so.id);
+    expect(createResult.success).toBe(true);
+    if (!createResult.success) return;
+    const shipmentId = createResult.shipmentId;
+    expect(await modules.shipmentService.post(shipmentId)).toEqual({ success: true });
+
+    const shipmentBefore = modules.shipmentRepository.getById(shipmentId)!;
+    const soStatusBefore = modules.salesOrderRepository.getById(so.id)?.status;
+    const balanceBefore =
+      modules.stockBalanceRepository.getByItemWarehouseAndStyle(item.id, so.warehouseId, "GOOD")?.qtyOnHand ?? 0;
+    const reservedBefore = modules.stockReservationRepository.sumActiveQtyForSalesOrderItem(
+      so.id,
+      item.id,
+      so.warehouseId,
+    );
+    const soAuditIdsBeforeReverse = [
+      ...modules.listAuditEventsForEntity("sales_order", so.id).map((e) => e.id),
+    ].sort();
+    const outboundShipmentMovementCountBefore = modules.stockMovementRepository
+      .list()
+      .filter((m) => m.movementType === "shipment" && m.sourceDocumentType === "shipment").length;
+    const receiptReversalMovementCountBefore = modules.stockMovementRepository.list()
+      .filter((m) => m.movementType === "receipt_reversal").length;
+
+    const originalSoUpdate = modules.salesOrderRepository.update.bind(modules.salesOrderRepository);
+    let confirmedSoUpdateAttempt = 0;
+    vi.spyOn(modules.salesOrderRepository, "update").mockImplementation((id, patch) => {
+      if (
+        id === so.id &&
+        patch &&
+        typeof patch === "object" &&
+        "status" in patch &&
+        patch.status === "confirmed"
+      ) {
+        confirmedSoUpdateAttempt += 1;
+        if (confirmedSoUpdateAttempt === 1) {
+          throw new Error("sales order update exploded during reverse");
+        }
+      }
+      return originalSoUpdate(id, patch);
+    });
+
+    const revResult = await modules.shipmentService.reverseDocument(shipmentId, { reversalReasonCode: "OTHER" });
+    expect(revResult.success).toBe(false);
+    if (revResult.success) return;
+    expect(revResult.error).toContain("Shipment reverse failed: sales order update exploded during reverse");
+
+    expect(modules.shipmentRepository.getById(shipmentId)?.status).toBe(shipmentBefore.status);
+    expect(modules.shipmentRepository.getById(shipmentId)?.reversalReasonCode).toBe(
+      shipmentBefore.reversalReasonCode,
+    );
+    expect(modules.shipmentRepository.getById(shipmentId)?.reversalReasonComment).toBe(
+      shipmentBefore.reversalReasonComment,
+    );
+    expect(modules.salesOrderRepository.getById(so.id)?.status).toBe(soStatusBefore);
+    expect(
+      modules.stockBalanceRepository.getByItemWarehouseAndStyle(item.id, so.warehouseId, "GOOD")?.qtyOnHand ?? 0,
+    ).toBe(balanceBefore);
+    expect(
+      modules.stockReservationRepository.sumActiveQtyForSalesOrderItem(so.id, item.id, so.warehouseId),
+    ).toBe(reservedBefore);
+    expect(
+      modules.stockMovementRepository.list().filter((row) => row.sourceDocumentId === shipmentId),
+    ).toEqual([expect.objectContaining({ movementType: "shipment", qtyDelta: -10 })]);
+    expect(
+      modules.stockMovementRepository
+        .list()
+        .filter((m) => m.movementType === "shipment_reversal" && m.sourceDocumentId === shipmentId),
+    ).toHaveLength(0);
+    expect(
+      modules.stockMovementRepository
+        .list()
+        .filter((m) => m.movementType === "shipment" && m.sourceDocumentType === "shipment"),
+    ).toHaveLength(outboundShipmentMovementCountBefore);
+    expect(
+      modules.listAuditEventsForEntity("shipment", shipmentId).map((row) => row.eventType),
+    ).not.toContain("document_reversed");
+    expect(
+      [...modules.listAuditEventsForEntity("sales_order", so.id).map((e) => e.id)].sort(),
+    ).toEqual(soAuditIdsBeforeReverse);
+    expect(modules.stockMovementRepository.list().filter((m) => m.movementType === "receipt_reversal")).toHaveLength(
+      receiptReversalMovementCountBefore,
+    );
+  });
+
+  it("shipment reverse rolls back when document_reversed audit append throws after reconcile", async () => {
+    const modules = await loadShipmentWorkflow();
+    const item = createActiveItem(modules);
+    const so = await createConfirmedSalesOrder(modules, [{ itemId: item.id, qty: 10, unitPrice: 5 }]);
+    seedGoodStock(modules, item.id, so.warehouseId, 10);
+    expect(await modules.allocateSalesOrderStock(so.id)).toEqual({ success: true, linesTouched: 1 });
+    const createResult = await modules.createShipmentFromSalesOrder(so.id);
+    expect(createResult.success).toBe(true);
+    if (!createResult.success) return;
+    const shipmentId = createResult.shipmentId;
+    expect(await modules.shipmentService.post(shipmentId)).toEqual({ success: true });
+
+    const auditModule = await import("../../src/shared/audit/eventLogRepository");
+    const origAppend = auditModule.appendAuditEvent;
+    vi.spyOn(auditModule, "appendAuditEvent").mockImplementation((input) => {
+      if (input.entityType === "shipment" && input.eventType === "document_reversed") {
+        throw new Error("document_reversed audit append failed");
+      }
+      return origAppend(input);
+    });
+
+    const reservedBeforeReverse = modules.stockReservationRepository.sumActiveQtyForSalesOrderItem(
+      so.id,
+      item.id,
+      so.warehouseId,
+    );
+    const soAuditIdsBeforeReverse = [
+      ...modules.listAuditEventsForEntity("sales_order", so.id).map((e) => e.id),
+    ].sort();
+
+    const revResult = await modules.shipmentService.reverseDocument(shipmentId, { reversalReasonCode: "OTHER" });
+    expect(revResult.success).toBe(false);
+    if (revResult.success) return;
+    expect(revResult.error).toContain("document_reversed audit append failed");
+
+    expect(modules.shipmentRepository.getById(shipmentId)?.status).toBe("posted");
+    expect(
+      modules.stockReservationRepository.sumActiveQtyForSalesOrderItem(so.id, item.id, so.warehouseId),
+    ).toBe(reservedBeforeReverse);
+    expect(
+      [...modules.listAuditEventsForEntity("sales_order", so.id).map((e) => e.id)].sort(),
+    ).toEqual(soAuditIdsBeforeReverse);
+    expect(
+      modules.listAuditEventsForEntity("shipment", shipmentId).map((row) => row.eventType),
+    ).not.toContain("document_reversed");
+  });
+
+  it("shipment reverse reports combined error when rollback flush also fails", async () => {
+    const modules = await loadShipmentWorkflow();
+    const item = createActiveItem(modules);
+    const so = await createConfirmedSalesOrder(modules, [{ itemId: item.id, qty: 10, unitPrice: 5 }]);
+    seedGoodStock(modules, item.id, so.warehouseId, 10);
+    expect(await modules.allocateSalesOrderStock(so.id)).toEqual({ success: true, linesTouched: 1 });
+    const createResult = await modules.createShipmentFromSalesOrder(so.id);
+    expect(createResult.success).toBe(true);
+    if (!createResult.success) return;
+    const shipmentId = createResult.shipmentId;
+    expect(await modules.shipmentService.post(shipmentId)).toEqual({ success: true });
+
+    await modules.flushAllPendingPersistence();
+
+    modules.mockFs.injectWriteFileFailure("inventory/stock-balances.json", {
+      times: 2,
+      message: "Injected balance persist failure",
+    });
+
+    const revResult = await modules.shipmentService.reverseDocument(shipmentId, { reversalReasonCode: "OTHER" });
+    expect(revResult.success).toBe(false);
+    if (revResult.success) return;
+    expect(revResult.error).toContain("Shipment reverse was rolled back but saving the rolled-back state failed");
+    expect(revResult.error).toContain("Shipment reverse failed");
+    expect(revResult.error).toContain("|");
+
+    await expect(modules.flushAllPendingPersistence()).resolves.toBeUndefined();
+  });
+
+  it("shipment reverse rolls back MARKDOWN-style stock when balance adjust throws", async () => {
+    const modules = await loadShipmentWorkflow();
+    const warehouse = createActiveWarehouse(modules);
+    const customer = createActiveCustomer(modules);
+    const item = createActiveItem(modules);
+    const md = modules.markdownRepository.create({
+      itemId: item.id,
+      markdownPrice: 5,
+      reasonCode: "OTHER",
+      status: "ACTIVE",
+      createdAt: "2026-03-30T00:00:00.000Z",
+      createdBy: "test",
+      warehouseId: warehouse.id,
+      style: "MARKDOWN",
+      printCount: 0,
+    });
+    const so = modules.salesOrderRepository.create(
+      {
+        date: "2026-03-30",
+        customerId: customer.id,
+        warehouseId: warehouse.id,
+        status: "draft",
+        comment: "",
+      },
+      [{ itemId: item.id, qty: 1, unitPrice: 15, markdownCode: md.markdownCode }],
+    );
+    expect(modules.confirmSalesOrder(so.id)).toEqual({ success: true });
+    const confirmedSo = modules.salesOrderRepository.getById(so.id)!;
+    seedGoodStock(modules, item.id, warehouse.id, 1);
+    modules.stockBalanceRepository.upsert({
+      itemId: item.id,
+      warehouseId: warehouse.id,
+      style: "MARKDOWN",
+      qtyOnHand: 1,
+    });
+    const allocResult = await modules.allocateSalesOrderStock(confirmedSo.id);
+    expect(allocResult.success).toBe(true);
+    const createResult = await modules.createShipmentFromSalesOrder(confirmedSo.id);
+    expect(createResult.success).toBe(true);
+    if (!createResult.success) return;
+    const shipmentId = createResult.shipmentId;
+    expect(await modules.shipmentService.post(shipmentId)).toEqual({ success: true });
+
+    const markdownQtyBefore =
+      modules.stockBalanceRepository.getByItemWarehouseAndStyle(item.id, warehouse.id, "MARKDOWN")?.qtyOnHand ?? 0;
+    expect(markdownQtyBefore).toBe(0);
+    const goodQtyBefore =
+      modules.stockBalanceRepository.getByItemWarehouseAndStyle(item.id, warehouse.id, "GOOD")?.qtyOnHand ?? 0;
+    expect(goodQtyBefore).toBe(1);
+
+    const originalAdjustQty = modules.stockBalanceRepository.adjustQty.bind(modules.stockBalanceRepository);
+    let isFirstAdjustAfterPost = true;
+    vi.spyOn(modules.stockBalanceRepository, "adjustQty").mockImplementation((input) => {
+      if (isFirstAdjustAfterPost) {
+        isFirstAdjustAfterPost = false;
+        throw new Error("markdown reversal balance exploded");
+      }
+      return originalAdjustQty(input);
+    });
+
+    expect(
+      await modules.shipmentService.reverseDocument(shipmentId, { reversalReasonCode: "OTHER" }),
+    ).toEqual({
+      success: false,
+      error: "Shipment reverse failed: markdown reversal balance exploded",
+    });
+
+    expect(
+      modules.stockBalanceRepository.getByItemWarehouseAndStyle(item.id, warehouse.id, "MARKDOWN")?.qtyOnHand ?? 0,
+    ).toBe(markdownQtyBefore);
+    expect(
+      modules.stockBalanceRepository.getByItemWarehouseAndStyle(item.id, warehouse.id, "GOOD")?.qtyOnHand ?? 0,
+    ).toBe(goodQtyBefore);
+    expect(modules.shipmentRepository.getById(shipmentId)?.status).toBe("posted");
   });
 
   it("receipt post fails and rolls back when inventory persistence fails during flush", async () => {
@@ -416,8 +1203,8 @@ describe.sequential("Receipt and Shipment durability failure paths", () => {
     const item = createActiveItem(modules);
     const so = await createConfirmedSalesOrder(modules, [{ itemId: item.id, qty: 10, unitPrice: 5 }]);
     seedGoodStock(modules, item.id, so.warehouseId, 10);
-    expect(modules.allocateSalesOrderStock(so.id)).toEqual({ success: true, linesTouched: 1 });
-    const createResult = modules.createShipmentFromSalesOrder(so.id);
+    expect(await modules.allocateSalesOrderStock(so.id)).toEqual({ success: true, linesTouched: 1 });
+    const createResult = await modules.createShipmentFromSalesOrder(so.id);
     expect(createResult.success).toBe(true);
     if (!createResult.success) return;
 
