@@ -204,7 +204,11 @@ export function ItemsMarkingImportPage() {
   );
 
   return (
-    <ItemsModuleLayout className="doc-page mx-auto max-w-6xl space-y-4 p-4 md:p-5">
+    <ItemsModuleLayout
+      className="doc-page min-w-0 gap-4"
+      contentVariant="narrow"
+      contentClassName="space-y-4 p-4 md:p-5"
+    >
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
           <p className="text-[11px] text-muted-foreground">

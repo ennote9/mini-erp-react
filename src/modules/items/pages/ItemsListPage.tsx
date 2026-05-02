@@ -966,7 +966,11 @@ export function ItemsListPage() {
   );
 
   return (
-    <ItemsModuleLayout className="flex min-h-0 min-w-0 flex-1 flex-col gap-2">
+    <ItemsModuleLayout
+      className="flex min-h-0 min-w-0 flex-1 flex-col gap-2"
+      contentVariant="full"
+      contentClassName="flex min-h-0 min-w-0 flex-1 flex-col"
+    >
       <ListPageLayout
       header={null}
       controls={

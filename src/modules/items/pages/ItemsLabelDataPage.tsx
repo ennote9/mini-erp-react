@@ -478,7 +478,11 @@ export function ItemsLabelDataPage() {
   }, [selectedIds, filteredItems, draftById, t]);
 
   return (
-    <ItemsModuleLayout className="mx-auto max-w-[1920px] space-y-3 p-3 md:p-4">
+    <ItemsModuleLayout
+      className="flex min-h-0 min-w-0 flex-col gap-3"
+      contentVariant="full"
+      contentClassName="space-y-3 p-3 md:p-4"
+    >
       <div className="flex flex-wrap items-start justify-between gap-3 border-b border-border/60 pb-3">
         <div>
           <h1 className="text-base font-semibold tracking-tight">{t("master.itemsLabelData.pageTitle")}</h1>

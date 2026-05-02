@@ -253,7 +253,11 @@ export function ItemsMarkingSyncConsolePage() {
   );
 
   return (
-    <ItemsModuleLayout className="doc-page mx-auto max-w-[1600px] space-y-3 p-4 md:p-5">
+    <ItemsModuleLayout
+      className="doc-page min-w-0 gap-3"
+      contentVariant="wide"
+      contentClassName="space-y-3 p-4 md:p-5"
+    >
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div>
           <p className="text-[11px] text-muted-foreground">
