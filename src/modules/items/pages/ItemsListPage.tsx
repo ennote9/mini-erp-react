@@ -62,7 +62,7 @@ import { buildItemsTableListViewState } from "../itemsListViewState";
 import { formatItemsTableValue } from "../itemsTanstackColumns";
 import { ItemsTanstackTable } from "../ItemsTanstackTable";
 import { ItemsHeaderFilterPanel } from "../ItemsHeaderFilterPanel";
-import { ItemsSubnav } from "../components/ItemsSubnav";
+import { ItemsModuleLayout } from "../components/ItemsModuleLayout";
 
 const COLUMN_SIZING_STORAGE_KEY = "mini-erp:items:tanstack:columnSizing:v1";
 const MAX_REASONABLE_COLUMN_SIZE = 1200;
@@ -966,11 +966,11 @@ export function ItemsListPage() {
   );
 
   return (
-    <ListPageLayout
+    <ItemsModuleLayout className="flex min-h-0 min-w-0 flex-1 flex-col gap-2">
+      <ListPageLayout
       header={null}
       controls={
         <div className="flex w-full min-w-0 flex-col gap-2">
-          <ItemsSubnav />
           <div className="list-page__controls-stack flex w-full min-w-0 flex-wrap items-center justify-between gap-x-4 gap-y-2">
           <ListPageSearch
             inputRef={listSearchInputRef}
@@ -1177,5 +1177,6 @@ export function ItemsListPage() {
     >
       {listContent}
     </ListPageLayout>
+    </ItemsModuleLayout>
   );
 }

@@ -21,7 +21,7 @@ import {
   type ParseMarkingPoolImportResult,
 } from "../lib/parseMarkingPoolImport";
 import { parseMarkingPoolXlsx, buildMarkingPoolTemplateXlsxBuffer } from "../lib/markingPoolImportXlsx";
-import { ItemsSubnav } from "../components/ItemsSubnav";
+import { ItemsModuleLayout } from "../components/ItemsModuleLayout";
 import {
   buildMarkingPoolExportCsv,
   buildMarkingPoolExportTsv,
@@ -204,8 +204,7 @@ export function ItemsMarkingImportPage() {
   );
 
   return (
-    <div className="doc-page mx-auto max-w-6xl space-y-4 p-4 md:p-5">
-      <ItemsSubnav />
+    <ItemsModuleLayout className="doc-page mx-auto max-w-6xl space-y-4 p-4 md:p-5">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
           <p className="text-[11px] text-muted-foreground">
@@ -433,6 +432,6 @@ export function ItemsMarkingImportPage() {
           </div>
         </section>
       ) : null}
-    </div>
+    </ItemsModuleLayout>
   );
 }

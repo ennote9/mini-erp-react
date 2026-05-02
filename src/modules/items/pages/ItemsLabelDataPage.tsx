@@ -39,7 +39,7 @@ import {
   buildLabelDataTemplateXlsxBuffer,
   parseLabelDataXlsx,
 } from "../lib/labelDataImportXlsx";
-import { ItemsSubnav } from "../components/ItemsSubnav";
+import { ItemsModuleLayout } from "../components/ItemsModuleLayout";
 
 type ViewMode = "all" | "translation" | "marking";
 
@@ -478,8 +478,7 @@ export function ItemsLabelDataPage() {
   }, [selectedIds, filteredItems, draftById, t]);
 
   return (
-    <div className="mx-auto max-w-[1920px] space-y-3 p-3 md:p-4">
-      <ItemsSubnav />
+    <ItemsModuleLayout className="mx-auto max-w-[1920px] space-y-3 p-3 md:p-4">
       <div className="flex flex-wrap items-start justify-between gap-3 border-b border-border/60 pb-3">
         <div>
           <h1 className="text-base font-semibold tracking-tight">{t("master.itemsLabelData.pageTitle")}</h1>
@@ -961,6 +960,6 @@ export function ItemsLabelDataPage() {
           </Dialog.Content>
         </Dialog.Portal>
       </Dialog.Root>
-    </div>
+    </ItemsModuleLayout>
   );
 }
