@@ -11,6 +11,12 @@ export const settingsEn = {
     persistenceLabel: "Settings persistence",
     buildInfoLabel: "Application",
     buildInfoDesc: "Build mode for this front-end bundle.",
+    exportWorkspaceBackup: "Export workspace backup",
+    exportWorkspaceBackupInProgress: "Exporting…",
+    exportWorkspaceBackupSaved: "Backup saved to {{path}}.",
+    exportWorkspaceBackupWarnings: "Completed with warnings: {{details}}",
+    exportWorkspaceBackupFailed: "Backup export failed: {{message}}",
+    exportWorkspaceBackupUnknownError: "Unknown error",
   },
   persistence: {
     filePersisted: "Saved locally (app data folder).",
@@ -188,7 +194,8 @@ export const settingsEn = {
     },
     dataAudit__backupRestore: {
       label: "Backup & restore",
-      description: "Full workspace backup is not available in this version.",
+      description:
+        "Export a workspace backup ZIP from this page. Restore from a backup is not implemented yet.",
     },
     dataAudit__resetDemo: {
       label: "Reset demo / test data",

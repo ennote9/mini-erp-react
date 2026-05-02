@@ -680,6 +680,12 @@ export const ruMessages: MessageTree = {
       persistenceLabel: "Сохранение настроек",
       buildInfoLabel: "Приложение",
       buildInfoDesc: "Режим сборки фронтенда.",
+      exportWorkspaceBackup: "Экспорт резервной копии рабочей области",
+      exportWorkspaceBackupInProgress: "Экспорт…",
+      exportWorkspaceBackupSaved: "Резервная копия сохранена: {{path}}.",
+      exportWorkspaceBackupWarnings: "Завершено с предупреждениями: {{details}}",
+      exportWorkspaceBackupFailed: "Ошибка экспорта резервной копии: {{message}}",
+      exportWorkspaceBackupUnknownError: "Неизвестная ошибка",
     },
     persistence: {
       filePersisted: "Сохранено локально (папка данных приложения).",

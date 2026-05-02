@@ -852,10 +852,10 @@ export function SalesOrderPage() {
   const returnTo = readReturnToParam(searchParams);
   const backHref = returnTo ?? "/sales-orders";
 
-  const handleConfirm = () => {
+  const handleConfirm = async () => {
     if (!id || isNew) return;
     setActionIssues([]);
-    const result = confirm(id);
+    const result = await confirm(id);
     if (result.success) setRefresh((r) => r + 1);
     else if (!issueListContainsMessage(health.issues, result.error))
       setActionIssues([actionIssueFromServiceMessage(result.error)]);
@@ -1261,10 +1261,10 @@ export function SalesOrderPage() {
     ],
   );
 
-  const handleCancelDocumentConfirm = (payload: CancelDocumentReasonPayload) => {
+  const handleCancelDocumentConfirm = async (payload: CancelDocumentReasonPayload) => {
     if (!id || isNew) return;
     setActionIssues([]);
-    const result = cancelDocument(id, payload);
+    const result = await cancelDocument(id, payload);
     if (result.success) setRefresh((r) => r + 1);
     else if (!issueListContainsMessage(health.issues, result.error))
       setActionIssues([actionIssueFromServiceMessage(result.error)]);

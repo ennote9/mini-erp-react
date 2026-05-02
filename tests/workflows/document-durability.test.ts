@@ -59,6 +59,7 @@ async function loadShipmentWorkflow() {
   return {
     confirmSalesOrder: soService.confirm,
     allocateSalesOrderStock: soService.allocateStock,
+    cancelSalesOrderDocument: soService.cancelDocument,
     createShipmentFromSalesOrder: soService.createShipment,
     salesOrderRepository: soRepositoryModule.salesOrderRepository,
     shipmentService: shipmentServiceModule,
@@ -174,7 +175,7 @@ async function createConfirmedSalesOrder(
     },
     lines,
   );
-  expect(modules.confirmSalesOrder(so.id)).toEqual({ success: true });
+  expect(await modules.confirmSalesOrder(so.id)).toEqual({ success: true });
   return modules.salesOrderRepository.getById(so.id)!;
 }
 
@@ -203,7 +204,7 @@ describe.sequential("Receipt and Shipment durability failure paths", () => {
     const modules = await loadReceiptWorkflow();
     const item = createActiveItem(modules);
     const po = await createConfirmedPurchaseOrder(modules, [{ itemId: item.id, qty: 10, unitPrice: 1 }]);
-    const createResult = modules.createReceiptFromPurchaseOrder(po.id);
+    const createResult = await modules.createReceiptFromPurchaseOrder(po.id);
     expect(createResult.success).toBe(true);
     if (!createResult.success) return;
 
@@ -251,7 +252,7 @@ describe.sequential("Receipt and Shipment durability failure paths", () => {
     const modules = await loadReceiptWorkflow();
     const item = createActiveItem(modules);
     const po = await createConfirmedPurchaseOrder(modules, [{ itemId: item.id, qty: 10, unitPrice: 1 }]);
-    const createResult = modules.createReceiptFromPurchaseOrder(po.id);
+    const createResult = await modules.createReceiptFromPurchaseOrder(po.id);
     expect(createResult.success).toBe(true);
     if (!createResult.success) return;
     const receiptId = createResult.receiptId;
@@ -295,7 +296,7 @@ describe.sequential("Receipt and Shipment durability failure paths", () => {
     const modules = await loadReceiptWorkflow();
     const item = createActiveItem(modules);
     const po = await createConfirmedPurchaseOrder(modules, [{ itemId: item.id, qty: 10, unitPrice: 1 }]);
-    const createResult = modules.createReceiptFromPurchaseOrder(po.id);
+    const createResult = await modules.createReceiptFromPurchaseOrder(po.id);
     expect(createResult.success).toBe(true);
     if (!createResult.success) return;
     const receiptId = createResult.receiptId;
@@ -421,6 +422,154 @@ describe.sequential("Receipt and Shipment durability failure paths", () => {
     expect(
       modules.listAuditEventsForEntity("sales_order", so.id).map((e) => e.eventType),
     ).toContain("stock_allocated");
+  });
+
+  it("sales order cancel rolls back when final persistence flush fails after mutations", async () => {
+    const modules = await loadShipmentWorkflow();
+    const { patchAppSettings } = await import("../../src/shared/settings/store");
+    patchAppSettings({ inventory: { releaseReservationsOnSalesOrderCancel: true } });
+
+    const item = createActiveItem(modules);
+    const so = await createConfirmedSalesOrder(modules, [{ itemId: item.id, qty: 10, unitPrice: 5 }]);
+    seedGoodStock(modules, item.id, so.warehouseId, 20);
+    expect(await modules.allocateSalesOrderStock(so.id)).toEqual({ success: true, linesTouched: 1 });
+    await modules.flushAllPendingPersistence();
+
+    const soSnapshot = modules.salesOrderRepository.getById(so.id)!;
+    const reservationsBefore = listReservationsForSalesOrderSorted(modules, so.id);
+    const soAuditIdsBefore = [...modules.listAuditEventsForEntity("sales_order", so.id).map((e) => e.id)].sort();
+
+    modules.mockFs.injectWriteFileFailure("documents/sales-orders.json.tmp", {
+      times: 1,
+      message: "Injected sales order persist failure on cancel finalize",
+    });
+
+    const cancelResult = await modules.cancelSalesOrderDocument(so.id, {
+      cancelReasonCode: "OTHER",
+      cancelReasonComment: "Should fail persist",
+    });
+    expect(cancelResult.success).toBe(false);
+    if (cancelResult.success) return;
+    expect(cancelResult.error).toContain("Injected sales order persist failure on cancel finalize");
+
+    const soAfter = modules.salesOrderRepository.getById(so.id)!;
+    expect(soAfter.status).toBe(soSnapshot.status);
+    expect(soAfter.cancelReasonCode).toBe(soSnapshot.cancelReasonCode);
+    expect(soAfter.cancelReasonComment).toBe(soSnapshot.cancelReasonComment);
+
+    expect(listReservationsForSalesOrderSorted(modules, so.id)).toEqual(reservationsBefore);
+    expect([...modules.listAuditEventsForEntity("sales_order", so.id).map((e) => e.id)].sort()).toEqual(
+      soAuditIdsBefore,
+    );
+    expect(
+      modules.listAuditEventsForEntity("sales_order", so.id).map((e) => e.eventType),
+    ).not.toContain("document_cancelled");
+    expect(
+      modules.listAuditEventsForEntity("sales_order", so.id).map((e) => e.eventType),
+    ).not.toContain("reservation_released");
+
+    await expect(modules.flushAllPendingPersistence()).resolves.toBeUndefined();
+    const retry = await modules.cancelSalesOrderDocument(so.id, {
+      cancelReasonCode: "OTHER",
+      cancelReasonComment: "Retry ok",
+    });
+    expect(retry).toEqual({ success: true });
+    expect(modules.salesOrderRepository.getById(so.id)?.status).toBe("cancelled");
+    expect(modules.stockReservationRepository.listActiveForSalesOrder(so.id)).toEqual([]);
+    const types = modules.listAuditEventsForEntity("sales_order", so.id).map((e) => e.eventType);
+    expect(types).toContain("document_cancelled");
+    expect(types).toContain("reservation_released");
+  });
+
+  it("sales order confirm rolls back when final persistence flush fails after mutations", async () => {
+    const modules = await loadShipmentWorkflow();
+    const item = createActiveItem(modules);
+    const warehouse = createActiveWarehouse(modules);
+    const customer = createActiveCustomer(modules);
+    const so = modules.salesOrderRepository.create(
+      {
+        date: "2026-03-30",
+        customerId: customer.id,
+        warehouseId: warehouse.id,
+        status: "draft",
+        comment: "",
+      },
+      [{ itemId: item.id, qty: 10, unitPrice: 5 }],
+    );
+    const firstLine = modules.salesOrderRepository.listLines(so.id)[0]!;
+    const otherWarehouse = createActiveWarehouse(modules);
+    modules.stockReservationRepository.upsertActiveForSalesOrderLine({
+      salesOrderId: so.id,
+      salesOrderLineId: firstLine.id,
+      warehouseId: otherWarehouse.id,
+      itemId: item.id,
+      qty: 3,
+    });
+    await modules.flushAllPendingPersistence();
+
+    const statusBefore = modules.salesOrderRepository.getById(so.id)!.status;
+    const reservationsBefore = listReservationsForSalesOrderSorted(modules, so.id);
+    const soAuditIdsBefore = [...modules.listAuditEventsForEntity("sales_order", so.id).map((e) => e.id)].sort();
+
+    modules.mockFs.injectWriteFileFailure("documents/sales-orders.json.tmp", {
+      times: 1,
+      message: "Injected sales order persist failure on confirm finalize",
+    });
+
+    const confirmResult = await modules.confirmSalesOrder(so.id);
+    expect(confirmResult.success).toBe(false);
+    if (confirmResult.success) return;
+    expect(confirmResult.error).toContain("Injected sales order persist failure on confirm finalize");
+
+    expect(modules.salesOrderRepository.getById(so.id)!.status).toBe(statusBefore);
+    expect(listReservationsForSalesOrderSorted(modules, so.id)).toEqual(reservationsBefore);
+    expect([...modules.listAuditEventsForEntity("sales_order", so.id).map((e) => e.id)].sort()).toEqual(
+      soAuditIdsBefore,
+    );
+    expect(
+      modules.listAuditEventsForEntity("sales_order", so.id).map((e) => e.eventType),
+    ).not.toContain("document_confirmed");
+    expect(
+      modules.listAuditEventsForEntity("sales_order", so.id).map((e) => e.eventType),
+    ).not.toContain("reservation_reconciled");
+
+    await expect(modules.flushAllPendingPersistence()).resolves.toBeUndefined();
+    expect(await modules.confirmSalesOrder(so.id)).toEqual({ success: true });
+    expect(modules.salesOrderRepository.getById(so.id)?.status).toBe("confirmed");
+    const typesAfter = modules.listAuditEventsForEntity("sales_order", so.id).map((e) => e.eventType);
+    expect(typesAfter).toContain("document_confirmed");
+    expect(typesAfter).toContain("reservation_reconciled");
+  });
+
+  it("create receipt rolls back when final persistence flush fails after mutations", async () => {
+    const modules = await loadReceiptWorkflow();
+    const item = createActiveItem(modules);
+    const po = await createConfirmedPurchaseOrder(modules, [{ itemId: item.id, qty: 10, unitPrice: 1 }]);
+    await modules.flushAllPendingPersistence();
+
+    const receiptIdsBefore = new Set(modules.receiptRepository.list().map((r) => r.id));
+
+    modules.mockFs.injectWriteFileFailure("documents/receipts.json.tmp", {
+      times: 1,
+      message: "Injected receipt persist failure on create receipt finalize",
+    });
+
+    const createResult = await modules.createReceiptFromPurchaseOrder(po.id);
+    expect(createResult.success).toBe(false);
+    if (createResult.success) return;
+    expect(createResult.error).toContain("Injected receipt persist failure on create receipt finalize");
+
+    expect(new Set(modules.receiptRepository.list().map((r) => r.id))).toEqual(receiptIdsBefore);
+    expect(modules.receiptRepository.list().filter((r) => r.purchaseOrderId === po.id)).toEqual([]);
+
+    await expect(modules.flushAllPendingPersistence()).resolves.toBeUndefined();
+    const retry = await modules.createReceiptFromPurchaseOrder(po.id);
+    expect(retry.success).toBe(true);
+    if (!retry.success) return;
+    expect(modules.receiptRepository.getById(retry.receiptId)?.status).toBe("draft");
+    expect(
+      modules.listAuditEventsForEntity("receipt", retry.receiptId).some((e) => e.eventType === "document_created"),
+    ).toBe(true);
   });
 
   it("create shipment rolls back when final persistence flush fails after mutations", async () => {
@@ -559,7 +708,7 @@ describe.sequential("Receipt and Shipment durability failure paths", () => {
       },
       [{ itemId: item.id, qty: 1, unitPrice: 15, markdownCode: md.markdownCode }],
     );
-    expect(modules.confirmSalesOrder(so.id)).toEqual({ success: true });
+    expect(await modules.confirmSalesOrder(so.id)).toEqual({ success: true });
     const confirmedSo = modules.salesOrderRepository.getById(so.id)!;
     seedGoodStock(modules, item.id, warehouse.id, 1);
     modules.stockBalanceRepository.upsert({
@@ -1118,7 +1267,7 @@ describe.sequential("Receipt and Shipment durability failure paths", () => {
       },
       [{ itemId: item.id, qty: 1, unitPrice: 15, markdownCode: md.markdownCode }],
     );
-    expect(modules.confirmSalesOrder(so.id)).toEqual({ success: true });
+    expect(await modules.confirmSalesOrder(so.id)).toEqual({ success: true });
     const confirmedSo = modules.salesOrderRepository.getById(so.id)!;
     seedGoodStock(modules, item.id, warehouse.id, 1);
     modules.stockBalanceRepository.upsert({
@@ -1172,7 +1321,7 @@ describe.sequential("Receipt and Shipment durability failure paths", () => {
     const modules = await loadReceiptWorkflow();
     const item = createActiveItem(modules);
     const po = await createConfirmedPurchaseOrder(modules, [{ itemId: item.id, qty: 10, unitPrice: 1 }]);
-    const createResult = modules.createReceiptFromPurchaseOrder(po.id);
+    const createResult = await modules.createReceiptFromPurchaseOrder(po.id);
     expect(createResult.success).toBe(true);
     if (!createResult.success) return;
 

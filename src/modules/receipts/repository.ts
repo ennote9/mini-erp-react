@@ -270,6 +270,24 @@ export const receiptRepository = {
     schedulePersist();
     return newLines;
   },
+
+  /**
+   * Removes a draft receipt header and its lines (e.g. rollback after failed createReceipt persistence).
+   * Returns false if the receipt is missing or not in draft status.
+   */
+  removeDraftReceiptById(receiptId: string): boolean {
+    const doc = headerStore.find((x) => x.id === receiptId);
+    if (!doc || doc.status !== "draft") return false;
+    const hi = headerStore.findIndex((x) => x.id === receiptId);
+    if (hi >= 0) headerStore.splice(hi, 1);
+    for (let i = lineStore.length - 1; i >= 0; i--) {
+      if (lineStore[i]!.receiptId === receiptId) {
+        lineStore.splice(i, 1);
+      }
+    }
+    schedulePersist();
+    return true;
+  },
 };
 
 await bootstrapFromDisk();

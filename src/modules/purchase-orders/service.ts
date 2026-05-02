@@ -1,5 +1,9 @@
+import { formatPersistenceFailure } from "../../shared/persistenceFailureMessage";
 import { purchaseOrderRepository } from "./repository";
-import { receiptRepository } from "../receipts/repository";
+import {
+  flushPendingReceiptPersist,
+  receiptRepository,
+} from "../receipts/repository";
 import { supplierRepository } from "../suppliers/repository";
 import { warehouseRepository } from "../warehouses/repository";
 import { itemRepository } from "../items/repository";
@@ -24,7 +28,12 @@ import {
   type CancelDocumentReasonInput,
 } from "../../shared/reasonCodes";
 import { getAppSettings } from "../../shared/settings/store";
-import { appendAuditEvent } from "../../shared/audit/eventLogRepository";
+import {
+  appendAuditEvent,
+  flushPendingAuditEventPersist,
+  listAuditEventsForEntity,
+  removeAuditEventById,
+} from "../../shared/audit/eventLogRepository";
 import { AUDIT_ACTOR_LOCAL_USER } from "../../shared/audit/eventLogTypes";
 import { auditReceiptDocumentCreated } from "../../shared/audit/factualDocumentAudit";
 import {
@@ -353,7 +362,33 @@ function hasDraftReceiptForPo(poId: string): boolean {
     .some((r) => r.purchaseOrderId === poId && r.status === "draft");
 }
 
-export function createReceipt(poId: string): CreateReceiptResult {
+function removeNewAuditEventsForReceipt(
+  receiptId: string,
+  preReceiptAuditIds: ReadonlySet<string>,
+): void {
+  const toRemove = listAuditEventsForEntity("receipt", receiptId)
+    .filter((e) => !preReceiptAuditIds.has(e.id))
+    .map((e) => e.id);
+  for (const id of toRemove) {
+    removeAuditEventById(id);
+  }
+}
+
+async function flushCreateReceiptCriticalPersistence(): Promise<void> {
+  const settled = await Promise.allSettled([
+    flushPendingReceiptPersist(),
+    flushPendingAuditEventPersist(),
+  ]);
+  const failures = settled.flatMap((result) => {
+    if (result.status === "fulfilled") return [];
+    return [result.reason instanceof Error ? result.reason.message : String(result.reason)];
+  });
+  if (failures.length > 0) {
+    throw new Error(failures.join(" | "));
+  }
+}
+
+export async function createReceipt(poId: string): Promise<CreateReceiptResult> {
   const po = purchaseOrderRepository.getById(poId);
   if (!po) return { success: false, error: "Purchase order not found." };
   if (po.status !== "confirmed")
@@ -384,17 +419,50 @@ export function createReceipt(poId: string): CreateReceiptResult {
       error: "Nothing remaining to receive for this purchase order.",
     };
   }
-  const receipt = receiptRepository.create(
-    {
-      date: po.date,
-      purchaseOrderId: poId,
-      warehouseId: po.warehouseId,
-      status: "draft",
-    },
-    receiptLines,
-  );
-  auditReceiptDocumentCreated(receipt);
-  return { success: true, receiptId: receipt.id };
+
+  let createdReceiptId: string | null = null;
+  let preReceiptAuditIds = new Set<string>();
+
+  try {
+    await flushCreateReceiptCriticalPersistence();
+
+    const receipt = receiptRepository.create(
+      {
+        date: po.date,
+        purchaseOrderId: poId,
+        warehouseId: po.warehouseId,
+        status: "draft",
+      },
+      receiptLines,
+    );
+    createdReceiptId = receipt.id;
+    preReceiptAuditIds = new Set(
+      listAuditEventsForEntity("receipt", receipt.id).map((e) => e.id),
+    );
+
+    auditReceiptDocumentCreated(receipt);
+
+    await flushCreateReceiptCriticalPersistence();
+
+    return { success: true, receiptId: receipt.id };
+  } catch (error) {
+    if (createdReceiptId !== null) {
+      removeNewAuditEventsForReceipt(createdReceiptId, preReceiptAuditIds);
+      receiptRepository.removeDraftReceiptById(createdReceiptId);
+    }
+    try {
+      await flushCreateReceiptCriticalPersistence();
+    } catch (flushErr) {
+      return {
+        success: false,
+        error: `${formatPersistenceFailure(
+          "Create receipt was rolled back but saving the rolled-back state failed",
+          flushErr,
+        )} | ${formatPersistenceFailure("Create receipt failed", error)}`,
+      };
+    }
+    return { success: false, error: formatPersistenceFailure("Create receipt failed", error) };
+  }
 }
 
 export const purchaseOrderService = {

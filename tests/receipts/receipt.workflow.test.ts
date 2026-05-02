@@ -109,7 +109,7 @@ describe.sequential("Receipt workflow", () => {
       [{ itemId: "1", qty: 4 }],
     );
 
-    const result = modules.createReceiptFromPurchaseOrder(po.id);
+    const result = await modules.createReceiptFromPurchaseOrder(po.id);
     expect(result.success).toBe(true);
     if (!result.success) return;
 
@@ -139,7 +139,7 @@ describe.sequential("Receipt workflow", () => {
       draftPurchaseOrderHeaderForWarehouse(warehouse.id),
       [{ itemId: "1", qty: 10, unitPrice: 1 }],
     );
-    expect(modules.createReceiptFromPurchaseOrder(draftPo.id)).toEqual({
+    expect(await modules.createReceiptFromPurchaseOrder(draftPo.id)).toEqual({
       success: false,
       error: "Only confirmed purchase orders can have a receipt created.",
     });
@@ -157,7 +157,7 @@ describe.sequential("Receipt workflow", () => {
       [{ itemId: "1", qty: 10 }],
     );
 
-    expect(modules.createReceiptFromPurchaseOrder(confirmedPo.id)).toEqual({
+    expect(await modules.createReceiptFromPurchaseOrder(confirmedPo.id)).toEqual({
       success: false,
       error: "Purchase order is already fully received (posted receipts).",
     });
@@ -166,7 +166,7 @@ describe.sequential("Receipt workflow", () => {
   it("posts only draft receipts and updates stock, purchase order status, and audit", async () => {
     const modules = await loadWorkflow();
     const po = await createConfirmedPurchaseOrder(modules, [{ itemId: "1", qty: 10, unitPrice: 1 }]);
-    const createResult = modules.createReceiptFromPurchaseOrder(po.id);
+    const createResult = await modules.createReceiptFromPurchaseOrder(po.id);
     expect(createResult.success).toBe(true);
     if (!createResult.success) return;
 
@@ -218,7 +218,7 @@ describe.sequential("Receipt workflow", () => {
   it("cancels only draft receipts without inventory impact and writes audit", async () => {
     const modules = await loadWorkflow();
     const po = await createConfirmedPurchaseOrder(modules, [{ itemId: "1", qty: 10, unitPrice: 1 }]);
-    const createResult = modules.createReceiptFromPurchaseOrder(po.id);
+    const createResult = await modules.createReceiptFromPurchaseOrder(po.id);
     expect(createResult.success).toBe(true);
     if (!createResult.success) return;
 
@@ -254,7 +254,7 @@ describe.sequential("Receipt workflow", () => {
   it("reverses posted receipts with compensating movements and purchase order reopen", async () => {
     const modules = await loadWorkflow();
     const po = await createConfirmedPurchaseOrder(modules, [{ itemId: "1", qty: 10, unitPrice: 1 }]);
-    const createResult = modules.createReceiptFromPurchaseOrder(po.id);
+    const createResult = await modules.createReceiptFromPurchaseOrder(po.id);
     expect(createResult.success).toBe(true);
     if (!createResult.success) return;
 
@@ -299,7 +299,7 @@ describe.sequential("Receipt workflow", () => {
   it("fails reversal when on-hand stock is insufficient", async () => {
     const modules = await loadWorkflow();
     const po = await createConfirmedPurchaseOrder(modules, [{ itemId: "1", qty: 10, unitPrice: 1 }]);
-    const createResult = modules.createReceiptFromPurchaseOrder(po.id);
+    const createResult = await modules.createReceiptFromPurchaseOrder(po.id);
     expect(createResult.success).toBe(true);
     if (!createResult.success) return;
 
@@ -463,7 +463,7 @@ describe.sequential("Receipt workflow", () => {
     const item = createActiveItem(modules);
     const po = await createConfirmedPurchaseOrder(modules, [{ itemId: item.id, qty: 10, unitPrice: 1 }]);
 
-    const draftCreate = modules.createReceiptFromPurchaseOrder(po.id);
+    const draftCreate = await modules.createReceiptFromPurchaseOrder(po.id);
     expect(draftCreate.success).toBe(true);
     if (!draftCreate.success) return;
 
@@ -480,7 +480,7 @@ describe.sequential("Receipt workflow", () => {
     expect(cancelledFulfillment.postedReceiptCount).toBe(0);
     expect(cancelledFulfillment.state).toBe("not_started");
 
-    const postedCreate = modules.createReceiptFromPurchaseOrder(po.id);
+    const postedCreate = await modules.createReceiptFromPurchaseOrder(po.id);
     expect(postedCreate.success).toBe(true);
     if (!postedCreate.success) return;
 

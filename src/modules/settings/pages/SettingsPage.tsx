@@ -9,6 +9,7 @@ import { SelectField } from "@/components/ui/select-field";
 import { cn } from "@/lib/utils";
 import {
   registryEntriesForSection,
+  settingsSectionsVisibleForWorkspace,
   useSettings,
   type AppSettings,
   type SettingReadiness,
@@ -16,6 +17,8 @@ import {
   type SettingsSectionId,
   type SettingsPersistenceState,
 } from "@/shared/settings";
+import { getAppVersionForBackupExport } from "@/shared/appVersion";
+import { exportWorkspaceBackupToFile } from "@/shared/backup/exportToFile";
 import { settingRowIconForEntryId } from "@/shared/settings/settingRowIcons";
 import { NULL_PROFILE_OVERRIDES, isWorkspaceFeatureVisible } from "@/shared/workspace";
 import { useTranslation, settingRegistryIdToI18nKey, type TFunction } from "@/shared/i18n";
@@ -184,7 +187,15 @@ export function SettingsPage() {
   } = useSettings();
   const [activeSection, setActiveSection] = useState<SettingsSectionId>("general");
   const workspaceMode = settings.general.workspaceMode;
-  const visibleSettingsSections = useMemo<SettingsSectionId[]>(() => ["general"], []);
+  const visibleSettingsSections = useMemo(
+    () => settingsSectionsVisibleForWorkspace(workspaceMode),
+    [workspaceMode],
+  );
+  const [backupExportRunning, setBackupExportRunning] = useState(false);
+  const [backupExportNotice, setBackupExportNotice] = useState<{
+    tone: "success" | "warn" | "error";
+    text: string;
+  } | null>(null);
 
   useEffect(() => {
     if (!visibleSettingsSections.includes(activeSection)) {
@@ -289,6 +300,46 @@ export function SettingsPage() {
     [patch],
   );
 
+  const onExportWorkspaceBackup = useCallback(async () => {
+    setBackupExportNotice(null);
+    setBackupExportRunning(true);
+    try {
+      const result = await exportWorkspaceBackupToFile({
+        appVersion: getAppVersionForBackupExport(),
+        createdAt: new Date().toISOString(),
+      });
+      if (result.success) {
+        let text = t("settings.page.exportWorkspaceBackupSaved", { path: result.path });
+        if (result.warnings.length > 0) {
+          text += ` ${t("settings.page.exportWorkspaceBackupWarnings", {
+            details: result.warnings.join("; "),
+          })}`;
+        }
+        setBackupExportNotice({
+          tone: result.warnings.length > 0 ? "warn" : "success",
+          text,
+        });
+      } else if (result.cancelled) {
+        /* save dialog dismissed — no error */
+      } else {
+        setBackupExportNotice({
+          tone: "error",
+          text: t("settings.page.exportWorkspaceBackupFailed", {
+            message: result.error ?? t("settings.page.exportWorkspaceBackupUnknownError"),
+          }),
+        });
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      setBackupExportNotice({
+        tone: "error",
+        text: t("settings.page.exportWorkspaceBackupFailed", { message }),
+      });
+    } finally {
+      setBackupExportRunning(false);
+    }
+  }, [t]);
+
   const sectionEntries = useMemo(
     () => registryEntriesForSection(activeSection, workspaceMode),
     [activeSection, workspaceMode],
@@ -380,6 +431,7 @@ export function SettingsPage() {
                 const RowIcon = settingRowIconForEntryId(entry.id);
 
                 if (entry.valueType === "readonly") {
+                  const isBackupRestore = entry.id === "dataAudit.backupRestore";
                   return (
                     <div key={entry.id} className="flex flex-col gap-1 py-3 first:pt-0 sm:flex-row sm:items-start sm:justify-between">
                       <div className="min-w-0 flex-1 space-y-1 pr-4">
@@ -396,8 +448,39 @@ export function SettingsPage() {
                           <ReadinessBadge readiness={entry.readiness} t={t} />
                         </div>
                         <p className="text-xs text-muted-foreground">{entryDescription}</p>
+                        {isBackupRestore && backupExportNotice ? (
+                          <p
+                            className={cn(
+                              "text-[11px] leading-snug",
+                              backupExportNotice.tone === "error"
+                                ? "text-destructive"
+                                : backupExportNotice.tone === "warn"
+                                  ? "text-amber-200/90"
+                                  : "text-emerald-400/90",
+                            )}
+                          >
+                            {backupExportNotice.text}
+                          </p>
+                        ) : null}
                       </div>
-                      <div className="shrink-0 text-xs text-muted-foreground">—</div>
+                      <div className="flex shrink-0 flex-col items-stretch gap-1 sm:items-end">
+                        {isBackupRestore ? (
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            className="h-8 text-xs"
+                            disabled={backupExportRunning}
+                            onClick={() => void onExportWorkspaceBackup()}
+                          >
+                            {backupExportRunning
+                              ? t("settings.page.exportWorkspaceBackupInProgress")
+                              : t("settings.page.exportWorkspaceBackup")}
+                          </Button>
+                        ) : (
+                          <div className="text-xs text-muted-foreground">—</div>
+                        )}
+                      </div>
                     </div>
                   );
                 }

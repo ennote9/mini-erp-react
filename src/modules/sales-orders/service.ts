@@ -1,4 +1,4 @@
-import { salesOrderRepository } from "./repository";
+import { flushPendingSalesOrderPersist, salesOrderRepository } from "./repository";
 import { flushPendingShipmentPersist, shipmentRepository } from "../shipments/repository";
 import { customerRepository } from "../customers/repository";
 import { carrierRepository } from "../carriers/repository";
@@ -484,26 +484,55 @@ function validateConfirm(soId: string): string | null {
   return null;
 }
 
-export function confirm(soId: string): ConfirmResult {
+export async function confirm(soId: string): Promise<ConfirmResult> {
   const err = validateConfirm(soId);
   if (err) return { success: false, error: err };
   const so = salesOrderRepository.getById(soId)!;
-  salesOrderRepository.update(soId, { status: "confirmed" });
-  if (getAppSettings().inventory.reconcileReservationsOnSalesOrderSaveConfirm) {
-    reconcileSalesOrderReservations(soId, { reason: "confirm" });
+  const prevStatus = so.status;
+
+  const reservationSnapshotBefore = captureReservationsSnapshotForSalesOrder(soId);
+  const preSoAuditIds = new Set(
+    listAuditEventsForEntity("sales_order", soId).map((e) => e.id),
+  );
+
+  try {
+    await flushConfirmSalesOrderCriticalPersistence();
+
+    salesOrderRepository.update(soId, { status: "confirmed" });
+    if (getAppSettings().inventory.reconcileReservationsOnSalesOrderSaveConfirm) {
+      reconcileSalesOrderReservations(soId, { reason: "confirm" });
+    }
+    appendAuditEvent({
+      entityType: "sales_order",
+      entityId: soId,
+      eventType: "document_confirmed",
+      actor: AUDIT_ACTOR_LOCAL_USER,
+      payload: {
+        documentNumber: so.number,
+        previousStatus: so.status,
+        newStatus: "confirmed" as const,
+      },
+    });
+
+    await flushConfirmSalesOrderCriticalPersistence();
+    return { success: true };
+  } catch (error) {
+    replaceReservationsForSalesOrderFromSnapshot(soId, reservationSnapshotBefore);
+    removeNewAuditEventsForSalesOrder(soId, preSoAuditIds);
+    salesOrderRepository.update(soId, { status: prevStatus });
+    try {
+      await flushConfirmSalesOrderCriticalPersistence();
+    } catch (flushErr) {
+      return {
+        success: false,
+        error: `${formatPersistenceFailure(
+          "Confirm sales order was rolled back but saving the rolled-back state failed",
+          flushErr,
+        )} | ${formatPersistenceFailure("Confirm sales order failed", error)}`,
+      };
+    }
+    return { success: false, error: formatPersistenceFailure("Confirm sales order failed", error) };
   }
-  appendAuditEvent({
-    entityType: "sales_order",
-    entityId: soId,
-    eventType: "document_confirmed",
-    actor: AUDIT_ACTOR_LOCAL_USER,
-    payload: {
-      documentNumber: so.number,
-      previousStatus: so.status,
-      newStatus: "confirmed" as const,
-    },
-  });
-  return { success: true };
 }
 
 export async function allocateStock(soId: string): Promise<AllocateStockResult> {
@@ -586,10 +615,40 @@ export async function allocateStock(soId: string): Promise<AllocateStockResult> 
   }
 }
 
-export function cancelDocument(
+async function flushCancelSalesOrderCriticalPersistence(): Promise<void> {
+  const settled = await Promise.allSettled([
+    flushPendingSalesOrderPersist(),
+    flushPendingStockReservationPersist(),
+    flushPendingAuditEventPersist(),
+  ]);
+  const failures = settled.flatMap((result) => {
+    if (result.status === "fulfilled") return [];
+    return [result.reason instanceof Error ? result.reason.message : String(result.reason)];
+  });
+  if (failures.length > 0) {
+    throw new Error(failures.join(" | "));
+  }
+}
+
+async function flushConfirmSalesOrderCriticalPersistence(): Promise<void> {
+  const settled = await Promise.allSettled([
+    flushPendingSalesOrderPersist(),
+    flushPendingStockReservationPersist(),
+    flushPendingAuditEventPersist(),
+  ]);
+  const failures = settled.flatMap((result) => {
+    if (result.status === "fulfilled") return [];
+    return [result.reason instanceof Error ? result.reason.message : String(result.reason)];
+  });
+  if (failures.length > 0) {
+    throw new Error(failures.join(" | "));
+  }
+}
+
+export async function cancelDocument(
   soId: string,
   input: CancelDocumentReasonInput,
-): CancelDocumentResult {
+): Promise<CancelDocumentResult> {
   const resolved = resolveCancelDocumentReasonForService(
     input,
     getAppSettings().documents.requireCancelReason,
@@ -605,41 +664,75 @@ export function cancelDocument(
   const code = resolved.code;
   const comment = resolved.comment;
   const prevStatus = so.status;
-  const reservationsReleased = getAppSettings().inventory.releaseReservationsOnSalesOrderCancel
-    ? stockReservationRepository.releaseAllActiveForSalesOrder(soId)
-    : 0;
-  salesOrderRepository.update(soId, {
-    status: "cancelled",
-    cancelReasonCode: code,
-    ...(comment !== undefined ? { cancelReasonComment: comment } : {}),
-  });
-  appendAuditEvent({
-    entityType: "sales_order",
-    entityId: soId,
-    eventType: "document_cancelled",
-    actor: AUDIT_ACTOR_LOCAL_USER,
-    payload: {
-      documentNumber: so.number,
-      previousStatus: prevStatus,
-      newStatus: "cancelled" as const,
+  const prevCancelReasonCode = so.cancelReasonCode;
+  const prevCancelReasonComment = so.cancelReasonComment;
+
+  const reservationSnapshotBefore = captureReservationsSnapshotForSalesOrder(soId);
+  const preSoAuditIds = new Set(
+    listAuditEventsForEntity("sales_order", soId).map((e) => e.id),
+  );
+
+  try {
+    await flushCancelSalesOrderCriticalPersistence();
+
+    const reservationsReleased = getAppSettings().inventory.releaseReservationsOnSalesOrderCancel
+      ? stockReservationRepository.releaseAllActiveForSalesOrder(soId)
+      : 0;
+    salesOrderRepository.update(soId, {
+      status: "cancelled",
       cancelReasonCode: code,
-      cancelReasonComment: comment ?? null,
-    },
-  });
-  if (reservationsReleased > 0) {
+      ...(comment !== undefined ? { cancelReasonComment: comment } : {}),
+    });
     appendAuditEvent({
       entityType: "sales_order",
       entityId: soId,
-      eventType: "reservation_released",
+      eventType: "document_cancelled",
       actor: AUDIT_ACTOR_LOCAL_USER,
       payload: {
         documentNumber: so.number,
-        reservationsReleased,
-        reason: "sales_order_cancelled",
+        previousStatus: prevStatus,
+        newStatus: "cancelled" as const,
+        cancelReasonCode: code,
+        cancelReasonComment: comment ?? null,
       },
     });
+    if (reservationsReleased > 0) {
+      appendAuditEvent({
+        entityType: "sales_order",
+        entityId: soId,
+        eventType: "reservation_released",
+        actor: AUDIT_ACTOR_LOCAL_USER,
+        payload: {
+          documentNumber: so.number,
+          reservationsReleased,
+          reason: "sales_order_cancelled",
+        },
+      });
+    }
+
+    await flushCancelSalesOrderCriticalPersistence();
+    return { success: true };
+  } catch (error) {
+    replaceReservationsForSalesOrderFromSnapshot(soId, reservationSnapshotBefore);
+    removeNewAuditEventsForSalesOrder(soId, preSoAuditIds);
+    salesOrderRepository.update(soId, {
+      status: prevStatus,
+      cancelReasonCode: prevCancelReasonCode,
+      cancelReasonComment: prevCancelReasonComment,
+    });
+    try {
+      await flushCancelSalesOrderCriticalPersistence();
+    } catch (flushErr) {
+      return {
+        success: false,
+        error: `${formatPersistenceFailure(
+          "Cancel sales order was rolled back but saving the rolled-back state failed",
+          flushErr,
+        )} | ${formatPersistenceFailure("Cancel sales order failed", error)}`,
+      };
+    }
+    return { success: false, error: formatPersistenceFailure("Cancel sales order failed", error) };
   }
-  return { success: true };
 }
 
 function hasDraftShipmentForSo(soId: string): boolean {

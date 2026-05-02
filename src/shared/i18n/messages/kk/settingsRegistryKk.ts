@@ -137,7 +137,8 @@ export const kkSettingsEntriesFull: MessageTree = {
   },
   dataAudit__backupRestore: {
     label: "Сақтық көшірме және қалпына келтіру",
-    description: "Толық жұмыс ортасын сақтық көшіру осы нұсқада қолжетімсіз.",
+    description:
+      "Осы беттен жұмыс ортасының ZIP сақтық көшірмесін экспорттауға болады. Сақтық көшірмеден қалпына келтіру әлі іске асырылмаған.",
   },
   dataAudit__resetDemo: {
     label: "Демо / тест деректерін қалпына келтіру",

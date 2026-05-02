@@ -80,7 +80,7 @@ describe.sequential("Receipt post atomicity", () => {
     expect(modules.confirmPurchaseOrder(po.id)).toEqual({ success: true });
     const confirmed = modules.purchaseOrderRepository.getById(po.id)!;
 
-    const createResult = modules.createReceiptFromPurchaseOrder(confirmed.id);
+    const createResult = await modules.createReceiptFromPurchaseOrder(confirmed.id);
     expect(createResult.success).toBe(true);
     if (!createResult.success) return;
     const receiptId = createResult.receiptId;

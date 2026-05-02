@@ -150,7 +150,7 @@ async function createConfirmedSalesOrder(
     draftSalesOrderHeaderFor(warehouse.id, customer.id, patch),
     lines,
   );
-  const confirmResult = modules.confirmSalesOrder(so.id);
+  const confirmResult = await modules.confirmSalesOrder(so.id);
   expect(confirmResult).toEqual({ success: true });
   return modules.salesOrderRepository.getById(so.id)!;
 }

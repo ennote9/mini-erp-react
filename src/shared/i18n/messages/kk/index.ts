@@ -677,6 +677,12 @@ export const kkMessages: MessageTree = {
       persistenceLabel: "Баптауларды сақтау",
       buildInfoLabel: "Қолданба",
       buildInfoDesc: "Фронтенд жинағының режимі.",
+      exportWorkspaceBackup: "Жұмыс ортасының сақтық көшірмесін экспорттау",
+      exportWorkspaceBackupInProgress: "Экспортталуда…",
+      exportWorkspaceBackupSaved: "Сақтық көшірме сақталды: {{path}}.",
+      exportWorkspaceBackupWarnings: "Ескертпелермен аяқталды: {{details}}",
+      exportWorkspaceBackupFailed: "Сақтық көшірмені экспорттау қатесі: {{message}}",
+      exportWorkspaceBackupUnknownError: "Белгісіз қате",
     },
     persistence: {
       filePersisted: "Жергілікті сақталған (қолданба деректер қалтасы).",

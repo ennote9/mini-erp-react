@@ -137,7 +137,8 @@ export const ruSettingsEntriesFull: MessageTree = {
   },
   dataAudit__backupRestore: {
     label: "Резервное копирование и восстановление",
-    description: "Полное резервирование рабочей области в этой версии недоступно.",
+    description:
+      "Экспорт ZIP-резервной копии рабочей области доступен на этой странице. Восстановление из резервной копии пока не реализовано.",
   },
   dataAudit__resetDemo: {
     label: "Сброс демо / тестовых данных",

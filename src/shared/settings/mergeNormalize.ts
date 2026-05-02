@@ -58,6 +58,7 @@ export function normalizeAppSettingsFromUnknown(raw: unknown): AppSettings {
   if (!isRecord(raw)) return structuredClone(base);
 
   const g = isRecord(raw.general) ? raw.general : {};
+  const i = isRecord(raw.inventory) ? raw.inventory : {};
   const c = isRecord(raw.commercial) ? raw.commercial : {};
   const a = isRecord(raw.dataAudit) ? raw.dataAudit : {};
 
@@ -89,7 +90,8 @@ export function normalizeAppSettingsFromUnknown(raw: unknown): AppSettings {
       reservationsEnabled: true,
       requireReservationBeforeShipment: true,
       allocationMode: base.inventory.allocationMode,
-      releaseReservationsOnSalesOrderCancel: true,
+      releaseReservationsOnSalesOrderCancel:
+        asBool(i.releaseReservationsOnSalesOrderCancel) ?? base.inventory.releaseReservationsOnSalesOrderCancel,
       releaseReservationsOnSalesOrderClose: true,
       reconcileReservationsOnSalesOrderSaveConfirm: true,
     },
@@ -144,7 +146,6 @@ export function mergeAppSettingsPatch(
       reservationsEnabled: true,
       requireReservationBeforeShipment: true,
       allocationMode: current.inventory.allocationMode,
-      releaseReservationsOnSalesOrderCancel: true,
       releaseReservationsOnSalesOrderClose: true,
       reconcileReservationsOnSalesOrderSaveConfirm: true,
     },

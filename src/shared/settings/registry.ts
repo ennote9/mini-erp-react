@@ -329,8 +329,9 @@ export const SETTINGS_REGISTRY: SettingRegistryEntry[] = [
     section: "dataAudit",
     valueType: "readonly",
     label: "Backup & restore",
-    description: "Full workspace backup is not available in this version.",
-    readiness: "informational",
+    description:
+      "You can export a workspace backup ZIP from Settings. Restore from a backup is not implemented yet.",
+    readiness: "partial",
     minWorkspaceMode: "standard",
   },
   {

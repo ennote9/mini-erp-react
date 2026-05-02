@@ -448,10 +448,10 @@ export function PurchaseOrderPage() {
   const returnTo = readReturnToParam(searchParams);
   const backHref = returnTo ?? "/purchase-orders";
 
-  const handleCreateReceipt = () => {
+  const handleCreateReceipt = async () => {
     if (!id || isNew) return;
     setActionIssues([]);
-    const result = createReceipt(id);
+    const result = await createReceipt(id);
     if (result.success) navigate(`/receipts/${result.receiptId}`);
     else if (!issueListContainsMessage(health.issues, result.error))
       setActionIssues([actionIssueFromServiceMessage(result.error)]);
