@@ -3,9 +3,6 @@ import { cn } from "@/lib/utils";
 import { useTranslation } from "@/shared/i18n";
 import { useSettings } from "@/shared/settings";
 import { getEffectiveWorkspaceFeatureEnabled } from "@/shared/workspace";
-import { MarkingSubnav } from "./MarkingSubnav";
-
-const MARKING_PREFIX = "/items/marking-";
 
 const TOP_LINK_CLASS = ({ isActive }: { isActive: boolean }) =>
   cn(
@@ -28,7 +25,7 @@ function isReferencesSectionActive(pathname: string): boolean {
 }
 
 /**
- * Two-level in-section navigation for Items list, item references, label data, and marking operational pages.
+ * Two-level in-section navigation for Items list, item references, and label data.
  */
 export function ItemsSubnav() {
   const { t } = useTranslation();
@@ -40,7 +37,6 @@ export function ItemsSubnav() {
     "navBrandsCategories",
   );
 
-  const isMarkingSection = pathname.startsWith(MARKING_PREFIX);
   const isReferencesSection = isReferencesSectionActive(pathname);
 
   return (
@@ -61,16 +57,6 @@ export function ItemsSubnav() {
         </NavLink>
         <NavLink to="/items/label-data" end className={TOP_LINK_CLASS}>
           {t("master.itemsLabelData.navLink")}
-        </NavLink>
-        <NavLink
-          to="/items/marking-import"
-          className={({ isActive }) =>
-            TOP_LINK_CLASS({
-              isActive: isActive || pathname.startsWith(MARKING_PREFIX),
-            })
-          }
-        >
-          {t("items.subnav.marking")}
         </NavLink>
       </nav>
 
@@ -94,8 +80,6 @@ export function ItemsSubnav() {
           ) : null}
         </nav>
       ) : null}
-
-      {isMarkingSection ? <MarkingSubnav /> : null}
     </div>
   );
 }
