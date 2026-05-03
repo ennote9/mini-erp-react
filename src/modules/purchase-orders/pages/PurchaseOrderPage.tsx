@@ -1491,194 +1491,196 @@ export function PurchaseOrderPage() {
               <div className="flex items-end gap-2 w-full mb-1.5">
                 <Card className="border-0 shadow-none flex-1 min-w-0">
                   <CardContent className="p-2 pb-0">
-                    <div className="grid grid-cols-2 md:grid-cols-[minmax(200px,240px)_auto_auto_auto_minmax(160px,220px)_minmax(260px,1fr)] gap-x-2 gap-y-1 items-end w-max max-w-full">
-                    <div className="flex flex-col gap-0.5">
-                      <Label htmlFor="line-entry-item" className="text-sm">
-                        {t("doc.page.itemLabel")} <span className="text-destructive">*</span>
-                      </Label>
-                      <PurchaseOrderItemAutocomplete
-                        ref={lineEntryItemPickerRef}
-                        id="line-entry-item"
-                        value={lineEntryItemId}
-                        onChange={handleLineEntryItemChange}
-                        items={documentLineItems}
-                        placeholder={t("doc.page.searchItemPlaceholder")}
-                        className="w-[240px]"
-                        dropdownRightEdgeRef={lineEntryDropdownRightEdgeRef}
-                      />
-                    </div>
-                    <div className="flex flex-col gap-0.5">
-                      <Label htmlFor="line-entry-qty" className="text-sm">
-                        {t("doc.columns.qty")} <span className="text-destructive">*</span>
-                      </Label>
-                      <Input
-                        ref={lineEntryQtyInputRef}
-                        id="line-entry-qty"
-                        type="number"
-                        min={1}
-                        value={lineEntryQty}
-                        onChange={(e) =>
-                          setLineEntryQty(Number(e.target.value) || 1)
-                        }
-                        onKeyDown={(e) => {
-                          if (e.key === "Enter" && editingLineId === null) {
-                            e.preventDefault();
-                            addLineFromEntry();
-                          }
-                        }}
-                        className="h-8 w-[80px] text-sm text-right align-middle [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                      />
-                    </div>
-                    <div className="flex flex-col gap-0.5">
-                      <Label htmlFor="line-entry-unit-price" className="text-sm">{t("doc.columns.unitPrice")}</Label>
-                      <Input
-                        id="line-entry-unit-price"
-                        type="number"
-                        min={0}
-                        step="0.01"
-                        value={lineEntryUnitPrice}
-                        onChange={(e) => {
-                          const v = Number(e.target.value);
-                          const next = Number.isFinite(v) && v >= 0 ? v : 0;
-                          setLineEntryUnitPrice(next);
-                          if (roundMoney(next) !== 0) setLineEntryZeroPriceReason("");
-                        }}
-                        className="h-8 w-[80px] text-sm text-right align-middle [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                      />
-                    </div>
-                    <div className="flex flex-col gap-0.5 md:col-span-1">
-                      <Label htmlFor="line-entry-zp-reason" className="text-sm">
-                        {t("doc.page.zeroPriceReasonLabel")}
-                        {roundMoney(lineEntryUnitPrice) === 0 ? (
-                          <span className="text-destructive"> *</span>
-                        ) : null}
-                      </Label>
-                      <SelectField
-                        id="line-entry-zp-reason"
-                        value={lineEntryZeroPriceReason}
-                        onChange={setLineEntryZeroPriceReason}
-                        options={zeroPriceReasonOptions}
-                        placeholder={
-                          roundMoney(lineEntryUnitPrice) === 0
-                            ? t("doc.cancelDialog.selectPlaceholder")
-                            : t("domain.audit.summary.emDash")
-                        }
-                        className="w-[min(100%,220px)] min-w-0"
-                        disabled={roundMoney(lineEntryUnitPrice) !== 0}
-                      />
-                    </div>
-                    <div
-                      ref={lineEntryDropdownRightEdgeRef}
-                      className="flex gap-1.5 flex-shrink-0 items-center"
-                    >
-                      {editingLineId === null ? (
-                        <>
-                          <Button
-                            type="button"
-                            variant="outline"
-                            size="sm"
-                            className="h-8 gap-1.5"
-                            onClick={addLineFromEntry}
-                            title={t("doc.page.addLineTitle")}
-                          >
-                            <Plus className="h-4 w-4 shrink-0" aria-hidden />
-                            {t("doc.page.addLine")}
-                          </Button>
-                          <Button
-                            type="button"
-                            variant="outline"
-                            size="sm"
-                            className="h-8 gap-1.5"
-                            onClick={() => {
-                              setLineImportInitialTab("paste");
-                              setIsLineImportModalOpen(true);
-                            }}
-                            title={t("doc.page.addLinesTitle")}
-                          >
-                            <ClipboardPaste className="h-4 w-4 shrink-0" aria-hidden />
-                            {t("doc.page.addLines")}
-                          </Button>
-                        </>
-                      ) : (
-                        <>
-                          <Button
-                            type="button"
-                            size="sm"
-                            className="h-8 gap-1.5"
-                            onClick={updateLineFromEntry}
-                          >
-                            <Check className="h-4 w-4 shrink-0" aria-hidden />
-                            {t("doc.page.updateLine")}
-                          </Button>
-                          <Button
-                            type="button"
-                            variant="outline"
-                            size="sm"
-                            className="h-8 gap-1.5"
-                            disabled={form.lines.length <= 1}
-                            onClick={() => {
-                              if (editingLineId !== null) {
-                                removeLineByLineId(editingLineId);
-                                cancelEdit();
+                    <div className="flex w-full min-w-0 flex-col gap-2">
+                      <div className="flex w-full min-w-0 flex-wrap items-end gap-x-3 gap-y-2">
+                        <div className="flex min-w-0 max-w-full flex-wrap items-end gap-x-2 gap-y-1">
+                          <div className="flex min-w-[180px] max-w-[240px] flex-col gap-0.5">
+                            <Label htmlFor="line-entry-item" className="text-sm">
+                              {t("doc.page.itemLabel")} <span className="text-destructive">*</span>
+                            </Label>
+                            <PurchaseOrderItemAutocomplete
+                              ref={lineEntryItemPickerRef}
+                              id="line-entry-item"
+                              value={lineEntryItemId}
+                              onChange={handleLineEntryItemChange}
+                              items={documentLineItems}
+                              placeholder={t("doc.page.searchItemPlaceholder")}
+                              className="w-full min-w-0 max-w-[240px]"
+                              dropdownRightEdgeRef={lineEntryDropdownRightEdgeRef}
+                            />
+                          </div>
+                          <div className="flex flex-col gap-0.5">
+                            <Label htmlFor="line-entry-qty" className="text-sm">
+                              {t("doc.columns.qty")} <span className="text-destructive">*</span>
+                            </Label>
+                            <Input
+                              ref={lineEntryQtyInputRef}
+                              id="line-entry-qty"
+                              type="number"
+                              min={1}
+                              value={lineEntryQty}
+                              onChange={(e) =>
+                                setLineEntryQty(Number(e.target.value) || 1)
                               }
-                            }}
-                          >
-                            <Trash2 className="h-4 w-4 shrink-0" aria-hidden />
-                            {t("doc.page.remove")}
-                          </Button>
-                          <Button
-                            type="button"
-                            variant="outline"
-                            size="sm"
-                            className="h-8 gap-1.5"
-                            onClick={cancelEdit}
-                          >
-                            <X className="h-4 w-4 shrink-0" aria-hidden />
-                            {t("doc.page.cancelEdit")}
-                          </Button>
-                        </>
-                      )}
-                    </div>
-                    <div className="doc-lines__contextual-slot min-h-9 flex items-end">
-                      {duplicateChoicePending && editingLineId === null ? (
-                        <div className="flex flex-col gap-1">
-                          <span className="text-muted-foreground text-xs leading-tight">{t("doc.page.itemAlreadyExists")}</span>
-                          <div className="flex items-center gap-1.5">
-                            <Button
-                              type="button"
-                              variant="default"
-                              size="sm"
-                              className="h-8"
-                              onClick={handleDuplicateIncreaseQty}
-                            >
-                              {t("doc.page.increaseQuantity")}
-                            </Button>
-                            <Button
-                              type="button"
-                              variant="outline"
-                              size="sm"
-                              className="h-8"
-                              onClick={handleDuplicateCancel}
-                            >
-                              {t("common.cancel")}
-                            </Button>
+                              onKeyDown={(e) => {
+                                if (e.key === "Enter" && editingLineId === null) {
+                                  e.preventDefault();
+                                  addLineFromEntry();
+                                }
+                              }}
+                              className="h-8 w-[80px] text-sm text-right align-middle [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                            />
+                          </div>
+                          <div className="flex flex-col gap-0.5">
+                            <Label htmlFor="line-entry-unit-price" className="text-sm">{t("doc.columns.unitPrice")}</Label>
+                            <Input
+                              id="line-entry-unit-price"
+                              type="number"
+                              min={0}
+                              step="0.01"
+                              value={lineEntryUnitPrice}
+                              onChange={(e) => {
+                                const v = Number(e.target.value);
+                                const next = Number.isFinite(v) && v >= 0 ? v : 0;
+                                setLineEntryUnitPrice(next);
+                                if (roundMoney(next) !== 0) setLineEntryZeroPriceReason("");
+                              }}
+                              className="h-8 w-[80px] text-sm text-right align-middle [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                            />
+                          </div>
+                          <div className="flex min-w-0 flex-col gap-0.5">
+                            <Label htmlFor="line-entry-zp-reason" className="text-sm">
+                              {t("doc.page.zeroPriceReasonLabel")}
+                              {roundMoney(lineEntryUnitPrice) === 0 ? (
+                                <span className="text-destructive"> *</span>
+                              ) : null}
+                            </Label>
+                            <SelectField
+                              id="line-entry-zp-reason"
+                              value={lineEntryZeroPriceReason}
+                              onChange={setLineEntryZeroPriceReason}
+                              options={zeroPriceReasonOptions}
+                              placeholder={
+                                roundMoney(lineEntryUnitPrice) === 0
+                                  ? t("doc.cancelDialog.selectPlaceholder")
+                                  : t("domain.audit.summary.emDash")
+                              }
+                              className="w-[min(100%,220px)] min-w-0"
+                              disabled={roundMoney(lineEntryUnitPrice) !== 0}
+                            />
                           </div>
                         </div>
-                      ) : selectedLineIds.length >= 2 ? (
-                        <div className="flex flex-col gap-1">
-                          <span className="text-muted-foreground text-xs leading-tight">
-                            {t("doc.page.linesSelected", { count: selectedLineIds.length })}
-                          </span>
-                          <div className="flex items-center gap-1.5">
-                            <Button type="button" variant="outline" size="sm" className="h-8" onClick={removeSelectedLines}>
-                              {t("doc.page.removeSelectedLines")}
-                            </Button>
-                          </div>
+                        <div
+                          ref={lineEntryDropdownRightEdgeRef}
+                          className="flex shrink-0 flex-wrap items-center gap-1.5"
+                        >
+                          {editingLineId === null ? (
+                            <>
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                className="h-8 gap-1.5"
+                                onClick={addLineFromEntry}
+                                title={t("doc.page.addLineTitle")}
+                              >
+                                <Plus className="h-4 w-4 shrink-0" aria-hidden />
+                                {t("doc.page.addLine")}
+                              </Button>
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                className="h-8 gap-1.5"
+                                onClick={() => {
+                                  setLineImportInitialTab("paste");
+                                  setIsLineImportModalOpen(true);
+                                }}
+                                title={t("doc.page.addLinesTitle")}
+                              >
+                                <ClipboardPaste className="h-4 w-4 shrink-0" aria-hidden />
+                                {t("doc.page.addLines")}
+                              </Button>
+                            </>
+                          ) : (
+                            <>
+                              <Button
+                                type="button"
+                                size="sm"
+                                className="h-8 gap-1.5"
+                                onClick={updateLineFromEntry}
+                              >
+                                <Check className="h-4 w-4 shrink-0" aria-hidden />
+                                {t("doc.page.updateLine")}
+                              </Button>
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                className="h-8 gap-1.5"
+                                disabled={form.lines.length <= 1}
+                                onClick={() => {
+                                  if (editingLineId !== null) {
+                                    removeLineByLineId(editingLineId);
+                                    cancelEdit();
+                                  }
+                                }}
+                              >
+                                <Trash2 className="h-4 w-4 shrink-0" aria-hidden />
+                                {t("doc.page.remove")}
+                              </Button>
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                className="h-8 gap-1.5"
+                                onClick={cancelEdit}
+                              >
+                                <X className="h-4 w-4 shrink-0" aria-hidden />
+                                {t("doc.page.cancelEdit")}
+                              </Button>
+                            </>
+                          )}
                         </div>
-                      ) : null}
+                        {duplicateChoicePending && editingLineId === null ? (
+                          <div className="doc-lines__contextual-slot flex min-w-0 max-w-full shrink-0 basis-full flex-col gap-1 sm:basis-auto sm:max-w-md">
+                            <span className="text-muted-foreground text-xs leading-tight">{t("doc.page.itemAlreadyExists")}</span>
+                            <div className="flex flex-wrap items-center gap-1.5">
+                              <Button
+                                type="button"
+                                variant="default"
+                                size="sm"
+                                className="h-8"
+                                onClick={handleDuplicateIncreaseQty}
+                              >
+                                {t("doc.page.increaseQuantity")}
+                              </Button>
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                className="h-8"
+                                onClick={handleDuplicateCancel}
+                              >
+                                {t("common.cancel")}
+                              </Button>
+                            </div>
+                          </div>
+                        ) : selectedLineIds.length >= 2 ? (
+                          <div className="doc-lines__contextual-slot flex min-w-0 max-w-full shrink-0 basis-full flex-col gap-1 sm:basis-auto sm:max-w-md">
+                            <span className="text-muted-foreground text-xs leading-tight">
+                              {t("doc.page.linesSelected", { count: selectedLineIds.length })}
+                            </span>
+                            <div className="flex flex-wrap items-center gap-1.5">
+                              <Button type="button" variant="outline" size="sm" className="h-8 shrink-0" onClick={removeSelectedLines}>
+                                {t("doc.page.removeSelectedLines")}
+                              </Button>
+                            </div>
+                          </div>
+                        ) : null}
+                      </div>
                     </div>
-                  </div>
-                </CardContent>
+                  </CardContent>
               </Card>
               </div>
             )}
