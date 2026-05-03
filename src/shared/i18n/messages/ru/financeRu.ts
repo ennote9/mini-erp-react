@@ -3,6 +3,16 @@ export const financeRu = {
   sectionHint:
     "Учёт оплат по этому заказу на продажу. Счёт на оплату отделён от предварительного документа клиенту.",
   paymentStatusLabel: "Статус оплаты",
+  paymentSectionTitle: "Оплата",
+  plannedProfitSectionTitle: "Плановая прибыль",
+  revenue: "Выручка",
+  plannedCost: "Плановая себестоимость",
+  plannedGrossProfit: "Плановая валовая прибыль",
+  plannedMargin: "Плановая маржа",
+  plannedProfitHint:
+    "Расчёт основан на закупочных ценах номенклатуры на дату заказа. Это не фактическая прибыль.",
+  plannedProfitMissingCostWarning:
+    "Себестоимость не указана для {{count}} строк; эти строки учтены с нулевой плановой себестоимостью.",
   paymentStatus: {
     unpaid: "Не оплачен",
     partially_paid: "Частично оплачен",

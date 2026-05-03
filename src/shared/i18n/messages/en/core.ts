@@ -454,7 +454,6 @@ export const coreEn = {
     salesOrders: "Sales Orders",
     salesOrder: "Sales Order",
     salesOrderPreliminaryDocument: "Preliminary document",
-    salesOrderCustomerDocument: "Preliminary customer document",
     salesOrderCustomerInvoice: "Payment request (sales order)",
     shipments: "Shipments",
     shipment: "Shipment",

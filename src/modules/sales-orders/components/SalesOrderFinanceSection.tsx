@@ -10,7 +10,11 @@ import {
   deleteSalesOrderPayment,
   type PaymentServiceErrorCode,
 } from "../salesOrderPaymentService";
-import { deriveSalesOrderPaymentSummary } from "../salesOrderFinance";
+import {
+  deriveSalesOrderPaymentSummary,
+  deriveSalesOrderPlannedProfitSummary,
+  type SalesOrderPlannedProfitLineInput,
+} from "../salesOrderFinance";
 import { CUSTOMER_PAYMENT_METHOD_CODES } from "../salesOrderPaymentModel";
 import type { CustomerPaymentMethod } from "../salesOrderPaymentModel";
 import { getCommercialMoneyDecimalPlaces, roundMoney } from "@/shared/commercialMoney";
@@ -40,17 +44,26 @@ function defaultDatetimeLocal(): string {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
+/** Compact finance metrics: label stays near value on wide panels (capped width). */
+const FINANCE_METRICS_DL = "w-full max-w-md space-y-1.5 text-sm";
+const FINANCE_METRIC_ROW =
+  "grid grid-cols-[minmax(0,1fr)_auto] items-baseline gap-x-3 [&_dt]:text-muted-foreground";
+
 export type SalesOrderFinanceSectionProps = {
   salesOrderId: string;
   cancelled: boolean;
   orderTotalAmount: number;
   hasLines: boolean;
+  /** YYYY-MM-DD — effective purchase prices for planned cost. */
+  orderDateYmd: string;
+  /** Lines used for planned profit (same basis as commercial revenue). */
+  plannedProfitLines: ReadonlyArray<SalesOrderPlannedProfitLineInput>;
 };
 
 export function SalesOrderFinanceSection(props: SalesOrderFinanceSectionProps) {
-  const { salesOrderId, cancelled, orderTotalAmount, hasLines } = props;
+  const { salesOrderId, cancelled, orderTotalAmount, hasLines, orderDateYmd, plannedProfitLines } = props;
   const { t, locale } = useTranslation();
-  const { formatDateTime, formatMoney } = useAppDisplayFormatters();
+  const { formatDateTime, formatMoney, formatNumber } = useAppDisplayFormatters();
   const moneyFractionDigits = getCommercialMoneyDecimalPlaces();
   const revision = useAppReadModelRevision();
 
@@ -63,6 +76,20 @@ export function SalesOrderFinanceSection(props: SalesOrderFinanceSectionProps) {
     () => deriveSalesOrderPaymentSummary(orderTotalAmount, payments),
     [orderTotalAmount, payments],
   );
+
+  const plannedProfit = useMemo(
+    () => deriveSalesOrderPlannedProfitSummary(plannedProfitLines, orderDateYmd),
+    [plannedProfitLines, orderDateYmd],
+  );
+
+  const plannedMarginLabel = useMemo(() => {
+    if (plannedProfit.marginPercent === null) return "—";
+    return `${formatNumber(plannedProfit.marginPercent, { minFractionDigits: 1, maxFractionDigits: 2 })}%`;
+  }, [plannedProfit.marginPercent, formatNumber]);
+
+  const plannedGrossProfitNegative = plannedProfit.plannedGrossProfit < 0;
+  const plannedMarginNegative =
+    plannedProfit.marginPercent !== null && plannedProfit.marginPercent < 0;
 
   const [amountStr, setAmountStr] = useState("");
   const [paidAtLocal, setPaidAtLocal] = useState(defaultDatetimeLocal);
@@ -137,120 +164,206 @@ export function SalesOrderFinanceSection(props: SalesOrderFinanceSectionProps) {
   );
 
   return (
-    <Card className="max-w-4xl border-0 bg-transparent shadow-none">
-      <CardContent className="space-y-4 p-2">
-        <div className="flex flex-wrap items-center gap-2">
-          {canOpenInvoice ? (
-            <Button type="button" variant="outline" size="sm" className="gap-1.5" asChild>
-              <Link to={invoiceTo}>
-                <ExternalLink className="h-4 w-4" aria-hidden />
-                {t("finance.openCustomerInvoice")}
-              </Link>
-            </Button>
-          ) : (
-            <Button type="button" variant="outline" size="sm" className="gap-1.5" disabled>
-              <ExternalLink className="h-4 w-4" aria-hidden />
-              {t("finance.openCustomerInvoice")}
-            </Button>
-          )}
-          {canMutatePayments ? (
-            <Button type="button" size="sm" className="gap-1.5" onClick={openRecordPaymentDialog}>
-              {t("finance.addPayment")}
-            </Button>
-          ) : null}
-        </div>
-
-        {!hasLines && payments.length === 0 ? (
-          <p className="text-sm text-muted-foreground">
-            {t(cancelled ? "finance.invoiceUnavailable" : "finance.invoiceNeedsLines")}
-          </p>
-        ) : null}
-        {cancelled && hasLines ? (
-          <p className="text-sm text-muted-foreground">{t("finance.readOnlyCancelled")}</p>
-        ) : null}
-
-        {showAmountsAndPayments ? (
-          <>
-            <div className="rounded-md border border-border px-3 py-2 text-sm">
-              <div className="flex flex-wrap gap-x-6 gap-y-1">
-                <span>
-                  <span className="text-muted-foreground">{t("common.status")}: </span>
-                  <span className="font-medium">{paymentStatusLabel}</span>
-                </span>
-                <span className="tabular-nums">
-                  <span className="text-muted-foreground">{t("finance.orderTotal")}: </span>
-                  {formatMoney(roundMoney(summary.totalAmount), moneyFractionDigits)}
-                </span>
-                <span className="tabular-nums">
-                  <span className="text-muted-foreground">{t("finance.paidTotal")}: </span>
-                  {formatMoney(roundMoney(summary.paidAmount), moneyFractionDigits)}
-                </span>
-                <span className="tabular-nums">
-                  <span className="text-muted-foreground">{t("finance.remaining")}: </span>
-                  {formatMoney(roundMoney(summary.remainingAmount), moneyFractionDigits)}
-                </span>
-              </div>
-            </div>
-
-            <div>
-              <h4 className="mb-1 text-xs font-semibold uppercase tracking-wide leading-none text-muted-foreground">
-                {t("finance.paymentHistory")}
-              </h4>
-              {payments.length === 0 ? (
-                <p className="text-sm text-muted-foreground">{t("finance.noPayments")}</p>
+    <Card className="w-full max-w-none border-0 bg-transparent shadow-none">
+      <CardContent className="w-full p-2">
+        <div className="grid w-full grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] xl:items-start">
+          <section
+            className="min-w-0 w-full space-y-4 rounded-md border border-border p-3"
+            aria-labelledby="so-finance-payment-section-title"
+          >
+            <h4
+              id="so-finance-payment-section-title"
+              className="mb-0 text-xs font-semibold uppercase tracking-wide leading-none text-muted-foreground"
+            >
+              {t("finance.paymentSectionTitle")}
+            </h4>
+            <div className="flex flex-wrap items-center gap-2">
+              {canOpenInvoice ? (
+                <Button type="button" variant="outline" size="sm" className="gap-1.5" asChild>
+                  <Link to={invoiceTo}>
+                    <ExternalLink className="h-4 w-4" aria-hidden />
+                    {t("finance.openCustomerInvoice")}
+                  </Link>
+                </Button>
               ) : (
-                <div className="overflow-x-auto rounded-md border border-border">
-                  <table className="w-full border-collapse text-sm leading-tight">
-                    <thead>
-                      <tr className="border-b border-border text-left text-xs text-muted-foreground">
-                        <th className="px-1 py-1 font-medium">{t("finance.paidAt")}</th>
-                        <th className="px-1 py-1 font-medium">{t("finance.amount")}</th>
-                        <th className="px-1 py-1 font-medium">{t("finance.method")}</th>
-                        <th className="px-1 py-1 font-medium">{t("finance.reference")}</th>
-                        <th className="px-1 py-1 font-medium">{t("finance.comment")}</th>
-                        {canMutatePayments ? <th className="w-8 px-0 py-1" /> : null}
-                      </tr>
-                    </thead>
-                    <tbody className="text-xs">
-                      {payments.map((p) => (
-                        <tr key={p.id} className="border-b border-border/80 last:border-0">
-                          <td className="px-1 py-px tabular-nums whitespace-nowrap align-middle">
-                            {formatDateTime(p.paidAt)}
-                          </td>
-                          <td className="px-1 py-px tabular-nums align-middle">
-                            {formatMoney(roundMoney(p.amount), moneyFractionDigits)}
-                          </td>
-                          <td className="px-1 py-px align-middle">{t(`finance.paymentMethod.${p.method}`)}</td>
-                          <td className="max-w-[10rem] truncate px-1 py-px align-middle" title={p.reference ?? ""}>
-                            {p.reference ?? "—"}
-                          </td>
-                          <td className="max-w-[12rem] truncate px-1 py-px align-middle" title={p.comment ?? ""}>
-                            {p.comment ?? "—"}
-                          </td>
-                          <td className="p-0 align-middle">
-                            {canMutatePayments ? (
-                              <Button
-                                type="button"
-                                variant="ghost"
-                                size="icon"
-                                className="h-6 w-6 text-muted-foreground hover:text-destructive"
-                                title={t("finance.deletePayment")}
-                                aria-label={t("finance.deletePayment")}
-                                onClick={() => handleDelete(p.id)}
-                              >
-                                <Trash2 className="h-3.5 w-3.5" />
-                              </Button>
-                            ) : null}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
+                <Button type="button" variant="outline" size="sm" className="gap-1.5" disabled>
+                  <ExternalLink className="h-4 w-4" aria-hidden />
+                  {t("finance.openCustomerInvoice")}
+                </Button>
               )}
+              {canMutatePayments ? (
+                <Button type="button" size="sm" className="gap-1.5" onClick={openRecordPaymentDialog}>
+                  {t("finance.addPayment")}
+                </Button>
+              ) : null}
             </div>
-          </>
-        ) : null}
+
+            {!hasLines && payments.length === 0 ? (
+              <p className="text-sm text-muted-foreground">
+                {t(cancelled ? "finance.invoiceUnavailable" : "finance.invoiceNeedsLines")}
+              </p>
+            ) : null}
+            {cancelled && hasLines ? (
+              <p className="text-sm text-muted-foreground">{t("finance.readOnlyCancelled")}</p>
+            ) : null}
+
+            {showAmountsAndPayments ? (
+              <>
+                <div className="rounded-sm bg-muted/25 px-3 py-2">
+                  <dl className={FINANCE_METRICS_DL}>
+                    <div className={FINANCE_METRIC_ROW}>
+                      <dt>{t("common.status")}</dt>
+                      <dd className="text-right font-medium">{paymentStatusLabel}</dd>
+                    </div>
+                    <div className={FINANCE_METRIC_ROW}>
+                      <dt>{t("finance.orderTotal")}</dt>
+                      <dd className="text-right font-medium tabular-nums">
+                        {formatMoney(roundMoney(summary.totalAmount), moneyFractionDigits)}
+                      </dd>
+                    </div>
+                    <div className={FINANCE_METRIC_ROW}>
+                      <dt>{t("finance.paidTotal")}</dt>
+                      <dd className="text-right font-medium tabular-nums">
+                        {formatMoney(roundMoney(summary.paidAmount), moneyFractionDigits)}
+                      </dd>
+                    </div>
+                    <div className={cn(FINANCE_METRIC_ROW, "[&_dt]:font-medium [&_dt]:text-foreground")}>
+                      <dt>{t("finance.remaining")}</dt>
+                      <dd className="text-right font-semibold tabular-nums text-foreground">
+                        {formatMoney(roundMoney(summary.remainingAmount), moneyFractionDigits)}
+                      </dd>
+                    </div>
+                  </dl>
+                </div>
+
+                <div>
+                  <h4 className="mb-1 text-xs font-semibold uppercase tracking-wide leading-none text-muted-foreground">
+                    {t("finance.paymentHistory")}
+                  </h4>
+                  {payments.length === 0 ? (
+                    <p className="text-sm text-muted-foreground">{t("finance.noPayments")}</p>
+                  ) : (
+                    <div className="overflow-x-auto rounded-md border border-border">
+                      <table className="w-full border-collapse text-sm leading-tight">
+                        <thead>
+                          <tr className="border-b border-border text-left text-xs text-muted-foreground">
+                            <th className="px-1 py-1 font-medium">{t("finance.paidAt")}</th>
+                            <th className="px-1 py-1 font-medium">{t("finance.amount")}</th>
+                            <th className="px-1 py-1 font-medium">{t("finance.method")}</th>
+                            <th className="px-1 py-1 font-medium">{t("finance.reference")}</th>
+                            <th className="px-1 py-1 font-medium">{t("finance.comment")}</th>
+                            {canMutatePayments ? <th className="w-8 px-0 py-1" /> : null}
+                          </tr>
+                        </thead>
+                        <tbody className="text-xs">
+                          {payments.map((p) => (
+                            <tr key={p.id} className="border-b border-border/80 last:border-0">
+                              <td className="px-1 py-px tabular-nums whitespace-nowrap align-middle">
+                                {formatDateTime(p.paidAt)}
+                              </td>
+                              <td className="px-1 py-px tabular-nums align-middle">
+                                {formatMoney(roundMoney(p.amount), moneyFractionDigits)}
+                              </td>
+                              <td className="px-1 py-px align-middle">{t(`finance.paymentMethod.${p.method}`)}</td>
+                              <td className="max-w-[10rem] truncate px-1 py-px align-middle" title={p.reference ?? ""}>
+                                {p.reference ?? "—"}
+                              </td>
+                              <td className="max-w-[12rem] truncate px-1 py-px align-middle" title={p.comment ?? ""}>
+                                {p.comment ?? "—"}
+                              </td>
+                              <td className="p-0 align-middle">
+                                {canMutatePayments ? (
+                                  <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-6 w-6 text-muted-foreground hover:text-destructive"
+                                    title={t("finance.deletePayment")}
+                                    aria-label={t("finance.deletePayment")}
+                                    onClick={() => handleDelete(p.id)}
+                                  >
+                                    <Trash2 className="h-3.5 w-3.5" />
+                                  </Button>
+                                ) : null}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </div>
+              </>
+            ) : null}
+          </section>
+
+          <section
+            className="min-w-0 w-full space-y-3 rounded-md border border-border p-3"
+            aria-labelledby="so-finance-planned-profit-section-title"
+          >
+            <h4
+              id="so-finance-planned-profit-section-title"
+              className="mb-0 text-xs font-semibold uppercase tracking-wide leading-none text-muted-foreground"
+            >
+              {t("finance.plannedProfitSectionTitle")}
+            </h4>
+            <div className="rounded-sm bg-muted/25 px-3 py-2">
+              <dl className={FINANCE_METRICS_DL}>
+                <div className={FINANCE_METRIC_ROW}>
+                  <dt>{t("finance.revenue")}</dt>
+                  <dd className="text-right font-medium tabular-nums">
+                    {formatMoney(roundMoney(plannedProfit.revenue), moneyFractionDigits)}
+                  </dd>
+                </div>
+                <div className={FINANCE_METRIC_ROW}>
+                  <dt>{t("finance.plannedCost")}</dt>
+                  <dd className="text-right font-medium tabular-nums">
+                    {formatMoney(roundMoney(plannedProfit.plannedCost), moneyFractionDigits)}
+                  </dd>
+                </div>
+                <div
+                  className={cn(
+                    FINANCE_METRIC_ROW,
+                    "border-t border-border/60 pt-2.5 mt-0.5",
+                  )}
+                >
+                  <dt>{t("finance.plannedGrossProfit")}</dt>
+                  <dd
+                    className={cn(
+                      "text-right font-semibold tabular-nums",
+                      plannedGrossProfitNegative ? "text-destructive" : "text-foreground",
+                    )}
+                  >
+                    {formatMoney(roundMoney(plannedProfit.plannedGrossProfit), moneyFractionDigits)}
+                  </dd>
+                </div>
+                <div className={FINANCE_METRIC_ROW}>
+                  <dt>{t("finance.plannedMargin")}</dt>
+                  <dd
+                    className={cn(
+                      "text-right font-semibold tabular-nums",
+                      plannedProfit.marginPercent === null
+                        ? "text-foreground"
+                        : plannedMarginNegative
+                          ? "text-destructive"
+                          : "text-foreground",
+                    )}
+                  >
+                    {plannedMarginLabel}
+                  </dd>
+                </div>
+              </dl>
+            </div>
+            <p className="text-xs text-muted-foreground leading-snug">{t("finance.plannedProfitHint")}</p>
+            {plannedProfit.missingCostLineCount > 0 ? (
+              <p className="text-xs text-amber-600 dark:text-amber-500/90 leading-snug">
+                {t("finance.plannedProfitMissingCostWarning", {
+                  count: String(plannedProfit.missingCostLineCount),
+                })}
+              </p>
+            ) : null}
+          </section>
+        </div>
       </CardContent>
       <Dialog.Root
         open={recordPaymentOpen}

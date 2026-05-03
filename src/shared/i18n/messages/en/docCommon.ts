@@ -187,6 +187,7 @@ export const docCommonEn = {
     tabLines: "Lines",
     tabExecution: "Execution",
     tabPayments: "Payments",
+    tabFinance: "Finance",
     tabAttachments: "Attachments",
     tabEventLog: "Event log",
     tabPanelsAria: "Sales Order working areas",

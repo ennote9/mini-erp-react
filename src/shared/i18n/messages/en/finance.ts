@@ -4,6 +4,16 @@ export const financeEn = {
   sectionHint:
     "Track customer payments against this order. The payment request (invoice) is separate from the preliminary customer document.",
   paymentStatusLabel: "Payment status",
+  paymentSectionTitle: "Payment",
+  plannedProfitSectionTitle: "Planned profit",
+  revenue: "Revenue",
+  plannedCost: "Planned cost",
+  plannedGrossProfit: "Planned gross profit",
+  plannedMargin: "Planned margin",
+  plannedProfitHint:
+    "Based on item purchase prices for the order date. This is not actual profit.",
+  plannedProfitMissingCostWarning:
+    "Cost is missing for {{count}} line(s); those lines are counted with zero planned cost.",
   paymentStatus: {
     unpaid: "Unpaid",
     partially_paid: "Partially paid",

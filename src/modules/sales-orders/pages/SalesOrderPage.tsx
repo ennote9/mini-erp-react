@@ -363,8 +363,6 @@ export function SalesOrderPage() {
     if (!id || !canOpenPreliminaryCustomerDoc) return [];
     return [
       { to: `/sales-orders/${id}/preliminary-document`, label: t("doc.customerDocument.simplePreliminaryTitle") },
-      { to: `/sales-orders/${id}/customer-document`, label: t("doc.customerDocument.preliminaryTitle") },
-      { to: `/sales-orders/${id}/customer-invoice`, label: t("finance.openCustomerInvoiceShort") },
     ];
   }, [id, canOpenPreliminaryCustomerDoc, t, locale]);
 
@@ -724,6 +722,21 @@ export function SalesOrderPage() {
   const isDraft = doc?.status === "draft";
   const isConfirmed = doc?.status === "confirmed";
   const isEditable = isNew || isDraft;
+
+  const financePlannedProfitLines = useMemo(
+    () =>
+      (isEditable ? form.lines : lines).map((l) => ({
+        itemId: l.itemId,
+        qty: l.qty,
+        unitPrice: l.unitPrice,
+      })),
+    [isEditable, form.lines, lines],
+  );
+
+  const financeOrderDateYmd = useMemo(
+    () => normalizeDateForSO(isEditable ? form.date : doc?.date ?? ""),
+    [isEditable, form.date, doc?.date],
+  );
 
   const selectedLineIds = useMemo(
     () => Object.keys(lineRowSelection).filter((k) => lineRowSelection[k]).map((k) => Number(k)),
@@ -2253,7 +2266,7 @@ export function SalesOrderPage() {
           >
             <span className="inline-flex items-center gap-1.5">
               <Wallet className="h-3.5 w-3.5" aria-hidden />
-              {t("doc.so.tabPayments")}
+              {t("doc.so.tabFinance")}
             </span>
           </button>
           <button
@@ -2424,6 +2437,8 @@ export function SalesOrderPage() {
                 cancelled={doc.status === "cancelled"}
                 orderTotalAmount={isEditable ? totals.totalAmount : readonlyTotals.totalAmount}
                 hasLines={isEditable ? form.lines.length > 0 : lines.length > 0}
+                orderDateYmd={financeOrderDateYmd}
+                plannedProfitLines={financePlannedProfitLines}
               />
             ) : null}
           </div>

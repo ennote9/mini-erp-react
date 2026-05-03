@@ -3,6 +3,16 @@ export const financeKk = {
   sectionHint:
     "Бұл тапсырыс бойынша төлемдерді есептеу. Төлем шоты алдын ала клиент құжатынан бөлек.",
   paymentStatusLabel: "Төлем күйі",
+  paymentSectionTitle: "Төлем",
+  plannedProfitSectionTitle: "Жоспарланған пайда",
+  revenue: "Түсім",
+  plannedCost: "Жоспарлы өзіндік құн",
+  plannedGrossProfit: "Жоспарлы жалпы пайда",
+  plannedMargin: "Жоспарлы маржа",
+  plannedProfitHint:
+    "Есеп тапсырыс күні бойынша тауарлардың сатып алу бағаларына негізделген. Бұл нақты пайда емес.",
+  plannedProfitMissingCostWarning:
+    "{{count}} жол үшін өзіндік құн көрсетілмеген; олар нөлдік жоспарлы өзіндік құнмен есептелген.",
   paymentStatus: {
     unpaid: "Төленбеген",
     partially_paid: "Ішінара төленген",
