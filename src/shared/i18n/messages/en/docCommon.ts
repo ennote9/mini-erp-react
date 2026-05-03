@@ -407,6 +407,9 @@ export const docCommonEn = {
     export: "Export",
     open: "Open",
     noRows: "No rows to show.",
+    noRowsTrueEmptyTitle: "No records yet",
+    noRowsTrueEmptyHint:
+      "Create the first record or import data to start using this list.",
     all: "All",
     clear: "Clear",
     create: "Create",

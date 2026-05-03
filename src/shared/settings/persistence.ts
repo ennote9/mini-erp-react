@@ -11,6 +11,7 @@ import {
   rename,
   writeFile,
 } from "@tauri-apps/plugin-fs";
+import { shouldUseTauriPluginFs } from "../tauriRuntime";
 import { DEFAULT_APP_SETTINGS } from "./defaults";
 import { normalizeAppSettingsFromUnknown } from "./mergeNormalize";
 import type { AppSettings } from "./types";
@@ -131,6 +132,15 @@ async function tryWriteFile(settings: AppSettings): Promise<
  * Returns the effective persistence mode after the attempt.
  */
 export async function persistAppSettings(settings: AppSettings): Promise<SettingsPersistenceState> {
+  if (!shouldUseTauriPluginFs()) {
+    const lsOk = saveToLocalStorage(normalizeAppSettingsFromUnknown(settings));
+    if (lsOk) return "fallback_persisted";
+    if (import.meta.env.DEV) {
+      console.error("[settingsPersistence] localStorage save failed (browser-only mode).");
+    }
+    return "defaults_only";
+  }
+
   const fileResult = await tryWriteFile(settings);
   if (fileResult.ok) {
     saveToLocalStorage(normalizeAppSettingsFromUnknown(settings));
@@ -153,6 +163,32 @@ export async function persistAppSettings(settings: AppSettings): Promise<Setting
  */
 export async function loadAppSettingsFromDisk(): Promise<AppSettingsLoadResult> {
   const lsReadable = probeLocalStorageWritable();
+
+  if (!shouldUseTauriPluginFs()) {
+    const fromLs = loadFromLocalStorage();
+    if (fromLs) {
+      return {
+        settings: fromLs,
+        persistenceState: "fallback_persisted",
+        corruptRestored: false,
+        lastFilesystemError: null,
+      };
+    }
+    if (lsReadable) {
+      return {
+        settings: structuredClone(DEFAULT_APP_SETTINGS),
+        persistenceState: "fallback_persisted",
+        corruptRestored: false,
+        lastFilesystemError: null,
+      };
+    }
+    return {
+      settings: structuredClone(DEFAULT_APP_SETTINGS),
+      persistenceState: "defaults_only",
+      corruptRestored: false,
+      lastFilesystemError: null,
+    };
+  }
 
   try {
     await mkdir(CONFIG_DIR, { recursive: true, baseDir: BD });

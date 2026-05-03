@@ -11,6 +11,7 @@ import {
   rename,
   writeFile,
 } from "@tauri-apps/plugin-fs";
+import { shouldUseTauriPluginFs } from "./tauriRuntime";
 
 const BD = BaseDirectory.AppLocalData;
 const MASTER_DATA_DIR = "master-data";
@@ -52,6 +53,10 @@ export async function writeMasterDataPayload<T extends { id: string }>(
   relativePath: string,
   records: T[],
 ): Promise<void> {
+  if (!shouldUseTauriPluginFs()) {
+    return;
+  }
+
   const dir = parentDirOf(relativePath);
   if (dir) await mkdir(dir, { recursive: true, baseDir: BD });
 
@@ -91,6 +96,15 @@ export async function loadMasterDataPersisted<T extends { id: string }>(
   options: LoadOptions<T>,
 ): Promise<LoadMasterDataResult<T>> {
   const { relativePath, buildSeedRecords, normalizeRecord, diagnosticsTag } = options;
+
+  if (!shouldUseTauriPluginFs()) {
+    const seed = buildSeedRecords();
+    return {
+      records: seed,
+      nextId: computeNextNumericId(seed),
+      diagnostics: null,
+    };
+  }
 
   try {
     await mkdir(MASTER_DATA_DIR, { recursive: true, baseDir: BD });

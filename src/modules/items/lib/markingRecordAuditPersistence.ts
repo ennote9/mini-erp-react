@@ -10,6 +10,7 @@ import {
   rename,
   writeFile,
 } from "@tauri-apps/plugin-fs";
+import { shouldUseTauriPluginFs } from "@/shared/tauriRuntime";
 import type { ItemMarkingRecordAuditEntry } from "../model/itemMarkingRecordAudit";
 import { normalizeItemMarkingRecordAudit } from "./normalizeItemMarkingRecordAudit";
 
@@ -82,6 +83,15 @@ function saveToLocalStorage(entries: ItemMarkingRecordAuditEntry[]): boolean {
 }
 
 export async function writeMarkingRecordAuditPayload(entries: ItemMarkingRecordAuditEntry[]): Promise<void> {
+  if (!shouldUseTauriPluginFs()) {
+    if (!saveToLocalStorage(entries)) {
+      throw new Error(
+        "Marking record audit could not be saved: browser storage is unavailable or full. Run the app with Tauri (desktop) for file-based persistence.",
+      );
+    }
+    return;
+  }
+
   try {
     await mkdir("items", { recursive: true, baseDir: BD });
     const payload: Envelope = { version: MARKING_RECORD_AUDIT_PERSIST_VERSION, entries };
@@ -107,6 +117,12 @@ export type LoadMarkingRecordAuditResult = {
 export async function loadMarkingRecordAuditPersisted(): Promise<LoadMarkingRecordAuditResult> {
   const canLs = probeLocalStorageWritable();
   const fromLs = canLs ? loadFromLocalStorage() : null;
+
+  if (!shouldUseTauriPluginFs()) {
+    if (fromLs) return { entries: fromLs, diagnostics: null };
+    return { entries: [], diagnostics: null };
+  }
+
   try {
     await mkdir("items", { recursive: true, baseDir: BD });
     const fileExists = await exists(RELATIVE_PATH, { baseDir: BD });

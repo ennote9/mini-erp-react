@@ -11,6 +11,7 @@ import {
   remove,
   rename,
 } from "@tauri-apps/plugin-fs";
+import { shouldUseTauriPluginFs } from "@/shared/tauriRuntime";
 import type {
   Item,
   ItemBarcode,
@@ -366,6 +367,16 @@ export async function writeItemsPayload(items: Item[]): Promise<void> {
   const payload: ItemsPersistedPayload = { version: ITEMS_PERSIST_VERSION, items };
   const json = JSON.stringify(payload, null, 2);
   const bytes = new TextEncoder().encode(json);
+
+  if (!shouldUseTauriPluginFs()) {
+    if (!saveItemsToLocalStorage(items)) {
+      throw new Error(
+        "Items data could not be saved: browser storage is unavailable or full. Run the app with Tauri (desktop) for file-based persistence, or free local storage space.",
+      );
+    }
+    return;
+  }
+
   try {
     await mkdir(ITEMS_DIR, { recursive: true, baseDir: BD });
     await writeFile(ITEMS_JSON_TMP, bytes, { baseDir: BD });
@@ -400,6 +411,22 @@ export type ItemsLoadResult = {
 export async function loadItemsPersisted(buildSeedItems: () => Item[]): Promise<ItemsLoadResult> {
   setDiagnostics(null);
   const lsReadable = probeLocalStorageWritable();
+
+  if (!shouldUseTauriPluginFs()) {
+    const fromLs = loadItemsFromLocalStorage();
+    if (fromLs) {
+      return { items: fromLs, nextId: computeNextNumericId(fromLs) };
+    }
+    const seed = buildSeedItems();
+    try {
+      await writeItemsPayload(seed);
+    } catch (w) {
+      const msg = w instanceof Error ? w.message : String(w);
+      setDiagnostics(`First-run persist failed (using in-memory seed): ${msg}`);
+    }
+    return { items: seed, nextId: computeNextNumericId(seed) };
+  }
+
   try {
     await mkdir(ITEMS_DIR, { recursive: true, baseDir: BD });
     const fileExists = await exists(ITEMS_JSON_RELATIVE, { baseDir: BD });

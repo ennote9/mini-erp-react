@@ -10,6 +10,7 @@ import {
   rename,
   writeFile,
 } from "@tauri-apps/plugin-fs";
+import { shouldUseTauriPluginFs } from "@/shared/tauriRuntime";
 import type { MarkingAutoSyncSettings } from "../model/markingAutoSyncSettings";
 import { normalizeMarkingAutoSyncSettings } from "./normalizeMarkingAutoSyncSettings";
 
@@ -74,6 +75,15 @@ function saveToLocalStorage(settings: MarkingAutoSyncSettings): boolean {
 }
 
 export async function writeMarkingAutoSyncSettingsPayload(settings: MarkingAutoSyncSettings): Promise<void> {
+  if (!shouldUseTauriPluginFs()) {
+    if (!saveToLocalStorage(settings)) {
+      throw new Error(
+        "Marking auto-sync settings could not be saved: browser storage is unavailable or full. Run the app with Tauri (desktop) for file-based persistence.",
+      );
+    }
+    return;
+  }
+
   try {
     await mkdir("items", { recursive: true, baseDir: BD });
     const payload: Envelope = { version: MARKING_AUTO_SYNC_SETTINGS_PERSIST_VERSION, settings };
@@ -99,6 +109,12 @@ export type LoadMarkingAutoSyncSettingsResult = {
 export async function loadMarkingAutoSyncSettingsPersisted(): Promise<LoadMarkingAutoSyncSettingsResult> {
   const canLs = probeLocalStorageWritable();
   const fromLs = canLs ? loadFromLocalStorage() : null;
+
+  if (!shouldUseTauriPluginFs()) {
+    if (fromLs) return { settings: fromLs, diagnostics: null };
+    return { settings: normalizeMarkingAutoSyncSettings(null), diagnostics: null };
+  }
+
   try {
     await mkdir("items", { recursive: true, baseDir: BD });
     const fileExists = await exists(RELATIVE_PATH, { baseDir: BD });

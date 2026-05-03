@@ -37,6 +37,20 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
+describe("writeDocumentPayload (browser-only)", () => {
+  it("writes the localStorage mirror without calling plugin-fs mkdir", async () => {
+    const fs = await import("@tauri-apps/plugin-fs");
+    const mkdirSpy = vi.spyOn(fs, "mkdir");
+    vi.resetModules();
+    const { writeDocumentPayload } = await import("../../src/shared/documentPersistence");
+    await writeDocumentPayload("documents/purchase-orders.json", [] as never[]);
+    expect(mkdirSpy).not.toHaveBeenCalled();
+    const raw = globalThis.localStorage.getItem("mini-erp-documents-v1:documents/purchase-orders.json");
+    expect(raw).toBeTruthy();
+    expect(JSON.parse(raw as string)).toEqual({ version: 1, records: [] });
+  });
+});
+
 describe("loadDocumentsPersisted (browser-only)", () => {
   it("returns empty records when localStorage has an empty envelope (does not reseed)", async () => {
     globalThis.localStorage.setItem(

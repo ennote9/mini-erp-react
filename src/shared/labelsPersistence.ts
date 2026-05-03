@@ -12,6 +12,7 @@ import {
   rename,
   writeFile,
 } from "@tauri-apps/plugin-fs";
+import { shouldUseTauriPluginFs } from "./tauriRuntime";
 
 const BD = BaseDirectory.AppLocalData;
 const LABELS_DIR = "labels";
@@ -112,6 +113,15 @@ export function getLabelsFilePath(fileName: string): string {
 }
 
 export async function writeLabelsPayload<T>(relativePath: string, records: T[]): Promise<void> {
+  if (!shouldUseTauriPluginFs()) {
+    if (!saveLabelsPayloadToLocalStorage(relativePath, records)) {
+      throw new Error(
+        "Labels data could not be saved: browser storage is unavailable or full. Run the app with Tauri (desktop) for file-based persistence, or free local storage space.",
+      );
+    }
+    return;
+  }
+
   try {
     const dir = parentDirOf(relativePath);
     if (dir) await mkdir(dir, { recursive: true, baseDir: BD });
@@ -152,12 +162,27 @@ export async function loadLabelsPersisted<T>(options: LoadOptions<T>): Promise<L
   const localStorageRecords = canUseLocalStorage
     ? loadLabelsPayloadFromLocalStorage(relativePath, normalizeRecord)
     : null;
+
+  if (!shouldUseTauriPluginFs()) {
+    if (localStorageRecords !== null) {
+      return { records: localStorageRecords, diagnostics: null };
+    }
+    const seed = buildSeedRecords();
+    if (saveLabelsPayloadToLocalStorage(relativePath, seed)) {
+      return { records: seed, diagnostics: null };
+    }
+    return {
+      records: seed,
+      diagnostics: `[${diagnosticsTag}] Browser local storage is not available for labels data.`,
+    };
+  }
+
   try {
     await mkdir(LABELS_DIR, { recursive: true, baseDir: BD });
 
     const fileExists = await exists(relativePath, { baseDir: BD });
     if (!fileExists) {
-      if (localStorageRecords) {
+      if (localStorageRecords !== null) {
         return { records: localStorageRecords, diagnostics: null };
       }
       const seed = buildSeedRecords();
@@ -251,7 +276,7 @@ export async function loadLabelsPersisted<T>(options: LoadOptions<T>): Promise<L
     return { records: normalized, diagnostics: null };
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
-    if (localStorageRecords) {
+    if (localStorageRecords !== null) {
       return {
         records: localStorageRecords,
         diagnostics: `[${diagnosticsTag}] File load failed; using browser local fallback: ${msg}`,

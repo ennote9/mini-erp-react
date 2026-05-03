@@ -10,6 +10,7 @@ import {
   rename,
   writeFile,
 } from "@tauri-apps/plugin-fs";
+import { shouldUseTauriPluginFs } from "@/shared/tauriRuntime";
 import type { MarkingProviderSettings } from "../model/markingProviderSettings";
 import { normalizeMarkingProviderSettings } from "./normalizeMarkingProviderSettings";
 
@@ -74,6 +75,15 @@ function saveToLocalStorage(settings: MarkingProviderSettings): boolean {
 }
 
 export async function writeMarkingProviderSettingsPayload(settings: MarkingProviderSettings): Promise<void> {
+  if (!shouldUseTauriPluginFs()) {
+    if (!saveToLocalStorage(settings)) {
+      throw new Error(
+        "Marking provider settings could not be saved: browser storage is unavailable or full. Run the app with Tauri (desktop) for file-based persistence.",
+      );
+    }
+    return;
+  }
+
   try {
     await mkdir("items", { recursive: true, baseDir: BD });
     const payload: Envelope = { version: MARKING_PROVIDER_SETTINGS_PERSIST_VERSION, settings };
@@ -99,6 +109,12 @@ export type LoadMarkingProviderSettingsResult = {
 export async function loadMarkingProviderSettingsPersisted(): Promise<LoadMarkingProviderSettingsResult> {
   const canLs = probeLocalStorageWritable();
   const fromLs = canLs ? loadFromLocalStorage() : null;
+
+  if (!shouldUseTauriPluginFs()) {
+    if (fromLs) return { settings: fromLs, diagnostics: null };
+    return { settings: normalizeMarkingProviderSettings(null), diagnostics: null };
+  }
+
   try {
     await mkdir("items", { recursive: true, baseDir: BD });
     const fileExists = await exists(RELATIVE_PATH, { baseDir: BD });

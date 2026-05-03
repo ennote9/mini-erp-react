@@ -1322,6 +1322,9 @@ export const ruMessages: MessageTree = {
       export: "Экспорт",
       open: "Открыть",
       noRows: "Нет строк для отображения.",
+      noRowsTrueEmptyTitle: "Записей пока нет",
+      noRowsTrueEmptyHint:
+        "Создайте первую запись или импортируйте данные, чтобы начать работу со списком.",
       all: "Все",
       clear: "Сбросить",
       create: "Создать",

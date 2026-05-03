@@ -1318,6 +1318,9 @@ export const kkMessages: MessageTree = {
       export: "Экспорт",
       open: "Ашу",
       noRows: "Көрсетілетін жолдар жоқ.",
+      noRowsTrueEmptyTitle: "Әзірге жазбалар жоқ",
+      noRowsTrueEmptyHint:
+        "Тізімді пайдалана бастау үшін бірінші жазбаны жасаңыз немесе деректерді импорттаңыз.",
       all: "Барлығы",
       clear: "Тазалау",
       create: "Жасау",

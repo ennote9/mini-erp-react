@@ -157,6 +157,15 @@ export async function writeDocumentPayload<T>(
   relativePath: string,
   records: T[],
 ): Promise<void> {
+  if (!shouldUseTauriPluginFs()) {
+    if (!saveDocumentPayloadToLocalStorage(relativePath, records)) {
+      throw new Error(
+        "Document data could not be saved: browser storage is unavailable or full. Run the app with Tauri (desktop) for file-based persistence, or free local storage space.",
+      );
+    }
+    return;
+  }
+
   try {
     const dir = parentDirOf(relativePath);
     if (dir) await mkdir(dir, { recursive: true, baseDir: BD });

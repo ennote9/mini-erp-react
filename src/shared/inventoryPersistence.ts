@@ -195,7 +195,7 @@ export async function loadInventoryPersisted<T>(
 
     const fileExists = await exists(relativePath, { baseDir: BD });
     if (!fileExists) {
-      if (localStorageRecords) {
+      if (localStorageRecords !== null) {
         return { records: localStorageRecords, diagnostics: null };
       }
       const seed = buildSeedRecords();
@@ -289,7 +289,7 @@ export async function loadInventoryPersisted<T>(
     return { records: normalized, diagnostics: null };
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
-    if (localStorageRecords) {
+    if (localStorageRecords !== null) {
       return {
         records: localStorageRecords,
         diagnostics: `[${diagnosticsTag}] File load failed; using browser local fallback: ${msg}`,
