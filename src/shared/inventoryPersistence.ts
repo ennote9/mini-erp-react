@@ -83,6 +83,28 @@ function saveInventoryPayloadToLocalStorage<T>(relativePath: string, records: T[
   }
 }
 
+/** Removes the browser mirror key for an inventory-relative path (dev/test cleanup). Best-effort; never throws. */
+export function removeInventoryLocalStorageMirror(relativePath: string): void {
+  try {
+    const ls =
+      typeof globalThis !== "undefined" && "localStorage" in globalThis
+        ? (globalThis as unknown as { localStorage?: Storage }).localStorage
+        : undefined;
+    if (!ls) return;
+    ls.removeItem(localStorageKey(relativePath));
+  } catch {
+    // ignore
+  }
+}
+
+/** Writes `{ version: 1, records }` to the inventory localStorage mirror only (no plugin-fs). */
+export function writeInventoryPayloadToBrowserLocalStorageOnly<T>(
+  relativePath: string,
+  records: T[],
+): boolean {
+  return saveInventoryPayloadToLocalStorage(relativePath, records);
+}
+
 function parentDirOf(path: string): string {
   const i = path.lastIndexOf("/");
   return i > 0 ? path.slice(0, i) : "";
@@ -155,7 +177,7 @@ export async function loadInventoryPersisted<T>(
     : null;
 
   if (!shouldUseTauriPluginFs()) {
-    if (localStorageRecords) {
+    if (localStorageRecords !== null) {
       return { records: localStorageRecords, diagnostics: null };
     }
     const seed = buildSeedRecords();

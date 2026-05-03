@@ -9,6 +9,7 @@ import App from "./App";
 
 if (import.meta.env.DEV) {
   void import("./dev/e2eHarness");
+  void import("./dev/resetPurchasingSalesWorkspaceRunner");
 }
 
 ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(

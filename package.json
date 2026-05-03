@@ -7,6 +7,8 @@
     "dev": "vite",
     "build": "tsc && vite build",
     "test": "vitest run",
+    "dev:reset-purchasing-sales:dry": "vitest run tests/dev/reset-purchasing-sales-workspace-runner-smoke.test.ts",
+    "dev:reset-purchasing-sales:help": "node scripts/dev-reset-purchasing-sales-help.mjs",
     "preview": "vite preview",
     "test:e2e:items-toolbar": "playwright test e2e/items-toolbar-create-visible.spec.ts",
     "test:e2e:item-prices": "playwright test e2e/item-prices.spec.ts",

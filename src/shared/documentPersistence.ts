@@ -7,6 +7,7 @@ import {
   rename,
   writeFile,
 } from "@tauri-apps/plugin-fs";
+import { shouldUseTauriPluginFs } from "./tauriRuntime";
 
 const BD = BaseDirectory.AppLocalData;
 const DOCUMENTS_DIR = "documents";
@@ -82,6 +83,55 @@ function saveDocumentPayloadToLocalStorage<T>(relativePath: string, records: T[]
   }
 }
 
+/** Removes the browser mirror key for a documents-relative path (dev/test cleanup). Best-effort; never throws. */
+export function removeDocumentLocalStorageMirror(relativePath: string): void {
+  try {
+    const ls =
+      typeof globalThis !== "undefined" && "localStorage" in globalThis
+        ? (globalThis as unknown as { localStorage?: Storage }).localStorage
+        : undefined;
+    if (!ls) return;
+    ls.removeItem(localStorageKey(relativePath));
+  } catch {
+    // ignore (private mode, SSR, tests without localStorage, etc.)
+  }
+}
+
+function getOptionalLocalStorage(): Storage | undefined {
+  if (typeof globalThis === "undefined" || !("localStorage" in globalThis)) return undefined;
+  return (globalThis as unknown as { localStorage?: Storage }).localStorage;
+}
+
+/**
+ * Reads a v1 `{ version, records }` envelope from the documents browser mirror only (no plugin-fs).
+ * Used when Tauri is unavailable (plain Vite dev).
+ */
+export function readDocumentEnvelopeFromBrowserLocalStorage(
+  relativePath: string,
+): { version: number; records: unknown[] } | null {
+  try {
+    const ls = getOptionalLocalStorage();
+    if (!ls) return null;
+    const text = ls.getItem(localStorageKey(relativePath));
+    if (!text) return null;
+    const parsed = JSON.parse(text) as unknown;
+    if (!parsed || typeof parsed !== "object") return null;
+    const rec = parsed as Partial<Envelope<unknown>>;
+    if (rec.version !== PERSIST_VERSION || !Array.isArray(rec.records)) return null;
+    return { version: rec.version, records: rec.records };
+  } catch {
+    return null;
+  }
+}
+
+/** Writes `{ version: 1, records }` to the documents localStorage mirror only (no plugin-fs). */
+export function writeDocumentPayloadToBrowserLocalStorageOnly<T>(
+  relativePath: string,
+  records: T[],
+): boolean {
+  return saveDocumentPayloadToLocalStorage(relativePath, records);
+}
+
 function parentDirOf(path: string): string {
   const i = path.lastIndexOf("/");
   return i > 0 ? path.slice(0, i) : "";
@@ -149,12 +199,32 @@ export async function loadDocumentsPersisted<T>(
   const localStorageRecords = canUseLocalStorage
     ? loadDocumentPayloadFromLocalStorage(relativePath, normalizeRecord)
     : null;
+
+  /**
+   * Plain Vite / browser: localStorage is the source of truth (mirrors inventoryPersistence).
+   * Never read AppLocalData via plugin-fs here — otherwise a stale on-disk file can override a
+   * browser-only reset that cleared localStorage.
+   */
+  if (!shouldUseTauriPluginFs()) {
+    if (localStorageRecords !== null) {
+      return { records: localStorageRecords, diagnostics: null };
+    }
+    const seed = buildSeedRecords();
+    if (saveDocumentPayloadToLocalStorage(relativePath, seed)) {
+      return { records: seed, diagnostics: null };
+    }
+    return {
+      records: seed,
+      diagnostics: `[${diagnosticsTag}] Browser local storage is not available for documents data.`,
+    };
+  }
+
   try {
     await mkdir(DOCUMENTS_DIR, { recursive: true, baseDir: BD });
 
     const fileExists = await exists(relativePath, { baseDir: BD });
     if (!fileExists) {
-      if (localStorageRecords) {
+      if (localStorageRecords !== null) {
         return { records: localStorageRecords, diagnostics: null };
       }
       const seed = buildSeedRecords();
@@ -248,7 +318,7 @@ export async function loadDocumentsPersisted<T>(
     return { records: normalized, diagnostics: null };
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
-    if (localStorageRecords) {
+    if (localStorageRecords !== null) {
       return {
         records: localStorageRecords,
         diagnostics: `[${diagnosticsTag}] File load failed; using browser local fallback: ${msg}`,
