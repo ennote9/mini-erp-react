@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, type ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
@@ -125,41 +125,88 @@ export function StockBalanceDetailContent({ row, activeTab }: Props) {
   }, [incoming, row.netShortageQty]);
 
   if (activeTab === "operational") {
+    const operationalRows: Array<{
+      key: string;
+      label: string;
+      value: ReactNode;
+      meaning: string;
+    }> = [
+      {
+        key: "on-hand",
+        label: "Физический остаток",
+        value: formatQty(row.qtyOnHand),
+        meaning: "Текущее количество на складе.",
+      },
+      {
+        key: "reserved",
+        label: "В резерве",
+        value: formatQty(row.reservedQty),
+        meaning: "Занято под заказы клиентов.",
+      },
+      {
+        key: "available",
+        label: "Доступно",
+        value: formatQty(row.availableQty),
+        meaning: "Можно использовать для новых операций.",
+      },
+      {
+        key: "outgoing",
+        label: "Исходящий спрос",
+        value: formatQty(row.outgoingQty),
+        meaning: "Открытый спрос по заказам клиентов.",
+      },
+      {
+        key: "incoming",
+        label: "Входящие поставки",
+        value: formatQty(row.incomingQty),
+        meaning: "Ожидается по заказам поставщику.",
+      },
+      {
+        key: "net-shortage",
+        label: "Чистый дефицит",
+        value: formatQty(row.netShortageQty),
+        meaning: "Нехватка после учёта спроса и поставок.",
+      },
+      {
+        key: "coverage",
+        label: "Покрытие",
+        value: (
+          <Badge variant={coverageBadgeVariant(row.coverageStatus)} className="h-5 px-2 text-[0.68rem]">
+            {t(`ops.stock.coverage.${row.coverageStatus}`)}
+          </Badge>
+        ),
+        meaning: "Общая оценка обеспеченности.",
+      },
+    ];
+
     return (
-      <div className="space-y-3">
-        <section className="rounded-md border border-border/70 bg-background p-3">
-          <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3">
-            <div className="rounded border border-border/60 bg-background px-2.5 py-2">
-              <div className="text-[0.62rem] uppercase tracking-wide text-muted-foreground">{t("doc.columns.available")}</div>
-              <div className="mt-1 text-sm font-semibold tabular-nums">{formatQty(row.availableQty)}</div>
-            </div>
-            <div className="rounded border border-border/60 bg-background px-2.5 py-2">
-              <div className="text-[0.62rem] uppercase tracking-wide text-muted-foreground">{t("doc.columns.reserved")}</div>
-              <div className="mt-1 text-sm font-semibold tabular-nums">{formatQty(row.reservedQty)}</div>
-            </div>
-            <div className="rounded border border-border/60 bg-background px-2.5 py-2">
-              <div className="text-[0.62rem] uppercase tracking-wide text-muted-foreground">{t("doc.columns.outgoing")}</div>
-              <div className="mt-1 text-sm font-semibold tabular-nums">{formatQty(row.outgoingQty)}</div>
-            </div>
-            <div className="rounded border border-border/60 bg-background px-2.5 py-2">
-              <div className="text-[0.62rem] uppercase tracking-wide text-muted-foreground">{t("doc.columns.incoming")}</div>
-              <div className="mt-1 text-sm font-semibold tabular-nums">{formatQty(row.incomingQty)}</div>
-            </div>
-            <div className="rounded border border-border/60 bg-background px-2.5 py-2">
-              <div className="text-[0.62rem] uppercase tracking-wide text-muted-foreground">{t("doc.columns.netShortage")}</div>
-              <div className="mt-1 text-sm font-semibold tabular-nums">{formatQty(row.netShortageQty)}</div>
-            </div>
-            <div className="rounded border border-border/60 bg-background px-2.5 py-2">
-              <div className="text-[0.62rem] uppercase tracking-wide text-muted-foreground">{t("doc.columns.coverage")}</div>
-              <div className="mt-1">
-                <Badge variant={coverageBadgeVariant(row.coverageStatus)} className="h-5 px-2 text-[0.68rem]">
-                  {t(`ops.stock.coverage.${row.coverageStatus}`)}
-                </Badge>
-              </div>
-            </div>
-          </div>
-        </section>
-      </div>
+      <section className="rounded-md border border-border/70 bg-background px-3 py-2">
+        <div className="-mx-1 overflow-x-auto">
+          <table className="w-full min-w-[720px] table-fixed">
+            <colgroup>
+              <col style={{ width: "30%" }} />
+              <col style={{ width: "20%" }} />
+              <col style={{ width: "50%" }} />
+            </colgroup>
+            <thead>
+              <tr className="bg-background">
+                <th className={th}>Показатель</th>
+                <th className={cn(th, "text-right")}>Количество / статус</th>
+                <th className={th}>Пояснение</th>
+              </tr>
+            </thead>
+            <tbody>
+              {operationalRows.map((metricRow) => (
+                <tr key={metricRow.key} className="hover:bg-background">
+                  <td className={td}>{metricRow.label}</td>
+                  <td className={cn(td, "text-right")}>{metricRow.value}</td>
+                  <td className={cn(td, "text-muted-foreground")}>{metricRow.meaning}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </section>
     );
   }
 

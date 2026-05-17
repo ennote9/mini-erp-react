@@ -88,7 +88,7 @@ export function StockBalanceDetailPage() {
 
   return (
     <div className="doc-page">
-      <div className="max-w-[1120px] min-w-0 space-y-4">
+      <div className="w-full max-w-[1480px] min-w-0 space-y-4">
         <div className="doc-page__breadcrumb">
           <div className="ml-1 flex flex-wrap gap-2">
             {actions.map((action) => (
