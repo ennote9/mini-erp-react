@@ -1,6 +1,12 @@
 import { useMemo, type ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
 import { Badge } from "@/components/ui/badge";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import {
   listIncomingContributorsForWarehouseItem,
@@ -38,6 +44,7 @@ export type StockBalanceDetailTab =
 type Props = {
   row: StockBalanceDrillDownSnapshot;
   activeTab: StockBalanceDetailTab;
+  onTabChange?: (tab: StockBalanceDetailTab) => void;
 };
 
 const th =
@@ -73,7 +80,7 @@ function sumReservations(rows: { qty: number }[]) {
   return rows.reduce((a, r) => a + r.qty, 0);
 }
 
-export function StockBalanceDetailContent({ row, activeTab }: Props) {
+export function StockBalanceDetailContent({ row, activeTab, onTabChange }: Props) {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const { formatDateTime, formatNumber } = useAppDisplayFormatters();
@@ -125,47 +132,85 @@ export function StockBalanceDetailContent({ row, activeTab }: Props) {
   }, [incoming, row.netShortageQty]);
 
   if (activeTab === "operational") {
+    const operationalActionDash = <span className="text-muted-foreground/70">—</span>;
+    const warehouseItemQuery = `warehouseId=${encodeURIComponent(row.warehouseId)}&itemId=${encodeURIComponent(row.itemId)}`;
+
     const operationalRows: Array<{
       key: string;
       label: string;
       value: ReactNode;
       meaning: string;
+      action: ReactNode;
     }> = [
       {
         key: "on-hand",
         label: "Физический остаток",
         value: formatQty(row.qtyOnHand),
         meaning: "Текущее количество на складе.",
+        action: (
+          <button
+            type="button"
+            className={linkBtn}
+            onClick={() => navigate(`/stock-movements?${warehouseItemQuery}`)}
+          >
+            Открыть движения
+          </button>
+        ),
       },
       {
         key: "reserved",
         label: "В резерве",
         value: formatQty(row.reservedQty),
         meaning: "Занято под заказы клиентов.",
+        action: (
+          <button type="button" className={linkBtn} onClick={() => onTabChange?.("reservations")}>
+            Открыть резервы
+          </button>
+        ),
       },
       {
         key: "available",
         label: "Доступно",
         value: formatQty(row.availableQty),
         meaning: "Можно использовать для новых операций.",
+        action: operationalActionDash,
       },
       {
         key: "outgoing",
         label: "Исходящий спрос",
         value: formatQty(row.outgoingQty),
         meaning: "Открытый спрос по заказам клиентов.",
+        action: (
+          <button
+            type="button"
+            className={linkBtn}
+            onClick={() => navigate(`/sales-orders?${warehouseItemQuery}`)}
+          >
+            Заказы клиентов
+          </button>
+        ),
       },
       {
         key: "incoming",
         label: "Входящие поставки",
         value: formatQty(row.incomingQty),
         meaning: "Ожидается по заказам поставщику.",
+        action: (
+          <button
+            type="button"
+            className={linkBtn}
+            onClick={() => navigate(`/purchase-orders?${warehouseItemQuery}`)}
+          >
+            Заказы поставщику
+          </button>
+        ),
       },
       {
         key: "net-shortage",
         label: "Чистый дефицит",
         value: formatQty(row.netShortageQty),
         meaning: "Нехватка после учёта спроса и поставок.",
+        action: operationalActionDash,
       },
       {
         key: "coverage",
@@ -176,36 +221,48 @@ export function StockBalanceDetailContent({ row, activeTab }: Props) {
           </Badge>
         ),
         meaning: "Общая оценка обеспеченности.",
+        action: operationalActionDash,
       },
     ];
 
     return (
       <section className="rounded-md border border-border/70 bg-background px-3 py-2">
-        <div className="-mx-1 overflow-x-auto">
-          <table className="w-full min-w-[720px] table-fixed">
-            <colgroup>
-              <col style={{ width: "30%" }} />
-              <col style={{ width: "20%" }} />
-              <col style={{ width: "50%" }} />
-            </colgroup>
-            <thead>
-              <tr className="bg-background">
-                <th className={th}>Показатель</th>
-                <th className={cn(th, "text-right")}>Количество / статус</th>
-                <th className={th}>Пояснение</th>
-              </tr>
-            </thead>
-            <tbody>
-              {operationalRows.map((metricRow) => (
-                <tr key={metricRow.key} className="hover:bg-background">
-                  <td className={td}>{metricRow.label}</td>
-                  <td className={cn(td, "text-right")}>{metricRow.value}</td>
-                  <td className={cn(td, "text-muted-foreground")}>{metricRow.meaning}</td>
+        <TooltipProvider delayDuration={1000}>
+          <div className="-mx-1 overflow-x-auto">
+            <table className="w-full min-w-[780px] table-fixed">
+              <colgroup>
+                <col style={{ width: "42%" }} />
+                <col style={{ width: "18%" }} />
+                <col style={{ width: "40%" }} />
+              </colgroup>
+              <thead>
+                <tr className="bg-background">
+                  <th className={th}>Показатель</th>
+                  <th className={cn(th, "text-right")}>Количество / статус</th>
+                  <th className={th}>Действие</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+              <tbody>
+                {operationalRows.map((metricRow) => (
+                  <tr key={metricRow.key} className="hover:bg-background">
+                    <td className={td}>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <span className="cursor-help">
+                            {metricRow.label}
+                          </span>
+                        </TooltipTrigger>
+                        <TooltipContent sideOffset={4}>{metricRow.meaning}</TooltipContent>
+                      </Tooltip>
+                    </td>
+                    <td className={cn(td, "text-right")}>{metricRow.value}</td>
+                    <td className={cn(td, "tabular-nums")}>{metricRow.action}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </TooltipProvider>
       </section>
     );
   }

@@ -69,21 +69,6 @@ export function StockBalanceDetailPage() {
       label: t("ops.stock.drilldown.openItemCard"),
       onClick: () => navigate(`/items/${row.itemId}`),
     },
-    {
-      key: "so",
-      label: t("ops.stock.drilldown.openRelatedSo"),
-      onClick: () => navigate(`/sales-orders?warehouseId=${encodeURIComponent(row.warehouseId)}&itemId=${encodeURIComponent(row.itemId)}`),
-    },
-    {
-      key: "po",
-      label: t("ops.stock.drilldown.openRelatedPo"),
-      onClick: () => navigate(`/purchase-orders?warehouseId=${encodeURIComponent(row.warehouseId)}&itemId=${encodeURIComponent(row.itemId)}`),
-    },
-    {
-      key: "moves",
-      label: t("ops.stock.drilldown.openRelatedMovements"),
-      onClick: () => navigate(`/stock-movements?warehouseId=${encodeURIComponent(row.warehouseId)}&itemId=${encodeURIComponent(row.itemId)}`),
-    },
   ];
 
   return (
@@ -160,7 +145,11 @@ export function StockBalanceDetailPage() {
             </Tabs.List>
 
             <Tabs.Content value={activeTab} className="mt-3 outline-none">
-              <StockBalanceDetailContent row={row} activeTab={activeTab} />
+              <StockBalanceDetailContent
+                row={row}
+                activeTab={activeTab}
+                onTabChange={setActiveTab}
+              />
             </Tabs.Content>
           </Tabs.Root>
         </div>
