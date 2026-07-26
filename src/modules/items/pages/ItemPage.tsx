@@ -58,12 +58,6 @@ type FormState = {
   brandId: string;
   categoryId: string;
   baseItemId: string;
-  translationName: string;
-  translationDescription: string;
-  translationComposition: string;
-  translationCountry: string;
-  translationImporter: string;
-  translationExtraText: string;
 };
 
 function defaultForm(): FormState {
@@ -77,12 +71,6 @@ function defaultForm(): FormState {
     brandId: "",
     categoryId: "",
     baseItemId: "",
-    translationName: "",
-    translationDescription: "",
-    translationComposition: "",
-    translationCountry: "",
-    translationImporter: "",
-    translationExtraText: "",
   };
 }
 
@@ -188,12 +176,6 @@ export function ItemPage() {
             brandId: base.brandId ?? "",
             categoryId: base.categoryId ?? "",
             baseItemId: base.id,
-            translationName: base.translationName ?? "",
-            translationDescription: base.translationDescription ?? "",
-            translationComposition: base.translationComposition ?? "",
-            translationCountry: base.translationCountry ?? "",
-            translationImporter: base.translationImporter ?? "",
-            translationExtraText: base.translationExtraText ?? "",
           });
           return;
         }
@@ -212,12 +194,6 @@ export function ItemPage() {
         brandId: item.brandId ?? "",
         categoryId: item.categoryId ?? "",
         baseItemId: item.baseItemId ?? "",
-        translationName: item.translationName ?? "",
-        translationDescription: item.translationDescription ?? "",
-        translationComposition: item.translationComposition ?? "",
-        translationCountry: item.translationCountry ?? "",
-        translationImporter: item.translationImporter ?? "",
-        translationExtraText: item.translationExtraText ?? "",
       });
     }
   }, [
@@ -232,12 +208,6 @@ export function ItemPage() {
     item?.accountingProfile,
     item?.brandId,
     item?.categoryId,
-    item?.translationName,
-    item?.translationDescription,
-    item?.translationComposition,
-    item?.translationCountry,
-    item?.translationImporter,
-    item?.translationExtraText,
     createKind,
     requestedBaseItemId,
   ]);
@@ -268,12 +238,6 @@ export function ItemPage() {
           categoryId: form.categoryId || undefined,
           itemKind: itemKindForSave,
           baseItemId: baseItemIdForSave,
-          translationName: form.translationName || undefined,
-          translationDescription: form.translationDescription || undefined,
-          translationComposition: form.translationComposition || undefined,
-          translationCountry: form.translationCountry || undefined,
-          translationImporter: form.translationImporter || undefined,
-          translationExtraText: form.translationExtraText || undefined,
         },
         isNew ? undefined : id ?? undefined,
       );

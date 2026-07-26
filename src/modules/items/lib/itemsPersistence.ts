@@ -247,17 +247,6 @@ function normalizeItem(raw: unknown): Item | null {
   const responsibleAssignments: ItemResponsibleAssignment[] = Array.isArray(raRaw)
     ? raRaw.map(normalizeItemResponsibleAssignment).filter((x): x is ItemResponsibleAssignment => x !== null)
     : [];
-  const optStr = (v: unknown): string | undefined => {
-    if (typeof v !== "string") return undefined;
-    const t = v.trim();
-    return t.length > 0 ? t : undefined;
-  };
-  const translationName = optStr(o.translationName);
-  const translationDescription = optStr(o.translationDescription);
-  const translationComposition = optStr(o.translationComposition);
-  const translationCountry = optStr(o.translationCountry);
-  const translationImporter = optStr(o.translationImporter);
-  const translationExtraText = optStr(o.translationExtraText);
   return {
     id: o.id,
     code: o.code,
@@ -278,12 +267,6 @@ function normalizeItem(raw: unknown): Item | null {
     baseItemId,
     testerCodeNextSeq,
     responsibleAssignments,
-    translationName,
-    translationDescription,
-    translationComposition,
-    translationCountry,
-    translationImporter,
-    translationExtraText,
   };
 }
 

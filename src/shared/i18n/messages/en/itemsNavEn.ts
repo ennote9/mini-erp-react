@@ -1,4 +1,4 @@
-/** Items module navigation (subnav under /items, label data, and item references). */
+/** Items module navigation (subnav under /items and item references). */
 export const itemsNavEn = {
   subnav: {
     itemReferences: "Item references",

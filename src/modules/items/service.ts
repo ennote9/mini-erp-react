@@ -29,12 +29,6 @@ export type SaveItemInput = {
   categoryId?: string;
   itemKind?: ItemKind;
   baseItemId?: string;
-  translationName?: string;
-  translationDescription?: string;
-  translationComposition?: string;
-  translationCountry?: string;
-  translationImporter?: string;
-  translationExtraText?: string;
 };
 export type SaveItemResult =
   | { success: true; id: string }
@@ -101,8 +95,6 @@ export function saveItem(
   const itemKind: ItemKind = data.itemKind ?? "SELLABLE";
   const baseItemId = normalizeTrim(data.baseItemId) || undefined;
 
-  const opt = (v: string | undefined) => normalizeTrim(v) || undefined;
-
   const patch = {
     code,
     name,
@@ -114,12 +106,6 @@ export function saveItem(
     categoryId,
     itemKind,
     baseItemId: itemKind === "TESTER" ? baseItemId : undefined,
-    translationName: opt(data.translationName),
-    translationDescription: opt(data.translationDescription),
-    translationComposition: opt(data.translationComposition),
-    translationCountry: opt(data.translationCountry),
-    translationImporter: opt(data.translationImporter),
-    translationExtraText: opt(data.translationExtraText),
   };
 
   if (existingId) {

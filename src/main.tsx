@@ -1,6 +1,5 @@
 import "@fontsource-variable/geist";
 import "./globals.css";
-import "./modules/labels/labelPrint.css";
 import "react-day-picker/src/style.css";
 import "./calendar-overrides.css";
 import React from "react";

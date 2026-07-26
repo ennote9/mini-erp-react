@@ -58,8 +58,6 @@ const DEFAULT_STORE_DEFINITIONS: ReadonlyArray<Pick<WorkspaceBackupStoreEntry, "
   { id: "markdown-records", relativePath: "master-data/markdown-records.json" },
   { id: "markdown-journals", relativePath: "master-data/markdown-journals.json" },
   { id: "markdown-journal-lines", relativePath: "master-data/markdown-journal-lines.json" },
-  { id: "label-templates", relativePath: "labels/templates.json" },
-  { id: "print-jobs", relativePath: "labels/print-jobs.json" },
   { id: "items", relativePath: "items/items.json" },
   { id: "app-settings", relativePath: "config/app-settings.json" },
 ];

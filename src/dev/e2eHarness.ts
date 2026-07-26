@@ -19,12 +19,9 @@ import type { UpdateItemPatch } from "@/modules/items/repository";
 import { purchaseOrderRepository, flushPendingPurchaseOrderPersist } from "@/modules/purchase-orders/repository";
 import { salesOrderRepository, flushPendingSalesOrderPersist } from "@/modules/sales-orders/repository";
 import { employeeRepository, flushPendingEmployeePersist } from "@/modules/employees/repository";
-import { flushPendingLabelWrites } from "@/modules/labels/service";
-import { labelTemplateRepository } from "@/modules/labels/labelTemplateRepository";
 
 export type MiniErpE2eApi = {
   itemRepository: typeof itemRepository;
-  labelTemplateRepository: typeof labelTemplateRepository;
   applyItemPriceAwaitPersist: typeof applyItemPriceAwaitPersist;
   cancelScheduledItemPriceAwaitPersist: typeof cancelScheduledItemPriceAwaitPersist;
   getEffectiveItemBasePriceOrZero: typeof getEffectiveItemBasePriceOrZero;
@@ -55,7 +52,6 @@ async function flushAll(): Promise<void> {
   await flushPendingPurchaseOrderPersist().catch(() => undefined);
   await flushPendingSalesOrderPersist().catch(() => undefined);
   await flushPendingEmployeePersist().catch(() => undefined);
-  await flushPendingLabelWrites().catch(() => undefined);
 }
 
 async function patchItem(id: string, patch: UpdateItemPatch): Promise<void> {
@@ -68,7 +64,6 @@ async function patchItem(id: string, patch: UpdateItemPatch): Promise<void> {
 function attach(): void {
   window.__MINI_ERP_E2E__ = {
     itemRepository,
-    labelTemplateRepository,
     applyItemPriceAwaitPersist,
     cancelScheduledItemPriceAwaitPersist,
     getEffectiveItemBasePriceOrZero,

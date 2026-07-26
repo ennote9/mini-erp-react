@@ -4,7 +4,7 @@
 
 `resetPurchasingSalesOperationalStores` clears **persisted** purchasing and sales operational JSON (PO, receipts, SO, shipments, payments, stock movements/reservations/balances, audit events) and filters **operational** rows out of `entity-attachments.json` (`order` / `shipment` only). It does **not** change business rules in services — only files on disk / localStorage mirrors.
 
-**Preserved:** items, master data (suppliers, customers, warehouses, brands, categories, …), customer agreements, label templates, app settings, markdown master-data, and entity attachments for `customer` / `agreement`.
+**Preserved:** items, master data (suppliers, customers, warehouses, brands, categories, …), customer agreements, app settings, markdown master-data, and entity attachments for `customer` / `agreement`.
 
 **After a real reset:** restart the desktop app or hard-reload the web view so repositories bootstrap from the cleared files.
 

@@ -145,16 +145,4 @@ export interface Item {
   testerCodeNextSeq?: number;
   /** Direct nominations on this item; brand/category context is read-only elsewhere. */
   responsibleAssignments?: ItemResponsibleAssignment[];
-  /** Localized / alternate display name for translation stickers (optional). */
-  translationName?: string;
-  /** Extra translation copy (optional). */
-  translationDescription?: string;
-  /** Composition / ingredients line for label workflows (optional). */
-  translationComposition?: string;
-  /** Country of origin for translation labels (optional). */
-  translationCountry?: string;
-  /** Importer / distributor line (optional). */
-  translationImporter?: string;
-  /** Free-form extra translation text for stickers (optional). */
-  translationExtraText?: string;
 }
