@@ -86,7 +86,6 @@ export const kkMessages: MessageTree = {
       stockMovements: "Қозғалыстар",
       markdownJournal: "Уценка журналы",
       labels: "Стикерлер мен басып шығару",
-      marking: "Маркировка",
     },
   },
   labels: {
@@ -121,20 +120,13 @@ export const kkMessages: MessageTree = {
       PRICE_TAG: "Баға белгішесі",
       QR_LABEL: "QR стикері",
       TRANSLATION_STICKER: "Аудару",
-      KIZ_LABEL: "КИЗ / маркировка (ақпараттық)",
       DATAMATRIX_LABEL: "DataMatrix стикері",
       CUSTOM: "Пайдаланушы",
     },
     domainIssues: {
       translationContentMissing:
         "Осы стикер үшін аудару атауы, сипаттамасы, құрамы немесе қосымша мәтіннің кем дегенде біреуін толтырыңыз.",
-      kizMarkingMissing:
-        "Кем дегенде біреуін енгізіңіз: КИЗ, маркировка коды немесе GS1 DataMatrix.",
-      datamatrixSourceMissing:
-        "DataMatrix payload, GS1 DataMatrix немесе маркировка кодын енгізіңіз.",
       matrixBindingEmpty: "DataMatrix элементіне байланыстан мән келмейді.",
-      markingRecordUnavailable:
-        "Таңдалған маркировка коды қолжетімсіз (жоқ, жойылған немесе пайдаланылған) — басқасын таңдаңыз немесе тазалаңыз.",
     },
     paper: {
       LABEL: "Стикер",
@@ -214,8 +206,6 @@ export const kkMessages: MessageTree = {
           primary_barcode: "Негізгі ШК",
           barcode_by_packaging: "Қаптау деңгейі бойынша ШК",
           barcode_by_role: "Рөл бойынша ШК",
-          selected_marking_payload: "Таңдалған маркировка payload",
-          selected_marking_human_label: "Таңдалған маркировка атауы",
         },
         fieldPath: "Жол",
         packagingLevel: "Қаптау деңгейі",
@@ -242,10 +232,6 @@ export const kkMessages: MessageTree = {
       noTemplates: "Белсенді үлгілер жоқ.",
       copiesLabel: "Дана",
       copiesHint: "Тек алдын ала қарау — принтерге әлі жіберілмейді.",
-      markingRecordLabel: "Маркировка коды",
-      markingRecordNone: "Жоқ (тауар өрістері)",
-      markingRecordPlaceholder: "Пулдан таңдаңыз",
-      markingRecordHint: "КИЗ / DataMatrix үлгілері үшін пулдан код таңдаңыз немесе тауар өрістерін қолданыңыз.",
       reprintHint:
         "Тарихтан қалпына келтірілді — үлгі мен даналарды тексеріңіз, содан кейін басып шығару немесе PDF.",
       actions: {
@@ -306,9 +292,6 @@ export const kkMessages: MessageTree = {
         warningBarcodeNotFound: "Штрихкод табылмады — алдын ала қарауда негізгі қолданылады.",
         warningBarcodeInactive: "Штрихкод белсенді емес — алдын ала қарауда негізгі қолданылады.",
         warningNoActiveBarcodes: "Белсенді штрихкодтар жоқ — байламдар бос болуы мүмкін.",
-        warningMarkingRecordNotFound: "Маркировка коды табылмады — басқасын таңдаңыз немесе тазалаңыз.",
-        warningMarkingRecordUnavailable:
-          "Маркировка кодын басып шығаруға болмайды (жойылған немесе пайдаланылған) — басқасын таңдаңыз немесе тазалаңыз.",
       },
     },
     operations: {
@@ -329,12 +312,7 @@ export const kkMessages: MessageTree = {
       columnCopies: "Дана",
       columnItem: "Тауар",
       columnSource: "Көз",
-      markingHint: "Маркировка",
       openWorkspace: "Жұмыс орнында ашу",
-      openMarkingReconciliation: "Маркировка кодтарын тексеру",
-      openMarkingTraceability: "Трассировка",
-      openMarkingSyncConsole: "Маркировканы синхрондау консолі",
-      syncRelatedMarkingCodes: "Трассировка / синхрондау",
       reprint: "Қайта ашу (басып шығару)",
       openBatch: "Топтамды басып шығаруда ашу",
       reprintBatch: "Топтам тізімін қалпына келтіру",
@@ -412,8 +390,6 @@ export const kkMessages: MessageTree = {
       colCode: "Коды",
       colName: "Атауы",
       colBarcode: "Штрихкод",
-      colMarking: "Маркировка",
-      markingNone: "—",
       colCopies: "Дана",
       colStatus: "Күй",
       validation: {
@@ -423,7 +399,7 @@ export const kkMessages: MessageTree = {
         noActiveBarcodes: "Белсенді ШК жоқ",
         noBarcode: "ШК таңдаңыз",
         itemMissing: "Жол жоқ",
-        domainDataMissing: "Осы үлгі үшін деректер жоқ (аудару, маркировка т. б.).",
+        domainDataMissing: "Осы үлгі үшін деректер жоқ (мысалы, аударма немесе штрихкод мәні).",
       },
       feedback: {
         restored: "Тізім тапсырыстан қалпына келтірілді.",
@@ -437,11 +413,6 @@ export const kkMessages: MessageTree = {
     dashboard: "Басқару тақтасы",
     items: "Тауарлар",
     itemsLabelData: "Стикер деректері",
-    itemsMarkingImport: "Маркировка кодтарын импорттау",
-    itemsMarkingReconciliation: "Маркировканы растау",
-    itemsMarkingTraceability: "Маркировка кодтарының трассировкасы",
-    itemsMarkingSync: "Маркировканы синхрондау",
-    settingsMarkingProvider: "Маркировка провайдері",
     barcodes: "Штрихкодтар тізілімі",
     item: "Тауар карточкасы",
     brands: "Брендтер",
@@ -683,7 +654,6 @@ export const kkMessages: MessageTree = {
       exportWorkspaceBackupWarnings: "Ескертпелермен аяқталды: {{details}}",
       exportWorkspaceBackupFailed: "Сақтық көшірмені экспорттау қатесі: {{message}}",
       exportWorkspaceBackupUnknownError: "Белгісіз қате",
-      markingProviderOpen: "Ашу",
     },
     persistence: {
       filePersisted: "Жергілікті сақталған (қолданба деректер қалтасы).",
@@ -1407,11 +1377,6 @@ export const kkMessages: MessageTree = {
       barcodesShort: "Штрихкодтар",
       brandsShort: "Брендтер",
       categoriesShort: "Санаттар",
-      marking: "Маркировка",
-      markingImportShort: "Кодтарды импорттау",
-      markingConfirmationShort: "Растау",
-      markingTraceabilityShort: "Трассировка",
-      markingSyncShort: "Синхрондау",
     },
   },
 };

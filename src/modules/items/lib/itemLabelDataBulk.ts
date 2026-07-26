@@ -8,11 +8,6 @@ export type ItemLabelDataDraft = {
   translationCountry: string;
   translationImporter: string;
   translationExtraText: string;
-  markingCode: string;
-  kizCode: string;
-  dataMatrixPayload: string;
-  gs1DataMatrixPayload: string;
-  markingComment: string;
 };
 
 export const LABEL_DATA_FIELD_KEYS: (keyof ItemLabelDataDraft)[] = [
@@ -22,11 +17,6 @@ export const LABEL_DATA_FIELD_KEYS: (keyof ItemLabelDataDraft)[] = [
   "translationCountry",
   "translationImporter",
   "translationExtraText",
-  "markingCode",
-  "kizCode",
-  "dataMatrixPayload",
-  "gs1DataMatrixPayload",
-  "markingComment",
 ];
 
 export function emptyLabelDataDraft(): ItemLabelDataDraft {
@@ -37,11 +27,6 @@ export function emptyLabelDataDraft(): ItemLabelDataDraft {
     translationCountry: "",
     translationImporter: "",
     translationExtraText: "",
-    markingCode: "",
-    kizCode: "",
-    dataMatrixPayload: "",
-    gs1DataMatrixPayload: "",
-    markingComment: "",
   };
 }
 
@@ -53,11 +38,6 @@ export function itemToLabelDataDraft(item: Item): ItemLabelDataDraft {
     translationCountry: item.translationCountry ?? "",
     translationImporter: item.translationImporter ?? "",
     translationExtraText: item.translationExtraText ?? "",
-    markingCode: item.markingCode ?? "",
-    kizCode: item.kizCode ?? "",
-    dataMatrixPayload: item.dataMatrixPayload ?? "",
-    gs1DataMatrixPayload: item.gs1DataMatrixPayload ?? "",
-    markingComment: item.markingComment ?? "",
   };
 }
 
@@ -79,11 +59,6 @@ export function draftToItemPatch(draft: ItemLabelDataDraft): Partial<Item> {
     translationCountry: opt(draft.translationCountry),
     translationImporter: opt(draft.translationImporter),
     translationExtraText: opt(draft.translationExtraText),
-    markingCode: opt(draft.markingCode),
-    kizCode: opt(draft.kizCode),
-    dataMatrixPayload: opt(draft.dataMatrixPayload),
-    gs1DataMatrixPayload: opt(draft.gs1DataMatrixPayload),
-    markingComment: opt(draft.markingComment),
   };
 }
 
@@ -110,21 +85,9 @@ export function hasTranslationDisplayContent(item: Item): boolean {
   );
 }
 
-export function hasMarkingContent(item: Item): boolean {
-  return !!(
-    item.markingCode?.trim() ||
-    item.kizCode?.trim() ||
-    item.dataMatrixPayload?.trim() ||
-    item.gs1DataMatrixPayload?.trim()
-  );
-}
-
 export type LabelDataFilter =
   | "all"
   | "no_translation"
-  | "no_marking"
-  | "no_datamatrix"
-  | "no_kiz_marking"
   | "issues"
   | "dirty_only"
   | "import_skipped";
@@ -143,15 +106,6 @@ export function hasTranslationInDraft(d: ItemLabelDataDraft): boolean {
   );
 }
 
-export function hasMarkingInDraft(d: ItemLabelDataDraft): boolean {
-  return !!(
-    d.markingCode?.trim() ||
-    d.kizCode?.trim() ||
-    d.dataMatrixPayload?.trim() ||
-    d.gs1DataMatrixPayload?.trim()
-  );
-}
-
 export function applyLabelDataFilter(items: Item[], f: LabelDataFilter, ctx?: LabelDataFilterContext): Item[] {
   if (f === "all") return items;
   if (f === "dirty_only") return items.filter((i) => ctx?.dirtyIds?.has(i.id));
@@ -160,16 +114,7 @@ export function applyLabelDataFilter(items: Item[], f: LabelDataFilter, ctx?: La
   return items.filter((item) => {
     const d = ctx?.draftById?.[item.id] ?? itemToLabelDataDraft(item);
     if (f === "no_translation") return !hasTranslationInDraft(d);
-    if (f === "no_marking") return !hasMarkingInDraft(d);
-    if (f === "no_datamatrix") {
-      return !d.dataMatrixPayload?.trim() && !d.gs1DataMatrixPayload?.trim();
-    }
-    if (f === "no_kiz_marking") {
-      return !d.kizCode?.trim() && !d.markingCode?.trim();
-    }
-    if (f === "issues") {
-      return !hasTranslationInDraft(d) || !hasMarkingInDraft(d);
-    }
+    if (f === "issues") return !hasTranslationInDraft(d);
     return true;
   });
 }

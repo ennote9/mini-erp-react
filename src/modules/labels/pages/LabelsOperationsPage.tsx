@@ -170,16 +170,6 @@ export function LabelsOperationsPage() {
                             {job.itemCodeSnapshot}
                           </span>
                         ) : null}
-                        {job.markingRecordId || job.markingPayloadSnapshot ? (
-                          <span
-                            className="mt-0.5 block max-w-full truncate font-mono text-[10px] text-violet-700/90 dark:text-violet-300/90"
-                            title={job.markingPayloadSnapshot ?? job.markingRecordId}
-                          >
-                            {t("labels.operations.markingHint")}:{" "}
-                            {(job.markingPayloadSnapshot ?? job.markingRecordId ?? "").slice(0, 42)}
-                            {(job.markingPayloadSnapshot ?? job.markingRecordId ?? "").length > 42 ? "…" : ""}
-                          </span>
-                        ) : null}
                       </>
                     ) : (
                       <span className="text-muted-foreground/80">—</span>
@@ -200,28 +190,6 @@ export function LabelsOperationsPage() {
                         >
                           {t("labels.operations.batchRestore")}
                         </Link>
-                        {job.batchRowsSnapshot ? (
-                          <>
-                            <Link
-                              to={`/items/marking-reconciliation?job=${encodeURIComponent(job.id)}`}
-                              className="text-[10px] text-violet-700 underline-offset-2 hover:underline dark:text-violet-300"
-                            >
-                              {t("labels.operations.openMarkingReconciliation")}
-                            </Link>
-                            <Link
-                              to={`/items/marking-traceability?job=${encodeURIComponent(job.id)}`}
-                              className="text-[10px] text-violet-700 underline-offset-2 hover:underline dark:text-violet-300"
-                            >
-                              {t("labels.operations.syncRelatedMarkingCodes")}
-                            </Link>
-                            <Link
-                              to={`/items/marking-sync?job=${encodeURIComponent(job.id)}`}
-                              className="text-[10px] text-violet-700 underline-offset-2 hover:underline dark:text-violet-300"
-                            >
-                              {t("labels.operations.openMarkingSyncConsole")}
-                            </Link>
-                          </>
-                        ) : null}
                       </div>
                     ) : (
                       <div className="flex flex-col items-end gap-1">
@@ -237,28 +205,6 @@ export function LabelsOperationsPage() {
                         >
                           {t("labels.operations.reprint")}
                         </Link>
-                        {job.markingRecordId || job.markingPayloadSnapshot ? (
-                          <>
-                            <Link
-                              to={`/items/marking-reconciliation?job=${encodeURIComponent(job.id)}`}
-                              className="text-[10px] text-violet-700 underline-offset-2 hover:underline dark:text-violet-300"
-                            >
-                              {t("labels.operations.openMarkingReconciliation")}
-                            </Link>
-                            <Link
-                              to={`/items/marking-traceability?job=${encodeURIComponent(job.id)}`}
-                              className="text-[10px] text-violet-700 underline-offset-2 hover:underline dark:text-violet-300"
-                            >
-                              {t("labels.operations.syncRelatedMarkingCodes")}
-                            </Link>
-                            <Link
-                              to={`/items/marking-sync?job=${encodeURIComponent(job.id)}`}
-                              className="text-[10px] text-violet-700 underline-offset-2 hover:underline dark:text-violet-300"
-                            >
-                              {t("labels.operations.openMarkingSyncConsole")}
-                            </Link>
-                          </>
-                        ) : null}
                       </div>
                     )}
                   </div>

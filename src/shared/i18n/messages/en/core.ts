@@ -76,7 +76,6 @@ export const coreEn = {
       stockMovements: "Stock Movements",
       markdownJournal: "Markdown Journal",
       labels: "Labels & printing",
-      marking: "Marking",
     },
   },
   labels: {
@@ -111,20 +110,13 @@ export const coreEn = {
       PRICE_TAG: "Price tag",
       QR_LABEL: "QR sticker",
       TRANSLATION_STICKER: "Translation sticker",
-      KIZ_LABEL: "KIZ / marking (informative)",
       DATAMATRIX_LABEL: "DataMatrix label",
       CUSTOM: "Custom",
     },
     domainIssues: {
       translationContentMissing:
         "Fill at least one translation field (name, description, composition, or extra text) for this sticker.",
-      kizMarkingMissing:
-        "Fill at least one of: KIZ, marking code, or GS1 DataMatrix payload before printing.",
-      datamatrixSourceMissing:
-        "Fill DataMatrix payload, GS1 DataMatrix payload, or marking code before printing.",
       matrixBindingEmpty: "A DataMatrix element has no value from its binding.",
-      markingRecordUnavailable:
-        "The selected marking code is missing, void, or already used — pick another code or clear the selection.",
     },
     paper: {
       LABEL: "Label stock",
@@ -204,8 +196,6 @@ export const coreEn = {
           primary_barcode: "Primary barcode",
           barcode_by_packaging: "Barcode by packaging level",
           barcode_by_role: "Barcode by role",
-          selected_marking_payload: "Selected marking payload",
-          selected_marking_human_label: "Selected marking label",
         },
         fieldPath: "Path",
         packagingLevel: "Packaging level",
@@ -232,10 +222,6 @@ export const coreEn = {
       noTemplates: "No active templates available.",
       copiesLabel: "Copies",
       copiesHint: "Preview only — not sent to a printer yet.",
-      markingRecordLabel: "Marking code",
-      markingRecordNone: "None (use item fields)",
-      markingRecordPlaceholder: "Select a pool code",
-      markingRecordHint: "For KIZ / DataMatrix templates, pick a code or rely on scalar fields on the item.",
       reprintHint:
         "Restored from history — check template and copies, then print or export PDF.",
       actions: {
@@ -295,9 +281,6 @@ export const coreEn = {
         warningBarcodeNotFound: "Barcode not found — using primary barcode for preview.",
         warningBarcodeInactive: "Barcode is inactive — using primary barcode for preview.",
         warningNoActiveBarcodes: "No active barcodes — code bindings may be empty.",
-        warningMarkingRecordNotFound: "Marking code not found — pick another code or clear the selection.",
-        warningMarkingRecordUnavailable:
-          "Marking code cannot be used for printing (void or used) — pick another code or clear the selection.",
       },
     },
     operations: {
@@ -318,12 +301,7 @@ export const coreEn = {
       columnCopies: "Copies",
       columnItem: "Item",
       columnSource: "Source",
-      markingHint: "Marking",
       openWorkspace: "Open in workspace",
-      openMarkingReconciliation: "Review marking codes",
-      openMarkingTraceability: "Marking traceability",
-      openMarkingSyncConsole: "Marking sync console",
-      syncRelatedMarkingCodes: "Traceability / sync codes",
       reprint: "Reopen for reprint",
       openBatch: "Open in batch print",
       reprintBatch: "Restore batch list",
@@ -401,8 +379,6 @@ export const coreEn = {
       colCode: "Code",
       colName: "Name",
       colBarcode: "Barcode",
-      colMarking: "Marking",
-      markingNone: "—",
       colCopies: "Copies",
       colStatus: "Status",
       validation: {
@@ -412,7 +388,7 @@ export const coreEn = {
         noActiveBarcodes: "No active barcode",
         noBarcode: "Pick a barcode",
         itemMissing: "Item missing",
-        domainDataMissing: "Missing data for this template (e.g. translation or marking code).",
+        domainDataMissing: "Missing data for this template (for example translation content or a barcode value).",
       },
       feedback: {
         restored: "Batch list restored from the job.",
@@ -426,11 +402,6 @@ export const coreEn = {
     dashboard: "Dashboard",
     items: "Items",
     itemsLabelData: "Label data",
-    itemsMarkingImport: "Marking code import",
-    itemsMarkingReconciliation: "Marking confirmation",
-    itemsMarkingTraceability: "Marking traceability",
-    itemsMarkingSync: "Marking sync",
-    settingsMarkingProvider: "Marking provider",
     barcodes: "Barcode Registry",
     item: "Catalog item",
     brands: "Brands",

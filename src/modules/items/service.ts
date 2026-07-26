@@ -35,11 +35,6 @@ export type SaveItemInput = {
   translationCountry?: string;
   translationImporter?: string;
   translationExtraText?: string;
-  markingCode?: string;
-  kizCode?: string;
-  dataMatrixPayload?: string;
-  gs1DataMatrixPayload?: string;
-  markingComment?: string;
 };
 export type SaveItemResult =
   | { success: true; id: string }
@@ -125,11 +120,6 @@ export function saveItem(
     translationCountry: opt(data.translationCountry),
     translationImporter: opt(data.translationImporter),
     translationExtraText: opt(data.translationExtraText),
-    markingCode: opt(data.markingCode),
-    kizCode: opt(data.kizCode),
-    dataMatrixPayload: opt(data.dataMatrixPayload),
-    gs1DataMatrixPayload: opt(data.gs1DataMatrixPayload),
-    markingComment: opt(data.markingComment),
   };
 
   if (existingId) {

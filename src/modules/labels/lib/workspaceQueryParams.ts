@@ -5,8 +5,6 @@
 export const LABELS_WORKSPACE_QUERY = {
   itemId: "itemId",
   barcodeId: "barcodeId",
-  /** Pool selection for KIZ / DataMatrix domain templates. */
-  markingRecordId: "markingRecordId",
   templateId: "templateId",
   /** e.g. `item-barcodes` when opened from item card tab */
   source: "source",
@@ -19,7 +17,6 @@ export const LABELS_WORKSPACE_QUERY = {
 export function buildLabelsWorkspaceUrl(params: {
   itemId: string;
   barcodeId: string;
-  markingRecordId?: string;
   templateId?: string;
   source?: string;
   copies?: number;
@@ -28,7 +25,6 @@ export function buildLabelsWorkspaceUrl(params: {
   const q = new URLSearchParams();
   q.set(LABELS_WORKSPACE_QUERY.itemId, params.itemId);
   q.set(LABELS_WORKSPACE_QUERY.barcodeId, params.barcodeId);
-  if (params.markingRecordId) q.set(LABELS_WORKSPACE_QUERY.markingRecordId, params.markingRecordId);
   if (params.templateId) q.set(LABELS_WORKSPACE_QUERY.templateId, params.templateId);
   if (params.source) q.set(LABELS_WORKSPACE_QUERY.source, params.source);
   if (params.copies != null && params.copies >= 1 && params.copies <= 999) {

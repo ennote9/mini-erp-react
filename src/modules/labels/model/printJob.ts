@@ -1,5 +1,4 @@
 import type { LabelTemplateKind } from "./labelTemplate";
-import type { ItemMarkingRecordKind, ItemMarkingRecordStatus } from "@/modules/items/model/itemMarkingRecord";
 
 export type PrintJobMode = "preview" | "print" | "pdf";
 
@@ -15,11 +14,6 @@ export interface PrintJob {
   itemIds: string[];
   /** Optional catalog context when job was created from workspace. */
   barcodeId?: string;
-  /** Selected marking pool record (workspace / station) — audit trail. */
-  markingRecordId?: string;
-  markingPayloadSnapshot?: string;
-  markingKindSnapshot?: ItemMarkingRecordKind;
-  markingStatusSnapshot?: ItemMarkingRecordStatus;
   copies: number;
   mode: PrintJobMode;
   status: PrintJobStatus;

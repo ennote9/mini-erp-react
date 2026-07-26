@@ -86,7 +86,6 @@ export const ruMessages: MessageTree = {
       stockMovements: "Движения",
       markdownJournal: "Журнал уценки",
       labels: "Этикетки и печать",
-      marking: "Маркировка",
     },
   },
   labels: {
@@ -121,20 +120,13 @@ export const ruMessages: MessageTree = {
       PRICE_TAG: "Ценник",
       QR_LABEL: "QR-наклейка",
       TRANSLATION_STICKER: "Перевод",
-      KIZ_LABEL: "КИЗ / маркировка (справочно)",
       DATAMATRIX_LABEL: "DataMatrix этикетка",
       CUSTOM: "Пользовательский",
     },
     domainIssues: {
       translationContentMissing:
         "Заполните хотя бы одно переводное поле (название, описание, состав или доп. текст) для этого стикера.",
-      kizMarkingMissing:
-        "Укажите хотя бы одно: КИЗ, код маркировки или GS1 DataMatrix перед печатью.",
-      datamatrixSourceMissing:
-        "Укажите payload DataMatrix, GS1 DataMatrix или код маркировки перед печатью.",
       matrixBindingEmpty: "Для элемента DataMatrix привязка не даёт значения.",
-      markingRecordUnavailable:
-        "Выбранный код маркировки недоступен (не найден, аннулирован или уже использован) — выберите другой или сбросьте выбор.",
     },
     paper: {
       LABEL: "Этикетка",
@@ -214,8 +206,6 @@ export const ruMessages: MessageTree = {
           primary_barcode: "Основной штрихкод",
           barcode_by_packaging: "Штрихкод по уровню упаковки",
           barcode_by_role: "Штрихкод по роли",
-          selected_marking_payload: "Выбранный payload маркировки",
-          selected_marking_human_label: "Подпись выбранной маркировки",
         },
         fieldPath: "Путь",
         packagingLevel: "Уровень упаковки",
@@ -242,11 +232,6 @@ export const ruMessages: MessageTree = {
       noTemplates: "Нет доступных активных шаблонов.",
       copiesLabel: "Копий",
       copiesHint: "Только предпросмотр — на принтер пока не отправляется.",
-      markingRecordLabel: "Код маркировки",
-      markingRecordNone: "Нет (поля номенклатуры)",
-      markingRecordPlaceholder: "Выберите код из пула",
-      markingRecordHint:
-        "Для шаблонов КИЗ / DataMatrix выберите код из пула или используйте скалярные поля номенклатуры.",
       reprintHint:
         "Восстановлено из истории — проверьте шаблон и копии, затем печать или PDF.",
       actions: {
@@ -307,9 +292,6 @@ export const ruMessages: MessageTree = {
         warningBarcodeNotFound: "Штрихкод не найден — для предпросмотра используется основной.",
         warningBarcodeInactive: "Штрихкод неактивен — для предпросмотра используется основной.",
         warningNoActiveBarcodes: "Нет активных штрихкодов — привязки кодов могут быть пустыми.",
-        warningMarkingRecordNotFound: "Код маркировки не найден — выберите другой или сбросьте выбор.",
-        warningMarkingRecordUnavailable:
-          "Код маркировки нельзя использовать для печати (аннулирован или списан) — выберите другой или сбросьте выбор.",
       },
     },
     operations: {
@@ -330,12 +312,7 @@ export const ruMessages: MessageTree = {
       columnCopies: "Копий",
       columnItem: "Товар",
       columnSource: "Источник",
-      markingHint: "Маркировка",
       openWorkspace: "Открыть в рабочем месте",
-      openMarkingReconciliation: "Проверить коды маркировки",
-      openMarkingTraceability: "Трассировка кодов",
-      openMarkingSyncConsole: "Консоль синхронизации маркировки",
-      syncRelatedMarkingCodes: "Трассировка / синхронизация",
       reprint: "Повторить в рабочем месте",
       openBatch: "Открыть в пакетной печати",
       reprintBatch: "Восстановить список пакета",
@@ -413,8 +390,6 @@ export const ruMessages: MessageTree = {
       colCode: "Код",
       colName: "Наименование",
       colBarcode: "Штрихкод",
-      colMarking: "Маркировка",
-      markingNone: "—",
       colCopies: "Копий",
       colStatus: "Статус",
       validation: {
@@ -424,7 +399,7 @@ export const ruMessages: MessageTree = {
         noActiveBarcodes: "Нет активного ШК",
         noBarcode: "Выберите ШК",
         itemMissing: "Нет позиции",
-        domainDataMissing: "Нет данных для этого шаблона (перевод, маркировка и т. п.).",
+        domainDataMissing: "Нет данных для этого шаблона (например, перевода или значения штрихкода).",
       },
       feedback: {
         restored: "Список восстановлен из задания.",
@@ -438,11 +413,6 @@ export const ruMessages: MessageTree = {
     dashboard: "Панель",
     items: "Номенклатура",
     itemsLabelData: "Этикеточные данные",
-    itemsMarkingImport: "Импорт кодов маркировки",
-    itemsMarkingReconciliation: "Подтверждение маркировки",
-    itemsMarkingTraceability: "Трассировка кодов маркировки",
-    itemsMarkingSync: "Синхронизация маркировки",
-    settingsMarkingProvider: "Провайдер маркировки",
     barcodes: "Реестр штрихкодов",
     item: "Номенклатура",
     brands: "Бренды",
@@ -686,7 +656,6 @@ export const ruMessages: MessageTree = {
       exportWorkspaceBackupWarnings: "Завершено с предупреждениями: {{details}}",
       exportWorkspaceBackupFailed: "Ошибка экспорта резервной копии: {{message}}",
       exportWorkspaceBackupUnknownError: "Неизвестная ошибка",
-      markingProviderOpen: "Открыть",
     },
     persistence: {
       filePersisted: "Сохранено локально (папка данных приложения).",
@@ -1411,11 +1380,6 @@ export const ruMessages: MessageTree = {
       barcodesShort: "Штрихкоды",
       brandsShort: "Бренды",
       categoriesShort: "Категории",
-      marking: "Маркировка",
-      markingImportShort: "Импорт кодов",
-      markingConfirmationShort: "Подтверждение",
-      markingTraceabilityShort: "Трассировка",
-      markingSyncShort: "Синхронизация",
     },
   },
 };

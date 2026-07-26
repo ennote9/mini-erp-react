@@ -11,7 +11,7 @@ export type BatchRowsSnapshotV2 = {
   v: 2;
   source: typeof LABELS_BATCH_SOURCE;
   templateId: string;
-  rows: Array<{ itemId: string; barcodeId?: string; markingRecordId?: string; copies: number }>;
+  rows: Array<{ itemId: string; barcodeId?: string; copies: number }>;
 };
 
 export type BatchRowsSnapshot = BatchRowsSnapshotV1 | BatchRowsSnapshotV2;
@@ -50,7 +50,6 @@ export function parseBatchRowsSnapshot(raw: string | undefined | null): BatchRow
         rows.push({
           itemId,
           barcodeId: typeof rr.barcodeId === "string" ? rr.barcodeId : undefined,
-          markingRecordId: typeof rr.markingRecordId === "string" ? rr.markingRecordId : undefined,
           copies: Math.floor(copies),
         });
       }

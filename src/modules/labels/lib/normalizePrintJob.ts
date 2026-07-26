@@ -1,16 +1,11 @@
 import type { PrintJob, PrintJobMode, PrintJobStatus } from "../model";
 import type { LabelTemplateKind } from "../model/labelTemplate";
-import type { ItemMarkingRecordKind, ItemMarkingRecordStatus } from "@/modules/items/model/itemMarkingRecord";
-
-const MARKING_KINDS = new Set<ItemMarkingRecordKind>(["MARKING", "KIZ", "DATAMATRIX", "GS1_DATAMATRIX"]);
-const MARKING_STATUSES = new Set<ItemMarkingRecordStatus>(["AVAILABLE", "RESERVED", "PRINTED", "USED", "VOID"]);
 
 const TEMPLATE_KINDS = new Set<string>([
   "ITEM_LABEL",
   "PRICE_TAG",
   "QR_LABEL",
   "TRANSLATION_STICKER",
-  "KIZ_LABEL",
   "DATAMATRIX_LABEL",
   "CUSTOM",
 ]);
@@ -56,17 +51,6 @@ export function normalizePrintJob(raw: unknown): PrintJob | null {
     templateNameSnapshot: optString(o.templateNameSnapshot),
     itemIds,
     barcodeId: optString(o.barcodeId),
-    markingRecordId: optString(o.markingRecordId),
-    markingPayloadSnapshot: optString(o.markingPayloadSnapshot),
-    markingKindSnapshot:
-      typeof o.markingKindSnapshot === "string" && MARKING_KINDS.has(o.markingKindSnapshot as ItemMarkingRecordKind)
-        ? (o.markingKindSnapshot as ItemMarkingRecordKind)
-        : undefined,
-    markingStatusSnapshot:
-      typeof o.markingStatusSnapshot === "string" &&
-      MARKING_STATUSES.has(o.markingStatusSnapshot as ItemMarkingRecordStatus)
-        ? (o.markingStatusSnapshot as ItemMarkingRecordStatus)
-        : undefined,
     copies,
     mode: mode as PrintJobMode,
     status: status as PrintJobStatus,

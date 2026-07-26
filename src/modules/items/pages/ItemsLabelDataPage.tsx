@@ -41,7 +41,7 @@ import {
 } from "../lib/labelDataImportXlsx";
 import { ItemsModuleLayout } from "../components/ItemsModuleLayout";
 
-type ViewMode = "all" | "translation" | "marking";
+type ViewMode = "all" | "translation";
 
 function downloadTextFile(filename: string, content: string, mime: string) {
   const blob = new Blob([content], { type: mime });
@@ -354,16 +354,6 @@ export function ItemsLabelDataPage() {
     }
   }, [allItems, selectedIds, updateDraft]);
 
-  const bulkMarkingFromPrimaryBarcode = useCallback(() => {
-    if (selectedIds.size === 0) return;
-    for (const id of selectedIds) {
-      const it = allItems.find((x) => x.id === id);
-      if (!it) continue;
-      const v = primaryBarcodeValue(it);
-      if (v) updateDraft(id, { markingCode: v });
-    }
-  }, [allItems, selectedIds, updateDraft]);
-
   const filterOptions = useMemo(
     () =>
       (
@@ -372,9 +362,6 @@ export function ItemsLabelDataPage() {
           ["dirty_only", t("master.itemsLabelData.filter.dirty_only")],
           ["import_skipped", t("master.itemsLabelData.filter.import_skipped")],
           ["no_translation", t("master.itemsLabelData.filter.no_translation")],
-          ["no_marking", t("master.itemsLabelData.filter.no_marking")],
-          ["no_datamatrix", t("master.itemsLabelData.filter.no_datamatrix")],
-          ["no_kiz_marking", t("master.itemsLabelData.filter.no_kiz_marking")],
           ["issues", t("master.itemsLabelData.filter.issues")],
         ] as const
       ).map(([value, label]) => ({ value, label })),
@@ -387,7 +374,6 @@ export function ItemsLabelDataPage() {
         [
           ["all", t("master.itemsLabelData.view.all")],
           ["translation", t("master.itemsLabelData.view.translation")],
-          ["marking", t("master.itemsLabelData.view.marking")],
         ] as const
       ).map(([value, label]) => ({ value, label })),
     [t],
@@ -413,15 +399,7 @@ export function ItemsLabelDataPage() {
         "translationImporter",
         "translationExtraText",
       ];
-      const mark: (keyof ItemLabelDataDraft)[] = [
-        "markingCode",
-        "kizCode",
-        "dataMatrixPayload",
-        "gs1DataMatrixPayload",
-        "markingComment",
-      ];
-      if (viewMode === "translation") return trans.includes(k);
-      return mark.includes(k);
+      return trans.includes(k);
     },
     [viewMode],
   );
@@ -585,16 +563,6 @@ export function ItemsLabelDataPage() {
         <div className="flex flex-wrap gap-2 border-t border-border/50 pt-2">
           <Button type="button" size="sm" variant="outline" className="h-7 text-xs" disabled={selectedIds.size === 0} onClick={bulkTranslationFromName}>
             {t("master.itemsLabelData.quickTranslationName")}
-          </Button>
-          <Button
-            type="button"
-            size="sm"
-            variant="outline"
-            className="h-7 text-xs"
-            disabled={selectedIds.size === 0}
-            onClick={bulkMarkingFromPrimaryBarcode}
-          >
-            {t("master.itemsLabelData.quickMarkingBarcode")}
           </Button>
         </div>
       </section>

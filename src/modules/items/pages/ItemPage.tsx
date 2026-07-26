@@ -64,11 +64,6 @@ type FormState = {
   translationCountry: string;
   translationImporter: string;
   translationExtraText: string;
-  markingCode: string;
-  kizCode: string;
-  dataMatrixPayload: string;
-  gs1DataMatrixPayload: string;
-  markingComment: string;
 };
 
 function defaultForm(): FormState {
@@ -88,11 +83,6 @@ function defaultForm(): FormState {
     translationCountry: "",
     translationImporter: "",
     translationExtraText: "",
-    markingCode: "",
-    kizCode: "",
-    dataMatrixPayload: "",
-    gs1DataMatrixPayload: "",
-    markingComment: "",
   };
 }
 
@@ -204,11 +194,6 @@ export function ItemPage() {
             translationCountry: base.translationCountry ?? "",
             translationImporter: base.translationImporter ?? "",
             translationExtraText: base.translationExtraText ?? "",
-            markingCode: base.markingCode ?? "",
-            kizCode: base.kizCode ?? "",
-            dataMatrixPayload: base.dataMatrixPayload ?? "",
-            gs1DataMatrixPayload: base.gs1DataMatrixPayload ?? "",
-            markingComment: base.markingComment ?? "",
           });
           return;
         }
@@ -233,11 +218,6 @@ export function ItemPage() {
         translationCountry: item.translationCountry ?? "",
         translationImporter: item.translationImporter ?? "",
         translationExtraText: item.translationExtraText ?? "",
-        markingCode: item.markingCode ?? "",
-        kizCode: item.kizCode ?? "",
-        dataMatrixPayload: item.dataMatrixPayload ?? "",
-        gs1DataMatrixPayload: item.gs1DataMatrixPayload ?? "",
-        markingComment: item.markingComment ?? "",
       });
     }
   }, [
@@ -258,11 +238,6 @@ export function ItemPage() {
     item?.translationCountry,
     item?.translationImporter,
     item?.translationExtraText,
-    item?.markingCode,
-    item?.kizCode,
-    item?.dataMatrixPayload,
-    item?.gs1DataMatrixPayload,
-    item?.markingComment,
     createKind,
     requestedBaseItemId,
   ]);
@@ -299,11 +274,6 @@ export function ItemPage() {
           translationCountry: form.translationCountry || undefined,
           translationImporter: form.translationImporter || undefined,
           translationExtraText: form.translationExtraText || undefined,
-          markingCode: form.markingCode || undefined,
-          kizCode: form.kizCode || undefined,
-          dataMatrixPayload: form.dataMatrixPayload || undefined,
-          gs1DataMatrixPayload: form.gs1DataMatrixPayload || undefined,
-          markingComment: form.markingComment || undefined,
         },
         isNew ? undefined : id ?? undefined,
       );

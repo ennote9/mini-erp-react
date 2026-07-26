@@ -8,12 +8,6 @@ import { SelectField } from "@/components/ui/select-field";
 import { useTranslation } from "@/shared/i18n";
 import { getAppReadModelRevision, subscribeAppReadModelRevision } from "@/shared/appReadModelRevision";
 import { itemRepository } from "@/modules/items/repository";
-import {
-  abortBatchMarkingPrintSession,
-  beginBatchMarkingPrintSession,
-  listSelectableMarkingRecordsForItem,
-  markManyMarkingRecordsPrinted,
-} from "@/modules/items/markingRecordService";
 import { LABEL_PREVIEW_DEMO_CONTEXT } from "../lib/previewContext";
 import { buildItemPreviewBindingContext } from "../lib/itemPreviewContext";
 import { printBatchLabelSurfaces } from "../lib/printLabelSurface";
@@ -158,7 +152,6 @@ export function LabelsBatchPage() {
         built.push(
           buildBatchRowFromItem(item, {
             barcodeId: r.barcodeId,
-            markingRecordId: r.markingRecordId,
             copies: r.copies,
             template: tpl,
           }),
@@ -223,7 +216,6 @@ export function LabelsBatchPage() {
     }
     const b = buildItemPreviewBindingContext(previewItem, {
       barcodeId: selectedRow.barcodeId || undefined,
-      markingRecordId: selectedRow.markingRecordId || undefined,
     });
     return { context: b.context, mode: "item" as const };
   }, [previewItem, selectedRow, revision]);
@@ -235,7 +227,6 @@ export function LabelsBatchPage() {
       previewItem,
       selectedRow.barcodeId || undefined,
       t,
-      selectedRow.markingRecordId || undefined,
     );
   }, [selectedTemplate, previewItem, selectedRow, previewBuilt.mode, t]);
 
@@ -315,26 +306,6 @@ export function LabelsBatchPage() {
     [selectedTemplate],
   );
 
-  const updateRowMarking = useCallback(
-    (rowId: string, markingRecordId: string) => {
-      setRows((prev) =>
-        prev.map((row) => {
-          if (row.id !== rowId) return row;
-          const it = itemRepository.getById(row.itemId);
-          if (!it) return { ...row, isValid: false, validationMessage: "itemMissing" };
-          return buildBatchRowFromItem(it, {
-            barcodeId: row.barcodeId,
-            markingRecordId,
-            copies: row.copies,
-            rowId: row.id,
-            template: selectedTemplate,
-          });
-        }),
-      );
-    },
-    [selectedTemplate],
-  );
-
   const updateRowCopies = useCallback(
     (rowId: string, copies: number) => {
       const n = Math.min(999, Math.max(1, copies));
@@ -386,7 +357,6 @@ export function LabelsBatchPage() {
       rows: rows.map((r) => ({
         itemId: r.itemId,
         barcodeId: r.barcodeId || undefined,
-        markingRecordId: r.markingRecordId || undefined,
         copies: r.copies,
       })),
     });
@@ -489,15 +459,13 @@ export function LabelsBatchPage() {
       return;
     }
     setActionBusy("pdf");
-    const markingIds = rows.filter((r) => r.isValid && r.markingRecordId).map((r) => r.markingRecordId);
-    const releaseMap = beginBatchMarkingPrintSession(markingIds, "print_batch");
     try {
       const segments = await runExportSegments();
       await saveBatchLabelPdf({
         segments,
         filenameBase: `labels-batch-${selectedTemplate.name}`,
       });
-      const job = createPrintJobFromBatch({
+      createPrintJobFromBatch({
         templateId: selectedTemplate.id,
         copies: segments.reduce((s, g) => s + g.copies, 0),
         mode: "pdf",
@@ -512,10 +480,8 @@ export function LabelsBatchPage() {
         batchSummarySnapshot: summaryText,
         batchRowsSnapshot: buildSnapshotPayload(),
       });
-      markManyMarkingRecordsPrinted(markingIds, { printJobId: job.id, source: "print_batch" });
       setFeedback({ kind: "success", message: t("labels.workspace.feedback.pdfSaved") });
     } catch (e) {
-      abortBatchMarkingPrintSession(releaseMap, "print_batch");
       const msg = e instanceof Error ? e.message : String(e);
       try {
         createPrintJobFromBatch({
@@ -565,8 +531,6 @@ export function LabelsBatchPage() {
       return;
     }
     setActionBusy("print");
-    const markingIdsPrint = rows.filter((r) => r.isValid && r.markingRecordId).map((r) => r.markingRecordId);
-    const releaseMapPrint = beginBatchMarkingPrintSession(markingIdsPrint, "print_batch");
     let jobId: string | undefined;
     try {
       const segments = await runExportSegments();
@@ -594,12 +558,10 @@ export function LabelsBatchPage() {
 
       await printBatchLabelSurfaces(printSegments);
       if (jobId) markPrintJobSubmitted(jobId);
-      markManyMarkingRecordsPrinted(markingIdsPrint, { printJobId: jobId, source: "print_batch" });
       setFeedback({ kind: "success", message: t("labels.workspace.feedback.printDialogDone") });
     } catch (e) {
       const msg = (e instanceof Error ? e.message : String(e)).slice(0, 500);
       if (jobId) markPrintJobFailed(jobId, msg);
-      abortBatchMarkingPrintSession(releaseMapPrint, "print_batch");
       setFeedback({
         kind: "error",
         message: `${t("labels.workspace.feedback.printFailed")} ${msg}`,
@@ -646,7 +608,6 @@ export function LabelsBatchPage() {
     if (!item) return null;
     return buildItemPreviewBindingContext(item, {
       barcodeId: exportRow.barcodeId || undefined,
-      markingRecordId: exportRow.markingRecordId || undefined,
     });
   }, [exportRow, selectedTemplate, revision]);
 
@@ -854,7 +815,6 @@ export function LabelsBatchPage() {
                   <th className="px-2 py-1.5">{t("labels.batch.colCode")}</th>
                   <th className="px-2 py-1.5">{t("labels.batch.colName")}</th>
                   <th className="px-2 py-1.5">{t("labels.batch.colBarcode")}</th>
-                  <th className="px-2 py-1.5 min-w-[10rem]">{t("labels.batch.colMarking")}</th>
                   <th className="px-2 py-1.5 w-20">{t("labels.batch.colCopies")}</th>
                   <th className="px-2 py-1.5">{t("labels.batch.colStatus")}</th>
                   <th className="px-2 py-1.5 w-10" />
@@ -863,7 +823,7 @@ export function LabelsBatchPage() {
               <tbody>
                 {rows.length === 0 ? (
                   <tr>
-                    <td colSpan={7} className="px-3 py-8 text-center">
+                    <td colSpan={6} className="px-3 py-8 text-center">
                       <p className="text-sm text-muted-foreground">{t("labels.batch.empty")}</p>
                       <p className="mt-1 text-[11px] leading-snug text-muted-foreground">{t("labels.batch.emptyHint")}</p>
                     </td>
@@ -873,14 +833,6 @@ export function LabelsBatchPage() {
                     const item = itemRepository.getById(row.itemId);
                     const active = item?.barcodes.filter((b) => b.isActive) ?? [];
                     const bcOptions = active.map((b) => ({ value: b.id, label: b.codeValue }));
-                    const markingOpts = item
-                      ? listSelectableMarkingRecordsForItem(item.id).map((r) => ({
-                          value: r.id,
-                          label: `${r.kind}${r.humanLabel ? ` · ${r.humanLabel}` : ""} · ${
-                            r.payload.length > 18 ? `${r.payload.slice(0, 18)}…` : r.payload
-                          }`,
-                        }))
-                      : [];
                     const isRowSelected = row.id === effectiveSelectedId;
                     return (
                       <tr
@@ -902,16 +854,6 @@ export function LabelsBatchPage() {
                             placeholder="—"
                             className="h-7 max-w-[10rem] text-[11px]"
                             disabled={active.length === 0}
-                          />
-                        </td>
-                        <td className="px-2 py-1.5" onClick={(e) => e.stopPropagation()}>
-                          <SelectField
-                            value={row.markingRecordId}
-                            onChange={(id) => updateRowMarking(row.id, id)}
-                            options={[{ value: "", label: t("labels.batch.markingNone") }, ...markingOpts]}
-                            placeholder="—"
-                            className="h-7 max-w-[14rem] text-[10px]"
-                            disabled={!item || markingOpts.length === 0}
                           />
                         </td>
                         <td className="px-2 py-1.5" onClick={(e) => e.stopPropagation()}>

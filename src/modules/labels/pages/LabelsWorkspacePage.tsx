@@ -7,13 +7,6 @@ import { SelectField } from "@/components/ui/select-field";
 import { useTranslation } from "@/shared/i18n";
 import { getAppReadModelRevision, subscribeAppReadModelRevision } from "@/shared/appReadModelRevision";
 import { itemRepository } from "@/modules/items/repository";
-import {
-  abortMarkingPrintSession,
-  beginMarkingPrintSession,
-  buildMarkingSnapshotFields,
-  completeMarkingPrintSuccess,
-  listSelectableMarkingRecordsForItem,
-} from "@/modules/items/markingRecordService";
 import { LABEL_PREVIEW_DEMO_CONTEXT, type LabelPreviewBindingContext } from "../lib/previewContext";
 import { buildItemPreviewBindingContext, type ItemPreviewWarningCode } from "../lib/itemPreviewContext";
 import { LABELS_WORKSPACE_QUERY } from "../lib/workspaceQueryParams";
@@ -54,7 +47,6 @@ export function LabelsWorkspacePage() {
 
   const itemId = searchParams.get(LABELS_WORKSPACE_QUERY.itemId) ?? "";
   const barcodeId = searchParams.get(LABELS_WORKSPACE_QUERY.barcodeId) ?? "";
-  const markingRecordId = searchParams.get(LABELS_WORKSPACE_QUERY.markingRecordId) ?? "";
   const urlTemplateId = searchParams.get(LABELS_WORKSPACE_QUERY.templateId) ?? "";
   const source = searchParams.get(LABELS_WORKSPACE_QUERY.source);
   const reprintFromHistory = searchParams.get(LABELS_WORKSPACE_QUERY.reprint) === "1";
@@ -66,22 +58,6 @@ export function LabelsWorkspacePage() {
     void revision;
     return itemId ? itemRepository.getById(itemId) : undefined;
   }, [revision, itemId]);
-
-  const markingPool = useMemo(() => {
-    void revision;
-    if (!item) return [];
-    return listSelectableMarkingRecordsForItem(item.id);
-  }, [revision, item]);
-
-  const setMarkingRecordParam = useCallback(
-    (id: string) => {
-      const next = new URLSearchParams(searchParams);
-      if (id) next.set(LABELS_WORKSPACE_QUERY.markingRecordId, id);
-      else next.delete(LABELS_WORKSPACE_QUERY.markingRecordId);
-      setSearchParams(next, { replace: true });
-    },
-    [searchParams, setSearchParams],
-  );
 
   const { previewContext, previewMode, itemWarnings, showItemNotFound } = useMemo((): {
     previewContext: LabelPreviewBindingContext;
@@ -107,7 +83,6 @@ export function LabelsWorkspacePage() {
     }
     const built = buildItemPreviewBindingContext(item, {
       barcodeId: barcodeId || undefined,
-      markingRecordId: markingRecordId || undefined,
     });
     return {
       previewContext: built.context,
@@ -115,7 +90,7 @@ export function LabelsWorkspacePage() {
       itemWarnings: built.warnings,
       showItemNotFound: false,
     };
-  }, [itemId, item, barcodeId, markingRecordId]);
+  }, [itemId, item, barcodeId]);
 
   const templates = useMemo((): LabelTemplate[] => {
     void revision;
@@ -151,21 +126,6 @@ export function LabelsWorkspacePage() {
       return def && templates.some((x) => x.id === def.id) ? def.id : templates[0].id;
     });
   }, [templates, urlTemplateId]);
-
-  useEffect(() => {
-    if (!item || !templateId) return;
-    if (markingRecordId) return;
-    const tpl = templates.find((x) => x.id === templateId);
-    if (!tpl) return;
-    const needKiz = tpl.kind === "KIZ_LABEL";
-    const needDm = tpl.kind === "DATAMATRIX_LABEL";
-    if (!needKiz && !needDm) return;
-    const candidates = needKiz
-      ? markingPool.filter((r) => r.kind === "KIZ")
-      : markingPool.filter((r) => r.kind === "DATAMATRIX" || r.kind === "GS1_DATAMATRIX");
-    if (candidates.length !== 1) return;
-    setMarkingRecordParam(candidates[0].id);
-  }, [item, templateId, templates, markingRecordId, markingPool, setMarkingRecordParam]);
 
   const handleTemplateChange = useCallback(
     (id: string) => {
@@ -240,7 +200,6 @@ export function LabelsWorkspacePage() {
     return {
       itemIds,
       barcodeId: barcodeId || undefined,
-      ...buildMarkingSnapshotFields(markingRecordId || undefined),
       source: source ?? undefined,
       isDemoContext: previewMode === "demo",
       itemNameSnapshot: item?.name,
@@ -252,7 +211,6 @@ export function LabelsWorkspacePage() {
     item,
     showItemNotFound,
     barcodeId,
-    markingRecordId,
     source,
     previewMode,
     previewContext.primaryBarcode,
@@ -312,7 +270,6 @@ export function LabelsWorkspacePage() {
 
     setActionBusy("pdf");
     const base = buildJobSnapshots();
-    const { releaseOnAbort } = beginMarkingPrintSession(markingRecordId || undefined, "print_workspace");
     try {
       await saveLabelPdf({
         element: surface,
@@ -320,7 +277,7 @@ export function LabelsWorkspacePage() {
         copies,
         filenameBase: `label-${selected.name}`,
       });
-      const job = createPrintJobFromWorkspace({
+      createPrintJobFromWorkspace({
         templateId: selected.id,
         copies,
         mode: "pdf",
@@ -328,10 +285,8 @@ export function LabelsWorkspacePage() {
         ...base,
         ...presetPayload,
       });
-      completeMarkingPrintSuccess(markingRecordId || undefined, job.id, "print_workspace");
       setFeedback({ kind: "success", message: t("labels.workspace.feedback.pdfSaved") });
     } catch (e) {
-      abortMarkingPrintSession(markingRecordId || undefined, releaseOnAbort, "print_workspace");
       const msg = e instanceof Error ? e.message : String(e);
       try {
         createPrintJobFromWorkspace({
@@ -354,7 +309,7 @@ export function LabelsWorkspacePage() {
     } finally {
       setActionBusy(null);
     }
-  }, [templateId, copies, selected, t, buildJobSnapshots, presetPayload, domainBlocked, markingRecordId]);
+  }, [templateId, copies, selected, t, buildJobSnapshots, presetPayload, domainBlocked]);
 
   const handlePrint = useCallback(async () => {
     setFeedback(null);
@@ -375,7 +330,6 @@ export function LabelsWorkspacePage() {
 
     setActionBusy("print");
     const base = buildJobSnapshots();
-    const { releaseOnAbort } = beginMarkingPrintSession(markingRecordId || undefined, "print_workspace");
     let jobId: string | undefined;
     try {
       const job = createPrintJobFromWorkspace({
@@ -388,7 +342,6 @@ export function LabelsWorkspacePage() {
       });
       jobId = job.id;
     } catch (e) {
-      abortMarkingPrintSession(markingRecordId || undefined, releaseOnAbort, "print_workspace");
       setFeedback({ kind: "error", message: t("labels.workspace.feedback.genericError") });
       if (import.meta.env.DEV) console.error(e);
       setActionBusy(null);
@@ -402,12 +355,10 @@ export function LabelsWorkspacePage() {
         copies,
       });
       if (jobId) markPrintJobSubmitted(jobId);
-      completeMarkingPrintSuccess(markingRecordId || undefined, jobId, "print_workspace");
       setFeedback({ kind: "success", message: t("labels.workspace.feedback.printDialogDone") });
     } catch (e) {
       const msg = (e instanceof Error ? e.message : String(e)).slice(0, 500);
       if (jobId) markPrintJobFailed(jobId, msg);
-      abortMarkingPrintSession(markingRecordId || undefined, releaseOnAbort, "print_workspace");
       setFeedback({
         kind: "error",
         message: `${t("labels.workspace.feedback.printFailed")} ${msg}`,
@@ -416,16 +367,7 @@ export function LabelsWorkspacePage() {
     } finally {
       setActionBusy(null);
     }
-  }, [templateId, copies, selected, t, buildJobSnapshots, presetPayload, domainBlocked, markingRecordId]);
-
-  const markingSelectOptions = useMemo(
-    () =>
-      markingPool.map((r) => ({
-        value: r.id,
-        label: `${r.kind}${r.humanLabel ? ` · ${r.humanLabel}` : ""} · ${r.payload.slice(0, 24)}${r.payload.length > 24 ? "…" : ""}`,
-      })),
-    [markingPool],
-  );
+  }, [templateId, copies, selected, t, buildJobSnapshots, presetPayload, domainBlocked]);
 
   return (
     <div className="labels-page mx-auto max-w-[1600px] space-y-4 p-4 md:p-5" data-module="labels">
@@ -584,21 +526,6 @@ export function LabelsWorkspacePage() {
               />
               <p className="text-[11px] leading-snug text-muted-foreground">{t("labels.workspace.copiesHint")}</p>
             </div>
-            {previewMode === "item" && item && markingPool.length > 0 ? (
-              <div className="space-y-1">
-                <Label className="text-xs text-muted-foreground">{t("labels.workspace.markingRecordLabel")}</Label>
-                <SelectField
-                  value={markingRecordId}
-                  onChange={(v) => setMarkingRecordParam(v)}
-                  options={[{ value: "", label: t("labels.workspace.markingRecordNone") }, ...markingSelectOptions]}
-                  placeholder={t("labels.workspace.markingRecordPlaceholder")}
-                  disabled={!selected}
-                  className="w-full max-w-full"
-                  aria-label={t("labels.workspace.markingRecordLabel")}
-                />
-                <p className="text-[11px] leading-snug text-muted-foreground">{t("labels.workspace.markingRecordHint")}</p>
-              </div>
-            ) : null}
             <div className="space-y-1">
               <Label className="text-xs text-muted-foreground">{t("labels.workspace.presets.paperLabel")}</Label>
               <SelectField

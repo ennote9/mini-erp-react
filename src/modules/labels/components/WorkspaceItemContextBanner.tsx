@@ -21,10 +21,6 @@ function warningMessage(t: (k: string) => string, code: ItemPreviewWarningCode):
       return t("labels.workspace.contextBanner.warningBarcodeInactive");
     case "noActiveBarcodes":
       return t("labels.workspace.contextBanner.warningNoActiveBarcodes");
-    case "markingRecordNotFound":
-      return t("labels.workspace.contextBanner.warningMarkingRecordNotFound");
-    case "markingRecordUnavailable":
-      return t("labels.workspace.contextBanner.warningMarkingRecordUnavailable");
     default: {
       const _e: never = code;
       return _e;

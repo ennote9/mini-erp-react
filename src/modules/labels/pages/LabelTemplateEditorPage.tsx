@@ -31,7 +31,6 @@ const KINDS: LabelTemplateKind[] = [
   "PRICE_TAG",
   "QR_LABEL",
   "TRANSLATION_STICKER",
-  "KIZ_LABEL",
   "DATAMATRIX_LABEL",
   "CUSTOM",
 ];
@@ -50,7 +49,6 @@ export function LabelTemplateEditorPage() {
   const [searchParams] = useSearchParams();
   const itemIdQuery = searchParams.get("itemId") ?? "";
   const barcodeIdQuery = searchParams.get("barcodeId") ?? "";
-  const markingRecordIdQuery = searchParams.get("markingRecordId") ?? "";
 
   const [draft, setDraft] = useState<LabelTemplate | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -66,9 +64,8 @@ export function LabelTemplateEditorPage() {
     if (!itemIdQuery || !item) return LABEL_PREVIEW_DEMO_CONTEXT;
     return buildItemPreviewBindingContext(item, {
       barcodeId: barcodeIdQuery || undefined,
-      markingRecordId: markingRecordIdQuery || undefined,
     }).context;
-  }, [itemIdQuery, item, barcodeIdQuery, markingRecordIdQuery]);
+  }, [itemIdQuery, item, barcodeIdQuery]);
 
   const showDemoHint = !itemIdQuery || !item;
 
@@ -174,7 +171,6 @@ export function LabelTemplateEditorPage() {
     q.set(LABELS_WORKSPACE_QUERY.templateId, draft.id);
     if (itemIdQuery) q.set(LABELS_WORKSPACE_QUERY.itemId, itemIdQuery);
     if (barcodeIdQuery) q.set(LABELS_WORKSPACE_QUERY.barcodeId, barcodeIdQuery);
-    if (markingRecordIdQuery) q.set(LABELS_WORKSPACE_QUERY.markingRecordId, markingRecordIdQuery);
     return `/labels/workspace?${q.toString()}`;
   })();
 

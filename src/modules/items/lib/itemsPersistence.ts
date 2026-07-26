@@ -258,11 +258,6 @@ function normalizeItem(raw: unknown): Item | null {
   const translationCountry = optStr(o.translationCountry);
   const translationImporter = optStr(o.translationImporter);
   const translationExtraText = optStr(o.translationExtraText);
-  const markingCode = optStr(o.markingCode);
-  const kizCode = optStr(o.kizCode);
-  const dataMatrixPayload = optStr(o.dataMatrixPayload);
-  const gs1DataMatrixPayload = optStr(o.gs1DataMatrixPayload);
-  const markingComment = optStr(o.markingComment);
   return {
     id: o.id,
     code: o.code,
@@ -289,11 +284,6 @@ function normalizeItem(raw: unknown): Item | null {
     translationCountry,
     translationImporter,
     translationExtraText,
-    markingCode,
-    kizCode,
-    dataMatrixPayload,
-    gs1DataMatrixPayload,
-    markingComment,
   };
 }
 

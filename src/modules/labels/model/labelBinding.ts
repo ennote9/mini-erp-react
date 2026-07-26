@@ -7,6 +7,4 @@ export type LabelBinding =
   | { kind: "selected_barcode" }
   | { kind: "primary_barcode" }
   | { kind: "barcode_by_packaging"; packagingLevel: string }
-  | { kind: "barcode_by_role"; role: string }
-  | { kind: "selected_marking_payload" }
-  | { kind: "selected_marking_human_label" };
+  | { kind: "barcode_by_role"; role: string };

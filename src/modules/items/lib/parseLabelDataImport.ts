@@ -36,15 +36,6 @@ const HEADER_ALIASES: Record<string, keyof ItemLabelDataDraft | "code" | "barcod
   translationcountry: "translationCountry",
   translationimporter: "translationImporter",
   translationextratext: "translationExtraText",
-  markingcode: "markingCode",
-  kizcode: "kizCode",
-  kiz: "kizCode",
-  datamatrixpayload: "dataMatrixPayload",
-  datamatrix: "dataMatrixPayload",
-  gs1datamatrixpayload: "gs1DataMatrixPayload",
-  gs1datamatrix: "gs1DataMatrixPayload",
-  gs1dm: "gs1DataMatrixPayload",
-  markingcomment: "markingComment",
 };
 
 /** Full-header aliases (trimmed lower) including spaced English / Russian labels */
@@ -56,12 +47,6 @@ const HEADER_ALIASES_FULL: Record<string, keyof ItemLabelDataDraft | "code" | "b
   "country of origin": "translationCountry",
   "importer distributor": "translationImporter",
   "additional text": "translationExtraText",
-  "marking code": "markingCode",
-  "kiz": "kizCode",
-  "datamatrix payload": "dataMatrixPayload",
-  "gs1 datamatrix payload": "gs1DataMatrixPayload",
-  "gs1 datamatrix": "gs1DataMatrixPayload",
-  "comment": "markingComment",
   код: "code",
   артикул: "code",
   штрихкод: "barcode",
@@ -75,10 +60,6 @@ const HEADER_ALIASES_FULL: Record<string, keyof ItemLabelDataDraft | "code" | "b
   страна: "translationCountry",
   импортер: "translationImporter",
   "доптекст": "translationExtraText",
-  кодмаркировки: "markingCode",
-  киз: "kizCode",
-  датаматрикс: "dataMatrixPayload",
-  комментарий: "markingComment",
   "имя перевода": "translationName",
 };
 

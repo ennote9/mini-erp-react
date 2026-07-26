@@ -52,32 +52,6 @@ describe("collectLabelDomainIssueCodes", () => {
     expect(codes.filter((c) => c === "translationContentMissing")).toHaveLength(0);
   });
 
-  it("flags KIZ when kiz, marking, gs1 payload are all empty", () => {
-    const codes = collectLabelDomainIssueCodes(
-      tpl("KIZ_LABEL"),
-      baseCtx({ kizCode: "", markingCode: "", gs1DataMatrixPayload: "" }),
-    );
-    expect(codes).toContain("kizMarkingMissing");
-  });
-
-  it("allows KIZ when marking code is set", () => {
-    const codes = collectLabelDomainIssueCodes(tpl("KIZ_LABEL"), baseCtx({ markingCode: "01059" }));
-    expect(codes.filter((c) => c === "kizMarkingMissing")).toHaveLength(0);
-  });
-
-  it("flags DataMatrix label when payloads and marking are empty", () => {
-    const codes = collectLabelDomainIssueCodes(
-      tpl("DATAMATRIX_LABEL"),
-      baseCtx({ dataMatrixPayload: "", gs1DataMatrixPayload: "", markingCode: "" }),
-    );
-    expect(codes).toContain("datamatrixSourceMissing");
-  });
-
-  it("allows DataMatrix label when dataMatrixPayload is set", () => {
-    const codes = collectLabelDomainIssueCodes(tpl("DATAMATRIX_LABEL"), baseCtx({ dataMatrixPayload: "DM1" }));
-    expect(codes.filter((c) => c === "datamatrixSourceMissing")).toHaveLength(0);
-  });
-
   it("dedupes matrixBindingEmpty across multiple DataMatrix elements", () => {
     const template = tpl("ITEM_LABEL", [
       {
@@ -87,7 +61,7 @@ describe("collectLabelDomainIssueCodes", () => {
         yMm: 0,
         widthMm: 10,
         heightMm: 10,
-        binding: { kind: "field", path: "item.markingCode" },
+        binding: { kind: "field", path: "item.translationName" },
         options: { symbologyHint: "DATAMATRIX" },
       },
       {
@@ -97,11 +71,28 @@ describe("collectLabelDomainIssueCodes", () => {
         yMm: 0,
         widthMm: 10,
         heightMm: 10,
-        binding: { kind: "field", path: "item.markingCode" },
+        binding: { kind: "field", path: "item.translationName" },
         options: { symbologyHint: "GS1_DATAMATRIX" },
       },
     ]);
-    const codes = collectLabelDomainIssueCodes(template, baseCtx({ markingCode: "" }));
+    const codes = collectLabelDomainIssueCodes(template, baseCtx({ translationName: "" }));
     expect(codes.filter((c) => c === "matrixBindingEmpty")).toHaveLength(1);
+  });
+
+  it("allows DataMatrix elements to use an ordinary item barcode", () => {
+    const template = tpl("DATAMATRIX_LABEL", [
+      {
+        id: "b1",
+        type: "barcode",
+        xMm: 0,
+        yMm: 0,
+        widthMm: 10,
+        heightMm: 10,
+        binding: { kind: "primary_barcode" },
+        options: { symbologyHint: "DATAMATRIX" },
+      },
+    ]);
+    const codes = collectLabelDomainIssueCodes(template, baseCtx());
+    expect(codes).not.toContain("matrixBindingEmpty");
   });
 });

@@ -7,13 +7,6 @@ import { SelectField } from "@/components/ui/select-field";
 import { useTranslation } from "@/shared/i18n";
 import { getAppReadModelRevision, subscribeAppReadModelRevision } from "@/shared/appReadModelRevision";
 import { itemRepository } from "@/modules/items/repository";
-import {
-  abortMarkingPrintSession,
-  beginMarkingPrintSession,
-  buildMarkingSnapshotFields,
-  completeMarkingPrintSuccess,
-  listSelectableMarkingRecordsForItem,
-} from "@/modules/items/markingRecordService";
 import type { Item } from "@/modules/items/model";
 import { LABEL_PREVIEW_DEMO_CONTEXT, type LabelPreviewBindingContext } from "../lib/previewContext";
 import { buildItemPreviewBindingContext, type ItemPreviewWarningCode } from "../lib/itemPreviewContext";
@@ -65,7 +58,6 @@ export function LabelsStationPage() {
 
   const itemId = searchParams.get(LABELS_STATION_QUERY.itemId) ?? "";
   const barcodeId = searchParams.get(LABELS_STATION_QUERY.barcodeId) ?? "";
-  const markingRecordId = searchParams.get(LABELS_STATION_QUERY.markingRecordId) ?? "";
   const urlTemplateId = searchParams.get(LABELS_STATION_QUERY.templateId) ?? "";
 
   const [paperPreset, setPaperPreset] = useState(() => loadWorkspacePrintSettings().paperPreset);
@@ -75,12 +67,6 @@ export function LabelsStationPage() {
     void revision;
     return itemId ? itemRepository.getById(itemId) : undefined;
   }, [revision, itemId]);
-
-  const markingPool = useMemo(() => {
-    void revision;
-    if (!item) return [];
-    return listSelectableMarkingRecordsForItem(item.id);
-  }, [revision, item]);
 
   const { previewContext, previewMode, itemWarnings, showItemNotFound } = useMemo((): {
     previewContext: LabelPreviewBindingContext;
@@ -106,7 +92,6 @@ export function LabelsStationPage() {
     }
     const built = buildItemPreviewBindingContext(item, {
       barcodeId: barcodeId || undefined,
-      markingRecordId: markingRecordId || undefined,
     });
     return {
       previewContext: built.context,
@@ -114,7 +99,7 @@ export function LabelsStationPage() {
       itemWarnings: built.warnings,
       showItemNotFound: false,
     };
-  }, [itemId, item, barcodeId, markingRecordId]);
+  }, [itemId, item, barcodeId]);
 
   const templates = useMemo((): LabelTemplate[] => {
     void revision;
@@ -152,31 +137,6 @@ export function LabelsStationPage() {
       return def && templates.some((x) => x.id === def.id) ? def.id : templates[0].id;
     });
   }, [templates, urlTemplateId]);
-
-  const setMarkingRecordParam = useCallback(
-    (id: string) => {
-      const next = new URLSearchParams(searchParams);
-      if (id) next.set(LABELS_STATION_QUERY.markingRecordId, id);
-      else next.delete(LABELS_STATION_QUERY.markingRecordId);
-      setSearchParams(next, { replace: true });
-    },
-    [searchParams, setSearchParams],
-  );
-
-  useEffect(() => {
-    if (!item || !templateId) return;
-    if (markingRecordId) return;
-    const tpl = templates.find((x) => x.id === templateId);
-    if (!tpl) return;
-    const needKiz = tpl.kind === "KIZ_LABEL";
-    const needDm = tpl.kind === "DATAMATRIX_LABEL";
-    if (!needKiz && !needDm) return;
-    const candidates = needKiz
-      ? markingPool.filter((r) => r.kind === "KIZ")
-      : markingPool.filter((r) => r.kind === "DATAMATRIX" || r.kind === "GS1_DATAMATRIX");
-    if (candidates.length !== 1) return;
-    setMarkingRecordParam(candidates[0].id);
-  }, [item, templateId, templates, markingRecordId, markingPool, setMarkingRecordParam]);
 
   const handleTemplateChange = useCallback(
     (id: string) => {
@@ -242,7 +202,6 @@ export function LabelsStationPage() {
     return {
       itemIds,
       barcodeId: barcodeId || undefined,
-      ...buildMarkingSnapshotFields(markingRecordId || undefined),
       source: LABELS_STATION_SOURCE,
       isDemoContext: !canOperate,
       itemNameSnapshot: item?.name,
@@ -253,7 +212,6 @@ export function LabelsStationPage() {
     canOperate,
     item,
     barcodeId,
-    markingRecordId,
     previewContext.primaryBarcode,
     previewContext.selectedBarcode,
   ]);
@@ -266,18 +224,12 @@ export function LabelsStationPage() {
     (
       nextItemId: string,
       nextBarcodeId?: string,
-      patch?: { templateId?: string; copies?: number; markingRecordId?: string | null },
+      patch?: { templateId?: string; copies?: number },
     ) => {
       const next = new URLSearchParams(searchParams);
       next.set(LABELS_STATION_QUERY.itemId, nextItemId);
       if (nextBarcodeId) next.set(LABELS_STATION_QUERY.barcodeId, nextBarcodeId);
       else next.delete(LABELS_STATION_QUERY.barcodeId);
-      if (patch?.markingRecordId !== undefined) {
-        if (patch.markingRecordId) next.set(LABELS_STATION_QUERY.markingRecordId, patch.markingRecordId);
-        else next.delete(LABELS_STATION_QUERY.markingRecordId);
-      } else {
-        next.delete(LABELS_STATION_QUERY.markingRecordId);
-      }
       if (patch?.templateId) next.set(LABELS_STATION_QUERY.templateId, patch.templateId);
       if (patch?.copies != null && patch.copies >= 1 && patch.copies <= 999) {
         next.set(LABELS_STATION_QUERY.copies, String(patch.copies));
@@ -330,7 +282,6 @@ export function LabelsStationPage() {
     applyItemToUrl(first, job.barcodeId, {
       templateId: job.templateId,
       copies: job.copies,
-      markingRecordId: job.markingRecordId ?? null,
     });
     setPickCandidates(null);
     setSearchDraft("");
@@ -398,7 +349,6 @@ export function LabelsStationPage() {
 
     setActionBusy("pdf");
     const base = buildJobSnapshots();
-    const { releaseOnAbort } = beginMarkingPrintSession(markingRecordId || undefined, "print_station");
     try {
       await saveLabelPdf({
         element: surface,
@@ -406,7 +356,7 @@ export function LabelsStationPage() {
         copies,
         filenameBase: `label-${selected.name}`,
       });
-      const job = createPrintJobFromWorkspace({
+      createPrintJobFromWorkspace({
         templateId: selected.id,
         copies,
         mode: "pdf",
@@ -414,10 +364,8 @@ export function LabelsStationPage() {
         ...base,
         ...presetPayload,
       });
-      completeMarkingPrintSuccess(markingRecordId || undefined, job.id, "print_station");
       setFeedback({ kind: "success", message: t("labels.workspace.feedback.pdfSaved") });
     } catch (e) {
-      abortMarkingPrintSession(markingRecordId || undefined, releaseOnAbort, "print_station");
       const msg = e instanceof Error ? e.message : String(e);
       try {
         createPrintJobFromWorkspace({
@@ -451,7 +399,6 @@ export function LabelsStationPage() {
     presetPayload,
     focusSearch,
     domainBlocked,
-    markingRecordId,
   ]);
 
   const handlePrint = useCallback(async () => {
@@ -476,7 +423,6 @@ export function LabelsStationPage() {
 
     setActionBusy("print");
     const base = buildJobSnapshots();
-    const { releaseOnAbort } = beginMarkingPrintSession(markingRecordId || undefined, "print_station");
     let jobId: string | undefined;
     try {
       const job = createPrintJobFromWorkspace({
@@ -489,7 +435,6 @@ export function LabelsStationPage() {
       });
       jobId = job.id;
     } catch (e) {
-      abortMarkingPrintSession(markingRecordId || undefined, releaseOnAbort, "print_station");
       setFeedback({ kind: "error", message: t("labels.workspace.feedback.genericError") });
       if (import.meta.env.DEV) console.error(e);
       setActionBusy(null);
@@ -504,12 +449,10 @@ export function LabelsStationPage() {
         copies,
       });
       if (jobId) markPrintJobSubmitted(jobId);
-      completeMarkingPrintSuccess(markingRecordId || undefined, jobId, "print_station");
       setFeedback({ kind: "success", message: t("labels.workspace.feedback.printDialogDone") });
     } catch (e) {
       const msg = (e instanceof Error ? e.message : String(e)).slice(0, 500);
       if (jobId) markPrintJobFailed(jobId, msg);
-      abortMarkingPrintSession(markingRecordId || undefined, releaseOnAbort, "print_station");
       setFeedback({
         kind: "error",
         message: `${t("labels.workspace.feedback.printFailed")} ${msg}`,
@@ -529,17 +472,7 @@ export function LabelsStationPage() {
     presetPayload,
     focusSearch,
     domainBlocked,
-    markingRecordId,
   ]);
-
-  const markingSelectOptions = useMemo(
-    () =>
-      markingPool.map((r) => ({
-        value: r.id,
-        label: `${r.kind}${r.humanLabel ? ` · ${r.humanLabel}` : ""} · ${r.payload.slice(0, 24)}${r.payload.length > 24 ? "…" : ""}`,
-      })),
-    [markingPool],
-  );
 
   const bannerProps =
     previewMode === "item" && item
@@ -664,20 +597,6 @@ export function LabelsStationPage() {
             />
           </div>
         </div>
-        {previewMode === "item" && item && markingPool.length > 0 ? (
-          <div className="mt-2 w-full max-w-lg space-y-1">
-            <Label className="text-[11px] text-muted-foreground">{t("labels.workspace.markingRecordLabel")}</Label>
-            <SelectField
-              value={markingRecordId}
-              onChange={(v) => setMarkingRecordParam(v)}
-              options={[{ value: "", label: t("labels.workspace.markingRecordNone") }, ...markingSelectOptions]}
-              placeholder={t("labels.workspace.markingRecordPlaceholder")}
-              disabled={!selected}
-              className="h-8 w-full max-w-full text-[11px]"
-              aria-label={t("labels.workspace.markingRecordLabel")}
-            />
-          </div>
-        ) : null}
       </section>
 
       {pickCandidates && pickCandidates.length > 0 ? (

@@ -157,17 +157,4 @@ export interface Item {
   translationImporter?: string;
   /** Free-form extra translation text for stickers (optional). */
   translationExtraText?: string;
-  /**
-   * Generic marking / traceability payload (e.g. DataMatrix content, GS1 string).
-   * Not validated against government schemas in-app.
-   */
-  markingCode?: string;
-  /** КИЗ / identification placeholder for label workflows (optional). */
-  kizCode?: string;
-  /** Raw DataMatrix payload for label printing (optional). */
-  dataMatrixPayload?: string;
-  /** GS1 DataMatrix payload string for label printing (optional). */
-  gs1DataMatrixPayload?: string;
-  /** Non-encoded comment about marking / codes (optional). */
-  markingComment?: string;
 }

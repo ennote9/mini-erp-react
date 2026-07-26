@@ -1,5 +1,4 @@
 import type { Item } from "@/modules/items/model";
-import { getMarkingRecordById, isMarkingRecordSelectableForPrinting } from "@/modules/items/markingRecordService";
 import type { LabelElement, LabelTemplate } from "../model";
 import type { LabelPreviewBindingContext } from "./previewContext";
 import { resolveLabelBindingValue } from "./previewContext";
@@ -8,26 +7,11 @@ import { parseLabelSymbologyHint } from "./labelSymbology";
 
 export type LabelDomainIssueCode =
   | "translationContentMissing"
-  | "kizMarkingMissing"
-  | "datamatrixSourceMissing"
-  | "matrixBindingEmpty"
-  | "markingRecordUnavailable";
+  | "matrixBindingEmpty";
 
 function hasTranslationDisplayContent(item: LabelPreviewBindingContext["item"]): boolean {
   return [item.translationName, item.translationDescription, item.translationComposition, item.translationExtraText].some(
     (s) => s?.trim(),
-  );
-}
-
-function hasKizMarkingSource(item: LabelPreviewBindingContext["item"]): boolean {
-  return !!(item.kizCode?.trim() || item.markingCode?.trim() || item.gs1DataMatrixPayload?.trim());
-}
-
-function hasDatamatrixItemSource(item: LabelPreviewBindingContext["item"]): boolean {
-  return !!(
-    item.dataMatrixPayload?.trim() ||
-    item.gs1DataMatrixPayload?.trim() ||
-    item.markingCode?.trim()
   );
 }
 
@@ -44,18 +28,6 @@ export function collectLabelDomainIssueCodes(
   if (template.kind === "TRANSLATION_STICKER") {
     if (!hasTranslationDisplayContent(item)) {
       codes.push("translationContentMissing");
-    }
-  }
-
-  if (template.kind === "KIZ_LABEL") {
-    if (!hasKizMarkingSource(item)) {
-      codes.push("kizMarkingMissing");
-    }
-  }
-
-  if (template.kind === "DATAMATRIX_LABEL") {
-    if (!hasDatamatrixItemSource(item)) {
-      codes.push("datamatrixSourceMissing");
     }
   }
 
@@ -106,17 +78,9 @@ export function collectLabelDomainIssueCodesForItem(
   template: LabelTemplate,
   item: Item,
   barcodeId: string | undefined,
-  markingRecordId?: string | undefined,
 ): LabelDomainIssueCode[] {
-  const pre: LabelDomainIssueCode[] = [];
-  if (markingRecordId) {
-    const rec = getMarkingRecordById(markingRecordId);
-    if (!rec || rec.itemId !== item.id || !isMarkingRecordSelectableForPrinting(rec)) {
-      pre.push("markingRecordUnavailable");
-    }
-  }
-  const { context } = buildItemPreviewBindingContext(item, { barcodeId, markingRecordId });
-  return [...new Set([...pre, ...collectLabelDomainIssueCodes(template, context)])];
+  const { context } = buildItemPreviewBindingContext(item, { barcodeId });
+  return collectLabelDomainIssueCodes(template, context);
 }
 
 export function collectLabelDomainIssuesForItem(
@@ -124,9 +88,8 @@ export function collectLabelDomainIssuesForItem(
   item: Item,
   barcodeId: string | undefined,
   t: (key: string) => string,
-  markingRecordId?: string | undefined,
 ): string[] {
-  return collectLabelDomainIssueCodesForItem(template, item, barcodeId, markingRecordId).map((c) =>
+  return collectLabelDomainIssueCodesForItem(template, item, barcodeId).map((c) =>
     t(`labels.domainIssues.${c}`),
   );
 }
