@@ -13,8 +13,7 @@ export type GoodsStyleProcessCapability =
   | "reservation"
   | "shipment"
   | "markdownTransition"
-  | "barcodeLookup"
-  | "labelPrinting";
+  | "barcodeLookup";
 
 type GoodsStyleMatrixRule = {
   allowedWarehousePolicies: WarehouseStylePolicy[];
@@ -38,7 +37,6 @@ export const GOODS_STYLE_PROCESS_MATRIX: Record<StockStyle, GoodsStyleMatrixRule
       shipment: true,
       markdownTransition: true,
       barcodeLookup: false,
-      labelPrinting: false,
     },
   },
   MARKDOWN: {
@@ -51,7 +49,6 @@ export const GOODS_STYLE_PROCESS_MATRIX: Record<StockStyle, GoodsStyleMatrixRule
       shipment: true,
       markdownTransition: false,
       barcodeLookup: true,
-      labelPrinting: true,
     },
   },
   DEFECT: {
@@ -64,7 +61,6 @@ export const GOODS_STYLE_PROCESS_MATRIX: Record<StockStyle, GoodsStyleMatrixRule
       shipment: false,
       markdownTransition: false,
       barcodeLookup: false,
-      labelPrinting: false,
     },
   },
 };

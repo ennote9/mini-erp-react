@@ -16,8 +16,6 @@ import {
   Users,
   Warehouse,
   Route,
-  Pencil,
-  Printer,
   ScanBarcode,
   UserCog,
 } from "lucide-react";
@@ -26,18 +24,7 @@ import { useTranslation } from "@/shared/i18n";
 const PAGE_TITLES: Record<string, string> = {
   "/": "routes.dashboard",
   "/items": "routes.items",
-  "/items/label-data": "routes.itemsLabelData",
-  "/items/marking-import": "routes.itemsMarkingImport",
-  "/items/marking-reconciliation": "routes.itemsMarkingReconciliation",
-  "/items/marking-traceability": "routes.itemsMarkingTraceability",
-  "/items/marking-sync": "routes.itemsMarkingSync",
-  "/settings/marking-provider": "routes.settingsMarkingProvider",
   "/barcodes": "routes.barcodes",
-  "/labels": "routes.labels",
-  "/labels/workspace": "routes.labelsWorkspace",
-  "/labels/station": "routes.labelsStation",
-  "/labels/batch": "routes.labelsBatch",
-  "/labels/operations": "routes.labelsOperations",
   "/brands": "routes.brands",
   "/categories": "routes.categories",
   "/suppliers": "routes.suppliers",
@@ -56,12 +43,6 @@ const PAGE_TITLES: Record<string, string> = {
 };
 
 function getPageTitleKey(pathname: string): string {
-  if (pathname === "/items/label-data") return "routes.itemsLabelData";
-  if (pathname === "/items/marking-import") return "routes.itemsMarkingImport";
-  if (pathname === "/items/marking-reconciliation") return "routes.itemsMarkingReconciliation";
-  if (pathname === "/items/marking-traceability") return "routes.itemsMarkingTraceability";
-  if (pathname === "/items/marking-sync") return "routes.itemsMarkingSync";
-  if (pathname === "/settings/marking-provider") return "routes.settingsMarkingProvider";
   if (pathname.match(/^\/items\/[^/]+$/)) return "routes.item";
   if (pathname.match(/^\/brands\/[^/]+$/)) return "routes.brand";
   if (pathname.match(/^\/categories\/[^/]+$/)) return "routes.category";
@@ -85,7 +66,6 @@ function getPageTitleKey(pathname: string): string {
   if (pathname.match(/^\/stock-balances\/[^/]+$/)) return "routes.stockBalance";
   if (pathname.match(/^\/markdown-journal\/new$/)) return "routes.markdownCreate";
   if (pathname.match(/^\/markdown-journal\/journals\/[^/]+$/)) return "routes.markdownJournalDocument";
-  if (pathname.match(/^\/labels\/templates\/[^/]+$/)) return "routes.labelTemplateEditor";
   return PAGE_TITLES[pathname] ?? "routes.fallback";
 }
 
@@ -93,26 +73,9 @@ function getPageIcon(
   pathname: string,
 ): ComponentType<{ className?: string }> | null {
   if (pathname === "/") return LayoutDashboard;
-  if (
-    pathname === "/items" ||
-    pathname === "/items/label-data" ||
-    pathname === "/items/marking-import" ||
-    pathname === "/items/marking-reconciliation" ||
-    pathname === "/items/marking-traceability" ||
-    pathname === "/items/marking-sync" ||
-    pathname.match(/^\/items\/[^/]+$/)
-  )
+  if (pathname === "/items" || pathname.match(/^\/items\/[^/]+$/))
     return Package;
   if (pathname === "/barcodes") return ScanBarcode;
-  if (pathname.match(/^\/labels\/templates\/[^/]+$/)) return Pencil;
-  if (
-    pathname === "/labels" ||
-    pathname === "/labels/workspace" ||
-    pathname === "/labels/station" ||
-    pathname === "/labels/batch" ||
-    pathname === "/labels/operations"
-  )
-    return Printer;
   if (pathname === "/brands" || pathname.match(/^\/brands\/[^/]+$/)) return Tag;
   if (pathname === "/categories" || pathname.match(/^\/categories\/[^/]+$/))
     return FolderOpen;
@@ -155,7 +118,7 @@ function getPageIcon(
     pathname.match(/^\/markdown-journal\/journals\/[^/]+$/)
   )
     return ScanBarcode;
-  if (pathname === "/settings" || pathname === "/settings/marking-provider") return Settings;
+  if (pathname === "/settings") return Settings;
   return null;
 }
 

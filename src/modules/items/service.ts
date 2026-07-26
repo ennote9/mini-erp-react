@@ -29,17 +29,6 @@ export type SaveItemInput = {
   categoryId?: string;
   itemKind?: ItemKind;
   baseItemId?: string;
-  translationName?: string;
-  translationDescription?: string;
-  translationComposition?: string;
-  translationCountry?: string;
-  translationImporter?: string;
-  translationExtraText?: string;
-  markingCode?: string;
-  kizCode?: string;
-  dataMatrixPayload?: string;
-  gs1DataMatrixPayload?: string;
-  markingComment?: string;
 };
 export type SaveItemResult =
   | { success: true; id: string }
@@ -106,8 +95,6 @@ export function saveItem(
   const itemKind: ItemKind = data.itemKind ?? "SELLABLE";
   const baseItemId = normalizeTrim(data.baseItemId) || undefined;
 
-  const opt = (v: string | undefined) => normalizeTrim(v) || undefined;
-
   const patch = {
     code,
     name,
@@ -119,17 +106,6 @@ export function saveItem(
     categoryId,
     itemKind,
     baseItemId: itemKind === "TESTER" ? baseItemId : undefined,
-    translationName: opt(data.translationName),
-    translationDescription: opt(data.translationDescription),
-    translationComposition: opt(data.translationComposition),
-    translationCountry: opt(data.translationCountry),
-    translationImporter: opt(data.translationImporter),
-    translationExtraText: opt(data.translationExtraText),
-    markingCode: opt(data.markingCode),
-    kizCode: opt(data.kizCode),
-    dataMatrixPayload: opt(data.dataMatrixPayload),
-    gs1DataMatrixPayload: opt(data.gs1DataMatrixPayload),
-    markingComment: opt(data.markingComment),
   };
 
   if (existingId) {

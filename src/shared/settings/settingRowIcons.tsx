@@ -21,7 +21,6 @@ import {
   Package,
   PackageMinus,
   PackageSearch,
-  Plug,
   RefreshCcw,
   Scale,
   ScrollText,
@@ -52,7 +51,6 @@ export const SETTING_ROW_ICON_BY_ID: Readonly<Record<string, LucideIcon>> = {
   "documents.singleDraftShipmentPerSalesOrder": Package,
   "documents.reversalOnlyFromPosted": FileLock2,
 
-  "inventory.markingProviderSettings": Plug,
   "inventory.stockReservationsInfo": Boxes,
   "inventory.requireReservationBeforeShipment": PackageSearch,
   "inventory.allocationManualInfo": Hand,

@@ -71,11 +71,6 @@ export const kkSettingsEntriesFull: MessageTree = {
     description:
       "Жүргізілген түсімдер мен жөнелтулерді бір рет толық кері қайтаруға болады (себеп жазылады); жоба немесе болдырылғанды кері қайтаруға болмайды. Бұл нұсқада бапталмайды.",
   },
-  inventory__markingProviderSettings: {
-    label: "Маркировка провайдері",
-    description:
-      "Маркировка провайдерін, токенді және синхрондау параметрлерін бөлек бетте баптаңыз.",
-  },
   inventory__stockReservationsInfo: {
     label: "Қор резервтері",
     description:

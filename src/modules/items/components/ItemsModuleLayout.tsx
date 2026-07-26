@@ -24,7 +24,7 @@ const CONTENT_VARIANT_CLASS: Record<ItemsModuleContentVariant, string> = {
 };
 
 /**
- * Shared shell for Items list, label data, and marking operational pages.
+ * Shared shell for Items pages.
  * Owns placement of {@link ItemsSubnav} above page content; subnav sticks within `.app-page-content` scroll.
  */
 export function ItemsModuleLayout({ children, className, contentVariant, contentClassName }: Props) {

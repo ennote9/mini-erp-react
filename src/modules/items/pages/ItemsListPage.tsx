@@ -974,8 +974,8 @@ export function ItemsListPage() {
       <ListPageLayout
       header={null}
       controls={
-        <div className="flex w-full min-w-0 flex-col gap-2">
-          <div className="list-page__controls-stack flex w-full min-w-0 flex-wrap items-center justify-between gap-x-4 gap-y-2">
+        <div className="list-page__controls-stack flex w-full min-w-0 flex-col gap-2">
+          <div className="flex w-full min-w-0 flex-wrap items-center justify-between gap-x-4 gap-y-2">
           <ListPageSearch
             inputRef={listSearchInputRef}
             placeholder={t("ops.list.items.searchPlaceholder")}

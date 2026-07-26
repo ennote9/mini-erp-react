@@ -193,15 +193,6 @@ export const SETTINGS_REGISTRY: SettingRegistryEntry[] = [
   },
 
   {
-    id: "inventory.markingProviderSettings",
-    section: "inventory",
-    valueType: "readonly",
-    label: "Marking provider",
-    description:
-      "Configure the marking provider, token, sync, and integration options on a dedicated page.",
-    readiness: "active",
-  },
-  {
     id: "inventory.stockReservationsInfo",
     section: "inventory",
     valueType: "readonly",

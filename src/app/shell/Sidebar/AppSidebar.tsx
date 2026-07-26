@@ -6,8 +6,6 @@ import {
   PackageCheck,
   Receipt,
   Scale,
-  Printer,
-  QrCode,
   ScanBarcode,
   ShoppingBag,
   ShoppingCart,
@@ -43,11 +41,6 @@ type NavLinkItem = {
   feature?: "navBrandsCategories" | "navStockMovements";
   /** Extra path prefixes that should highlight this link (exact match or `prefix/`). */
   activePathPrefixes?: readonly string[];
-  /**
-   * When set, the default `to` match is suppressed for paths starting with this prefix
-   * (e.g. exclude `/items/marking-*` from the Items row while keeping `/items/:id`).
-   */
-  defaultActiveExcludePathPrefix?: string;
 };
 
 const nav: ReadonlyArray<{ groupKey: string; links: readonly NavLinkItem[] }> = [
@@ -59,7 +52,6 @@ const nav: ReadonlyArray<{ groupKey: string; links: readonly NavLinkItem[] }> = 
         to: "/items",
         icon: Package,
         activePathPrefixes: ["/barcodes", "/brands", "/categories"] as const,
-        defaultActiveExcludePathPrefix: "/items/marking-",
       },
       { labelKey: "shell.nav.suppliers", to: "/suppliers", icon: Truck },
       { labelKey: "shell.nav.customers", to: "/customers", icon: Users },
@@ -88,18 +80,6 @@ const nav: ReadonlyArray<{ groupKey: string; links: readonly NavLinkItem[] }> = 
       { labelKey: "shell.nav.stockBalances", to: "/stock-balances", icon: Scale },
       { labelKey: "shell.nav.stockMovements", to: "/stock-movements", icon: ArrowLeftRight, feature: "navStockMovements" },
       { labelKey: "shell.nav.markdownJournal", to: "/markdown-journal", icon: ScanBarcode },
-      { labelKey: "shell.nav.labels", to: "/labels", icon: Printer },
-      {
-        labelKey: "shell.nav.marking",
-        to: "/items/marking-import",
-        icon: QrCode,
-        activePathPrefixes: [
-          "/items/marking-import",
-          "/items/marking-reconciliation",
-          "/items/marking-traceability",
-          "/items/marking-sync",
-        ] as const,
-      },
     ],
   },
   {
@@ -114,26 +94,20 @@ function SidebarNavLink({
   end,
   icon: Icon,
   activePathPrefixes,
-  defaultActiveExcludePathPrefix,
 }: {
   to: string;
   label: string;
   end?: boolean;
   icon: ComponentType<{ className?: string }>;
   activePathPrefixes?: readonly string[];
-  defaultActiveExcludePathPrefix?: string;
 }) {
   const location = useLocation();
   const pathname = location.pathname;
   const defaultActiveBase =
     to === "/" ? pathname === "/" : pathname === to || pathname.startsWith(`${to}/`);
-  const defaultActive =
-    defaultActiveExcludePathPrefix != null && pathname.startsWith(defaultActiveExcludePathPrefix)
-      ? false
-      : defaultActiveBase;
   const prefixActive =
     activePathPrefixes?.some((p) => pathname === p || pathname.startsWith(`${p}/`)) ?? false;
-  const isActive = defaultActive || prefixActive;
+  const isActive = defaultActiveBase || prefixActive;
 
   return (
     <SidebarMenuButton asChild isActive={isActive} tooltip={label}>
@@ -223,7 +197,6 @@ export function AppSidebar() {
                         label={t(link.labelKey)}
                         icon={link.icon}
                         activePathPrefixes={link.activePathPrefixes}
-                        defaultActiveExcludePathPrefix={link.defaultActiveExcludePathPrefix}
                       />
                     </SidebarMenuItem>
                   ))}

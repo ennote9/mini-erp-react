@@ -1,10 +1,4 @@
 export { ItemsListPage } from "./pages/ItemsListPage";
-export { ItemsLabelDataPage } from "./pages/ItemsLabelDataPage";
-export { ItemsMarkingImportPage } from "./pages/ItemsMarkingImportPage";
-export { ItemsMarkingReconciliationPage } from "./pages/ItemsMarkingReconciliationPage";
-export { ItemsMarkingTraceabilityPage } from "./pages/ItemsMarkingTraceabilityPage";
-export { ItemsMarkingSyncConsolePage } from "./pages/ItemsMarkingSyncConsolePage";
-export { MarkingProviderSettingsPage } from "./pages/MarkingProviderSettingsPage";
 export { ItemPage } from "./pages/ItemPage";
 export type {
   Item,

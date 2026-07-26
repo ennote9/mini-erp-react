@@ -58,14 +58,7 @@ const DEFAULT_STORE_DEFINITIONS: ReadonlyArray<Pick<WorkspaceBackupStoreEntry, "
   { id: "markdown-records", relativePath: "master-data/markdown-records.json" },
   { id: "markdown-journals", relativePath: "master-data/markdown-journals.json" },
   { id: "markdown-journal-lines", relativePath: "master-data/markdown-journal-lines.json" },
-  { id: "label-templates", relativePath: "labels/templates.json" },
-  { id: "print-jobs", relativePath: "labels/print-jobs.json" },
   { id: "items", relativePath: "items/items.json" },
-  { id: "item-marking-records", relativePath: "items/marking-records.json" },
-  { id: "marking-record-audit", relativePath: "items/marking-record-audit.json" },
-  { id: "marking-sync-log", relativePath: "items/marking-sync-log.json" },
-  { id: "marking-provider-settings", relativePath: "items/marking-provider-settings.json" },
-  { id: "marking-auto-sync-settings", relativePath: "items/marking-auto-sync-settings.json" },
   { id: "app-settings", relativePath: "config/app-settings.json" },
 ];
 
