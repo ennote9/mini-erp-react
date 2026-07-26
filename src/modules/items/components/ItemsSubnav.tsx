@@ -25,7 +25,7 @@ function isReferencesSectionActive(pathname: string): boolean {
 }
 
 /**
- * Two-level in-section navigation for Items list, item references, and label data.
+ * Two-level in-section navigation for Items list and item references.
  */
 export function ItemsSubnav() {
   const { t } = useTranslation();
@@ -54,9 +54,6 @@ export function ItemsSubnav() {
           }
         >
           {t("items.subnav.itemReferences")}
-        </NavLink>
-        <NavLink to="/items/label-data" end className={TOP_LINK_CLASS}>
-          {t("master.itemsLabelData.navLink")}
         </NavLink>
       </nav>
 

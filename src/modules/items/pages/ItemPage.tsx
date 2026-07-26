@@ -33,7 +33,6 @@ import { ItemImagesCard } from "../components/ItemImagesCard";
 import { ItemBarcodesCard } from "../components/ItemBarcodesCard";
 import { ItemPricesTab } from "../components/ItemPricesTab";
 import { ItemResponsiblesTab } from "../components/ItemResponsiblesTab";
-import { ItemMarkingPoolTab } from "../components/ItemMarkingPoolTab";
 import type { LucideIcon } from "lucide-react";
 import {
   Save,
@@ -43,8 +42,6 @@ import {
   Users,
   Image as ImageIcon,
   Barcode,
-  Languages,
-  QrCode,
   TestTube,
 } from "lucide-react";
 import { useTranslation } from "@/shared/i18n/context";
@@ -376,8 +373,6 @@ export function ItemPage() {
       { value: "responsibles", label: t("master.item.tabResponsibles"), icon: Users },
       { value: "images", label: t("master.item.tabImages"), icon: ImageIcon },
       { value: "barcodes", label: t("master.item.tabBarcodes"), icon: Barcode },
-      { value: "labelData", label: t("master.item.tabLabelData"), icon: Languages },
-      { value: "markingPool", label: t("master.item.tabMarkingPool"), icon: QrCode },
     ];
     if (showTestersTab) {
       base.push({ value: "testers", label: t("master.item.tabTesters"), icon: TestTube });
@@ -752,136 +747,6 @@ export function ItemPage() {
                 barcodes={item?.barcodes ?? []}
                 onBarcodesChanged={() => setBarcodesRevision((n) => n + 1)}
               />
-            </Tabs.Content>
-            <Tabs.Content value="labelData" className="outline-none focus-visible:outline-none">
-              <div className="w-full max-w-4xl space-y-4">
-                <p className="text-[11px] leading-snug text-muted-foreground">{t("master.item.labelData.hint")}</p>
-                <div className="space-y-2 rounded-md border border-border/70 bg-card/30 p-3">
-                  <CardTitle className="text-sm font-semibold">{t("master.item.labelData.sectionTranslation")}</CardTitle>
-                  <div className="grid gap-2 sm:grid-cols-2">
-                    <div className="flex flex-col gap-0.5 sm:col-span-2">
-                      <Label className="text-xs">{t("master.item.labelData.translationName")}</Label>
-                      <Input
-                        data-testid="item-label-data-translation-name"
-                        value={form.translationName}
-                        onChange={(e) => setForm((f) => ({ ...f, translationName: e.target.value }))}
-                        className="h-7 text-xs"
-                        placeholder={t("master.common.optionalPlaceholder")}
-                      />
-                    </div>
-                    <div className="flex flex-col gap-0.5 sm:col-span-2">
-                      <Label className="text-xs">{t("master.item.labelData.translationDescription")}</Label>
-                      <Textarea
-                        value={form.translationDescription}
-                        onChange={(e) => setForm((f) => ({ ...f, translationDescription: e.target.value }))}
-                        rows={2}
-                        className="min-h-[2.75rem] resize-y text-xs"
-                        placeholder={t("master.common.optionalPlaceholder")}
-                      />
-                    </div>
-                    <div className="flex flex-col gap-0.5 sm:col-span-2">
-                      <Label className="text-xs">{t("master.item.labelData.translationComposition")}</Label>
-                      <Textarea
-                        value={form.translationComposition}
-                        onChange={(e) => setForm((f) => ({ ...f, translationComposition: e.target.value }))}
-                        rows={2}
-                        className="min-h-[2.75rem] resize-y text-xs"
-                        placeholder={t("master.common.optionalPlaceholder")}
-                      />
-                    </div>
-                    <div className="flex flex-col gap-0.5">
-                      <Label className="text-xs">{t("master.item.labelData.translationCountry")}</Label>
-                      <Input
-                        value={form.translationCountry}
-                        onChange={(e) => setForm((f) => ({ ...f, translationCountry: e.target.value }))}
-                        className="h-7 text-xs"
-                        placeholder={t("master.common.optionalPlaceholder")}
-                      />
-                    </div>
-                    <div className="flex flex-col gap-0.5">
-                      <Label className="text-xs">{t("master.item.labelData.translationImporter")}</Label>
-                      <Input
-                        value={form.translationImporter}
-                        onChange={(e) => setForm((f) => ({ ...f, translationImporter: e.target.value }))}
-                        className="h-7 text-xs"
-                        placeholder={t("master.common.optionalPlaceholder")}
-                      />
-                    </div>
-                    <div className="flex flex-col gap-0.5 sm:col-span-2">
-                      <Label className="text-xs">{t("master.item.labelData.translationExtraText")}</Label>
-                      <Textarea
-                        value={form.translationExtraText}
-                        onChange={(e) => setForm((f) => ({ ...f, translationExtraText: e.target.value }))}
-                        rows={2}
-                        className="min-h-[2.75rem] resize-y text-xs"
-                        placeholder={t("master.common.optionalPlaceholder")}
-                      />
-                    </div>
-                  </div>
-                </div>
-                <div className="space-y-2 rounded-md border border-border/70 bg-card/30 p-3">
-                  <CardTitle className="text-sm font-semibold">{t("master.item.labelData.sectionMarking")}</CardTitle>
-                  <div className="grid gap-2 sm:grid-cols-2">
-                    <div className="flex flex-col gap-0.5">
-                      <Label className="text-xs">{t("master.item.labelData.markingCode")}</Label>
-                      <Input
-                        value={form.markingCode}
-                        onChange={(e) => setForm((f) => ({ ...f, markingCode: e.target.value }))}
-                        className="h-7 font-mono text-xs"
-                        placeholder={t("master.common.optionalPlaceholder")}
-                      />
-                    </div>
-                    <div className="flex flex-col gap-0.5">
-                      <Label className="text-xs">{t("master.item.labelData.kizCode")}</Label>
-                      <Input
-                        value={form.kizCode}
-                        onChange={(e) => setForm((f) => ({ ...f, kizCode: e.target.value }))}
-                        className="h-7 font-mono text-xs"
-                        placeholder={t("master.common.optionalPlaceholder")}
-                      />
-                    </div>
-                    <div className="flex flex-col gap-0.5 sm:col-span-2">
-                      <Label className="text-xs">{t("master.item.labelData.dataMatrixPayload")}</Label>
-                      <Textarea
-                        value={form.dataMatrixPayload}
-                        onChange={(e) => setForm((f) => ({ ...f, dataMatrixPayload: e.target.value }))}
-                        rows={2}
-                        className="min-h-[2.75rem] resize-y font-mono text-xs"
-                        placeholder={t("master.common.optionalPlaceholder")}
-                      />
-                    </div>
-                    <div className="flex flex-col gap-0.5 sm:col-span-2">
-                      <Label className="text-xs">{t("master.item.labelData.gs1DataMatrixPayload")}</Label>
-                      <Textarea
-                        value={form.gs1DataMatrixPayload}
-                        onChange={(e) => setForm((f) => ({ ...f, gs1DataMatrixPayload: e.target.value }))}
-                        rows={2}
-                        className="min-h-[2.75rem] resize-y font-mono text-xs"
-                        placeholder={t("master.common.optionalPlaceholder")}
-                      />
-                    </div>
-                    <div className="flex flex-col gap-0.5 sm:col-span-2">
-                      <Label className="text-xs">{t("master.item.labelData.markingComment")}</Label>
-                      <Textarea
-                        value={form.markingComment}
-                        onChange={(e) => setForm((f) => ({ ...f, markingComment: e.target.value }))}
-                        rows={2}
-                        className="min-h-[2.75rem] resize-y text-xs"
-                        placeholder={t("master.common.optionalPlaceholder")}
-                      />
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </Tabs.Content>
-            <Tabs.Content value="markingPool" className="outline-none focus-visible:outline-none">
-              <div className="space-y-1.5 p-1">
-                {itemRecordId ? (
-                  <ItemMarkingPoolTab itemId={itemRecordId} />
-                ) : (
-                  <p className="text-[11px] text-muted-foreground">{t("master.item.markingPool.unsavedHint")}</p>
-                )}
-              </div>
             </Tabs.Content>
             {showTestersTab ? (
               <Tabs.Content value="testers" className="outline-none focus-visible:outline-none">

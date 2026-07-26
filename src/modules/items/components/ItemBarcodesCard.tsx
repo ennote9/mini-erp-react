@@ -1,5 +1,4 @@
 import { useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 import { Dialog } from "radix-ui";
 import type { ItemBarcode } from "../model";
@@ -20,8 +19,6 @@ import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { MoreHorizontal } from "lucide-react";
-import { buildLabelsStationUrl } from "@/modules/labels/lib/labelsStationQueryParams";
-import { buildLabelsWorkspaceUrl } from "@/modules/labels/lib/workspaceQueryParams";
 
 type Props = {
   isNew: boolean;
@@ -45,7 +42,6 @@ function defaultDraft(): ItemBarcodeDraft {
 
 export function ItemBarcodesCard({ isNew, itemId, barcodes, onBarcodesChanged }: Props) {
   const { t } = useTranslation();
-  const navigate = useNavigate();
   const [draft, setDraft] = useState<ItemBarcodeDraft>(defaultDraft);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -223,37 +219,6 @@ export function ItemBarcodesCard({ isNew, itemId, barcodes, onBarcodesChanged }:
                                 onSelect={() => startEdit(row)}
                               >
                                 {t("common.edit")}
-                              </DropdownMenu.Item>
-                              <DropdownMenu.Item
-                                className="cursor-pointer rounded-sm px-2 py-1.5 text-xs text-popover-foreground outline-none hover:bg-accent hover:text-accent-foreground data-[disabled]:pointer-events-none data-[disabled]:opacity-45"
-                                disabled={busy || !itemId}
-                                onSelect={() => {
-                                  if (!itemId) return;
-                                  navigate(
-                                    buildLabelsWorkspaceUrl({
-                                      itemId,
-                                      barcodeId: row.id,
-                                      source: "item-barcodes",
-                                    }),
-                                  );
-                                }}
-                              >
-                                {t("labels.itemBarcodes.openInPrint")}
-                              </DropdownMenu.Item>
-                              <DropdownMenu.Item
-                                className="cursor-pointer rounded-sm px-2 py-1.5 text-xs text-popover-foreground outline-none hover:bg-accent hover:text-accent-foreground data-[disabled]:pointer-events-none data-[disabled]:opacity-45"
-                                disabled={busy || !itemId}
-                                onSelect={() => {
-                                  if (!itemId) return;
-                                  navigate(
-                                    buildLabelsStationUrl({
-                                      itemId,
-                                      barcodeId: row.id,
-                                    }),
-                                  );
-                                }}
-                              >
-                                {t("labels.itemBarcodes.openInStation")}
                               </DropdownMenu.Item>
                               <DropdownMenu.Item
                                 className="cursor-pointer rounded-sm px-2 py-1.5 text-xs text-destructive outline-none hover:bg-destructive/10 data-[disabled]:pointer-events-none data-[disabled]:opacity-45"

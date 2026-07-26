@@ -1,16 +1,7 @@
 import { Routes, Route } from "react-router-dom";
 import { AppShell } from "./shell/AppShell";
 import { DashboardPage } from "../modules/dashboard";
-import {
-  ItemsListPage,
-  ItemPage,
-  ItemsLabelDataPage,
-  ItemsMarkingImportPage,
-  ItemsMarkingReconciliationPage,
-  ItemsMarkingTraceabilityPage,
-  ItemsMarkingSyncConsolePage,
-  MarkingProviderSettingsPage,
-} from "../modules/items";
+import { ItemsListPage, ItemPage } from "../modules/items";
 import { BrandsListPage, BrandPage } from "../modules/brands";
 import { CategoriesListPage, CategoryPage } from "../modules/categories";
 import { SuppliersListPage, SupplierPage } from "../modules/suppliers";
@@ -40,14 +31,6 @@ import { StockMovementsListPage } from "../modules/stock-movements";
 import { SettingsPage } from "../modules/settings";
 import { MarkdownCreatePage, MarkdownJournalPage } from "../modules/markdown-journal";
 import { BarcodeRegistryPage } from "../modules/barcode-registry";
-import {
-  LabelTemplateEditorPage,
-  LabelsBatchPage,
-  LabelsListPage,
-  LabelsOperationsPage,
-  LabelsStationPage,
-  LabelsWorkspacePage,
-} from "../modules/labels";
 
 /**
  * Route tree: shell layout with nested page routes.
@@ -59,18 +42,7 @@ export function AppRoutes() {
       <Route path="/" element={<AppShell />}>
         <Route index element={<DashboardPage />} />
         <Route path="items" element={<ItemsListPage />} />
-        <Route path="items/label-data" element={<ItemsLabelDataPage />} />
-        <Route path="items/marking-import" element={<ItemsMarkingImportPage />} />
-        <Route path="items/marking-reconciliation" element={<ItemsMarkingReconciliationPage />} />
-        <Route path="items/marking-traceability" element={<ItemsMarkingTraceabilityPage />} />
-        <Route path="items/marking-sync" element={<ItemsMarkingSyncConsolePage />} />
         <Route path="barcodes" element={<BarcodeRegistryPage />} />
-        <Route path="labels/templates/:id" element={<LabelTemplateEditorPage />} />
-        <Route path="labels/workspace" element={<LabelsWorkspacePage />} />
-        <Route path="labels/station" element={<LabelsStationPage />} />
-        <Route path="labels/batch" element={<LabelsBatchPage />} />
-        <Route path="labels/operations" element={<LabelsOperationsPage />} />
-        <Route path="labels" element={<LabelsListPage />} />
         <Route path="items/:id" element={<ItemPage />} />
         <Route path="brands" element={<BrandsListPage />} />
         <Route path="brands/:id" element={<BrandPage />} />
@@ -106,7 +78,6 @@ export function AppRoutes() {
         <Route path="markdown-journal/new" element={<MarkdownCreatePage />} />
         <Route path="markdown-journal/journals/:id" element={<MarkdownCreatePage />} />
         <Route path="settings" element={<SettingsPage />} />
-        <Route path="settings/marking-provider" element={<MarkingProviderSettingsPage />} />
       </Route>
     </Routes>
   );
